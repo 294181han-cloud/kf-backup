@@ -209,3 +209,12 @@ powershell -ExecutionPolicy Bypass -File selftest.ps1
 - **访客撤回**：仅访客端自己隐藏（消息消失）；客服端保留原内容并显示橙色「已撤回」角标（后端不再清空消息内容）——方便客服了解访客撤回了什么
 - **客服撤回**：保持原行为（双方显示撤回胶囊，内容清除）
 - 接入引导移除「添加子客服」「配置询前表单」两项（保留：欢迎语/自动回复/获客链接）
+## 18. v2.15 变更记录（会话列表冻结 Bug 修复）
+
+### 根因
+v2.14 撤回同步改动遗漏了 `$recalledIds` 的块外初始化——**未选中任何会话时**（session=0）每次轮询都触发 PHP `Undefined variable` Warning，警告文本混入 JSON 响应体前缀 → 前端 `JSON.parse` 失败被静默捕获 → 会话列表停止更新（冻结）。选中某个会话后 currentId>0 不再触发 Warning，列表"过段时间自行恢复"——与用户反馈现象完全吻合。
+
+### 修复（三层）
+1. agent.php 补 `$recalledIds = []` 初始化
+2. index.php 关闭 `display_errors`（生产环境任何 Warning/Notice 都不得混入 API 响应——全局兜底）
+3. api.js JSON 解析容错（剥离可能混入的非 JSON 前缀，防同类问题复发）
