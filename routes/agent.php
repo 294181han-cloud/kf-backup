@@ -562,6 +562,10 @@ function handle_agent_poll(string $method): void
         $ru = $pdo->prepare("SELECT COALESCE(MAX(id),0) FROM messages WHERE session_id = ? AND from_type = 'agent' AND read_at IS NOT NULL");
         $ru->execute([$session]);
         $readUpto = (int)$ru->fetchColumn();
+        // 撤回同步：最近 10 分钟内被撤回的消息 id（前端据此标记本地消息）
+        $rc2 = $pdo->prepare('SELECT id FROM messages WHERE session_id = ? AND recalled_at IS NOT NULL AND recalled_at >= DATE_SUB(NOW(), INTERVAL 10 MINUTE)');
+        $rc2->execute([$session]);
+        $recalledIds = array_map('intval', $rc2->fetchAll(PDO::FETCH_COLUMN));
     }
     if ($session && $sinceMsg > 0) {
         session_of($ctx, $session); // 越权检查
@@ -569,5 +573,5 @@ function handle_agent_poll(string $method): void
         $st->execute([$session, $sinceMsg]);
         $msgs = array_map('to_msg', $st->fetchAll());
     }
-    json_out(['sessions' => $sessions, 'messages' => $msgs, 'readUpto' => $readUpto, 'now' => time()]);
+    json_out(['sessions' => $sessions, 'messages' => $msgs, 'readUpto' => $readUpto, 'recalledIds' => $recalledIds, 'now' => time()]);
 }

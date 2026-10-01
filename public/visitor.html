@@ -588,13 +588,18 @@ createApp({
     };
 
     // 访客端不显示系统提示（转接/结束等）；欢迎语按客服消息展示
-    const visibleMessages = Vue.computed(() => messages.value.filter(m => m.recalled || m.from !== 'system' || m.sender_name === '欢迎语'));
+    // 自己撤回的 → 直接隐藏；客服撤回的 → 显示"对方撤回了一条消息"胶囊；欢迎语保留
+    const visibleMessages = Vue.computed(() => messages.value.filter(m =>
+      (m.recalled && m.from === 'visitor') ? false :
+      (m.recalled && m.from === 'agent') ? true :
+      (m.from !== 'system' || m.sender_name === '欢迎语')
+    ));
     const canRecall = (m) => m.from === 'visitor' && !m.recalled && m.id > 0 && (Date.now() - new Date(m.time).getTime()) < 120000;
     const recallMine = async (m) => {
       try {
         await fetch('/api/visitor/recall', { method: 'POST', headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ session_id: sessionId.value, msg_id: m.id }) });
-        m.recalled = true; m.text = ''; m.attachments = [];
+        m.recalled = true; // 仅标记，内容保留（客服端可见+撤回标记），自己端由过滤规则隐藏
       } catch (e) { alert('撤回失败：' + e.message); }
     };
     const pushMessages = (list) => {
@@ -745,6 +750,11 @@ createApp({
       try {
         const r = await fetch('/api/poll?session=' + sessionId.value + '&sinceMsg=' + maxMsgId.value).then(x => x.json());
         pushMessages(r.messages || []);
+        // 撤回同步：把最近撤回的消息标记为已撤回（自己撤回的会被过滤隐藏，客服撤回的显示胶囊）
+        if (Array.isArray(r.recalledIds) && r.recalledIds.length) {
+          const set = new Set(r.recalledIds);
+          messages.value.forEach(m => { if (set.has(m.id)) m.recalled = true; });
+        }
       } catch (e) {}
     };
     const startPoll = () => {

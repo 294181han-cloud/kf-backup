@@ -403,9 +403,13 @@ function handle_visitor_poll(string $method): void
     $pdo->prepare('UPDATE v_sessions SET last_online_at = ? WHERE id = ?')->execute([now_dt(), $sid]);
     // 已读回执：访客在线即视为已读客服消息
     $pdo->prepare("UPDATE messages SET read_at = NOW() WHERE session_id = ? AND from_type = 'agent' AND read_at IS NULL")->execute([$sid]);
+    // 撤回同步：最近 10 分钟内被撤回的消息 id（前端据此把本地消息标记为已撤回）
+    $rc = $pdo->prepare('SELECT id FROM messages WHERE session_id = ? AND recalled_at IS NOT NULL AND recalled_at >= DATE_SUB(NOW(), INTERVAL 10 MINUTE)');
+    $rc->execute([$sid]);
+    $recalledIds = array_map('intval', $rc->fetchAll(PDO::FETCH_COLUMN));
     $st = $pdo->prepare('SELECT id, session_id, from_type AS `from`, sender_name, text, msg_type, attachments, recalled_at, created_at FROM messages WHERE session_id = ? AND id > ? ORDER BY id ASC');
     $st->execute([$sid, $sinceMsg]);
-    json_out(['messages' => array_map('to_msg', $st->fetchAll()), 'now' => time()]);
+    json_out(['messages' => array_map('to_msg', $st->fetchAll()), 'recalledIds' => $recalledIds, 'now' => time()]);
 }
 /* ---------- POST /api/visitor/send ---------- */
 function handle_visitor_send(string $method): void
@@ -494,6 +498,7 @@ function handle_visitor_recall(string $method): void
     if (!$msg) json_error('消息不存在', 400);
     if ($msg['recalled_at']) json_out(['ok' => true]);
     if (time() - strtotime($msg['created_at']) > 120) json_error('超过 2 分钟，无法撤回', 403);
-    db()->prepare("UPDATE messages SET recalled_at = ?, text = '消息已撤回', attachments = '' WHERE id = ?")->execute([$msgId]);
+    // 访客撤回：仅自己端隐藏，客服端保留内容并标记 recalled（需求）
+    db()->prepare('UPDATE messages SET recalled_at = ? WHERE id = ?')->execute([now_dt(), $msgId]);
     json_out(['ok' => true, 'msg_id' => $msgId]);
 }
