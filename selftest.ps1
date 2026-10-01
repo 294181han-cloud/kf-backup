@@ -1,4 +1,4 @@
-# 全流程自测脚本 v2（对线上 kf.ylcz.cc 新系统；幂等可重跑）
+﻿# 全流程自测脚本 v2（对线上 kf.ylcz.cc 新系统；幂等可重跑）
 $ErrorActionPreference = 'Continue'
 $base = 'https://kf.ylcz.cc'
 $pass = 0; $fail = 0
