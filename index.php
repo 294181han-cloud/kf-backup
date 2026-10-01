@@ -7,6 +7,10 @@
  */
 declare(strict_types=1);
 
+// 生产环境：任何 Warning/Notice 都不得混入 JSON 响应（避免前端解析失败）
+ini_set('display_errors', '0');
+error_reporting(E_ALL);
+
 require_once __DIR__ . '/helpers.php';
 
 set_exception_handler(function ($e) {

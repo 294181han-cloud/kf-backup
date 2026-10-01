@@ -29,7 +29,11 @@
       const ct = res.headers.get('Content-Type') || '';
       if (ct.includes('text/csv') || ct.includes('octet-stream')) return res;
       let j;
-      try { j = await res.json(); } catch (e) { throw new Error('响应解析失败(' + res.status + ')'); }
+      try {
+        const txt = await res.text();
+        const s = txt.indexOf('{');
+        j = JSON.parse(s > 0 ? txt.slice(s) : txt); // 容错：剥离可能混入的警告前缀
+      } catch (e) { throw new Error('响应解析失败(' + res.status + ')'); }
       if (!res.ok) throw new Error(j && j.error ? j.error : '请求失败(' + res.status + ')');
       return j;
     },

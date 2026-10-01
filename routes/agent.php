@@ -556,6 +556,7 @@ function handle_agent_poll(string $method): void
 
     $msgs = [];
     $readUpto = 0;
+    $recalledIds = [];
     $session = (int)input('session', 0);
     $sinceMsg = (int)input('sinceMsg', 0);
     if ($session) {
