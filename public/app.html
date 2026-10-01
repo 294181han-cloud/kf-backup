@@ -940,7 +940,8 @@ body.dark .guide-step { border-color: #3a4048 !important; color: #c9cdd4; }
               <span style="position:absolute;bottom:-2px;right:-2px;width:14px;height:14px;border-radius:50%;background:#13c56b;border:2px solid #fff;"></span>
             </div>
             <div>
-              <el-button size="small" type="primary" plain @click="openCrop">上传头像</el-button>
+              <el-button size="small" type="primary" plain @click="$refs.cropFileInput.click()">上传头像</el-button>
+              <input ref="cropFileInput" type="file" accept="image/png,image/jpeg,image/webp" style="display:none" @change="openCrop($event)"/>
               <div class="muted" style="font-size:11px;margin-top:5px;">支持 1:1 裁剪， JPG/PNG ≤ 5MB</div>
             </div>
           </div>

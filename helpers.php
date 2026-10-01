@@ -362,12 +362,12 @@ function save_upload(string $data, string $kind, string $filename = ''): array
 function lookup_geo(string $ip): string
 {
     if (!$ip || $ip === '127.0.0.1') return '';
-    $cacheFile = sys_get_temp_dir() . '/kfxt_geo_' . md5($ip) . '.json';
+    $cacheFile = sys_get_temp_dir() . '/kfxt_geo_zh_' . md5($ip) . '.json';
     if (is_file($cacheFile) && (time() - filemtime($cacheFile)) < 86400) {
         $v = @file_get_contents($cacheFile);
         if ($v !== false && $v !== '') return $v;
     }
-    $ch = curl_init('http://ip-api.com/json/' . urlencode($ip) . '?fields=status,country,regionName,city,isp,countryCode');
+    $ch = curl_init('http://ip-api.com/json/' . urlencode($ip) . '?fields=status,country,regionName,city,isp,countryCode&lang=zh-CN');
     curl_setopt_array($ch, [
         CURLOPT_RETURNTRANSFER => true,
         CURLOPT_TIMEOUT => 3,

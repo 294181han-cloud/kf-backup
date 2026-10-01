@@ -54,6 +54,7 @@ function ensure_upgrade(): void
         try { $pdo->exec("ALTER TABLE messages ADD COLUMN recalled_at DATETIME NULL"); } catch (\Throwable $e) { /* 列已存在 */ }
         try { $pdo->exec("ALTER TABLE messages ADD INDEX idx_msg_read (session_id, from_type, read_at)"); } catch (\Throwable $e) { /* 已存在 */ }
         try { $pdo->exec("ALTER TABLE v_sessions ADD COLUMN visitor_avatar VARCHAR(255) NOT NULL DEFAULT ''"); } catch (\Throwable $e) { /* 列已存在 */ }
+        try { $pdo->exec("UPDATE v_sessions SET geo = '' WHERE geo LIKE '%|%'"); } catch (\Throwable $e) { /* 旧英文格式清空 */ }
         try { $pdo->exec("ALTER TABLE v_sessions ADD COLUMN geo VARCHAR(150) NOT NULL DEFAULT ''"); } catch (\Throwable $e) { /* 列已存在 */ }
     } catch (\Throwable $e) { /* 忽略 */ }
 }
