@@ -209,6 +209,7 @@ function handle_tenant_settings(string $method): void
             'brand_color'    => ts_get($tid, 'brand_color', '#1677ff'),
             'brand_position' => ts_get($tid, 'brand_position', 'right-bottom'),
             'pre_inquiry_on' => ts_get($tid, 'pre_inquiry_on', '0') === '1',
+            'visitor_template' => ts_get($tid, 'visitor_template', 'default'),
             // 公告（访客端顶部横幅）
             'notice_on'      => ts_get($tid, 'notice_on', '0') === '1',
             'notice_text'    => ts_get($tid, 'notice_text', ''),
@@ -226,7 +227,7 @@ function handle_tenant_settings(string $method): void
         $data = body();
         $labels = ['brand_company' => '品牌名称', 'brand_title' => '欢迎标题', 'brand_sub' => '欢迎副标题',
             'brand_avatar' => '头像', 'brand_color' => '主题色', 'brand_position' => '窗口位置',
-            'notice_text' => '公告内容', 'filter_keywords' => '黑名单关键词'];
+            'notice_text' => '公告内容', 'filter_keywords' => '黑名单关键词', 'visitor_template' => '访客端模板'];
         foreach ($labels as $k => $label) {
             if (array_key_exists($k, $data)) {
                 $v = mb_substr(trim((string)$data[$k]), 0, 500);

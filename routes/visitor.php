@@ -71,6 +71,7 @@ function tenant_brand(array $tenant): array
         'pre_inquiry_on' => ts_get($tid, 'pre_inquiry_on', '0') === '1',
         'show_position' => ts_get($tid, 'brand_position', 'right-bottom'),
         'notice_on'     => ts_get($tid, 'notice_on', '0') === '1',
+        'template'      => ts_get($tid, 'visitor_template', 'default'),
         'notice_text'   => ts_get($tid, 'notice_text', ''),
     ];
 }
@@ -320,6 +321,8 @@ function handle_visitor_poll(string $method): void
     $pdo = db();
     // 心跳：仅更新本人会话
     $pdo->prepare('UPDATE v_sessions SET last_online_at = ? WHERE id = ?')->execute([now_dt(), $sid]);
+    // 已读回执：访客在线即视为已读客服消息
+    $pdo->prepare("UPDATE messages SET read_at = NOW() WHERE session_id = ? AND from_type = 'agent' AND read_at IS NULL")->execute([$sid]);
     $st = $pdo->prepare('SELECT id, session_id, from_type AS `from`, sender_name, text, msg_type, attachments, created_at FROM messages WHERE session_id = ? AND id > ? ORDER BY id ASC');
     $st->execute([$sid, $sinceMsg]);
     json_out(['messages' => array_map('to_msg', $st->fetchAll()), 'now' => time()]);
@@ -396,4 +399,21 @@ function handle_visitor_send(string $method): void
         }
     }
     json_out(['ok' => true, 'message' => $msg, 'auto_reply' => $autoReply, 'now' => time()]);
+}
+
+/* ---------- POST /api/visitor/recall（访客撤回自己 2 分钟内的消息） ---------- */
+function handle_visitor_recall(string $method): void
+{
+    if ($method !== 'POST') { json_error('方法不允许', 405); return; }
+    $sid = (int)input('session_id', 0);
+    $msgId = (int)input('msg_id', 0);
+    if (!$sid || !$msgId) json_error('参数缺失');
+    $st = db()->prepare("SELECT * FROM messages WHERE id = ? AND session_id = ? AND from_type = 'visitor'");
+    $st->execute([$msgId, $sid]);
+    $msg = $st->fetch();
+    if (!$msg) json_error('消息不存在', 400);
+    if ($msg['recalled_at']) json_out(['ok' => true]);
+    if (time() - strtotime($msg['created_at']) > 120) json_error('超过 2 分钟，无法撤回', 403);
+    db()->prepare("UPDATE messages SET recalled_at = ?, text = '消息已撤回', attachments = '' WHERE id = ?")->execute([$msgId]);
+    json_out(['ok' => true, 'msg_id' => $msgId]);
 }

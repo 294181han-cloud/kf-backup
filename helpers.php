@@ -274,7 +274,8 @@ function to_msg(array $r): array
 {
     $r['attachments'] = parse_attachments($r['attachments'] ?? null);
     $r['time'] = dt_to_iso($r['created_at'] ?? null);
-    unset($r['created_at'], $r['tenant_id']);
+    if (!empty($r['recalled_at'])) $r['recalled'] = true;
+    unset($r['created_at'], $r['recalled_at'], $r['read_at'], $r['tenant_id']);
     return $r;
 }
 

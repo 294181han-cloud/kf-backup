@@ -154,6 +154,28 @@ function handle_session_read(string $method, array $m): void
     json_out(['ok' => true]);
 }
 
+/* ---------- 撤回消息（2 分钟内自己的消息） ---------- */
+function handle_session_recall(string $method, array $m): void
+{
+    if ($method !== 'POST') { json_error('方法不允许', 405); return; }
+    $sid = (int)$m[1];
+    $ctx = require_workspace();
+    session_of($ctx, $sid);
+    $msgId = (int)input('msg_id', 0);
+    if (!$msgId) json_error('缺少 msg_id');
+    $st = db()->prepare('SELECT * FROM messages WHERE id = ? AND session_id = ? AND tenant_id = ?');
+    $st->execute([$msgId, $sid, $ctx['tenant_id']]);
+    $msg = $st->fetch();
+    if (!$msg) json_error('消息不存在', 400);
+    if ($msg['recalled_at']) json_out(['ok' => true]);
+    $own = $ctx['role'] === 'tenant' || (int)$msg['sender_id'] === (int)$ctx['id'];
+    if (!$own || $msg['from_type'] !== 'agent') json_error('只能撤回自己发送的客服消息', 403);
+    if (time() - strtotime($msg['created_at']) > 120) json_error('超过 2 分钟，无法撤回', 403);
+    db()->prepare('UPDATE messages SET recalled_at = ?, text = ?, attachments = ? WHERE id = ?')
+        ->execute([now_dt(), '消息已撤回', '', $msgId]);
+    json_out(['ok' => true, 'msg_id' => $msgId]);
+}
+
 /* ---------- 拉黑该会话访客 IP ---------- */
 function handle_session_block(string $method, array $m): void
 {
@@ -533,13 +555,19 @@ function handle_agent_poll(string $method): void
     }
 
     $msgs = [];
+    $readUpto = 0;
     $session = (int)input('session', 0);
     $sinceMsg = (int)input('sinceMsg', 0);
+    if ($session) {
+        $ru = $pdo->prepare("SELECT COALESCE(MAX(id),0) FROM messages WHERE session_id = ? AND from_type = 'agent' AND read_at IS NOT NULL");
+        $ru->execute([$session]);
+        $readUpto = (int)$ru->fetchColumn();
+    }
     if ($session && $sinceMsg > 0) {
         session_of($ctx, $session); // 越权检查
         $st = $pdo->prepare('SELECT id, session_id, from_type AS `from`, sender_id, sender_name, text, msg_type, attachments, created_at FROM messages WHERE session_id = ? AND id > ? ORDER BY id ASC');
         $st->execute([$session, $sinceMsg]);
         $msgs = array_map('to_msg', $st->fetchAll());
     }
-    json_out(['sessions' => $sessions, 'messages' => $msgs, 'now' => time()]);
+    json_out(['sessions' => $sessions, 'messages' => $msgs, 'readUpto' => $readUpto, 'now' => time()]);
 }

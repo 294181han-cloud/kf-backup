@@ -45,6 +45,10 @@ function ensure_upgrade(): void
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
         // v_sessions 增加访客 UA（用于访客资料：系统/浏览器）
         try { $pdo->exec("ALTER TABLE v_sessions ADD COLUMN ua VARCHAR(500) NOT NULL DEFAULT ''"); } catch (\Throwable $e) { /* 列已存在 */ }
+        // messages 增加已读时间（已读回执）与撤回时间
+        try { $pdo->exec("ALTER TABLE messages ADD COLUMN read_at DATETIME NULL"); } catch (\Throwable $e) { /* 列已存在 */ }
+        try { $pdo->exec("ALTER TABLE messages ADD COLUMN recalled_at DATETIME NULL"); } catch (\Throwable $e) { /* 列已存在 */ }
+        try { $pdo->exec("ALTER TABLE messages ADD INDEX idx_msg_read (session_id, from_type, read_at)"); } catch (\Throwable $e) { /* 已存在 */ }
     } catch (\Throwable $e) { /* 忽略 */ }
 }
 try { ensure_installed(); } catch (\Throwable $e) { /* 初始化失败由后续请求重试 */ }
@@ -135,6 +139,7 @@ function dispatch_api(string $method, string $uri): void
     if ($uri === '/api/visitor/send')        handle_visitor_send($method);
     if ($uri === '/api/visitor/upload')      handle_visitor_upload($method);
     if ($uri === '/api/visitor/messages')    handle_visitor_messages($method);
+    if ($uri === '/api/visitor/recall')      handle_visitor_recall($method);
 
     // ---- 工作台（tenant + agent） ----
     if ($uri === '/api/sessions')        handle_sessions($method);
@@ -150,6 +155,7 @@ function dispatch_api(string $method, string $uri): void
     if (preg_match('#^/api/sessions/(\d+)/read$#', $uri, $m))      handle_session_read($method, $m);
     if (preg_match('#^/api/sessions/(\d+)/transfer$#', $uri, $m))  handle_session_transfer($method, $m);
     if (preg_match('#^/api/sessions/(\d+)/block$#', $uri, $m))   handle_session_block($method, $m);
+    if (preg_match('#^/api/sessions/(\d+)/recall$#', $uri, $m))  handle_session_recall($method, $m);
     if (preg_match('#^/api/sessions/(\d+)/contacts(?:/(\w+))?$#', $uri, $m)) handle_session_contacts($method, $m);
     if (preg_match('#^/api/sessions/(\d+)/profile$#', $uri, $m))   handle_session_profile($method, $m);
 
