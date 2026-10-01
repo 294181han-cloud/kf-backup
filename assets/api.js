@@ -31,8 +31,11 @@
       let j;
       try {
         const txt = await res.text();
-        const s = txt.indexOf('{');
-        j = JSON.parse(s > 0 ? txt.slice(s) : txt); // 容错：剥离可能混入的警告前缀
+        try { j = JSON.parse(txt); }                       // 正常路径：对象/数组均可
+        catch (e2) {
+          const s = txt.indexOf('{');                      // 兜底：剥离可能混入的警告前缀（仅对象响应）
+          j = JSON.parse(s >= 0 ? txt.slice(s) : txt);
+        }
       } catch (e) { throw new Error('响应解析失败(' + res.status + ')'); }
       if (!res.ok) throw new Error(j && j.error ? j.error : '请求失败(' + res.status + ')');
       return j;
