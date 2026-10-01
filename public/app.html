@@ -493,7 +493,7 @@ body.dark .guide-step { border-color: #3a4048 !important; color: #c9cdd4; }
         <crud-table
           :rows="quickMsgs" :fields="quickFields" title="快捷回复" add-text="新增快捷回复"
           @reload="loadQuick" api="/api/quick-msgs"
-          :cols="[{k:'title',l:'标题'},{k:'content',l:'内容'},{k:'group_name',l:'分组'}]"/>
+          :cols="[{k:'title',l:'标题'},{k:'attachments',l:'图片',imgs:true},{k:'content',l:'内容'},{k:'group_name',l:'分组'}]"/>
       </div>
 
       <!-- ============ 欢迎语 ============ -->
@@ -501,7 +501,7 @@ body.dark .guide-step { border-color: #3a4048 !important; color: #c9cdd4; }
         <crud-table
           :rows="welcomeMsgs" :fields="welcomeFields" title="欢迎语（访客进入时自动发送，按顺序最多 5 条）" add-text="新增欢迎语"
           @reload="loadWelcome" api="/api/welcome-messages"
-          :cols="[{k:'content',l:'内容'},{k:'trig',l:'触发',map:{once:'仅首次',every:'每次进入'}},{k:'enabled',l:'启用',bool:true}]"/>
+          :cols="[{k:'content',l:'内容'},{k:'attachments',l:'配图',imgs:true},{k:'trig',l:'触发',map:{once:'仅首次',every:'每次进入'}},{k:'enabled',l:'启用',bool:true}]"/>
       </div>
 
       <!-- ============ 自动回复 ============ -->
@@ -1045,6 +1045,13 @@ const CrudTable = defineComponent({
       <el-table-column v-for="c in cols" :key="c.k" :label="c.l">
         <template #default="{row}">
           <template v-if="c.bool"><el-tag size="small" :type="row[c.k]?'success':'info'">{{ row[c.k]?'启用':'停用' }}</el-tag></template>
+          <template v-else-if="c.imgs">
+            <template v-if="(row[c.k]||[]).length">
+              <img v-for="(im, ii) in row[c.k].slice(0,3)" :key="ii" :src="im.url" style="width:26px;height:26px;object-fit:cover;border-radius:5px;margin-right:4px;vertical-align:middle;border:1px solid #e5e6eb;">
+              <span v-if="row[c.k].length > 3" class="muted" style="font-size:11px;">+{{ row[c.k].length - 3 }}</span>
+            </template>
+            <span class="muted">—</span>
+          </template>
           <template v-else>{{ c.map ? (c.map[row[c.k]] || row[c.k]) : row[c.k] }}</template>
         </template>
       </el-table-column>
@@ -1066,6 +1073,17 @@ const CrudTable = defineComponent({
           </el-select>
           <el-input-number v-else-if="f.type==='number'" v-model="form[f.k]"/>
           <el-input v-else-if="f.type==='textarea'" type="textarea" :rows="3" v-model="form[f.k]"/>
+          <div v-else-if="f.type==='images'" style="width:100%;">
+            <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
+              <div v-for="(img, ii) in (form[f.k] || [])" :key="ii" style="position:relative;">
+                <img :src="img.url" style="width:54px;height:54px;object-fit:cover;border-radius:8px;border:1px solid #e5e6eb;display:block;">
+                <span @click="rmImg(f.k, ii)" style="position:absolute;top:-7px;right:-7px;width:18px;height:18px;border-radius:50%;background:#f53f3f;color:#fff;text-align:center;line-height:18px;font-size:11px;cursor:pointer;">✕</span>
+              </div>
+              <button type="button" v-if="(form[f.k] || []).length < (f.max || 3)" @click="pickImg(f.k)" style="width:54px;height:54px;border:1px dashed #c9cdd4;border-radius:8px;background:#fafbfc;font-size:20px;color:#86909c;cursor:pointer;">＋</button>
+            </div>
+            <input :ref="el => setImgRef(f.k, el)" type="file" accept="image/png,image/jpeg,image/gif,image/webp" style="display:none" @change="onImg($event, f.k)">
+            <div class="muted" style="font-size:11px;margin-top:5px;">{{ f.tip || '发送该条消息时将附带图片' }}</div>
+          </div>
           <el-input v-else v-model="form[f.k]"/>
         </el-form-item>
       </el-form>
@@ -1079,13 +1097,33 @@ const CrudTable = defineComponent({
     const dlg = ref(false);
     const editId = ref(0);
     const form = reactive({});
+    const imgRefs = {};
+    const setImgRef = (k, el) => { if (el) imgRefs[k] = el; };
     const open = (row) => {
       editId.value = row ? row.id : 0;
       for (const f of props.fields) {
-        form[f.k] = row ? (row[f.k] !== undefined ? row[f.k] : (f.type === 'bool' ? false : '')) : (f.def !== undefined ? f.def : (f.type === 'bool' ? true : f.type === 'number' ? 0 : ''));
+        if (f.type === 'images') {
+          form[f.k] = row ? (Array.isArray(row[f.k]) ? row[f.k] : []) : [];
+        } else {
+          form[f.k] = row ? (row[f.k] !== undefined ? row[f.k] : (f.type === 'bool' ? false : '')) : (f.def !== undefined ? f.def : (f.type === 'bool' ? true : f.type === 'number' ? 0 : ''));
+        }
       }
       dlg.value = true;
     };
+    const pickImg = (k) => { if (imgRefs[k]) imgRefs[k].click(); };
+    const onImg = async (ev, k) => {
+      const file = ev.target.files[0];
+      ev.target.value = '';
+      if (!file) return;
+      if (file.size > 5 * 1024 * 1024) { ELEMENT.ElMessage.warning('图片不能超过 5MB'); return; }
+      const data = await new Promise(res => { const fr = new FileReader(); fr.onload = () => res(fr.result); fr.readAsDataURL(file); });
+      try {
+        const up = await API.post('/api/upload', { data, kind: 'image', filename: file.name });
+        if (!Array.isArray(form[k])) form[k] = [];
+        form[k].push(up);
+      } catch (e) { ELEMENT.ElMessage.error(e.message); }
+    };
+    const rmImg = (k, i) => { if (Array.isArray(form[k])) form[k].splice(i, 1); };
     const save = async () => {
       try {
         if (editId.value) await API.put(props.api + '/' + editId.value, { ...form });
@@ -1099,7 +1137,7 @@ const CrudTable = defineComponent({
       try { await API.del(props.api + '/' + row.id); ElementPlus.ElMessage.success('已删除'); emit('reload'); }
       catch (e) { ElementPlus.ElMessage.error(e.message); }
     };
-    return { dlg, editId, form, open, save, del };
+    return { dlg, editId, form, open, save, del, pickImg, onImg, rmImg, setImgRef };
   }
 });
 
@@ -1810,12 +1848,14 @@ const app = createApp({
     // CRUD 字段配置
     const quickFields = [
       { k: 'title', label: '标题' },
-      { k: 'content', label: '内容', type: 'textarea' },
+      { k: 'content', label: '文字内容（可与图片同时发送）', type: 'textarea' },
+      { k: 'attachments', label: '图片', type: 'images', max: 3, tip: '点击按钮直接发送文字与图片，最多 3 张' },
       { k: 'group_name', label: '分组', def: '通用' },
       { k: 'sort', label: '排序', type: 'number', def: 0 },
     ];
     const welcomeFields = [
-      { k: 'content', label: '内容', type: 'textarea' },
+      { k: 'content', label: '文字内容', type: 'textarea' },
+      { k: 'attachments', label: '配图', type: 'images', max: 3, tip: '欢迎语配图（访客端最多显示 3 张）' },
       { k: 'trig', label: '触发方式', type: 'select', def: 'once', options: [{ v: 'once', l: '仅首次进入' }, { v: 'every', l: '每次进入' }] },
       { k: 'enabled', label: '启用', type: 'bool' },
       { k: 'sort', label: '顺序', type: 'number', def: 0 },
