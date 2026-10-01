@@ -12,8 +12,16 @@ body { margin: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'P
 .layout { display: flex; height: 100vh; overflow: hidden; }
 
 /* ---------- 侧栏 ---------- */
-.side { width: 212px; background: #001529; color: #fff; display: flex; flex-direction: column; flex-shrink: 0; }
+.side { width: 212px; background: #001529; color: #fff; display: flex; flex-direction: column; flex-shrink: 0; transition: width .2s; overflow: hidden; }
+.side.collapsed { width: 60px; }
+.side.collapsed .nav-item { justify-content: center; padding: 11px 0; }
+.side.collapsed .nav-item .nv-text, .side.collapsed .nav-group, .side.collapsed .side-hero, .side.collapsed .logo .lg-text { display: none; }
+.side.collapsed .logo { justify-content: center; }
 .side .logo { font-size: 16px; font-weight: 600; padding: 16px 18px 14px; display: flex; align-items: center; gap: 8px; }
+.side-tools { border-top: 1px solid rgba(255,255,255,.08); }
+.theme-dot { width: 14px; height: 14px; border-radius: 50%; cursor: pointer; display: inline-block; border: 2px solid transparent; }
+.theme-dot.on { border-color: #fff; box-shadow: 0 0 6px rgba(255,255,255,.5); }
+.lg-text { }
 .side .nav { flex: 1; overflow-y: auto; padding-bottom: 10px; }
 .side-hero {
   margin: 2px 10px 10px; padding: 11px 12px;
@@ -117,11 +125,14 @@ body { margin: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'P
 .img-viewer { position: fixed; inset: 0; background: rgba(0,0,0,.9); z-index: 200; display: flex; align-items: center; justify-content: center; }
 .img-viewer img { max-width: 94vw; max-height: 90vh; }
 .quick-panel {
-  position: absolute; bottom: 66px; left: 12px; right: 12px;
-  display: flex; flex-wrap: wrap; gap: 8px;
+  position: absolute; bottom: 70px; left: 12px;
+  display: flex; flex-wrap: wrap; gap: 8px; align-items: center;
   background: #fff; border-radius: 12px; box-shadow: 0 10px 34px rgba(0,0,0,.18);
-  z-index: 20; padding: 10px; max-height: 220px; overflow-y: auto;
+  z-index: 20; padding: 10px 12px; max-height: 200px; overflow-y: auto; right: 12px;
+  transform-origin: left bottom;
+  transition: opacity .18s ease, transform .18s ease;
 }
+.quick-panel:not(.open) { opacity: 0; transform: translateX(-14px) scale(.96); pointer-events: none; }
 .quick-btn {
   border: 1px solid #dcdfe6; background: #f7f8fa; border-radius: 999px;
   padding: 7px 14px; font-size: 13px; cursor: pointer; color: #1f2329;
@@ -216,26 +227,38 @@ body.dark .guide-step { border-color: #3a4048 !important; color: #c9cdd4; }
         <div class="hero-expire">{{ expireText }}</div>
       </div>
       <div class="nav">
-        <div class="nav-item" :class="{active: tab==='work'}" @click="tab='work'; restartPoll()">💬 会话接待</div>
-        <div class="nav-item" :class="{active: tab==='stats'}" @click="tab='stats'">📊 数据面板</div>
-        <div class="nav-group">话术与自动化</div>
-        <div class="nav-item" :class="{active: tab==='quick'}" @click="tab='quick'">⚡ 快捷回复</div>
-        <div class="nav-item" :class="{active: tab==='welcome'}" @click="tab='welcome'">👋 欢迎语</div>
-        <div class="nav-item" :class="{active: tab==='auto'}" @click="tab='auto'">🤖 自动回复</div>
+        <div class="nav-group" style="padding-top:6px;">工 作</div>
+        <div class="nav-item" :class="{active: tab==='stats'}" @click="tab='stats'">📊 <span class="nv-text">数据面板</span></div>
+        <div class="nav-item" :class="{active: tab==='work'}" @click="tab='work'; restartPoll()">💬 <span class="nv-text">工作台</span></div>
+        <div class="nav-item" :class="{active: tab==='visitors'}" @click="tab='visitors'; loadVisitors()">📋 <span class="nv-text">访客列表</span></div>
         <template v-if="me && me.role==='tenant'">
-          <div class="nav-group">运营</div>
-          <div class="nav-item" :class="{active: tab==='broadcast'}" @click="tab='broadcast'">📣 群发</div>
-          <div class="nav-item" :class="{active: tab==='blacklist'}" @click="tab='blacklist'">🚫 IP 黑名单</div>
-          <div class="nav-item" :class="{active: tab==='preinq'}" @click="tab='preinq'">📝 询前表单</div>
-          <div class="nav-item" :class="{active: tab==='links'}" @click="tab='links'">🔗 获客链接</div>
-          <div class="nav-item" :class="{active: tab==='agents'}" @click="tab='agents'">👨‍💼 子客服</div>
-          <div class="nav-item" :class="{active: tab==='brand'}" @click="tab='brand'">🎨 访客端外观</div>
-          <div class="nav-item" :class="{active: tab==='policy'}" @click="tab='policy'">🧩 访客策略</div>
-          <div class="nav-item" :class="{active: tab==='visitors'}" @click="tab='visitors'; loadVisitors()">📋 访客资源</div>
-          <div class="nav-item" :class="{active: tab==='security'}" @click="tab='security'; loadSecurityPage()">🛡️ 安全与维护</div>
+          <div class="nav-item" :class="{active: tab==='agents'}" @click="tab='agents'">👨‍💼 <span class="nv-text">坐席管理</span></div>
+          <div class="nav-item" :class="{active: tab==='links'}" @click="tab='links'">🔗 <span class="nv-text">客服码</span></div>
         </template>
-        <div class="nav-group">账号</div>
-        <div class="nav-item" :class="{active: tab==='profile'}" @click="tab='profile'">👤 个人设置</div>
+        <div class="nav-group">内 容</div>
+        <div class="nav-item" :class="{active: tab==='quick'}" @click="tab='quick'">⚡ <span class="nv-text">快捷消息</span></div>
+        <div class="nav-item" :class="{active: tab==='welcome'}" @click="tab='welcome'">👋 <span class="nv-text">欢迎语</span></div>
+        <div class="nav-item" :class="{active: tab==='auto'}" @click="tab='auto'">🤖 <span class="nv-text">智能回复</span></div>
+        <template v-if="me && me.role==='tenant'">
+          <div class="nav-item" :class="{active: tab==='broadcast'}" @click="tab='broadcast'">📣 <span class="nv-text">群发模板</span></div>
+        </template>
+        <div class="nav-group">数 据</div>
+        <div class="nav-item" :class="{active: tab==='blacklist'}" @click="tab='blacklist'">🚫 <span class="nv-text">IP黑名单</span></div>
+        <template v-if="me && me.role==='tenant'">
+          <div class="nav-group">系 统</div>
+          <div class="nav-item" :class="{active: tab==='brand'}" @click="tab='brand'">🎨 <span class="nv-text">访客端模板</span></div>
+          <div class="nav-item" :class="{active: tab==='preinq'}" @click="tab='preinq'">📝 <span class="nv-text">询前表单</span></div>
+          <div class="nav-item" :class="{active: tab==='policy'}" @click="tab='policy'">🧩 <span class="nv-text">访客策略</span></div>
+          <div class="nav-item" :class="{active: tab==='security'}" @click="tab='security'; loadSecurityPage()">🛡️ <span class="nv-text">安全与维护</span></div>
+        </template>
+        <div class="nav-group">账 号</div>
+        <div class="nav-item" :class="{active: tab==='profile'}" @click="tab='profile'">👤 <span class="nv-text">个人设置</span></div>
+      </div>
+      <div class="side-tools" style="padding:10px 12px 4px;display:flex;align-items:center;justify-content:space-between;">
+        <span style="cursor:pointer;font-size:16px;" title="收起/展开菜单" @click="sideCollapsed = !sideCollapsed">{{ sideCollapsed ? '➡' : '⬅' }}</span>
+        <span style="display:flex;gap:6px;">
+          <span v-for="t in themeDots" :key="t.v" class="theme-dot" :class="{on: themeKey===t.v}" :style="{background:t.c}" :title="t.label" @click="setTheme(t.v)"></span>
+        </span>
       </div>
       <div class="me">
         <span style="cursor:pointer;display:inline-block;margin-bottom:6px;" @click="toggleDark">{{ dark ? '☀️ 浅色模式' : '🌙 深色模式' }}</span><br>
@@ -329,8 +352,13 @@ body.dark .guide-step { border-color: #3a4048 !important; color: #c9cdd4; }
               </template>
             </div>
             <div class="chat-input" style="position:relative;">
-              <div class="quick-panel" v-if="showQuick && quickMsgs.length">
-                <div class="quick-btn" v-for="q in quickMsgs" :key="q.id" :title="q.content" @click="sendQuick(q)">{{ q.title }}</div>
+              <div class="quick-panel" :class="{open: showQuick}">
+                <template v-if="showQuick && quickMsgs.length">
+                  <div class="quick-btn" v-for="q in quickMsgs" :key="q.id" :title="q.content" @click="sendQuick(q)">
+                    <span v-if="(q.attachments||[]).length" style="margin-right:3px;">🖼️</span>{{ q.title }}
+                  </div>
+                </template>
+                <div v-if="showQuick && !quickMsgs.length" class="muted" style="padding:6px 10px;font-size:12px;">还没有快捷消息，去「内容 → 快捷消息」添加</div>
               </div>
               <div class="chat-tools" style="margin-bottom:6px;">
                 <button class="tool-btn" title="快捷回复" @click="showQuick=!showQuick">⚡</button>
@@ -1085,7 +1113,7 @@ const app = createApp({
 
     // 快捷回复
     const quickMsgs = ref([]);
-    const showQuick = ref(false);
+    const showQuick = ref(true);
 
     // CRUD 数据
     const welcomeMsgs = ref([]);
@@ -1186,7 +1214,8 @@ const app = createApp({
     const tabTitle = computed(() => ({
       work: '会话接待', stats: '数据面板', quick: '快捷回复', welcome: '欢迎语', auto: '自动回复',
       broadcast: '群发', blacklist: 'IP 黑名单', preinq: '询前表单', links: '获客链接', agents: '子客服管理',
-      brand: '访客端外观', policy: '访客策略', visitors: '访客资源', security: '安全与维护', profile: '个人设置',
+      brand: '访客端模板', policy: '访客策略', visitors: '访客列表', security: '安全与维护', profile: '个人设置',
+      quick: '快捷消息', auto: '智能回复', agents: '坐席管理', broadcast: '群发模板', links: '客服码',
     }[tab.value]));
     const current = computed(() => sessions.value.find(s => s.id === currentId.value) || null);
     const filteredSessions = computed(() => {
@@ -1343,16 +1372,17 @@ const app = createApp({
     // 快捷回复：点击直接发送全部内容
     const sendQuick = async (q) => {
       if (!currentId.value || sending.value) { ElementPlus.ElMessage.warning('请先选择会话'); return; }
-      const text = q.content;
+      const text = q.content || '';
+      const atts = (q.attachments || []).filter(a => a && a.url);
+      if (!text && !atts.length) return;
       sending.value = true;
       try {
-        const r = await API.post('/api/sessions/' + currentId.value + '/messages', { text });
+        const r = await API.post('/api/sessions/' + currentId.value + '/messages', { text, attachments: atts });
         msgs.value.push(r.message);
         maxMsgId.value = r.message.id;
-        showQuick.value = false;
         scrollBottom();
         const s = sessions.value.find(x => x.id === currentId.value);
-        if (s) s.lastMsg = text.slice(0, 60);
+        if (s) s.lastMsg = (text || (atts.length ? '[图片]' : '')).slice(0, 60);
       } catch (e) { ElementPlus.ElMessage.error(e.message); }
       finally { sending.value = false; }
     };
@@ -1724,6 +1754,29 @@ const app = createApp({
       { k: 'xiaohongshu', label: '小红书', g1: '#FF2442' },
       { k: 'yangqianguan', label: '钱罐子', g1: '#FF8800' },
     ];
+    // ===== 主题换肤（对标对方 4 套主题） =====
+    const themeKey = ref(localStorage.getItem('kfxt_theme') || 'default');
+    const themeDots = [
+      { v: 'default', label: '经典蓝', c: '#1677ff' },
+      { v: 'purple', label: '优雅紫', c: '#8b7cf6' },
+      { v: 'sky', label: '天空蓝', c: '#2196f3' },
+      { v: 'green', label: '清新绿', c: '#00b96b' },
+    ];
+    const applyTheme = () => {
+      const map = {
+        default: { theme: '#1677ff', grad: 'linear-gradient(135deg,#1677ff,#4d9bff)', side: '#001529' },
+        purple:  { theme: '#8b7cf6', grad: 'linear-gradient(135deg,#8b7cf6,#a89bff)', side: '#17123a' },
+        sky:     { theme: '#2196f3', grad: 'linear-gradient(135deg,#2196f3,#64b5f6)', side: '#0d2136' },
+        green:   { theme: '#00b96b', grad: 'linear-gradient(135deg,#00b96b,#36d399)', side: '#0b2b1e' },
+      };
+      const t = map[themeKey.value] || map.default;
+      document.documentElement.style.setProperty('--theme', t.theme);
+      document.documentElement.style.setProperty('--theme-grad', t.grad);
+      document.querySelectorAll('.side').forEach(el => { el.style.background = t.side; });
+    };
+    const setTheme = (v) => { themeKey.value = v; try { localStorage.setItem('kfxt_theme', v); } catch (e) {} applyTheme(); };
+    applyTheme();
+
     // 顶栏时钟 + 未读总数
     const clock = ref('');
     const tickClock = () => { clock.value = new Date().toLocaleString('zh-CN', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit' }); };
@@ -1732,6 +1785,7 @@ const app = createApp({
 
     // 深色主题
     const dark = ref(false);
+    const sideCollapsed = ref(false);
     try { dark.value = localStorage.getItem('kfxt_dark') === '1'; } catch (e) {}
     const applyDark = () => { document.body.classList.toggle('dark', dark.value); };
     const toggleDark = () => { dark.value = !dark.value; try { localStorage.setItem('kfxt_dark', dark.value ? '1' : '0'); } catch (e) {} applyDark(); };
