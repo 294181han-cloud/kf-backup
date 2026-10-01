@@ -22,7 +22,8 @@ body { margin: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'P
 .theme-dot { width: 14px; height: 14px; border-radius: 50%; cursor: pointer; display: inline-block; border: 2px solid transparent; }
 .theme-dot.on { border-color: #fff; box-shadow: 0 0 6px rgba(255,255,255,.5); }
 .lg-text { }
-.side .nav { flex: 1; overflow-y: auto; padding-bottom: 10px; }
+.side .nav { flex: 1; overflow-y: auto; padding-bottom: 10px; scrollbar-width: none; -ms-overflow-style: none; }
+.side .nav::-webkit-scrollbar { width: 0; height: 0; display: none; }
 .side-hero {
   text-align: center;
   border-bottom: 1px solid rgba(255,255,255,.06);
@@ -66,7 +67,15 @@ body { margin: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'P
 .content.workbench { padding: 0; overflow: hidden; display: flex; max-width: 1400px; }
 
 /* ---------- 工作台三栏 ---------- */
-.sess-col { width: 300px; background: #fff; border-right: 1px solid #e5e6eb; display: flex; flex-direction: column; flex-shrink: 0; }
+.sess-col { width: 300px; background: #fff; border-right: 1px solid #e5e6eb; display: flex; flex-direction: column; flex-shrink: 0; transition: width .22s ease; position: relative; }
+.sess-col.collapsed { width: 30px; }
+.sess-col.collapsed .sess-collapse-btn { right: auto; left: 50%; transform: translateX(-50%); }
+.sess-collapse-btn {
+  position: absolute; top: 12px; right: 8px; z-index: 5;
+  width: 20px; height: 20px; border: 1px solid #e5e6eb; border-radius: 5px;
+  background: #f7f8fa; color: #86909c; font-size: 11px; cursor: pointer; line-height: 1;
+}
+.sess-collapse-btn:hover { color: #1677ff; border-color: #1677ff; }
 .sess-col .search { padding: 10px 12px; border-bottom: 1px solid #f2f3f5; }
 .sess-list { flex: 1; overflow-y: auto; }
 .sess-item { padding: 12px 14px; cursor: pointer; border-bottom: 1px solid #f7f8fa; }
@@ -106,8 +115,16 @@ body { margin: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'P
 .chat-input { background: #fff; border-top: 1px solid #e5e6eb; padding: 10px 14px; }
 .chat-input textarea { width: 100%; border: none; outline: none; resize: none; font-size: 14px; font-family: inherit; height: 64px; background: transparent; }
 .chat-tools { display: flex; align-items: center; gap: 14px; }
-.tool-btn { background: none; border: none; font-size: 20px; cursor: pointer; padding: 0; filter: grayscale(1) opacity(.6); transition: all .15s; }
-.tool-btn.on { filter: none; transform: scale(1.12); }
+.tool-btn { background: none; border: none; font-size: 20px; cursor: pointer; padding: 0; transition: transform .15s; }
+.tool-btn:active { transform: scale(.9); }
+.quick-toggle-row { padding: 0 2px 6px; }
+.quick-toggle-btn {
+  border: none; background: #f0f7ff; color: #165dff; border-radius: 8px;
+  padding: 6px 12px; font-size: 13px; font-weight: 500; cursor: pointer;
+  transition: all .15s;
+}
+.quick-toggle-btn:hover { background: #e3f0ff; }
+.quick-toggle-btn.on { background: #165dff; color: #fff; }
 .send-btn { background: #1677ff; color: #fff; border: none; border-radius: 6px; padding: 7px 22px; font-size: 14px; cursor: pointer; margin-left: auto; }
 .send-btn:disabled { opacity: .5; }
 
@@ -296,11 +313,12 @@ body.dark .guide-step { border-color: #3a4048 !important; color: #c9cdd4; }
 
       <!-- ============ 会话工作台 ============ -->
       <div class="content workbench" v-if="tab==='work'">
-        <div class="sess-col">
-          <div class="search">
+        <div class="sess-col" :class="{collapsed: sessCollapsed}">
+          <button class="sess-collapse-btn" :title="sessCollapsed ? '展开会话列表' : '收起会话列表'" @click="sessCollapsed = !sessCollapsed">{{ sessCollapsed ? '»' : '«' }}</button>
+          <div class="search" v-if="!sessCollapsed">
             <el-input v-model="sessSearch" placeholder="搜索访客/消息" size="small" clearable/>
           </div>
-          <div class="sess-list">
+          <div class="sess-list" v-if="!sessCollapsed">
             <div v-if="!filteredSessions.length" style="padding:40px;text-align:center;color:#a0a6ad;font-size:13px;">暂无会话</div>
             <div class="sess-item" v-for="s in filteredSessions" :key="s.id" :class="{active: currentId===s.id}" @click="openSession(s.id)">
               <div class="row1">
@@ -366,6 +384,11 @@ body.dark .guide-step { border-color: #3a4048 !important; color: #c9cdd4; }
               </template>
             </div>
             <div class="chat-input">
+              <div class="quick-toggle-row">
+                <button class="quick-toggle-btn" :class="{on: showQuick}" @click="showQuick=!showQuick">
+                  ⚡ 快捷消息 <span style="font-size:11px;">{{ showQuick ? '▾' : '▸' }}</span>
+                </button>
+              </div>
               <div class="quick-bar" :class="{open: showQuick}">
                 <div class="quick-scroll">
                   <template v-if="quickMsgs.length">
@@ -377,7 +400,7 @@ body.dark .guide-step { border-color: #3a4048 !important; color: #c9cdd4; }
                 </div>
               </div>
               <div class="chat-tools" style="margin-bottom:6px;">
-                <button class="tool-btn" :class="{on: showQuick}" title="快捷消息" @click="showQuick=!showQuick">⚡</button>
+
                 <button class="tool-btn" title="发送图片" @click="$refs.imgInput.click()">🖼️</button>
                 <button class="tool-btn" title="语音" @click="startRec">🎤</button>
                 <input ref="imgInput" type="file" accept="image/png,image/jpeg,image/gif,image/webp" style="display:none" @change="onImage"/>
@@ -1839,6 +1862,7 @@ const app = createApp({
 
     // 深色主题
     const dark = ref(false);
+    const sessCollapsed = ref(false);
     const sideCollapsed = ref(false);
     try { dark.value = localStorage.getItem('kfxt_dark') === '1'; } catch (e) {}
     const applyDark = () => { document.body.classList.toggle('dark', dark.value); };
@@ -1848,7 +1872,7 @@ const app = createApp({
     // CRUD 字段配置
     const quickFields = [
       { k: 'title', label: '标题' },
-      { k: 'content', label: '文字内容（可与图片同时发送）', type: 'textarea' },
+      { k: 'content', label: '文字内容', type: 'textarea' },
       { k: 'attachments', label: '图片', type: 'images', max: 3, tip: '点击按钮直接发送文字与图片，最多 3 张' },
       { k: 'group_name', label: '分组', def: '通用' },
       { k: 'sort', label: '排序', type: 'number', def: 0 },
@@ -1922,7 +1946,7 @@ const app = createApp({
       guide, guideDone, dark, toggleDark, renameVisitor, renderCodeQrs, tplList,
       blockSession, blockIp, kwList, kwInput, kwSaving, addKw, removeKw, saveFilter, agentCmd, restartPoll,
       chatSearchOn, chatSearchKw, searchHit, visibleMsgs, canRecall, recallMsg, isRead,
-      pol, savePolicy, uploadPolHead, clock, unreadTotal,
+      pol, savePolicy, uploadPolHead, clock, unreadTotal, sessCollapsed,
       quickFields, welcomeFields, autoFields, blFields, preqFields,
       shortTime, fmtTime, sourceText, contactLabel, barW, quotaW,
       openSession, send, onKey, useQuick, sendQuick, onImage, startRec, stopRec, closeSession, doTransfer,
