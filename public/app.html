@@ -89,7 +89,6 @@ body { margin: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'P
 .sess-item .dot.online { background: #00b42a; }
 .sess-item .dot.offline { background: #c9cdd4; }
 .badge { background: #f53f3f; color: #fff; font-size: 11px; min-width: 17px; height: 17px; border-radius: 9px; display: inline-flex; align-items: center; justify-content: center; padding: 0 5px; }
-.tag-wait { font-size: 10px; background: #fff7e8; color: #d25f00; border-radius: 3px; padding: 1px 4px; flex-shrink: 0; }
 .tag-agent { font-size: 10px; background: #e8f3ff; color: #165dff; border-radius: 3px; padding: 1px 4px; max-width: 64px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex-shrink: 0; }
 
 .chat-col { flex: 1; display: flex; flex-direction: column; min-width: 0; background: #f7f7f7; }
@@ -331,8 +330,7 @@ body.dark .guide-step { border-color: #3a4048 !important; color: #c9cdd4; }
                 <span class="time">{{ shortTime(s.lastTime) }}</span>
               </div>
               <div class="row2">
-                <span v-if="s.agent_id===0" class="tag-wait">待接入</span>
-                <span v-else class="tag-agent">{{ s.agent_name || '客服' }}</span>
+                <span v-if="s.agent_id>0" class="tag-agent">{{ s.agent_name || '客服' }}</span>
                 <span class="last">{{ s.lastMsg }}</span>
                 <span class="dot" :class="s.status"></span>
                 <span class="badge" v-if="s.unread>0">{{ s.unread>99?'99+':s.unread }}</span>
@@ -348,7 +346,7 @@ body.dark .guide-step { border-color: #3a4048 !important; color: #c9cdd4; }
               <span style="cursor:pointer;font-size:13px;" title="修改访客名称" @click="renameVisitor">✏️</span>
               <span style="cursor:pointer;font-size:13px;" title="搜索聊天记录" @click="chatSearchOn = !chatSearchOn">🔍</span>
               <el-tag size="small" :type="current.status==='online' ? 'success' : 'info'">{{ current.status==='online'?'在线':'离线' }}</el-tag>
-              <el-tag v-if="current.agent_id===0" size="small" type="warning">待接入</el-tag>
+
               <span style="margin-left:auto;display:flex;gap:8px;">
                 <el-popconfirm title="拉黑该访客 IP？拉黑后其无法再进入或发消息" @confirm="blockSession">
                   <template #reference><el-button size="small" type="danger" plain>🚫 拉黑</el-button></template>
@@ -479,7 +477,7 @@ body.dark .guide-step { border-color: #3a4048 !important; color: #c9cdd4; }
           <div class="stat-card"><div class="v">{{ stats.today_sessions }}</div><div class="l">今日新会话</div></div>
           <div class="stat-card"><div class="v" style="color:#00b42a;">{{ stats.today_active }}</div><div class="l">今日活跃访客</div></div>
           <div class="stat-card"><div class="v">{{ stats.today_replied }}</div><div class="l">今日回复数</div></div>
-          <div class="stat-card"><div class="v" style="color:#f77234;">{{ stats.waiting }}</div><div class="l">待接入</div></div>
+
           <div class="stat-card"><div class="v">{{ stats.online_visitors }}</div><div class="l">当前在线</div></div>
           <div class="stat-card"><div class="v">{{ stats.total_sessions }}</div><div class="l">总会话</div></div>
         </div>
@@ -625,7 +623,7 @@ body.dark .guide-step { border-color: #3a4048 !important; color: #c9cdd4; }
             子客服（{{ agents.length }} / {{ me.max_agents }}）
             <el-button size="small" type="primary" @click="agentDlg=true;agentMode='create';agentForm.username='';agentForm.nickname='';agentForm.password=''">＋ 新增子客服</el-button>
           </div>
-          <p class="muted" style="margin:0 0 12px;">子客服登录方式：登录页输入「您的卡密/子客服用户名」+ 密码。待接入会话所有客服可见；客服首次回复即自动接手。</p>
+          <p class="muted" style="margin:0 0 12px;">子客服登录方式：登录页输入「您的卡密/子客服用户名」+ 密码。未被接管的会话所有客服可见；客服首次回复即自动接手。</p>
           <el-table :data="agents" stripe>
             <el-table-column label="客服" min-width="180">
               <template #default="{row}">
@@ -926,7 +924,7 @@ body.dark .guide-step { border-color: #3a4048 !important; color: #c9cdd4; }
                 </div>
               </el-form-item>
               <el-form-item label="自动接手">
-                <el-switch v-model="profileForm.auto_accept" active-text="回复待接入会话时自动接手"/>
+                <el-switch v-model="profileForm.auto_accept" active-text="回复未接管会话时自动接手"/>
               </el-form-item>
               <el-form-item label="提示音"><el-switch v-model="profileForm.sound_enabled"/></el-form-item>
             </template>
@@ -948,7 +946,7 @@ body.dark .guide-step { border-color: #3a4048 !important; color: #c9cdd4; }
   <!-- ============ 弹窗们 ============ -->
   <el-dialog v-model="transferDlg" title="转接会话" width="380px">
     <el-select v-model="transferTo" placeholder="选择转接目标" style="width:100%;">
-      <el-option label="退回待接入池（所有人可见）" :value="0"/>
+      <el-option label="退回公共池（所有人可见）" :value="0"/>
       <el-option v-for="a in agentOptions" :key="a.id" :label="a.nickname + '（' + a.username + '）'" :value="a.id"/>
     </el-select>
     <template #footer>
@@ -1645,7 +1643,7 @@ const app = createApp({
       if (cmd === 'toggle') { await toggleAgent(row); }
       else if (cmd === 'del') {
         try {
-          await ElementPlus.ElMessageBox.confirm('删除该子客服？其名下会话将退回待接入池', '警告', { type: 'warning' });
+          await ElementPlus.ElMessageBox.confirm('删除该子客服？其名下会话将退回公共池', '警告', { type: 'warning' });
           await delAgent(row);
         } catch (e) {}
       }
