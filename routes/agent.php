@@ -34,7 +34,7 @@ function handle_sessions(string $method): void
         ELSE 'offline' END";
     $sql = "SELECT s.id, s.agent_id, a.nickname AS agent_name, s.visitor_name AS name,
         (SELECT value FROM contacts WHERE session_id = s.id AND type = 'note' LIMIT 1) AS note,
-        s.ip, s.from_url AS `from`, s.last_msg AS lastMsg, s.last_time AS lastTime, s.unread, s.source,
+        s.ip, s.from_url AS `from`, s.last_msg AS lastMsg, s.last_time AS lastTime, s.unread, s.source, s.geo,
         $onlineSql AS status,
         (SELECT COUNT(*) FROM messages WHERE session_id = s.id) AS message_count
         FROM v_sessions s LEFT JOIN agents a ON a.id = s.agent_id AND a.tenant_id = s.tenant_id
@@ -538,7 +538,7 @@ function handle_agent_poll(string $method): void
         ELSE 'offline' END";
     $st = $pdo->prepare("SELECT s.id, s.agent_id, a.nickname AS agent_name, s.visitor_name AS name,
         (SELECT value FROM contacts WHERE session_id = s.id AND type = 'note' LIMIT 1) AS note,
-        s.ip, s.from_url AS `from`, s.last_msg AS lastMsg, s.last_time AS lastTime, s.unread, s.source,
+        s.ip, s.from_url AS `from`, s.last_msg AS lastMsg, s.last_time AS lastTime, s.unread, s.source, s.geo,
         $onlineSql AS status,
         (SELECT COUNT(*) FROM messages WHERE session_id = s.id) AS message_count
         FROM v_sessions s LEFT JOIN agents a ON a.id = s.agent_id AND a.tenant_id = s.tenant_id
@@ -574,5 +574,23 @@ function handle_agent_poll(string $method): void
         $st->execute([$session, $sinceMsg]);
         $msgs = array_map('to_msg', $st->fetchAll());
     }
+    // 地理信息渐进补查：每轮最多补 2 个未解析的 IP（写回 v_sessions.geo，配合 1h 缓存）
+    try {
+        $needGeo = [];
+        foreach ($sessions as $row) {
+            if (count($needGeo) >= 2) break;
+            if (empty($row['geo']) && !empty($row['ip'])) $needGeo[$row['id']] = $row['ip'];
+        }
+        foreach ($needGeo as $sidG => $ipG) {
+            $g = lookup_geo($ipG);
+            if ($g !== '') {
+                $pdo->prepare('UPDATE v_sessions SET geo = ? WHERE id = ?')->execute([$g, $sidG]);
+                foreach ($sessions as &$rowUpd) {
+                    if ((int)$rowUpd['id'] === $sidG) { $rowUpd['geo'] = $g; break; }
+                }
+                unset($rowUpd);
+            }
+        }
+    } catch (\Throwable $e) { /* 地理补查失败不影响轮询 */ }
     json_out(['sessions' => $sessions, 'messages' => $msgs, 'readUpto' => $readUpto, 'recalledIds' => $recalledIds, 'now' => time()]);
 }

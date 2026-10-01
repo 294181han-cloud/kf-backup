@@ -98,6 +98,8 @@ body { margin: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'P
 .sess-item .dot.offline { background: #c9cdd4; }
 .badge { background: #f53f3f; color: #fff; font-size: 11px; min-width: 17px; height: 17px; border-radius: 9px; display: inline-flex; align-items: center; justify-content: center; padding: 0 5px; }
 .tag-agent { font-size: 10px; background: #e8f3ff; color: #165dff; border-radius: 3px; padding: 1px 4px; max-width: 64px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex-shrink: 0; }
+.geo-tag { display: inline-block; font-size: 10px; color: #86909c; background: #f2f3f5; border-radius: 4px; padding: 0 5px; margin-left: 5px; max-width: 120px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; vertical-align: 1px; }
+.chat-head .geo-tag { font-size: 11px; background: #f2f3f5; }
 
 .chat-col { flex: 1; display: flex; flex-direction: column; min-width: 0; background: #f7f7f7; }
     ::-webkit-scrollbar { width: 6px; height: 6px; }
@@ -330,7 +332,7 @@ body.dark .guide-step { border-color: #3a4048 !important; color: #c9cdd4; }
             <div v-if="!filteredSessions.length" style="padding:40px;text-align:center;color:#a0a6ad;font-size:13px;">暂无会话</div>
             <div class="sess-item" v-for="s in filteredSessions" :key="s.id" :class="{active: currentId===s.id}" @click="openSession(s.id)">
               <div class="row1">
-                <span class="name">{{ s.name }}</span>
+                <span class="name">{{ s.name }}<span class="geo-tag" v-if="s.geo" :title="geoTag(s.geo)">{{ geoTag(s.geo) }}</span></span>
                 <span class="time">{{ shortTime(s.lastTime) }}</span>
               </div>
               <div class="row2">
@@ -347,6 +349,7 @@ body.dark .guide-step { border-color: #3a4048 !important; color: #c9cdd4; }
           <template v-if="current">
             <div class="chat-head">
               <span class="name">{{ current.name }}</span>
+              <span class="geo-tag" v-if="current && current.geo" :title="geoTag(current.geo)">{{ geoTag(current.geo) }}</span>
               <span style="cursor:pointer;font-size:13px;" title="修改访客名称" @click="renameVisitor">✏️</span>
               <span style="cursor:pointer;font-size:13px;" title="搜索聊天记录" @click="chatSearchOn = !chatSearchOn">🔍</span>
               <el-tag size="small" :type="current.status==='online' ? 'success' : 'info'">{{ current.status==='online'?'在线':'离线' }}</el-tag>
@@ -1475,7 +1478,7 @@ const app = createApp({
       try {
         const r = await API.get('/api/poll?role=agent&session=' + currentId.value + '&sinceMsg=' + maxMsgId.value);
         sessions.value = r.sessions || [];
-        readUpto.value = r.readUpto ?? readUpto.value;
+        readUpto.value = r.readUpto != null ? r.readUpto : readUpto.value;
         // 撤回同步：最近撤回的消息标记（客服撤回→胶囊；访客撤回→内容保留+撤回角标）
         if (Array.isArray(r.recalledIds) && r.recalledIds.length) {
           const rset = new Set(r.recalledIds);
@@ -1783,7 +1786,7 @@ const app = createApp({
           createdAgent.account = r.login_account; createdAgent.password = r.plain.password;
           createdAgentVisible.value = true;
         } else {
-          const id = agents.value.find(a => a.username === agentForm.username)?.id;
+          const found = agents.value.find(a => a.username === agentForm.username); const id = found ? found.id : 0;
           if (id) await API.put('/api/tenant/agents/' + id, { nickname: agentForm.nickname });
         }
         agentDlg.value = false;
@@ -2129,6 +2132,17 @@ const app = createApp({
     tickClock(); setInterval(tickClock, 1000);
     const unreadTotal = Vue.computed(() => sessions.value.reduce((a, s) => a + (s.unread || 0), 0));
     const meAvatarUrl = Vue.computed(() => (me.value && me.value.avatar) || '');
+    // 地域标签格式化：国家 省 市（去 0/空，去重相邻）
+    const geoTag = (g) => {
+      if (!g) return '';
+      const p = String(g).split('|');
+      const parts = [];
+      for (const x of [p[0], p[1], p[2]]) {
+        const v = (x || '').trim();
+        if (v && v !== '0' && parts.indexOf(v) === -1) parts.push(v);
+      }
+      return parts.join(' ');
+    };
 
     // 深色主题
     const dark = ref(false);
