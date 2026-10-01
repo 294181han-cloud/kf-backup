@@ -2022,6 +2022,12 @@ const app = createApp({
       };
     };
     const cropUp = () => { cropDrag = null; };
+    const cropWheel = (e) => {
+      if (!cropDlg.value) return;
+      const d = e.deltaY > 0 ? -4 : 4;
+      const v = Math.max(10, Math.min(100, cropZoomPct.value + d));
+      if (v !== cropZoomPct.value) cropZoomInput();
+    };
     const cropClose = () => { cropSrc.value = ''; };
     const openCrop = (ev) => {
       const file = ev && ev.target ? ev.target.files[0] : null;
@@ -2132,6 +2138,7 @@ const app = createApp({
     tickClock(); setInterval(tickClock, 1000);
     const unreadTotal = Vue.computed(() => sessions.value.reduce((a, s) => a + (s.unread || 0), 0));
     const meAvatarUrl = Vue.computed(() => (me.value && me.value.avatar) || '');
+    const avatarPreview = meAvatarUrl;
     // 地域标签格式化：国家 省 市（去 0/空，去重相邻）
     const geoTag = (g) => {
       if (!g) return '';
