@@ -1,0 +1,13 @@
+# ===== 敏感/环境文件（不进仓库；服务器上保留真实版本，git pull 不会覆盖）=====
+config.php
+data/
+uploads/
+
+# ===== 本地参考/工具 =====
+old/
+.reasonix/
+
+# ===== 系统 =====
+Thumbs.db
+.DS_Store
+*.log

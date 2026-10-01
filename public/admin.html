@@ -1,0 +1,430 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>平台管理 - 客服系统</title>
+<link rel="stylesheet" href="/assets/vendor/element-plus.css">
+<style>
+body { margin: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif; background: #f2f3f5; }
+.layout { display: flex; min-height: 100vh; }
+.side {
+  width: 200px; background: #1f2329; color: #fff; flex-shrink: 0;
+  display: flex; flex-direction: column; padding-top: 12px;
+}
+.side .logo { font-size: 17px; font-weight: 600; padding: 18px 20px 16px; color: #fff; display: flex; align-items: center; gap: 8px; }
+.side .nav { flex: 1; }
+.side .nav-item {
+  padding: 12px 20px; cursor: pointer; color: #a9aeb8; font-size: 14px;
+  display: flex; align-items: center; gap: 10px; border-left: 3px solid transparent;
+}
+.side .nav-item:hover { color: #fff; background: rgba(255,255,255,.06); }
+.side .nav-item.active { color: #fff; background: rgba(22,119,255,.18); border-left-color: #1677ff; }
+.side .foot { padding: 14px 20px; font-size: 12px; color: #6b7280; cursor: pointer; }
+.main { flex: 1; display: flex; flex-direction: column; min-width: 0; }
+.topbar {
+  background: #fff; height: 54px; display: flex; align-items: center; padding: 0 24px;
+  box-shadow: 0 1px 4px rgba(0,0,0,.06); justify-content: space-between;
+}
+.topbar .title { font-size: 16px; font-weight: 600; color: #1f2329; }
+.content { padding: 20px 24px; flex: 1; overflow-y: auto; max-width: 1240px; margin: 0 auto; width: 100%; }
+.stat-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 14px; margin-bottom: 18px; }
+.stat-card { background: #fff; border-radius: 10px; padding: 18px; }
+.stat-card .v { font-size: 26px; font-weight: 700; color: #1f2329; }
+.stat-card .l { font-size: 13px; color: #86909c; margin-top: 4px; }
+.panel { background: #fff; border-radius: 10px; padding: 18px 20px; margin-bottom: 18px; }
+.panel-title { font-size: 15px; font-weight: 600; margin-bottom: 14px; color: #1f2329; }
+.bar-row { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; font-size: 13px; }
+.bar-row .name { width: 130px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #4e5969; }
+.bar-row .bar { flex: 1; background: #f2f3f5; border-radius: 4px; height: 18px; position: relative; }
+.bar-row .bar > div { height: 100%; border-radius: 4px; background: linear-gradient(90deg,#1677ff,#69b1ff); min-width: 2px; }
+.bar-row .num { width: 46px; text-align: right; color: #86909c; }
+.mono { font-family: Consolas, monospace; }
+.mb { margin-bottom: 14px; }
+</style>
+</head>
+<body>
+<div id="app" v-cloak>
+  <div v-if="!booted" style="height:100vh;display:flex;align-items:center;justify-content:center;color:#86909c;font-size:14px;">
+    ⏳ 正在验证登录...
+  </div>
+  <div class="layout" v-else>
+    <div class="side">
+      <div class="logo">🛡️ 平台管理</div>
+      <div class="nav">
+        <div class="nav-item" :class="{active: tab==='overview'}" @click="tab='overview'">📊 概览</div>
+        <div class="nav-item" :class="{active: tab==='tenants'}" @click="tab='tenants'">👥 租户管理</div>
+        <div class="nav-item" :class="{active: tab==='domains'}" @click="tab='domains'">🌐 域名池</div>
+        <div class="nav-item" :class="{active: tab==='settings'}" @click="tab='settings'">⚙️ 全局设置</div>
+      </div>
+      <div class="foot" @click="logout">退出登录</div>
+    </div>
+
+    <div class="main">
+      <div class="topbar">
+        <div class="title">{{ tabTitle }}</div>
+        <div>
+          <el-alert v-if="me && me.default_password" type="warning" :closable="false" style="display:inline-block;padding:4px 12px;margin-right:12px;">
+            当前使用默认密码，请尽快在「全局设置」中修改
+          </el-alert>
+          <span style="color:#4e5969;font-size:13px;">{{ me ? me.nickname : '' }}</span>
+        </div>
+      </div>
+
+      <div class="content">
+        <!-- ===================== 概览 ===================== -->
+        <template v-if="tab==='overview' && ov">
+          <div class="stat-grid">
+            <div class="stat-card"><div class="v">{{ ov.tenants_total }}</div><div class="l">租户总数</div></div>
+            <div class="stat-card"><div class="v" style="color:#00b42a;">{{ ov.tenants_active }}</div><div class="l">有效租户</div></div>
+            <div class="stat-card"><div class="v" style="color:#f53f3f;">{{ ov.tenants_expired }}</div><div class="l">已到期</div></div>
+            <div class="stat-card"><div class="v">{{ ov.agents_total }}</div><div class="l">子客服数</div></div>
+            <div class="stat-card"><div class="v">{{ ov.sessions_total }}</div><div class="l">总会话数</div></div>
+            <div class="stat-card"><div class="v">{{ ov.sessions_today }}</div><div class="l">今日新会话</div></div>
+            <div class="stat-card"><div class="v">{{ ov.messages_today }}</div><div class="l">今日消息数</div></div>
+          </div>
+          <div class="panel">
+            <div class="panel-title">近 7 天新会话</div>
+            <div class="bar-row" v-for="d in ov.trend7" :key="d.date">
+              <div class="name" style="width:50px;">{{ d.date }}</div>
+              <div class="bar"><div :style="{width: barWidth(d.count, ov.trend7)}"></div></div>
+              <div class="num">{{ d.count }}</div>
+            </div>
+          </div>
+          <div class="panel">
+            <div class="panel-title">租户活跃排行（近 7 天会话数）</div>
+            <div class="bar-row" v-if="!ov.ranking.length"><div class="name">暂无数据</div></div>
+            <div class="bar-row" v-for="r in ov.ranking" :key="r.id">
+              <div class="name mono">{{ r.kami }}（{{ r.nickname }}）</div>
+              <div class="bar"><div :style="{width: barWidth(r.c, ov.ranking)}"></div></div>
+              <div class="num">{{ r.c }}</div>
+            </div>
+          </div>
+        </template>
+
+        <!-- ===================== 租户管理 ===================== -->
+        <template v-if="tab==='tenants'">
+          <div class="panel">
+            <div class="panel-title" style="display:flex;justify-content:space-between;align-items:center;">
+              <span>租户列表（{{ tenants.length }}）</span>
+              <span>
+                <el-button size="small" @click="openGen">随机生成卡密</el-button>
+                <el-button type="primary" size="small" @click="openCreate">＋ 创建租户</el-button>
+              </span>
+            </div>
+            <el-table :data="tenants" size="default" stripe>
+              <el-table-column label="卡密" width="130">
+                <template #default="{row}"><span class="mono" style="font-weight:600;">{{ row.kami }}</span></template>
+              </el-table-column>
+              <el-table-column prop="nickname" label="名称" width="110"/>
+              <el-table-column label="状态" width="90">
+                <template #default="{row}">
+                  <el-tag v-if="row.status!=='active'" type="danger" size="small">已停用</el-tag>
+                  <el-tag v-else-if="row.expired" type="warning" size="small">已到期</el-tag>
+                  <el-tag v-else type="success" size="small">正常</el-tag>
+                </template>
+              </el-table-column>
+              <el-table-column label="有效期至" width="150">
+                <template #default="{row}">
+                  <span v-if="row.expires_at" :style="row.expired?'color:#f53f3f':''">{{ row.expires_at.slice(0,16) }}</span>
+                  <span v-else style="color:#86909c;">永久</span>
+                </template>
+              </el-table-column>
+              <el-table-column label="周额度 (网页/客服码)" width="160">
+                <template #default="{row}">{{ row.quota_web }} / {{ row.quota_app }}</template>
+              </el-table-column>
+              <el-table-column prop="max_agents" label="子客服上限" width="90"/>
+              <el-table-column prop="agents_cnt" label="子客服" width="70"/>
+              <el-table-column prop="sessions" label="会话数" width="75"/>
+              <el-table-column prop="last_login_at" label="最后登录" width="150">
+                <template #default="{row}"><span style="font-size:12px;color:#86909c;">{{ row.last_login_at ? row.last_login_at.slice(0,16) : '从未' }}</span></template>
+              </el-table-column>
+              <el-table-column label="备注" prop="remark" min-width="100" show-overflow-tooltip/>
+              <el-table-column label="操作" width="200" fixed="right">
+                <template #default="{row}">
+                  <el-button size="small" @click="openEdit(row)">编辑</el-button>
+                  <el-button size="small" :type="row.status==='active' ? 'warning' : 'success'" @click="toggleTenant(row)">
+                    {{ row.status==='active' ? '停用' : '启用' }}
+                  </el-button>
+                  <el-popconfirm title="删除租户及其全部数据，不可恢复？" @confirm="delTenant(row)">
+                    <template #reference><el-button size="small" type="danger">删除</el-button></template>
+                  </el-popconfirm>
+                </template>
+              </el-table-column>
+            </el-table>
+          </div>
+        </template>
+
+        <!-- ===================== 域名池 ===================== -->
+        <template v-if="tab==='domains'">
+          <div class="panel">
+            <div class="panel-title">客服码域名池</div>
+            <p style="font-size:13px;color:#86909c;margin:0 0 14px;">
+              租户「一键换码」时从该池随机取域名生成客服码链接。泛解析域名（*.abc.com）可自动生成随机子域。
+            </p>
+            <div style="display:flex;gap:10px;margin-bottom:14px;">
+              <el-input v-model="newDomain" placeholder="例如 abc.com 或 *.abc.com" style="max-width:320px;" @keyup.enter="addDomain"/>
+              <el-button type="primary" @click="addDomain">添加</el-button>
+            </div>
+            <el-table :data="domains" stripe>
+              <el-table-column prop="domain" label="域名"/>
+              <el-table-column label="类型" width="110">
+                <template #default="{row}">{{ row.wildcard ? '泛解析' : '单域名' }}</template>
+              </el-table-column>
+              <el-table-column label="状态" width="90">
+                <template #default="{row}">
+                  <el-tag :type="row.enabled ? 'success' : 'info'" size="small">{{ row.enabled ? '启用' : '停用' }}</el-tag>
+                </template>
+              </el-table-column>
+              <el-table-column label="操作" width="160">
+                <template #default="{row}">
+                  <el-button size="small" @click="toggleDomain(row)">{{ row.enabled ? '停用' : '启用' }}</el-button>
+                  <el-popconfirm title="删除该域名？" @confirm="delDomain(row)">
+                    <template #reference><el-button size="small" type="danger">删除</el-button></template>
+                  </el-popconfirm>
+                </template>
+              </el-table-column>
+            </el-table>
+          </div>
+        </template>
+
+        <!-- ===================== 全局设置 ===================== -->
+        <template v-if="tab==='settings'">
+          <div class="panel">
+            <div class="panel-title">主域名（专属链接用）</div>
+            <p style="font-size:13px;color:#86909c;margin:0 0 14px;">
+              租户的「专属链接」形如 https://子域.主域名/visitor.html。需将该主域名做泛解析（*.主域名 → 本服务器）。
+            </p>
+            <div style="display:flex;gap:10px;max-width:420px;">
+              <el-input v-model="rootDomain" placeholder="例如 kfabc.com"/>
+              <el-button type="primary" @click="saveRootDomain">保存</el-button>
+            </div>
+          </div>
+          <div class="panel">
+            <div class="panel-title">新租户默认额度</div>
+            <div style="display:flex;gap:20px;flex-wrap:wrap;max-width:560px;">
+              <div style="flex:1;min-width:160px;">
+                <div style="font-size:13px;color:#4e5969;margin-bottom:6px;">网页链接周进粉上限</div>
+                <el-input-number v-model="defVal.default_quota_web" :min="0" style="width:100%;"/>
+              </div>
+              <div style="flex:1;min-width:160px;">
+                <div style="font-size:13px;color:#4e5769;margin-bottom:6px;">客服码周进粉上限</div>
+                <el-input-number v-model="defVal.default_quota_app" :min="0" style="width:100%;"/>
+              </div>
+              <div style="flex:1;min-width:160px;">
+                <div style="font-size:13px;color:#4e5769;margin-bottom:6px;">子客服数量上限</div>
+                <el-input-number v-model="defVal.default_max_agents" :min="0" :max="50" style="width:100%;"/>
+              </div>
+            </div>
+            <el-button type="primary" style="margin-top:16px;" @click="saveDefaults">保存默认值</el-button>
+          </div>
+          <div class="panel">
+            <div class="panel-title">修改管理员密码</div>
+            <div style="display:flex;gap:10px;max-width:480px;flex-wrap:wrap;">
+              <el-input v-model="pwOld" type="password" placeholder="旧密码" style="width:150px;"/>
+              <el-input v-model="pwNew" type="password" placeholder="新密码（至少6位）" style="width:180px;"/>
+              <el-button type="primary" @click="changePw">修改密码</el-button>
+            </div>
+          </div>
+        </template>
+      </div>
+    </div>
+  </div>
+
+  <!-- 创建/编辑租户 -->
+  <el-dialog v-model="dlgVisible" :title="dlgMode==='create' ? '创建租户' : '编辑租户'" width="480px">
+    <el-form label-width="120px">
+      <el-form-item label="卡密" v-if="dlgMode==='create'">
+        <el-input v-model="dlg.kami" placeholder="留空自动生成">
+          <template #append><el-button @click="fillGenKami">生成</el-button></template>
+        </el-input>
+      </el-form-item>
+      <el-form-item label="卡密" v-else><span class="mono" style="font-weight:600;">{{ dlg.kami }}</span></el-form-item>
+      <el-form-item label="名称"><el-input v-model="dlg.nickname" placeholder="例如：张三的客服"/></el-form-item>
+      <el-form-item label="有效期">
+        <el-date-picker v-model="dlg.expires_at" type="datetime" placeholder="留空为永久"
+          value-format="YYYY-MM-DD HH:mm:ss" style="width:100%;"/>
+      </el-form-item>
+      <el-form-item label="网页周额度"><el-input-number v-model="dlg.quota_web" :min="0"/></el-form-item>
+      <el-form-item label="客服码周额度"><el-input-number v-model="dlg.quota_app" :min="0"/></el-form-item>
+      <el-form-item label="子客服上限"><el-input-number v-model="dlg.max_agents" :min="0" :max="50"/></el-form-item>
+      <el-form-item label="备注"><el-input v-model="dlg.remark" placeholder="购买渠道 / 联系方式等"/></el-form-item>
+      <el-form-item label="重置密码" v-if="dlgMode==='edit'">
+        <el-input v-model="dlg.password" placeholder="留空不修改"/>
+      </el-form-item>
+    </el-form>
+    <template #footer>
+      <el-button @click="dlgVisible=false">取消</el-button>
+      <el-button type="primary" :loading="dlgSaving" @click="saveTenant">{{ dlgMode==='create' ? '创建' : '保存' }}</el-button>
+    </template>
+  </el-dialog>
+
+  <!-- 创建成功展示卡密 -->
+  <el-dialog v-model="createdVisible" title="✅ 租户已创建" width="420px">
+    <p style="font-size:14px;color:#4e5969;margin:0 0 12px;">请将以下账号信息发送给客户（密码仅本次展示）：</p>
+    <div style="background:#f7f8fa;border-radius:8px;padding:16px;font-size:16px;line-height:2;">
+      卡密：<b class="mono">{{ created.kami }}</b><br>
+      密码：<b class="mono">{{ created.password }}</b><br>
+      登录地址：<span class="mono" style="font-size:13px;">{{ locationOrigin }}/login.html</span>
+    </div>
+    <template #footer>
+      <el-button @click="copyCreated">复制</el-button>
+      <el-button type="primary" @click="createdVisible=false">我已保存</el-button>
+    </template>
+  </el-dialog>
+
+  <!-- 随机生成 -->
+  <el-dialog v-model="genVisible" title="随机生成卡密" width="380px">
+    <div v-if="genPair" style="background:#f7f8fa;border-radius:8px;padding:14px;font-size:15px;line-height:2;">
+      卡密：<b class="mono">{{ genPair.kami }}</b><br>密码：<b class="mono">{{ genPair.password }}</b>
+    </div>
+    <template #footer>
+      <el-button @click="doGen">重新生成</el-button>
+      <el-button type="primary" @click="genVisible=false">关闭</el-button>
+    </template>
+  </el-dialog>
+</div>
+
+<script src="/assets/vendor/vue.global.js?v=2.0.1"></script>
+<script src="/assets/vendor/element-plus.js?v=2.0.1"></script>
+<script src="/assets/api.js?v=2.0.1"></script>
+<script>
+const { createApp, ref, reactive, computed, onMounted } = Vue;
+createApp({
+  setup() {
+    const tab = ref('overview');
+    const booted = ref(false);
+    const me = ref(null);
+    const ov = ref(null);
+    const tenants = ref([]);
+    const domains = ref([]);
+    const newDomain = ref('');
+    const rootDomain = ref('');
+    const defVal = reactive({ default_quota_web: 200, default_quota_app: 200, default_max_agents: 5 });
+    const pwOld = ref(''); const pwNew = ref('');
+
+    const tabTitle = computed(() => ({ overview: '平台概览', tenants: '租户管理', domains: '域名池', settings: '全局设置' }[tab.value]));
+    const locationOrigin = location.origin;
+
+    const barWidth = (v, list) => {
+      const max = Math.max(1, ...list.map(x => x.count ?? x.c));
+      return Math.max(0, Math.round(v / max * 100)) + '%';
+    };
+
+    const loadOverview = async () => { ov.value = await API.get('/api/admin/overview'); };
+    const loadTenants = async () => { tenants.value = await API.get('/api/admin/tenants'); };
+    const loadDomains = async () => { domains.value = await API.get('/api/admin/domain-pool'); };
+    const loadSettings = async () => {
+      const r = await API.get('/api/admin/root-domain'); rootDomain.value = r.root_domain;
+      Object.assign(defVal, await API.get('/api/admin/defaults'));
+    };
+    const loadAll = async () => {
+      try {
+        me.value = await API.me();
+        if (me.value.role !== 'admin') { location.href = '/login.html'; return; }
+        await Promise.all([loadOverview(), loadTenants(), loadDomains(), loadSettings()]);
+        booted.value = true;
+      } catch (e) { ElementPlus.ElMessage.error(e.message); }
+    };
+
+    // 租户 CRUD
+    const dlgVisible = ref(false);
+    const dlgMode = ref('create');
+    const dlgSaving = ref(false);
+    const dlg = reactive({ id: 0, kami: '', nickname: '', expires_at: null, quota_web: 200, quota_app: 200, max_agents: 5, remark: '', password: '' });
+    const createdVisible = ref(false);
+    const created = reactive({ kami: '', password: '' });
+    const genVisible = ref(false);
+    const genPair = ref(null);
+
+    const openCreate = () => {
+      dlgMode.value = 'create';
+      Object.assign(dlg, { id: 0, kami: '', nickname: '', expires_at: null, quota_web: defVal.default_quota_web, quota_app: defVal.default_quota_app, max_agents: defVal.default_max_agents, remark: '', password: '' });
+      dlgVisible.value = true;
+    };
+    const openEdit = (row) => {
+      dlgMode.value = 'edit';
+      Object.assign(dlg, { id: row.id, kami: row.kami, nickname: row.nickname, expires_at: row.expires_at, quota_web: row.quota_web, quota_app: row.quota_app, max_agents: row.max_agents, remark: row.remark, password: '' });
+      dlgVisible.value = true;
+    };
+    const fillGenKami = async () => {
+      try { const r = await API.post('/api/admin/tenants/gen'); dlg.kami = r.kami; } catch (e) { ElementPlus.ElMessage.error(e.message); }
+    };
+    const saveTenant = async () => {
+      dlgSaving.value = true;
+      try {
+        if (dlgMode.value === 'create') {
+          const r = await API.post('/api/admin/tenants', dlg);
+          created.kami = r.plain.kami; created.password = r.plain.password;
+          createdVisible.value = true;
+        } else {
+          await API.put('/api/admin/tenants/' + dlg.id, dlg);
+          ElementPlus.ElMessage.success('已保存');
+        }
+        dlgVisible.value = false;
+        await loadTenants();
+      } catch (e) { ElementPlus.ElMessage.error(e.message); }
+      finally { dlgSaving.value = false; }
+    };
+    const toggleTenant = async (row) => {
+      try {
+        await API.put('/api/admin/tenants/' + row.id, { status: row.status === 'active' ? 'banned' : 'active' });
+        await loadTenants();
+      } catch (e) { ElementPlus.ElMessage.error(e.message); }
+    };
+    const delTenant = async (row) => {
+      try { await API.del('/api/admin/tenants/' + row.id); ElementPlus.ElMessage.success('已删除'); await loadTenants(); await loadOverview(); }
+      catch (e) { ElementPlus.ElMessage.error(e.message); }
+    };
+    const copyCreated = () => {
+      const s = `卡密：${created.kami}\n密码：${created.password}\n登录地址：${locationOrigin}/login.html`;
+      navigator.clipboard && navigator.clipboard.writeText(s);
+      ElementPlus.ElMessage.success('已复制');
+    };
+    const openGen = async () => { genVisible.value = true; if (!genPair.value) await doGen(); };
+    const doGen = async () => { try { genPair.value = await API.post('/api/admin/tenants/gen'); } catch (e) { ElementPlus.ElMessage.error(e.message); } };
+
+    // 域名池
+    const addDomain = async () => {
+      if (!newDomain.value.trim()) return;
+      try { await API.post('/api/admin/domain-pool', { domain: newDomain.value.trim() }); newDomain.value = ''; await loadDomains(); }
+      catch (e) { ElementPlus.ElMessage.error(e.message); }
+    };
+    const toggleDomain = async (row) => {
+      try { await API.put('/api/admin/domain-pool/' + row.id, { enabled: row.enabled ? 0 : 1 }); await loadDomains(); }
+      catch (e) { ElementPlus.ElMessage.error(e.message); }
+    };
+    const delDomain = async (row) => {
+      try { await API.del('/api/admin/domain-pool/' + row.id); await loadDomains(); }
+      catch (e) { ElementPlus.ElMessage.error(e.message); }
+    };
+
+    // 设置
+    const saveRootDomain = async () => {
+      try { await API.post('/api/admin/root-domain', { root_domain: rootDomain.value }); ElementPlus.ElMessage.success('已保存'); }
+      catch (e) { ElementPlus.ElMessage.error(e.message); }
+    };
+    const saveDefaults = async () => {
+      try { await API.post('/api/admin/defaults', defVal); ElementPlus.ElMessage.success('已保存'); }
+      catch (e) { ElementPlus.ElMessage.error(e.message); }
+    };
+    const changePw = async () => {
+      if (!pwOld.value || !pwNew.value) { ElementPlus.ElMessage.warning('请输入旧密码和新密码'); return; }
+      try { await API.changePassword(pwOld.value, pwNew.value); ElementPlus.ElMessage.success('密码已修改'); pwOld.value = pwNew.value = ''; me.value = await API.me(); }
+      catch (e) { ElementPlus.ElMessage.error(e.message); }
+    };
+    const logout = () => { API.clearToken(); location.href = '/login.html'; };
+
+    onMounted(loadAll);
+    return {
+      tab, tabTitle, booted, me, ov, tenants, domains, newDomain, rootDomain, defVal, pwOld, pwNew,
+      barWidth, locationOrigin,
+      dlgVisible, dlgMode, dlg, dlgSaving, openCreate, openEdit, saveTenant, toggleTenant, delTenant,
+      createdVisible, created, copyCreated, openGen, genVisible, genPair, doGen, fillGenKami,
+      addDomain, toggleDomain, delDomain, saveRootDomain, saveDefaults, changePw, logout,
+    };
+  }
+}).use(ElementPlus).mount('#app');
+</script>
+</body>
+</html>

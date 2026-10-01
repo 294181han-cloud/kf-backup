@@ -1,0 +1,7 @@
+# 统一行尾，避免跨环境差异
+* text=auto eol=lf
+*.ps1 text eol=crlf
+*.png binary
+*.jpg binary
+*.gif binary
+*.woff2 binary

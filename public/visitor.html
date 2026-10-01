@@ -1,0 +1,679 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#1677ff">
+<title>在线咨询</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+:root {
+  --theme: #1677ff;
+  --theme-grad: linear-gradient(135deg, #1677ff 0%, #4d9bff 100%);
+  --bg: #f0f2f7;
+  --card: #ffffff;
+  --ink: #1a2233;
+  --ink-2: #5c6b85;
+  --ink-3: #9aa7bd;
+  --line: #e8ecf3;
+  --radius: 14px;
+}
+html, body { height: 100%; }
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', sans-serif;
+  background: var(--bg);
+  color: var(--ink);
+  display: flex; flex-direction: column;
+  overflow: hidden;
+}
+#app { display: flex; flex-direction: column; height: 100%; }
+
+/* ================= 头部 ================= */
+.v-header {
+  position: relative;
+  background: var(--theme-grad);
+  color: #fff;
+  padding: 16px 18px calc(16px);
+  display: flex; align-items: center; gap: 13px;
+  flex-shrink: 0;
+  z-index: 10;
+}
+.v-header::after {
+  content: '';
+  position: absolute; left: 0; right: 0; bottom: -18px; height: 18px;
+  background: var(--bg);
+  border-radius: 18px 18px 0 0;
+}
+.v-avatar {
+  position: relative;
+  width: 48px; height: 48px; border-radius: 50%;
+  background: rgba(255,255,255,.22);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 27px; flex-shrink: 0;
+  box-shadow: 0 4px 12px rgba(0,0,0,.14), inset 0 0 0 1.5px rgba(255,255,255,.35);
+  overflow: visible;
+}
+.v-avatar img { width: 100%; height: 100%; border-radius: 50%; object-fit: cover; }
+.v-avatar .online-dot {
+  position: absolute; right: -1px; bottom: -1px;
+  width: 13px; height: 13px; border-radius: 50%;
+  background: #2ee66b; border: 2.5px solid #fff0;
+  box-shadow: 0 0 0 2px rgba(46,230,107,.35);
+  animation: pulse 2s infinite;
+}
+@keyframes pulse { 0%,100% { box-shadow: 0 0 0 2px rgba(46,230,107,.35);} 50% { box-shadow: 0 0 0 5px rgba(46,230,107,.12);} }
+.v-title { font-size: 16.5px; font-weight: 700; letter-spacing: .3px; display: flex; align-items: center; gap: 7px; }
+.v-sub { font-size: 12px; opacity: .88; margin-top: 3px; }
+.v-status {
+  margin-left: auto; font-size: 11.5px; font-weight: 500;
+  background: rgba(255,255,255,.18); border: 1px solid rgba(255,255,255,.25);
+  padding: 4px 11px; border-radius: 999px; flex-shrink: 0;
+  backdrop-filter: blur(4px);
+}
+
+/* ================= 公告 ================= */
+.notice-bar {
+  background: linear-gradient(90deg, #fff8e8, #fffdf6);
+  border-bottom: 1px solid #ffe9b8;
+  color: #9a6d1b; padding: 9px 16px; font-size: 12.5px; line-height: 1.55;
+  flex-shrink: 0; display: flex; gap: 7px; align-items: flex-start;
+}
+.notice-bar .n-ic { flex-shrink: 0; }
+
+/* ================= 消息区 ================= */
+.v-body { flex: 1; overflow-y: auto; padding: 14px 14px 6px; -webkit-overflow-scrolling: touch; }
+.v-body::-webkit-scrollbar { width: 0; }
+
+/* 欢迎屏（无消息时） */
+.welcome-card {
+  margin: 8vh auto 0; max-width: 300px; text-align: center;
+  background: var(--card); border-radius: 20px; padding: 34px 26px;
+  box-shadow: 0 10px 40px rgba(30,60,120,.08);
+}
+.welcome-card .w-ava {
+  width: 68px; height: 68px; border-radius: 50%; margin: 0 auto 16px;
+  background: linear-gradient(135deg, rgba(22,119,255,.12), rgba(22,119,255,.22));
+  display: flex; align-items: center; justify-content: center; font-size: 36px;
+}
+.welcome-card .w-ava img { width: 100%; height: 100%; border-radius: 50%; object-fit: cover; }
+.welcome-card h3 { font-size: 16.5px; font-weight: 700; color: var(--ink); margin-bottom: 8px; }
+.welcome-card p { font-size: 13px; color: var(--ink-2); line-height: 1.7; }
+
+.msg-row { display: flex; margin-bottom: 16px; align-items: flex-start; gap: 9px; }
+.msg-row.visitor { flex-direction: row-reverse; }
+.msg-ava {
+  width: 34px; height: 34px; border-radius: 50%;
+  background: var(--card); flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center; font-size: 18px;
+  box-shadow: 0 2px 8px rgba(30,60,120,.10), inset 0 0 0 1px var(--line);
+  overflow: hidden;
+}
+.msg-ava img { width: 100%; height: 100%; object-fit: cover; }
+.msg-box { max-width: 74%; }
+.msg-bubble {
+  padding: 10px 13px; border-radius: 16px; font-size: 15px;
+  line-height: 1.6; word-break: break-word; white-space: pre-wrap;
+}
+.msg-row.agent .msg-bubble {
+  background: var(--card); color: var(--ink);
+  border-top-left-radius: 5px;
+  box-shadow: 0 2px 8px rgba(30,60,120,.06), inset 0 0 0 1px var(--line);
+}
+.msg-row.visitor .msg-bubble {
+  background: var(--theme-grad); color: #fff;
+  border-top-right-radius: 5px;
+  box-shadow: 0 4px 12px rgba(22,119,255,.25);
+}
+.msg-bubble img { max-width: 100%; max-height: 260px; border-radius: 10px; display: block; margin-top: 4px; cursor: zoom-in; }
+.msg-bubble audio { width: 100%; max-width: 210px; margin-top: 4px; }
+.msg-time { font-size: 10.5px; color: var(--ink-3); margin-top: 5px; padding: 0 3px; }
+.msg-row.visitor .msg-time { text-align: right; }
+
+/* ================= 输入区 ================= */
+.v-footer-wrap {
+  flex-shrink: 0;
+  background: var(--card);
+  border-radius: 20px 20px 0 0;
+  box-shadow: 0 -6px 30px rgba(30,60,120,.10);
+  padding: 10px 12px calc(10px + env(safe-area-inset-bottom));
+}
+.v-tool { display: flex; gap: 6px; padding: 0 4px 8px; align-items: center; }
+.v-tool-btn {
+  background: none; border: none; cursor: pointer; padding: 5px 7px;
+  font-size: 12px; color: var(--ink-2); border-radius: 8px;
+  display: flex; align-items: center; gap: 5px;
+}
+.v-tool-btn:active { background: var(--bg); }
+.v-tool-btn .ic { font-size: 19px; }
+.v-input-row { display: flex; gap: 9px; align-items: flex-end; }
+.v-input {
+  flex: 1; border: 1.5px solid var(--line); border-radius: 12px;
+  padding: 10px 13px; font-size: 15px; outline: none; resize: none;
+  max-height: 96px; line-height: 1.5; font-family: inherit;
+  background: #f7f9fc; transition: border-color .15s;
+}
+.v-input:focus { border-color: var(--theme); background: #fff; }
+.v-btn {
+  background: var(--theme-grad); color: #fff; border: none;
+  border-radius: 12px; min-width: 66px; height: 42px; font-size: 15px;
+  font-weight: 600; flex-shrink: 0; cursor: pointer;
+  box-shadow: 0 4px 12px rgba(22,119,255,.3);
+}
+.v-btn:disabled { opacity: .45; box-shadow: none; }
+.v-btn:active { transform: scale(.97); }
+
+/* 录音条 */
+.recording-bar {
+  display: flex; align-items: center; gap: 10px;
+  padding: 12px 8px; font-size: 14px; color: var(--ink-2);
+}
+.rec-dot { width: 10px; height: 10px; border-radius: 50%; background: #ff4d4f; animation: blink 1s infinite; }
+@keyframes blink { 50% { opacity: .25; } }
+.rec-time { font-variant-numeric: tabular-nums; font-weight: 600; color: var(--ink); }
+.rec-actions { margin-left: auto; display: flex; gap: 8px; }
+.rec-cancel { background: #eef1f6; color: var(--ink-2); border: none; border-radius: 10px; padding: 8px 16px; font-size: 14px; cursor: pointer; }
+.rec-send { background: var(--theme-grad); color: #fff; border: none; border-radius: 10px; padding: 8px 18px; font-size: 14px; font-weight: 600; cursor: pointer; }
+
+/* ================= 状态页 ================= */
+.block-page {
+  flex: 1; display: flex; flex-direction: column;
+  align-items: center; justify-content: center; padding: 32px;
+  text-align: center; background: var(--bg);
+}
+.block-card {
+  background: var(--card); border-radius: 20px; padding: 38px 30px;
+  max-width: 320px; box-shadow: 0 10px 40px rgba(30,60,120,.08);
+}
+.block-icon { font-size: 52px; margin-bottom: 16px; }
+.block-title { font-size: 16.5px; color: var(--ink); font-weight: 700; margin-bottom: 9px; }
+.block-desc { font-size: 13.5px; color: var(--ink-2); line-height: 1.75; }
+.spinner {
+  width: 34px; height: 34px; margin: 0 auto 16px;
+  border: 3px solid rgba(22,119,255,.18); border-top-color: var(--theme);
+  border-radius: 50%; animation: spin .8s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* ================= 询前表单 ================= */
+.mask {
+  position: fixed; inset: 0; background: rgba(15,23,42,.55);
+  z-index: 50; display: flex; align-items: center; justify-content: center; padding: 22px;
+  backdrop-filter: blur(3px);
+}
+.form-card {
+  background: var(--card); width: 100%; max-width: 380px;
+  border-radius: 22px; padding: 28px 24px 24px;
+  max-height: 86vh; overflow-y: auto;
+  animation: cardIn .28s cubic-bezier(.2,.9,.3,1.2);
+  box-shadow: 0 24px 70px rgba(0,0,0,.28);
+}
+@keyframes cardIn { from { transform: translateY(24px) scale(.96); opacity: 0; } to { transform: none; opacity: 1; } }
+.form-ava {
+  width: 54px; height: 54px; border-radius: 50%; margin: 0 auto 12px;
+  background: linear-gradient(135deg, rgba(22,119,255,.12), rgba(22,119,255,.22));
+  display: flex; align-items: center; justify-content: center; font-size: 28px;
+}
+.form-ava img { width: 100%; height: 100%; border-radius: 50%; object-fit: cover; }
+.form-title { font-size: 16.5px; font-weight: 700; text-align: center; margin-bottom: 4px; color: var(--ink); }
+.form-sub { font-size: 12.5px; color: var(--ink-3); text-align: center; margin-bottom: 20px; }
+.form-item { margin-bottom: 15px; }
+.form-label { font-size: 13px; color: var(--ink-2); margin-bottom: 7px; display: block; font-weight: 500; }
+.form-label .req { color: #ff4d4f; margin-left: 2px; }
+.form-input {
+  width: 100%; border: 1.5px solid var(--line); border-radius: 12px;
+  padding: 11px 13px; font-size: 15px; outline: none; font-family: inherit;
+  background: #f7f9fc; transition: border-color .15s;
+}
+.form-input:focus { border-color: var(--theme); background: #fff; }
+textarea.form-input { resize: none; min-height: 78px; }
+.form-btn {
+  width: 100%; margin-top: 10px;
+  background: var(--theme-grad); color: #fff; border: none;
+  border-radius: 13px; height: 47px; font-size: 16px; font-weight: 600;
+  cursor: pointer; box-shadow: 0 6px 16px rgba(22,119,255,.3);
+}
+.form-btn:disabled { opacity: .6; }
+.form-btn:active { transform: scale(.98); }
+
+/* 图片预览 */
+.img-viewer {
+  position: fixed; inset: 0; background: rgba(0,0,0,.92); z-index: 100;
+  display: flex; align-items: center; justify-content: center;
+  animation: fadeIn .18s;
+}
+@keyframes fadeIn { from { opacity: 0; } }
+.img-viewer img { max-width: 96vw; max-height: 90vh; border-radius: 6px; }
+</style>
+</head>
+<body>
+<div id="app">
+  <!-- 不可用 / 加载 -->
+  <template v-if="page === 'blocked'">
+    <div class="block-page">
+      <div class="block-card">
+        <div class="block-icon">⚠️</div>
+        <div class="block-title">{{ blockedTitle }}</div>
+        <div class="block-desc">{{ blockedDesc }}</div>
+      </div>
+    </div>
+  </template>
+  <template v-else-if="page === 'loading'">
+    <div class="block-page">
+      <div class="block-card">
+        <div class="spinner"></div>
+        <div class="block-title">正在接入</div>
+        <div class="block-desc">正在为您连接客服，请稍候…</div>
+      </div>
+    </div>
+  </template>
+
+  <!-- 主界面 -->
+  <template v-else>
+    <div class="v-header">
+      <div class="v-avatar">
+        <img v-if="isImg(brand.avatar)" :src="brand.avatar"><template v-else>{{ brand.avatar }}</template>
+        <span class="online-dot"></span>
+      </div>
+      <div style="min-width:0;">
+        <div class="v-title">{{ brand.company_name }}</div>
+        <div class="v-sub">{{ brand.welcome_sub }}</div>
+      </div>
+      <div class="v-status">{{ onlineText }}</div>
+    </div>
+
+    <!-- 公告横幅 -->
+    <div class="notice-bar" v-if="brand.notice_on && brand.notice_text">
+      <span class="n-ic">📢</span><span>{{ brand.notice_text }}</span>
+    </div>
+
+    <div class="v-body" ref="bodyRef">
+      <!-- 欢迎屏（暂无消息） -->
+      <div class="welcome-card" v-if="!messages.length">
+        <div class="w-ava"><img v-if="isImg(brand.avatar)" :src="brand.avatar"><template v-else>{{ brand.avatar }}</template></div>
+        <h3>{{ brand.welcome_title }}</h3>
+        <p>{{ brand.welcome_sub }}</p>
+      </div>
+
+      <div class="msg-row" :class="m.from === 'visitor' ? 'visitor' : 'agent'" v-for="m in visibleMessages" :key="m.id">
+        <div class="msg-ava" v-if="m.from === 'visitor'">🙋</div>
+        <div class="msg-ava" v-else>
+          <img v-if="isImg(brand.avatar)" :src="brand.avatar"><template v-else>{{ brand.avatar }}</template>
+        </div>
+        <div class="msg-box">
+          <div class="msg-bubble">
+            <template v-if="m.text">{{ m.text }}</template>
+            <template v-for="(a, i) in (m.attachments || [])" :key="i">
+              <img v-if="a.type === 'image'" :src="a.url" @click="viewImage(a.url)">
+              <audio v-if="a.type === 'audio'" :src="a.url" controls></audio>
+            </template>
+          </div>
+          <div class="msg-time">{{ fmtTime(m.time) }}</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 录音条 -->
+    <div class="v-footer-wrap" v-if="recording">
+      <div class="recording-bar">
+        <span class="rec-dot"></span>
+        <span>录音中</span>
+        <span class="rec-time">{{ recSecs }}s</span>
+        <span style="font-size:12px;color:var(--ink-3);">最长 60 秒</span>
+        <div class="rec-actions">
+          <button class="rec-cancel" @click="stopRec(false)">取消</button>
+          <button class="rec-send" @click="stopRec(true)">发送</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="v-footer-wrap" v-else>
+      <div class="v-tool">
+        <button class="v-tool-btn" @click="pickImage"><span class="ic">🖼️</span>图片</button>
+        <button class="v-tool-btn" @click="startRec"><span class="ic">🎤</span>语音</button>
+        <input ref="imgInput" type="file" accept="image/png,image/jpeg,image/gif,image/webp" style="display:none" @change="onImage">
+      </div>
+      <div class="v-input-row">
+        <textarea class="v-input" ref="inputRef" rows="1" v-model="draft"
+          @focus="scrollBottom" placeholder="请输入您的问题…"
+          @keydown.enter.exact.prevent="send"></textarea>
+        <button class="v-btn" :disabled="!draft.trim() || sending" @click="send">发送</button>
+      </div>
+    </div>
+  </template>
+
+  <!-- 询前表单 -->
+  <div class="mask" v-if="showForm">
+    <div class="form-card">
+      <div class="form-ava"><img v-if="isImg(brand.avatar)" :src="brand.avatar"><template v-else>{{ brand.avatar }}</template></div>
+      <div class="form-title">{{ brand.welcome_title }}</div>
+      <div class="form-sub">{{ brand.company_name }} · 在线客服</div>
+      <div class="form-item" v-for="f in formItems" :key="f.id">
+        <label class="form-label">{{ f.label }}<span class="req" v-if="f.required">*</span></label>
+        <input v-if="f.type !== 'textarea'" class="form-input" v-model="formValues[f.key]" :placeholder="f.placeholder">
+        <textarea v-else class="form-input" v-model="formValues[f.key]" :placeholder="f.placeholder"></textarea>
+      </div>
+      <button class="form-btn" :disabled="formSubmitting" @click="submitForm">{{ formSubmitting ? '正在接入…' : '开始咨询' }}</button>
+    </div>
+  </div>
+
+  <!-- 图片预览 -->
+  <div class="img-viewer" v-if="viewing" @click="viewing = ''">
+    <img :src="viewing" alt="">
+  </div>
+</div>
+
+<script src="/assets/vendor/vue.global.js?v=2.0.1"></script>
+<script>
+const { createApp, ref, reactive, onMounted, onUnmounted, nextTick } = Vue;
+
+createApp({
+  setup() {
+    const qs = new URLSearchParams(location.search);
+    const page = ref('loading');
+    const blockedTitle = ref('暂时无法接入');
+    const blockedDesc = ref('');
+    const brand = reactive({ company_name: '在线客服', welcome_title: '您好，欢迎咨询！', welcome_sub: '', avatar: '💬', theme_color: '#1677ff', pre_inquiry_on: true });
+    const messages = ref([]);
+    const draft = ref('');
+    const sending = ref(false);
+    const sessionId = ref(0);
+    const maxMsgId = ref(0);
+    const visitorToken = ref('');
+    const bodyRef = ref(null);
+    const inputRef = ref(null);
+    const imgInput = ref(null);
+    const viewing = ref('');
+
+    // 询前表单
+    const showForm = ref(false);
+    const formItems = ref([]);
+    const formValues = reactive({});
+    const formSubmitting = ref(false);
+
+    // 录音
+    const recording = ref(false);
+    const recSecs = ref(0);
+    let mediaRecorder = null, recChunks = [], recTimer = null, recStartAt = 0;
+
+    let pollTimer = null;
+
+    const params = () => {
+      const p = {};
+      if (qs.get('code')) p.code = qs.get('code');
+      if (qs.get('t')) p.t = qs.get('t');
+      return p;
+    };
+
+    const scrollBottom = () => nextTick(() => { if (bodyRef.value) bodyRef.value.scrollTop = bodyRef.value.scrollHeight; });
+
+    const isImg = (v) => typeof v === 'string' && (v.startsWith('http') || v.startsWith('/uploads'));
+    const fmtTime = (t) => {
+      if (!t) return '';
+      const d = new Date(t);
+      const pad = (n) => String(n).padStart(2, '0');
+      return pad(d.getHours()) + ':' + pad(d.getMinutes());
+    };
+
+    const applyBrand = (b) => {
+      Object.assign(brand, b);
+      if (b.theme_color) document.documentElement.style.setProperty('--theme', b.theme_color);
+    };
+
+    const storeToken = (t) => {
+      visitorToken.value = t;
+      const key = 'kfxt_vt_' + (qs.get('code') || qs.get('t') || location.hostname);
+      try { localStorage.setItem(key, t); } catch (e) {}
+    };
+    const loadToken = () => {
+      const key = 'kfxt_vt_' + (qs.get('code') || qs.get('t') || location.hostname);
+      try { return localStorage.getItem(key) || ''; } catch (e) { return ''; }
+    };
+
+    // 访客端不显示系统提示（转接/结束等）；欢迎语按客服消息展示
+    const visibleMessages = Vue.computed(() => messages.value.filter(m => m.from !== 'system' || m.sender_name === '欢迎语'));
+    const pushMessages = (list) => {
+      let added = false;
+      for (const m of (list || [])) {
+        if (m.id > maxMsgId.value) {
+          maxMsgId.value = m.id;
+          messages.value.push(m);
+          added = true;
+        }
+      }
+      if (added) scrollBottom();
+    };
+
+    // ---- 初始化流程 ----
+    const boot = async () => {
+      try {
+        const p = params();
+        if (!p.code && !p.t) {
+          // 纯子域名访问也允许（后端按 host 识别）
+        }
+        const q = new URLSearchParams(p);
+        const cfg = await fetch('/api/visitor/config?' + q.toString()).then(r => r.json());
+        if (!cfg.available) {
+          blockedDesc.value = cfg.unavailable_reason || '该链接已失效';
+          page.value = 'blocked';
+          return;
+        }
+        applyBrand(cfg.brand);
+        if (cfg.quota_full && cfg.quota_full !== '') {
+          blockedDesc.value = '本周客服名额已满，请稍后再来';
+          page.value = 'blocked';
+          return;
+        }
+
+        // 已有会话则直接恢复
+        const vt = loadToken();
+        if (vt) {
+          try {
+            const r = await fetch('/api/visitor/init', {
+              method: 'POST', headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ ...p, visitor_token: vt, from_url: document.referrer || '直接访问' })
+            }).then(x => x.json());
+            if (r && r.session_id) {
+              sessionId.value = r.session_id;
+              storeToken(r.visitor_token);
+              page.value = 'chat';
+              await loadHistory();
+              startPoll();
+              return;
+            }
+          } catch (e) { /* 恢复失败走新流程 */ }
+        }
+
+        // 询前表单 or 直接入口
+        if (cfg.brand.pre_inquiry_on) {
+          try {
+            const items = await fetch('/api/visitor/pre-inquiry?' + q.toString()).then(r => r.json());
+            if (Array.isArray(items) && items.length) {
+              formItems.value = items;
+              showForm.value = true;
+              page.value = 'chat';
+              return;
+            }
+          } catch (e) { /* 拉取失败跳过表单 */ }
+        }
+        await startSession({});
+      } catch (e) {
+        blockedDesc.value = '链接无效，请联系客服获取新的链接';
+        page.value = 'blocked';
+      }
+    };
+
+    const startSession = async (extra) => {
+      const p = { ...params(), ...extra, from_url: document.referrer || '直接访问' };
+      const vt = loadToken();
+      if (vt) p.visitor_token = vt;
+      const r = await fetch('/api/visitor/init', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(p)
+      }).then(x => { if (!x.ok) return x.json().then(j => { throw new Error(j.error || '接入失败'); }); return x.json(); });
+      if (!r.session_id) throw new Error(r.error || '接入失败');
+      sessionId.value = r.session_id;
+      storeToken(r.visitor_token);
+      page.value = 'chat';
+      await loadHistory();
+      // 欢迎语
+      try {
+        await fetch('/api/visitor/welcome', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ session_id: sessionId.value, name: extra.name || '' })
+        });
+      } catch (e) {}
+      await pollOnce();
+      startPoll();
+    };
+
+    const loadHistory = async () => {
+      const r = await fetch('/api/visitor/messages?session_id=' + sessionId.value).then(x => x.json());
+      pushMessages(r.messages || []);
+    };
+
+    const submitForm = async () => {
+      for (const f of formItems.value) {
+        if (f.required && !(formValues[f.key] || '').trim()) {
+          alert('请填写：' + f.label);
+          return;
+        }
+      }
+      formSubmitting.value = true;
+      try {
+        await startSession({
+          name: formValues.name || '',
+          phone: formValues.phone || '',
+          question: formValues.question || '',
+        });
+        showForm.value = false;
+      } catch (e) {
+        alert(e.message);
+      } finally { formSubmitting.value = false; }
+    };
+
+    // ---- 轮询 ----
+    const pollOnce = async () => {
+      if (!sessionId.value) return;
+      try {
+        const r = await fetch('/api/poll?session=' + sessionId.value + '&sinceMsg=' + maxMsgId.value).then(x => x.json());
+        pushMessages(r.messages || []);
+      } catch (e) {}
+    };
+    const startPoll = () => {
+      stopPoll();
+      pollTimer = setInterval(pollOnce, 2500);
+    };
+    const stopPoll = () => { if (pollTimer) { clearInterval(pollTimer); pollTimer = null; } };
+
+    // ---- 发送 ----
+    const send = async () => {
+      const text = draft.value.trim();
+      if (!text || sending.value || !sessionId.value) return;
+      sending.value = true;
+      draft.value = '';
+      try {
+        const r = await fetch('/api/visitor/send', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ session_id: sessionId.value, text })
+        }).then(x => { if (!x.ok) return x.json().then(j => { throw new Error(j.error); }); return x.json(); });
+        if (r.message) { pushMessages([r.message]); }
+        if (r.auto_reply) { pushMessages([r.auto_reply]); }
+      } catch (e) {
+        draft.value = text;
+        alert(e.message);
+      } finally { sending.value = false; }
+    };
+
+    // ---- 图片 ----
+    const pickImage = () => imgInput.value && imgInput.value.click();
+    const onImage = async (ev) => {
+      const file = ev.target.files[0];
+      ev.target.value = '';
+      if (!file) return;
+      if (file.size > 5 * 1024 * 1024) { alert('图片不能超过 5MB'); return; }
+      const data = await new Promise(res => { const fr = new FileReader(); fr.onload = () => res(fr.result); fr.readAsDataURL(file); });
+      try {
+        const up = await fetch('/api/visitor/upload', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ session_id: sessionId.value, data, kind: 'image', filename: file.name })
+        }).then(x => { if (!x.ok) return x.json().then(j => { throw new Error(j.error); }); return x.json(); });
+        const r = await fetch('/api/visitor/send', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ session_id: sessionId.value, text: '', attachments: [up] })
+        }).then(x => x.json());
+        if (r.message) pushMessages([r.message]);
+      } catch (e) { alert(e.message); }
+    };
+
+    // ---- 录音 ----
+    const startRec = async () => {
+      if (!navigator.mediaDevices || !window.MediaRecorder) { alert('当前浏览器不支持录音，请使用文字沟通'); return; }
+      try {
+        // 优先 mp4（iOS 微信兼容），否则 webm
+        let mime = '';
+        for (const m of ['audio/mp4', 'audio/webm;codecs=opus', 'audio/webm']) {
+          if (MediaRecorder.isTypeSupported(m)) { mime = m; break; }
+        }
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        mediaRecorder = mime ? new MediaRecorder(stream, { mimeType: mime }) : new MediaRecorder(stream);
+        recChunks = [];
+        mediaRecorder.ondataavailable = (e) => { if (e.data && e.data.size) recChunks.push(e.data); };
+        mediaRecorder.onstop = async () => {
+          stream.getTracks().forEach(t => t.stop());
+          if (!recSendFlag || !recChunks.length) return;
+          const blob = new Blob(recChunks, { type: mediaRecorder.mimeType || 'audio/webm' });
+          if (blob.size > 10 * 1024 * 1024) { alert('语音过长'); return; }
+          const data = await new Promise(res => { const fr = new FileReader(); fr.onload = () => res(fr.result); fr.readAsDataURL(blob); });
+          try {
+            const up = await fetch('/api/visitor/upload', {
+              method: 'POST', headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ session_id: sessionId.value, data, kind: 'audio', filename: 'voice.webm' })
+            }).then(x => { if (!x.ok) return x.json().then(j => { throw new Error(j.error); }); return x.json(); });
+            const r = await fetch('/api/visitor/send', {
+              method: 'POST', headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ session_id: sessionId.value, text: '', attachments: [up] })
+            }).then(x => x.json());
+            if (r.message) pushMessages([r.message]);
+          } catch (e) { alert(e.message); }
+        };
+        recSendFlag = false;
+        mediaRecorder.start();
+        recording.value = true;
+        recSecs.value = 0;
+        recStartAt = Date.now();
+        recTimer = setInterval(() => {
+          recSecs.value = Math.floor((Date.now() - recStartAt) / 1000);
+          if (recSecs.value >= 60) stopRec(true);
+        }, 500);
+      } catch (e) {
+        alert('无法获取麦克风权限，请使用文字沟通');
+      }
+    };
+    let recSendFlag = false;
+    const stopRec = (sendIt) => {
+      if (!mediaRecorder) return;
+      recSendFlag = sendIt;
+      clearInterval(recTimer);
+      recording.value = false;
+      try { mediaRecorder.stop(); } catch (e) {}
+    };
+
+    const viewImage = (url) => { viewing.value = url; };
+
+    const onlineText = ref('客服在线');
+
+    onMounted(boot);
+    onUnmounted(stopPoll);
+
+    return {
+      page, blockedTitle, blockedDesc, brand, messages, draft, sending,
+      bodyRef, inputRef, imgInput, viewing, viewImage,
+      showForm, formItems, formValues, formSubmitting, submitForm,
+      recording, recSecs, startRec, stopRec,
+      send, pickImage, onImage, fmtTime, scrollBottom, onlineText, isImg, visibleMessages,
+    };
+  }
+}).mount('#app');
+</script>
+</body>
+</html>

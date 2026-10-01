@@ -1,0 +1,1533 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>客服工作台</title>
+<link rel="stylesheet" href="/assets/vendor/element-plus.css">
+<style>
+* { box-sizing: border-box; }
+[v-cloak] { display: none; }
+body { margin: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif; background: #f2f3f5; }
+.layout { display: flex; height: 100vh; overflow: hidden; }
+
+/* ---------- 侧栏 ---------- */
+.side { width: 190px; background: #1f2329; color: #fff; display: flex; flex-direction: column; flex-shrink: 0; }
+.side .logo { font-size: 16px; font-weight: 600; padding: 16px 18px 14px; display: flex; align-items: center; gap: 8px; }
+.side .nav { flex: 1; overflow-y: auto; padding-bottom: 10px; }
+.nav-item { padding: 10px 18px; cursor: pointer; color: #a9aeb8; font-size: 13.5px; display: flex; align-items: center; gap: 9px; border-left: 3px solid transparent; }
+.nav-item:hover { color: #fff; background: rgba(255,255,255,.06); }
+.nav-item.active { color: #fff; background: rgba(22,119,255,.18); border-left-color: #1677ff; }
+.nav-group { padding: 14px 18px 6px; font-size: 11px; color: #6b7280; letter-spacing: 1px; }
+.side .me { padding: 12px 16px; border-top: 1px solid rgba(255,255,255,.08); font-size: 12px; color: #a9aeb8; line-height: 1.8; cursor: pointer; }
+.side .me:hover { color: #fff; }
+.side .me b { color: #fff; font-size: 13px; }
+
+/* ---------- 主区 ---------- */
+.main { flex: 1; display: flex; flex-direction: column; min-width: 0; }
+.topbar { background: #fff; height: 52px; display: flex; align-items: center; padding: 0 20px; box-shadow: 0 1px 4px rgba(0,0,0,.05); }
+.topbar .title { font-size: 16px; font-weight: 600; color: #1f2329; }
+.content { flex: 1; overflow-y: auto; padding: 16px 20px; max-width: 1100px; margin: 0 auto; width: 100%; }
+.content.workbench { padding: 0; overflow: hidden; display: flex; max-width: 1400px; }
+
+/* ---------- 工作台三栏 ---------- */
+.sess-col { width: 300px; background: #fff; border-right: 1px solid #e5e6eb; display: flex; flex-direction: column; flex-shrink: 0; }
+.sess-col .search { padding: 10px 12px; border-bottom: 1px solid #f2f3f5; }
+.sess-list { flex: 1; overflow-y: auto; }
+.sess-item { padding: 12px 14px; cursor: pointer; border-bottom: 1px solid #f7f8fa; }
+.sess-item:hover { background: #f7f8fa; }
+.sess-item.active { background: #e8f3ff; }
+.sess-item .row1 { display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px; }
+.sess-item .name { font-size: 14px; font-weight: 600; color: #1f2329; max-width: 150px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sess-item .time { font-size: 11px; color: #a0a6ad; }
+.sess-item .row2 { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+.sess-item .last { font-size: 12px; color: #86909c; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; }
+.sess-item .dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+.sess-item .dot.online { background: #00b42a; }
+.sess-item .dot.offline { background: #c9cdd4; }
+.badge { background: #f53f3f; color: #fff; font-size: 11px; min-width: 17px; height: 17px; border-radius: 9px; display: inline-flex; align-items: center; justify-content: center; padding: 0 5px; }
+.tag-wait { font-size: 10px; background: #fff7e8; color: #d25f00; border-radius: 3px; padding: 1px 4px; flex-shrink: 0; }
+.tag-agent { font-size: 10px; background: #e8f3ff; color: #165dff; border-radius: 3px; padding: 1px 4px; max-width: 64px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex-shrink: 0; }
+
+.chat-col { flex: 1; display: flex; flex-direction: column; min-width: 0; background: #f7f8fa; }
+.chat-head { background: #fff; padding: 10px 18px; display: flex; align-items: center; gap: 10px; border-bottom: 1px solid #e5e6eb; }
+.chat-head .name { font-size: 15px; font-weight: 600; }
+.chat-body { flex: 1; overflow-y: auto; padding: 16px 18px; }
+.chat-empty { flex: 1; display: flex; align-items: center; justify-content: center; color: #a0a6ad; font-size: 14px; flex-direction: column; gap: 10px; }
+.msg-row { display: flex; margin-bottom: 14px; gap: 8px; align-items: flex-start; }
+.msg-row.mine { flex-direction: row-reverse; }
+.msg-ava { width: 34px; height: 34px; border-radius: 6px; background: #fff; display: flex; align-items: center; justify-content: center; font-size: 18px; flex-shrink: 0; box-shadow: 0 1px 2px rgba(0,0,0,.05); }
+.msg-box { max-width: 65%; }
+.msg-sender { font-size: 11px; color: #a0a6ad; margin-bottom: 3px; }
+.msg-row.mine .msg-sender { text-align: right; }
+.msg-bubble { padding: 9px 12px; border-radius: 9px; font-size: 14px; line-height: 1.6; word-break: break-word; white-space: pre-wrap; background: #fff; color: #1f2329; border-top-left-radius: 2px; box-shadow: 0 1px 2px rgba(0,0,0,.04); }
+.msg-row.mine .msg-bubble { background: #1677ff; color: #fff; border-radius: 9px; border-top-right-radius: 2px; }
+.msg-row.sys { justify-content: center; }
+.msg-row.sys .msg-bubble { background: transparent; box-shadow: none; color: #a0a6ad; font-size: 12px; padding: 2px; }
+.msg-bubble img { max-width: 100%; border-radius: 6px; display: block; margin-top: 4px; cursor: pointer; }
+.msg-bubble audio { width: 200px; margin-top: 4px; }
+.msg-time { font-size: 10.5px; color: #c0c6cf; margin-top: 3px; }
+.msg-row.mine .msg-time { text-align: right; }
+.chat-input { background: #fff; border-top: 1px solid #e5e6eb; padding: 10px 14px; }
+.chat-input textarea { width: 100%; border: none; outline: none; resize: none; font-size: 14px; font-family: inherit; height: 64px; background: transparent; }
+.chat-tools { display: flex; align-items: center; gap: 14px; }
+.tool-btn { background: none; border: none; font-size: 20px; cursor: pointer; padding: 0; }
+.send-btn { background: #1677ff; color: #fff; border: none; border-radius: 6px; padding: 7px 22px; font-size: 14px; cursor: pointer; margin-left: auto; }
+.send-btn:disabled { opacity: .5; }
+
+.info-col { width: 260px; background: #fff; border-left: 1px solid #e5e6eb; overflow-y: auto; flex-shrink: 0; padding: 16px; }
+.info-col h4 { font-size: 13px; color: #86909c; margin: 16px 0 8px; font-weight: normal; }
+.info-col h4:first-child { margin-top: 0; }
+.info-item { display: flex; justify-content: space-between; font-size: 13px; padding: 5px 0; color: #4e5969; }
+.info-item .k { color: #86909c; flex-shrink: 0; margin-right: 8px; }
+.info-item .v { text-align: right; word-break: break-all; }
+
+/* ---------- 通用面板 ---------- */
+.panel { background: #fff; border-radius: 10px; padding: 18px 20px; margin-bottom: 16px; }
+.panel-title { font-size: 15px; font-weight: 600; margin-bottom: 14px; color: #1f2329; display: flex; justify-content: space-between; align-items: center; }
+.stat-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; margin-bottom: 16px; }
+.stat-card { background: #fff; border-radius: 10px; padding: 16px; }
+.stat-card .v { font-size: 24px; font-weight: 700; }
+.stat-card .l { font-size: 12px; color: #86909c; margin-top: 4px; }
+.bar-row { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; font-size: 12.5px; }
+.bar-row .nm { width: 46px; color: #4e5969; }
+.bar-row .bar { flex: 1; background: #f2f3f5; border-radius: 4px; height: 16px; }
+.bar-row .bar > div { height: 100%; border-radius: 4px; background: linear-gradient(90deg,#1677ff,#69b1ff); min-width: 2px; }
+.bar-row .num { width: 40px; text-align: right; color: #86909c; }
+.mono { font-family: Consolas, monospace; }
+.muted { color: #86909c; font-size: 13px; }
+.link-line { display: flex; align-items: center; gap: 8px; padding: 8px 10px; background: #f7f8fa; border-radius: 8px; margin-bottom: 8px; font-size: 13px; word-break: break-all; }
+.img-viewer { position: fixed; inset: 0; background: rgba(0,0,0,.9); z-index: 200; display: flex; align-items: center; justify-content: center; }
+.img-viewer img { max-width: 94vw; max-height: 90vh; }
+.quick-panel { position: absolute; bottom: 60px; left: 14px; width: 360px; max-height: 300px; overflow-y: auto; background: #fff; border-radius: 8px; box-shadow: 0 8px 30px rgba(0,0,0,.15); z-index: 20; padding: 8px; }
+.quick-item { padding: 8px 10px; border-radius: 6px; cursor: pointer; font-size: 13px; }
+.quick-item:hover { background: #f2f3f5; }
+.quick-item b { display: block; font-size: 13px; margin-bottom: 2px; }
+.quick-item span { color: #86909c; font-size: 12px; }
+.recording-bar { display: flex; align-items: center; gap: 8px; font-size: 13px; color: #4e5769; padding: 4px 0; }
+.guide-progress { height: 8px; border-radius: 4px; background: #f2f3f5; overflow: hidden; margin-bottom: 16px; }
+.guide-progress-bar { height: 100%; border-radius: 4px; background: linear-gradient(90deg, #1677ff, #00b42a); transition: width .4s; }
+.guide-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 12px; }
+.guide-card { display: flex; align-items: center; gap: 10px; border: 1.5px dashed #e5e6eb; border-radius: 12px; padding: 13px 14px; background: #fafbfc; }
+.guide-card.done { border-style: solid; border-color: #b7eb8f; background: #f6ffed; }
+.guide-card-ic { font-size: 24px; flex-shrink: 0; }
+.guide-card-body { flex: 1; min-width: 0; }
+.guide-card-name { font-size: 13.5px; font-weight: 600; color: #1f2329; }
+.guide-card.done .guide-card-name { color: #00b42a; }
+.guide-card-desc { font-size: 11.5px; color: #86909c; margin-top: 3px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.code-card { display: flex; align-items: center; gap: 14px; border: 1px solid #e5e6eb; border-radius: 10px; padding: 12px 14px; margin-bottom: 10px; }
+.code-qr { width: 76px; height: 76px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; border: 1px dashed #e5e6eb; border-radius: 8px; overflow: hidden; }
+.code-qr img, .code-qr canvas { width: 72px !important; height: 72px !important; }
+.kw-tags { min-height: 34px; margin-bottom: 12px; }
+.rec-dot { width: 9px; height: 9px; border-radius: 50%; background: #f53f3f; animation: blink 1s infinite; }
+@keyframes blink { 50% { opacity: .2; } }
+/* ===== dark theme ===== */
+body.dark { background: #171a1f; }
+body.dark .main .topbar { background: #23272e; box-shadow: 0 1px 4px rgba(0,0,0,.4); }
+body.dark .topbar .title { color: #e5e6eb; }
+body.dark .content { background: #171a1f; }
+body.dark .panel, body.dark .stat-card { background: #23272e; }
+body.dark .panel-title { color: #e5e6eb; }
+body.dark .stat-card .v { color: #e5e6eb; }
+body.dark .muted { color: #8b919c; }
+body.dark .el-table { --el-table-bg-color: #23272e; --el-table-tr-bg-color: #23272e; --el-table-header-bg-color: #1d2126; color: #c9cdd4; }
+body.dark .el-table, body.dark .el-table tr, body.dark .el-table td, body.dark .el-table th { background-color: transparent; color: #c9cdd4; border-color: #3a4048; }
+body.dark .sess-col { background: #23272e; border-color: #31363e; }
+body.dark .sess-item { border-color: #2a2f36; }
+body.dark .sess-item:hover { background: #2a2f36; }
+body.dark .sess-item.active { background: #1c3a5e; }
+body.dark .sess-item .name { color: #e5e6eb; }
+body.dark .chat-col { background: #1d2126; }
+body.dark .chat-head { background: #23272e; border-color: #31363e; }
+body.dark .chat-head .name { color: #e5e6eb; }
+body.dark .msg-bubble { background: #2e333b; color: #e5e6eb; }
+body.dark .msg-row.mine .msg-bubble { background: #1c5dd6; color: #fff; }
+body.dark .info-col { background: #23272e; border-color: #31363e; }
+body.dark .info-item { color: #c9cdd4; }
+body.dark .chat-input { background: #23272e; border-color: #31363e; }
+body.dark .chat-input textarea { color: #e5e6eb; }
+body.dark .quick-panel { background: #23272e; }
+body.dark .quick-item:hover { background: #2e333b; }
+body.dark .link-line { background: #1d2126; }
+body.dark .side { border-right: 1px solid #2a2f36; }
+body.dark .el-input__wrapper, body.dark .el-textarea__inner { background-color: #1d2126; box-shadow: 0 0 0 1px #3a4048 inset; }
+body.dark .el-input__inner, body.dark .el-textarea__inner { color: #e5e6eb; }
+body.dark .guide-step { border-color: #3a4048 !important; color: #c9cdd4; }
+</style>
+</head>
+<body>
+<div id="app" v-cloak>
+  <!-- 未鉴权前不渲染任何界面骨架 -->
+  <div v-if="!booted" style="height:100vh;display:flex;align-items:center;justify-content:center;color:#86909c;font-size:14px;">
+    ⏳ 正在验证登录...
+  </div>
+  <div class="layout" v-else>
+    <!-- ============ 侧栏导航 ============ -->
+    <div class="side">
+      <div class="logo">💬 客服工作台</div>
+      <div class="nav">
+        <div class="nav-item" :class="{active: tab==='work'}" @click="tab='work'">💬 会话接待</div>
+        <div class="nav-item" :class="{active: tab==='stats'}" @click="tab='stats'">📊 数据面板</div>
+        <div class="nav-group">话术与自动化</div>
+        <div class="nav-item" :class="{active: tab==='quick'}" @click="tab='quick'">⚡ 快捷回复</div>
+        <div class="nav-item" :class="{active: tab==='welcome'}" @click="tab='welcome'">👋 欢迎语</div>
+        <div class="nav-item" :class="{active: tab==='auto'}" @click="tab='auto'">🤖 自动回复</div>
+        <template v-if="me && me.role==='tenant'">
+          <div class="nav-group">运营</div>
+          <div class="nav-item" :class="{active: tab==='broadcast'}" @click="tab='broadcast'">📣 群发</div>
+          <div class="nav-item" :class="{active: tab==='blacklist'}" @click="tab='blacklist'">🚫 IP 黑名单</div>
+          <div class="nav-item" :class="{active: tab==='preinq'}" @click="tab='preinq'">📝 询前表单</div>
+          <div class="nav-item" :class="{active: tab==='links'}" @click="tab='links'">🔗 获客链接</div>
+          <div class="nav-item" :class="{active: tab==='agents'}" @click="tab='agents'">👨‍💼 子客服</div>
+          <div class="nav-item" :class="{active: tab==='brand'}" @click="tab='brand'">🎨 访客端外观</div>
+          <div class="nav-item" :class="{active: tab==='visitors'}" @click="tab='visitors'; loadVisitors()">📋 访客资源</div>
+          <div class="nav-item" :class="{active: tab==='security'}" @click="tab='security'; loadSecurityPage()">🛡️ 安全与维护</div>
+        </template>
+        <div class="nav-group">账号</div>
+        <div class="nav-item" :class="{active: tab==='profile'}" @click="tab='profile'">👤 个人设置</div>
+      </div>
+      <div class="me">
+        <span style="cursor:pointer;display:inline-block;margin-bottom:6px;" @click="toggleDark">{{ dark ? '☀️ 浅色模式' : '🌙 深色模式' }}</span><br>
+        <span @click="logout" style="cursor:pointer;">
+        <b>{{ me ? (me.nickname || me.kami || '') : '' }}</b><br>
+        <b>{{ me ? (me.nickname || me.kami || '') : '' }}</b><br>
+        <template v-if="me && me.role==='tenant'">{{ me.kami }} · {{ expireText }}</template>
+        <template v-else-if="me">子客服 {{ me.username }}</template>
+        <br>退出登录 →</span>
+      </div>
+    </div>
+
+    <div class="main">
+      <div class="topbar"><div class="title">{{ tabTitle }}</div></div>
+
+      <!-- ============ 会话工作台 ============ -->
+      <div class="content workbench" v-if="tab==='work'">
+        <div class="sess-col">
+          <div class="search">
+            <el-input v-model="sessSearch" placeholder="搜索访客/消息" size="small" clearable/>
+          </div>
+          <div class="sess-list">
+            <div v-if="!filteredSessions.length" style="padding:40px;text-align:center;color:#a0a6ad;font-size:13px;">暂无会话</div>
+            <div class="sess-item" v-for="s in filteredSessions" :key="s.id" :class="{active: currentId===s.id}" @click="openSession(s.id)">
+              <div class="row1">
+                <span class="name">{{ s.name }}</span>
+                <span class="time">{{ shortTime(s.lastTime) }}</span>
+              </div>
+              <div class="row2">
+                <span v-if="s.agent_id===0" class="tag-wait">待接入</span>
+                <span v-else class="tag-agent">{{ s.agent_name || '客服' }}</span>
+                <span class="last">{{ s.lastMsg }}</span>
+                <span class="dot" :class="s.status"></span>
+                <span class="badge" v-if="s.unread>0">{{ s.unread>99?'99+':s.unread }}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="chat-col">
+          <template v-if="current">
+            <div class="chat-head">
+              <span class="name">{{ current.name }}</span>
+              <span style="cursor:pointer;font-size:13px;" title="修改访客名称" @click="renameVisitor">✏️</span>
+              <el-tag size="small" :type="current.status==='online' ? 'success' : 'info'">{{ current.status==='online'?'在线':'离线' }}</el-tag>
+              <el-tag v-if="current.agent_id===0" size="small" type="warning">待接入</el-tag>
+              <span style="margin-left:auto;display:flex;gap:8px;">
+                <el-popconfirm title="拉黑该访客 IP？拉黑后其无法再进入或发消息" @confirm="blockSession">
+                  <template #reference><el-button size="small" type="danger" plain>🚫 拉黑</el-button></template>
+                </el-popconfirm>
+                <el-button size="small" @click="transferDlg=true">转接</el-button>
+                <el-popconfirm title="结束该会话？" @confirm="closeSession">
+                  <template #reference><el-button size="small" type="danger">结束会话</el-button></template>
+                </el-popconfirm>
+              </span>
+            </div>
+            <div class="chat-body" ref="chatBody">
+              <div class="msg-row" :class="m.from==='agent'?'mine':(m.from==='system'?'sys':'')" v-for="m in msgs" :key="m.id">
+                <div class="msg-ava" v-if="m.from!=='system'">{{ m.from==='agent' ? '🎧' : '🙋' }}</div>
+                <div class="msg-box">
+                  <div class="msg-sender" v-if="m.from!=='system' && m.sender_name">{{ m.sender_name }}</div>
+                  <div class="msg-bubble">
+                    <span v-if="m.text">{{ m.text }}</span>
+                    <template v-for="(a,i) in (m.attachments||[])" :key="i">
+                      <img v-if="a.type==='image'" :src="a.url" @click="viewing=a.url">
+                      <audio v-if="a.type==='audio'" :src="a.url" controls></audio>
+                    </template>
+                  </div>
+                  <div class="msg-time">{{ fmtTime(m.time) }}</div>
+                </div>
+              </div>
+            </div>
+            <div class="chat-input" style="position:relative;">
+              <div class="quick-panel" v-if="showQuick && quickMsgs.length">
+                <div class="quick-item" v-for="q in quickMsgs" :key="q.id" @click="useQuick(q)">
+                  <b>{{ q.title }}</b><span>{{ q.content.slice(0,50) }}</span>
+                </div>
+              </div>
+              <div class="chat-tools" style="margin-bottom:6px;">
+                <button class="tool-btn" title="快捷回复" @click="showQuick=!showQuick">⚡</button>
+                <button class="tool-btn" title="发送图片" @click="$refs.imgInput.click()">🖼️</button>
+                <button class="tool-btn" title="语音" @click="startRec">🎤</button>
+                <input ref="imgInput" type="file" accept="image/png,image/jpeg,image/gif,image/webp" style="display:none" @change="onImage"/>
+              </div>
+              <div class="recording-bar" v-if="recording">
+                <span class="rec-dot"></span> 录音中 {{ recSecs }}s
+                <el-button size="small" type="primary" @click="stopRec(true)">发送</el-button>
+                <el-button size="small" @click="stopRec(false)">取消</el-button>
+              </div>
+              <textarea v-else v-model="draft" placeholder="输入消息，Enter 发送，Shift+Enter 换行" @keydown="onKey"></textarea>
+              <button class="send-btn" :disabled="!draft.trim()||sending" @click="send" style="margin-top:6px;">发 送</button>
+            </div>
+          </template>
+          <div v-else class="chat-empty">
+            <div style="font-size:40px;">💬</div>
+            <div>选择左侧会话开始接待</div>
+          </div>
+        </div>
+
+        <div class="info-col" v-if="current">
+          <h4>访客信息</h4>
+          <div class="info-item"><span class="k">名称</span><span class="v" style="cursor:pointer;" title="点击修改" @click="renameVisitor">{{ current.name }} ✏️</span></div>
+          <div class="info-item" v-if="profile"><span class="k">系统</span><span class="v">{{ profile.os || '未知' }}</span></div>
+          <div class="info-item" v-if="profile"><span class="k">来源</span><span class="v">{{ profile.browser || '未知' }}</span></div>
+          <div class="info-item"><span class="k">I P</span><span class="v mono">{{ current.ip }}</span></div>
+          <div class="info-item" v-if="profile"><span class="k">地址</span><span class="v" style="font-size:12px;">{{ profile.geo || '未知' }}</span></div>
+          <div class="info-item"><span class="k">渠道</span><span class="v">{{ sourceText(current.source) }}</span></div>
+          <div class="info-item" v-if="profile"><span class="k">访问次数</span><span class="v">{{ profile.visit_count }}</span></div>
+          <div class="info-item" v-if="profile"><span class="k">消息数</span><span class="v">{{ profile.message_count }}</span></div>
+          <h4>联系方式</h4>
+          <div v-for="c in contactList" :key="c.type" class="info-item">
+            <span class="k">{{ contactLabel(c.type) }}</span>
+            <span class="v" style="cursor:pointer;" @click="editContact(c)" :title="'点击编辑'">{{ c.value || '＋ 添加' }}</span>
+          </div>
+          <h4>备注</h4>
+          <el-input type="textarea" :rows="3" v-model="noteDraft" placeholder="点击保存记录访客备注" @blur="saveNote"/>
+        </div>
+      </div>
+
+      <!-- ============ 数据面板 ============ -->
+      <div class="content" v-if="tab==='stats' && stats">
+        <div class="panel guide-panel" v-if="me.role==='tenant'">
+          <div class="panel-title" style="margin-bottom:10px;">
+            接入引导
+            <span :style="{color: guideDone === guide.length ? '#00b42a' : '#86909c', fontWeight:'normal', fontSize:'13px'}">
+              {{ guideDone === guide.length ? '🎉 已全部完成，系统接入就绪' : '已完成 ' + guideDone + ' / ' + guide.length }}
+            </span>
+          </div>
+          <div class="guide-progress">
+            <div class="guide-progress-bar" :style="{width: Math.round(guideDone / guide.length * 100) + '%'}"></div>
+          </div>
+          <div class="guide-grid">
+            <div v-for="g in guide" :key="g.k" class="guide-card" :class="{done: g.done}">
+              <div class="guide-card-ic">{{ g.icon }}</div>
+              <div class="guide-card-body">
+                <div class="guide-card-name">{{ g.label }}</div>
+                <div class="guide-card-desc">{{ g.desc }}</div>
+              </div>
+              <el-button size="small" :type="g.done ? 'success' : 'primary'" plain @click="g.go()">
+                {{ g.done ? '已完成' : '去设置' }}
+              </el-button>
+            </div>
+          </div>
+        </div>
+        <div class="stat-grid">
+          <div class="stat-card"><div class="v">{{ stats.today_sessions }}</div><div class="l">今日新会话</div></div>
+          <div class="stat-card"><div class="v" style="color:#00b42a;">{{ stats.today_active }}</div><div class="l">今日活跃访客</div></div>
+          <div class="stat-card"><div class="v">{{ stats.today_replied }}</div><div class="l">今日回复数</div></div>
+          <div class="stat-card"><div class="v" style="color:#f77234;">{{ stats.waiting }}</div><div class="l">待接入</div></div>
+          <div class="stat-card"><div class="v">{{ stats.online_visitors }}</div><div class="l">当前在线</div></div>
+          <div class="stat-card"><div class="v">{{ stats.total_sessions }}</div><div class="l">总会话</div></div>
+        </div>
+        <div class="panel">
+          <div class="panel-title">近 7 天会话趋势</div>
+          <div class="bar-row" v-for="d in stats.trend7" :key="d.date">
+            <div class="nm">{{ d.date }}</div><div class="bar"><div :style="{width:barW(d.count, stats.trend7)}"></div></div><div class="num">{{ d.count }}</div>
+          </div>
+        </div>
+        <div class="panel" v-if="stats.quota">
+          <div class="panel-title">本周进粉额度（每周一重置统计窗口）</div>
+          <div class="bar-row">
+            <div class="nm" style="width:110px;">网页链接</div>
+            <div class="bar"><div :style="{width: quotaW(stats.quota.web_used, stats.quota.web_limit)}"></div></div>
+            <div class="num" style="width:90px;">{{ stats.quota.web_used }} / {{ stats.quota.web_limit }}</div>
+          </div>
+          <div class="bar-row">
+            <div class="nm" style="width:110px;">客服码</div>
+            <div class="bar"><div :style="{width: quotaW(stats.quota.app_used, stats.quota.app_limit)}"></div></div>
+            <div class="num" style="width:90px;">{{ stats.quota.app_used }} / {{ stats.quota.app_limit }}</div>
+          </div>
+        </div>
+        <div class="panel">
+          <div class="panel-title">近 7 天接待明细</div>
+          <el-table :data="stats.daily" size="small" stripe>
+            <el-table-column prop="date" label="日期" width="110"/>
+            <el-table-column prop="received" label="新会话"/>
+            <el-table-column prop="active" label="活跃访客"/>
+            <el-table-column prop="replied" label="客服回复"/>
+            <el-table-column label="回复率" width="110">
+              <template #default="{row}">{{ row.active > 0 ? row.reply_rate + '%' : '—' }}</template>
+            </el-table-column>
+          </el-table>
+        </div>
+        <div class="panel">
+          <div class="panel-title" style="justify-content:flex-start;gap:12px;">会话数据
+            <el-button size="small" @click="exportCsv">导出 CSV</el-button>
+          </div>
+        </div>
+      </div>
+
+      <!-- ============ 快捷回复 ============ -->
+      <div class="content" v-if="tab==='quick'">
+        <crud-table
+          :rows="quickMsgs" :fields="quickFields" title="快捷回复" add-text="新增快捷回复"
+          @reload="loadQuick" api="/api/quick-msgs"
+          :cols="[{k:'title',l:'标题'},{k:'content',l:'内容'},{k:'group_name',l:'分组'}]"/>
+      </div>
+
+      <!-- ============ 欢迎语 ============ -->
+      <div class="content" v-if="tab==='welcome'">
+        <crud-table
+          :rows="welcomeMsgs" :fields="welcomeFields" title="欢迎语（访客进入时自动发送，按顺序最多 5 条）" add-text="新增欢迎语"
+          @reload="loadWelcome" api="/api/welcome-messages"
+          :cols="[{k:'content',l:'内容'},{k:'trig',l:'触发',map:{once:'仅首次',every:'每次进入'}},{k:'enabled',l:'启用',bool:true}]"/>
+      </div>
+
+      <!-- ============ 自动回复 ============ -->
+      <div class="content" v-if="tab==='auto'">
+        <crud-table
+          :rows="autoReplies" :fields="autoFields" title="自动回复（访客消息包含关键词时自动应答）" add-text="新增规则"
+          @reload="loadAuto" api="/api/auto-reply"
+          :cols="[{k:'keyword',l:'关键词'},{k:'reply',l:'自动回复内容'},{k:'enabled',l:'启用',bool:true}]"/>
+      </div>
+
+      <!-- ============ 群发 ============ -->
+      <div class="content" v-if="tab==='broadcast' && me.role==='tenant'">
+        <div class="panel" style="max-width:640px;margin:0 auto;">
+          <div class="panel-title">群发消息</div>
+          <p class="muted" style="margin:0 0 12px;">向近 24 小时内活跃的未结束会话发送消息，发送后计入会话记录。</p>
+          <el-input type="textarea" :rows="4" v-model="bcText" placeholder="输入群发内容"/>
+          <el-button type="primary" style="margin-top:12px;" :loading="bcSending" :disabled="!bcText.trim()" @click="sendBroadcast">立即群发</el-button>
+        </div>
+      </div>
+
+      <!-- ============ IP 黑名单 ============ -->
+      <div class="content" v-if="tab==='blacklist' && me.role==='tenant'">
+        <crud-table
+          :rows="blacklist" :fields="blFields" title="IP 黑名单（仅作用于您的访客）" add-text="添加 IP"
+          @reload="loadBlacklist" api="/api/ip-blacklist"
+          :cols="[{k:'ip',l:'IP'},{k:'reason',l:'原因'}]"/>
+      </div>
+
+      <!-- ============ 询前表单 ============ -->
+      <div class="content" v-if="tab==='preinq' && me.role==='tenant'">
+        <div class="panel" style="max-width:640px;margin:0 auto 14px;">
+          <div class="panel-title">询前表单开关</div>
+          <el-switch v-model="preqOn" active-text="访客进入时先填写表单" @change="savePreqOn"/>
+          <p class="muted" style="margin:8px 0 0;">关闭后访客直接进入聊天。表单项为空时也不会弹出表单。</p>
+        </div>
+        <crud-table
+          :rows="preInq" :fields="preqFields" title="表单项" add-text="新增表单项"
+          @reload="loadPreInq" api="/api/pre-inquiry"
+          :cols="[{k:'label',l:'字段名'},{k:'type',l:'类型',map:{text:'单行',textarea:'多行'}},{k:'required',l:'必填',bool:true},{k:'placeholder',l:'提示语'}]"/>
+      </div>
+
+      <!-- ============ 获客链接 ============ -->
+      <div class="content" v-if="tab==='links' && me.role==='tenant'">
+        <div class="panel">
+          <div class="panel-title">专属链接（固定子域名）</div>
+          <div v-if="links && links.domain_link" class="link-line">
+            <span style="flex:1;" class="mono">{{ links.domain_link.link }}</span>
+            <el-button size="small" @click="copy(links.domain_link.link)">复制</el-button>
+            <el-button size="small" @click="showQr(links.domain_link.link)">二维码</el-button>
+            <el-popconfirm title="更换后旧链接立即失效，确定？" @confirm="renewLink">
+              <template #reference><el-button size="small" type="warning">更换</el-button></template>
+            </el-popconfirm>
+          </div>
+          <div v-else>
+            <p class="muted" style="margin:0 0 10px;">
+              <template v-if="links && links.root_domain">您还没有专属链接，点击生成：https://子域.{{ links.root_domain }}/visitor.html</template>
+              <template v-else>平台尚未设置主域名，请联系平台管理员。</template>
+            </p>
+            <el-button type="primary" :disabled="!links || !links.root_domain" @click="createLink">生成专属链接</el-button>
+          </div>
+        </div>
+        <div class="panel">
+          <div class="panel-title" style="justify-content:flex-start;gap:12px;">
+            客服码（可随时换码，旧码作废）
+            <el-button size="small" type="primary" @click="newCode">＋ 一键换码</el-button>
+          </div>
+          <div v-for="c in (links ? links.codes : [])" :key="c.code" class="code-card">
+            <div class="code-qr" :data-code="c.code"></div>
+            <div style="flex:1;min-width:0;">
+              <div class="mono" style="font-weight:600;font-size:16px;letter-spacing:1px;margin-bottom:6px;">{{ c.code }}</div>
+              <div class="muted mono" style="word-break:break-all;font-size:12px;">{{ c.link }}</div>
+            </div>
+            <div style="display:flex;flex-direction:column;gap:6px;flex-shrink:0;">
+              <el-button size="small" @click="copy(c.link)">复制</el-button>
+              <el-button size="small" @click="showQr(c.link)">海报</el-button>
+              <el-popconfirm title="作废该客服码？" @confirm="delCode(c)">
+                <template #reference><el-button size="small" type="danger" plain>作废</el-button></template>
+              </el-popconfirm>
+            </div>
+          </div>
+          <div v-if="links && !links.codes.length" class="muted">还没有客服码，点击上方「一键换码」生成。</div>
+        </div>
+      </div>
+      <!-- ============ 子客服管理 ============ -->
+      <div class="content" v-if="tab==='agents' && me.role==='tenant'">
+        <div class="panel">
+          <div class="panel-title" style="justify-content:flex-start;gap:12px;">
+            子客服（{{ agents.length }} / {{ me.max_agents }}）
+            <el-button size="small" type="primary" @click="agentDlg=true;agentMode='create';agentForm.username='';agentForm.nickname='';agentForm.password=''">＋ 新增子客服</el-button>
+          </div>
+          <p class="muted" style="margin:0 0 12px;">子客服登录方式：登录页输入「您的卡密/子客服用户名」+ 密码。待接入会话所有客服可见；客服首次回复即自动接手。</p>
+          <el-table :data="agents" stripe>
+            <el-table-column label="客服" min-width="180">
+              <template #default="{row}">
+                <div style="display:flex;align-items:center;gap:9px;">
+                  <span style="width:34px;height:34px;border-radius:50%;background:#fff7e8;display:inline-flex;align-items:center;justify-content:center;font-size:17px;flex-shrink:0;">{{ row.avatar || '👨‍💼' }}</span>
+                  <div>
+                    <div style="font-weight:600;">{{ row.nickname }} <span class="muted mono" style="font-size:11.5px;font-weight:normal;">{{ row.username }}</span></div>
+                    <div class="muted" style="font-size:11.5px;margin-top:1px;">创建于 {{ (row.created_at||'').slice(0,10) }}</div>
+                  </div>
+                </div>
+              </template>
+            </el-table-column>
+            <el-table-column label="状态" width="150">
+              <template #default="{row}">
+                <el-tag size="small" :type="row.status==='active'?'success':'danger'">{{ row.status==='active'?'正常':'停用' }}</el-tag>
+                <span class="muted" style="font-size:12px;margin-left:6px;">{{ {online:'🟢 在线',busy:'🟡 忙碌',away:'⚪ 离开',offline:'⚫ 离线'}[row.work_status] || row.work_status }}</span>
+              </template>
+            </el-table-column>
+            <el-table-column label="操作" width="190" fixed="right">
+              <template #default="{row}">
+                <el-button size="small" @click="openAgentEdit(row)">编辑</el-button>
+                <el-button size="small" @click="resetAgentPw(row)">重置密码</el-button>
+                <el-dropdown trigger="click" @command="(cmd) => agentCmd(cmd, row)">
+                  <el-button size="small" type="primary" plain>更多 ▾</el-button>
+                  <template #dropdown>
+                    <el-dropdown-menu>
+                      <el-dropdown-item command="toggle">{{ row.status==='active' ? '停用账号' : '启用账号' }}</el-dropdown-item>
+                      <el-dropdown-item command="del" divided style="color:#f53f3f;">删除客服</el-dropdown-item>
+                    </el-dropdown-menu>
+                  </template>
+                </el-dropdown>
+              </template>
+            </el-table-column>
+          </el-table>
+        </div>
+      </div>
+
+      <!-- ============ 访客端外观 ============ -->
+      <div class="content" v-if="tab==='brand' && me.role==='tenant'">
+        <div class="panel" style="max-width:640px;margin:0 auto;">
+          <div class="panel-title">访客端外观</div>
+          <el-form label-width="100px">
+            <el-form-item label="品牌名称"><el-input v-model="brand.company_name" maxlength="30"/></el-form-item>
+            <el-form-item label="欢迎标题"><el-input v-model="brand.title" maxlength="50"/></el-form-item>
+            <el-form-item label="欢迎副标题"><el-input v-model="brand.sub" maxlength="80"/></el-form-item>
+            <el-form-item label="访客端头像">
+              <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+                <span v-if="brand.avatar && !isImg(brand.avatar)" style="font-size:26px;">{{ brand.avatar }}</span>
+                <img v-if="isImg(brand.avatar)" :src="brand.avatar" style="width:40px;height:40px;border-radius:8px;object-fit:cover;">
+                <el-input v-model="brand.avatar" placeholder="表情或图片地址" style="width:170px;"/>
+                <el-button size="small" @click="$refs.brandAvatarInput.click()">上传图片</el-button>
+                <input ref="brandAvatarInput" type="file" accept="image/png,image/jpeg,image/gif,image/webp" style="display:none" @change="uploadAvatar($event,'brand')"/>
+              </div>
+            </el-form-item>
+            <el-form-item label="主题色">
+              <el-color-picker v-model="brand.color"/>&nbsp;&nbsp;<span class="mono">{{ brand.color }}</span>
+            </el-form-item>
+          </el-form>
+          <el-button type="primary" @click="saveBrand">保存外观</el-button>
+        </div>
+      </div>
+
+      <!-- ============ 访客资源 ============ -->
+      <div class="content" v-if="tab==='visitors' && me.role==='tenant'">
+        <div class="panel">
+          <div class="panel-title" style="justify-content:flex-start;gap:12px;">
+            访客资源（{{ visitors.length }}）
+            <el-button size="small" @click="loadVisitors">刷新</el-button>
+          </div>
+          <p class="muted" style="margin:0 0 12px;">按访客身份聚合的全部到访记录，适合沉淀客户资源、回访跟进。</p>
+          <el-table :data="visitors" stripe>
+            <el-table-column label="访客" min-width="150">
+              <template #default="{row}">
+                <div style="display:flex;align-items:center;gap:9px;">
+                  <span style="width:32px;height:32px;border-radius:50%;background:#e8f3ff;color:#165dff;display:inline-flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0;">{{ (row.name||'?').slice(0,1) }}</span>
+                  <div style="min-width:0;">
+                    <div style="font-weight:600;">{{ row.name }}</div>
+                    <div class="muted" style="font-size:11.5px;">{{ row.session_count }} 次会话 · {{ row.msg_count }} 条消息</div>
+                  </div>
+                </div>
+              </template>
+            </el-table-column>
+            <el-table-column label="联系方式" min-width="150">
+              <template #default="{row}">
+                <div style="font-size:12.5px;line-height:1.8;">
+                  <div v-if="row.mobile">📱 {{ row.mobile }}</div>
+                  <div v-if="row.wechat">💬 {{ row.wechat }}</div>
+                  <span v-if="!row.mobile && !row.wechat" class="muted">—</span>
+                </div>
+              </template>
+            </el-table-column>
+            <el-table-column label="最近活跃" width="95">
+              <template #default="{row}">{{ shortTime(row.last_active) }}</template>
+            </el-table-column>
+            <el-table-column label="IP / 操作" min-width="170">
+              <template #default="{row}">
+                <div style="display:flex;align-items:center;gap:8px;">
+                  <span class="mono muted" style="font-size:12px;">{{ row.ip || '—' }}</span>
+                  <el-button size="small" text type="primary" @click="openVisitorSessions(row)">会话</el-button>
+                  <el-popconfirm v-if="row.ip" :title="'拉黑 ' + row.ip + '？'" @confirm="blockIp(row.ip)">
+                    <template #reference><el-button size="small" text type="danger">拉黑</el-button></template>
+                  </el-popconfirm>
+                </div>
+              </template>
+            </el-table-column>
+          </el-table>
+          <div v-if="!visitors.length" class="muted" style="padding:30px;text-align:center;">暂无访客记录</div>
+        </div>
+      </div>
+
+      <!-- ============ 安全与维护 ============ -->
+      <div class="content" v-if="tab==='security' && me.role==='tenant'">
+        <div class="panel">
+          <div class="panel-title">公告（访客端顶部横幅）</div>
+          <el-switch v-model="sec.notice_on" active-text="在访客聊天窗口顶部展示公告"/>
+          <el-input type="textarea" :rows="3" v-model="sec.notice_text" maxlength="200" show-word-limit
+            placeholder="欢迎光临客服中心..." style="margin-top:10px;" :disabled="!sec.notice_on"/>
+          <el-button type="primary" size="small" style="margin-top:10px;" @click="saveSecurity">保存公告</el-button>
+        </div>
+        <div class="panel">
+          <div class="panel-title">关键词拉黑</div>
+          <div class="kw-tags">
+            <el-tag v-for="kw in kwList" :key="kw" closable type="danger" effect="light" style="margin:0 8px 8px 0;" @close="removeKw(kw)">{{ kw }}</el-tag>
+            <span v-if="!kwList.length" class="muted" style="font-size:12px;">暂无关键词，在下方输入后回车添加</span>
+          </div>
+          <div style="display:flex;gap:8px;max-width:320px;">
+            <el-input v-model="kwInput" placeholder="输入关键词，回车添加" size="default" @keydown.enter.prevent="addKw"/>
+            <el-button @click="addKw">添加</el-button>
+          </div>
+          <div style="margin:14px 0 10px;"><el-switch v-model="sec.auto_blacklist" active-text="访客消息命中关键词时自动拉黑"/></div>
+          <p class="muted" style="margin:0 0 12px;">⚠️ 谨慎使用自动拉黑，过度匹配会误伤正常访客。</p>
+          <el-button type="primary" size="small" :loading="kwSaving" @click="saveFilter">保存关键词</el-button>
+        </div>
+        <div class="panel">
+          <div class="panel-title">访问策略</div>
+          <div style="margin-bottom:14px;"><el-switch v-model="sec.dedup_on" active-text="访客去重：同一访客 24 小时内多次进入只接待一次（复用会话，不占新额度）"/></div>
+          <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px;flex-wrap:wrap;">
+            <el-switch v-model="sec.ip_limit_on" active-text="IP 频率限制："/>
+            <el-input-number v-model="sec.ip_limit_count" :min="1" :max="100" size="small" :disabled="!sec.ip_limit_on"/>
+            <span class="muted">次新访客/分钟，超过自动拉黑该 IP</span>
+          </div>
+          <el-button type="primary" size="small" @click="saveSecurity">保存策略</el-button>
+        </div>
+        <div class="panel">
+          <div class="panel-title">登录记录（最近 20 次）</div>
+          <el-table :data="loginLogs" size="small" stripe>
+            <el-table-column label="时间" width="160"><template #default="{row}">{{ shortTime(row.created_at) }}</template></el-table-column>
+            <el-table-column label="身份" width="130"><template #default="{row}">{{ row.role==='tenant' ? '卡密主人' : ('子客服 ' + row.ident) }}</template></el-table-column>
+            <el-table-column prop="device" label="设备" width="120"/>
+            <el-table-column prop="ip" label="IP" width="140"/>
+            <el-table-column prop="ua_short" label="浏览器标识" min-width="150" show-overflow-tooltip/>
+          </el-table>
+          <div v-if="!loginLogs.length" class="muted" style="padding:20px;text-align:center;">暂无登录记录</div>
+        </div>
+        <div class="panel">
+          <div class="panel-title">数据清理（不可恢复，谨慎操作）</div>
+          <div class="link-line" v-for="opt in cleanupOpts" :key="opt.label">
+            <span style="flex:1;">{{ opt.label }}</span>
+            <el-popconfirm :title="'确认' + opt.label + '？不可恢复！'" @confirm="doCleanup(opt.days, 'sessions')">
+              <template #reference><el-button size="small" type="danger" plain>清理</el-button></template>
+            </el-popconfirm>
+          </div>
+          <div class="link-line">
+            <span style="flex:1;">清空 IP 黑名单</span>
+            <el-popconfirm title="确认清空全部黑名单？" @confirm="doCleanup(-1, 'blacklist')">
+              <template #reference><el-button size="small" type="danger" plain>清空</el-button></template>
+            </el-popconfirm>
+          </div>
+        </div>
+      </div>
+
+      <!-- ============ 个人设置 ============ -->
+      <div class="content" v-if="tab==='profile'">
+        <div class="panel" style="max-width:560px;margin:0 auto;">
+          <div class="panel-title">个人资料</div>
+          <el-form label-width="80px">
+            <el-form-item label="账号">
+              <span class="mono">{{ me && me.role==='tenant' ? me.kami : (me ? me.kami + '/' + me.username : '') }}</span>
+            </el-form-item>
+            <el-form-item label="昵称"><el-input v-model="profileForm.nickname" maxlength="30"/></el-form-item>
+            <template v-if="me && me.role==='agent'">
+              <el-form-item label="头像">
+                <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+                  <span v-if="profileForm.avatar && !isImg(profileForm.avatar)" style="font-size:26px;">{{ profileForm.avatar }}</span>
+                  <img v-if="isImg(profileForm.avatar)" :src="profileForm.avatar" style="width:40px;height:40px;border-radius:8px;object-fit:cover;">
+                  <el-input v-model="profileForm.avatar" placeholder="表情或图片地址" style="width:170px;"/>
+                  <el-button size="small" @click="$refs.myAvatarInput.click()">上传图片</el-button>
+                  <input ref="myAvatarInput" type="file" accept="image/png,image/jpeg,image/gif,image/webp" style="display:none" @change="uploadAvatar($event,'me')"/>
+                </div>
+              </el-form-item>
+              <el-form-item label="自动接手">
+                <el-switch v-model="profileForm.auto_accept" active-text="回复待接入会话时自动接手"/>
+              </el-form-item>
+              <el-form-item label="提示音"><el-switch v-model="profileForm.sound_enabled"/></el-form-item>
+            </template>
+          </el-form>
+          <el-button type="primary" @click="saveProfile">保存</el-button>
+        </div>
+        <div class="panel" style="max-width:560px;margin:0 auto;">
+          <div class="panel-title">修改密码</div>
+          <el-form label-width="80px">
+            <el-form-item label="旧密码"><el-input v-model="pwOld" type="password" show-password/></el-form-item>
+            <el-form-item label="新密码"><el-input v-model="pwNew" type="password" show-password placeholder="至少 6 位"/></el-form-item>
+          </el-form>
+          <el-button type="primary" @click="changePw">修改密码</el-button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ 弹窗们 ============ -->
+  <el-dialog v-model="transferDlg" title="转接会话" width="380px">
+    <el-select v-model="transferTo" placeholder="选择转接目标" style="width:100%;">
+      <el-option label="退回待接入池（所有人可见）" :value="0"/>
+      <el-option v-for="a in agentOptions" :key="a.id" :label="a.nickname + '（' + a.username + '）'" :value="a.id"/>
+    </el-select>
+    <template #footer>
+      <el-button @click="transferDlg=false">取消</el-button>
+      <el-button type="primary" @click="doTransfer">转接</el-button>
+    </template>
+  </el-dialog>
+
+  <el-dialog v-model="agentDlg" :title="agentMode==='create' ? '新增子客服' : '编辑子客服'" width="420px">
+    <el-form label-width="90px">
+      <el-form-item label="用户名" v-if="agentMode==='create'">
+        <el-input v-model="agentForm.username" placeholder="字母/数字/下划线"/>
+      </el-form-item>
+      <el-form-item label="昵称"><el-input v-model="agentForm.nickname"/></el-form-item>
+      <el-form-item label="初始密码" v-if="agentMode==='create'">
+        <el-input v-model="agentForm.password" placeholder="留空自动生成"/>
+      </el-form-item>
+    </el-form>
+    <template #footer>
+      <el-button @click="agentDlg=false">取消</el-button>
+      <el-button type="primary" @click="saveAgent">保存</el-button>
+    </template>
+  </el-dialog>
+
+  <el-dialog v-model="createdAgentVisible" title="✅ 子客服已创建" width="400px">
+    <p style="font-size:13px;color:#4e5969;margin:0 0 10px;">请保存以下登录信息（密码仅本次展示）：</p>
+    <div style="background:#f7f8fa;border-radius:8px;padding:14px;font-size:15px;line-height:2;">
+      登录账号：<b class="mono">{{ createdAgent.account }}</b><br>密码：<b class="mono">{{ createdAgent.password }}</b>
+    </div>
+    <template #footer><el-button type="primary" @click="createdAgentVisible=false">我已保存</el-button></template>
+  </el-dialog>
+
+  <el-dialog v-model="qrVisible" title="二维码 / 海报" width="760px" @open="onQrOpen" @closed="qrData=''">
+    <div style="display:flex;gap:20px;flex-wrap:wrap;">
+      <!-- 左：二维码与海报预览 -->
+      <div style="flex:1;min-width:280px;text-align:center;">
+        <div ref="qrBox" style="display:inline-block;padding:10px;border:1px dashed #e5e6eb;border-radius:8px;"></div>
+        <div style="margin-top:10px;">
+          <el-button size="small" @click="downloadQrBox('qr','qrcode')">⬇ 下载二维码</el-button>
+        </div>
+        <template v-if="posterUrl">
+          <div style="margin-top:14px;font-size:13px;color:#86909c;">海报预览（3:4）</div>
+          <img :src="posterUrl" style="max-width:240px;border-radius:8px;box-shadow:0 4px 16px rgba(0,0,0,.12);margin-top:6px;">
+          <div style="margin-top:8px;">
+            <el-button size="small" type="primary" @click="downloadPoster">⬇ 下载海报 PNG</el-button>
+          </div>
+        </template>
+      </div>
+      <!-- 右：海报设置 -->
+      <div style="flex:1;min-width:260px;">
+        <el-form label-width="78px" size="small">
+          <el-form-item label="标题"><el-input v-model="posterOpts.title" placeholder="如：微信扫码咨询"/></el-form-item>
+          <el-form-item label="副标题"><el-input v-model="posterOpts.footer" placeholder="如：官方客服 24h 在线"/></el-form-item>
+          <el-form-item label="码点样式">
+            <el-radio-group v-model="posterOpts.dotStyle">
+              <el-radio-button value="square">方形</el-radio-button>
+              <el-radio-button value="round">圆点</el-radio-button>
+              <el-radio-button value="rounded">圆角</el-radio-button>
+              <el-radio-button value="stripe">条状</el-radio-button>
+            </el-radio-group>
+          </el-form-item>
+          <el-form-item label="码眼样式">
+            <el-radio-group v-model="posterOpts.finderStyle">
+              <el-radio-button value="square">方形</el-radio-button>
+              <el-radio-button value="rounded">圆角</el-radio-button>
+              <el-radio-button value="circle">圆形</el-radio-button>
+            </el-radio-group>
+          </el-form-item>
+          <el-form-item label="配色">
+            <el-radio-group v-model="posterOpts.colorMode">
+              <el-radio-button value="solid">纯色</el-radio-button>
+              <el-radio-button value="gradient">渐变</el-radio-button>
+            </el-radio-group>
+          </el-form-item>
+          <el-form-item label="主色"><el-color-picker v-model="posterOpts.colorMain"/></el-form-item>
+          <el-form-item label="渐变色" v-if="posterOpts.colorMode==='gradient'">
+            <el-color-picker v-model="posterOpts.colorGrad1"/> →
+            <el-color-picker v-model="posterOpts.colorGrad2"/>
+          </el-form-item>
+          <el-form-item label="中心Logo">
+            <div style="display:flex;gap:8px;align-items:center;">
+              <img v-if="posterOpts.logoDataUrl" :src="posterOpts.logoDataUrl" style="width:36px;height:36px;border-radius:8px;object-fit:cover;">
+              <el-button size="small" @click="pickPosterLogo">上传 Logo</el-button>
+              <el-button size="small" v-if="posterOpts.logoDataUrl" @click="posterOpts.logoDataUrl=''">清除</el-button>
+            </div>
+          </el-form-item>
+          <el-form-item label="尺寸">
+            <el-slider v-model="posterOpts.size" :min="140" :max="320" :step="10" style="width:170px;"/>
+          </el-form-item>
+        </el-form>
+        <p class="muted" style="font-size:12px;margin:0;">链接：<span class="mono" style="word-break:break-all;">{{ qrData }}</span></p>
+      </div>
+    </div>
+  </el-dialog>
+
+  <div class="img-viewer" v-if="viewing" @click="viewing=''"><img :src="viewing"></div>
+
+  <!-- 联系方式编辑 -->
+  <el-dialog v-model="contactDlg" :title="'编辑 ' + contactLabel(editingContact.type)" width="360px">
+    <el-input v-model="editingContact.value" maxlength="100"/>
+    <template #footer>
+      <el-button @click="contactDlg=false">取消</el-button>
+      <el-button type="primary" @click="saveContact">保存</el-button>
+    </template>
+  </el-dialog>
+</div>
+
+<script src="/assets/vendor/vue.global.js?v=2.0.1"></script>
+<script src="/assets/vendor/element-plus.js?v=2.0.1"></script>
+<script src="/assets/vendor/qrcode.min.js?v=2.0.1"></script>
+<script src="/assets/qr-poster.js?v=2.0.1"></script>
+<script src="/assets/api.js?v=2.0.1"></script>
+<script>
+const { createApp, ref, reactive, computed, onMounted, onUnmounted, nextTick, defineComponent, h } = Vue;
+
+/* ---------- 通用 CRUD 表格组件 ---------- */
+const CrudTable = defineComponent({
+  props: { rows: Array, cols: Array, fields: Array, title: String, addText: String, api: String },
+  emits: ['reload'],
+  template: `
+  <div class="panel">
+    <div class="panel-title" style="justify-content:flex-start;gap:12px;">
+      {{ title }}（{{ rows.length }}）
+      <el-button size="small" type="primary" @click="open()">{{ addText }}</el-button>
+    </div>
+    <el-table :data="rows" stripe size="default">
+      <el-table-column v-for="c in cols" :key="c.k" :label="c.l">
+        <template #default="{row}">
+          <template v-if="c.bool"><el-tag size="small" :type="row[c.k]?'success':'info'">{{ row[c.k]?'启用':'停用' }}</el-tag></template>
+          <template v-else>{{ c.map ? (c.map[row[c.k]] || row[c.k]) : row[c.k] }}</template>
+        </template>
+      </el-table-column>
+      <el-table-column label="操作" width="130">
+        <template #default="{row}">
+          <el-button size="small" @click="open(row)">编辑</el-button>
+          <el-popconfirm title="确认删除？" @confirm="del(row)">
+            <template #reference><el-button size="small" type="danger">删除</el-button></template>
+          </el-popconfirm>
+        </template>
+      </el-table-column>
+    </el-table>
+    <el-dialog v-model="dlg" :title="editId ? '编辑' : '新增'" width="440px">
+      <el-form label-width="90px">
+        <el-form-item v-for="f in fields" :key="f.k" :label="f.label">
+          <el-switch v-if="f.type==='bool'" v-model="form[f.k]"/>
+          <el-select v-else-if="f.type==='select'" v-model="form[f.k]">
+            <el-option v-for="o in f.options" :key="o.v" :label="o.l" :value="o.v"/>
+          </el-select>
+          <el-input-number v-else-if="f.type==='number'" v-model="form[f.k]"/>
+          <el-input v-else-if="f.type==='textarea'" type="textarea" :rows="3" v-model="form[f.k]"/>
+          <el-input v-else v-model="form[f.k]"/>
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="dlg=false">取消</el-button>
+        <el-button type="primary" @click="save">保存</el-button>
+      </template>
+    </el-dialog>
+  </div>`,
+  setup(props, { emit }) {
+    const dlg = ref(false);
+    const editId = ref(0);
+    const form = reactive({});
+    const open = (row) => {
+      editId.value = row ? row.id : 0;
+      for (const f of props.fields) {
+        form[f.k] = row ? (row[f.k] !== undefined ? row[f.k] : (f.type === 'bool' ? false : '')) : (f.def !== undefined ? f.def : (f.type === 'bool' ? true : f.type === 'number' ? 0 : ''));
+      }
+      dlg.value = true;
+    };
+    const save = async () => {
+      try {
+        if (editId.value) await API.put(props.api + '/' + editId.value, { ...form });
+        else await API.post(props.api, { ...form });
+        ElementPlus.ElMessage.success('已保存');
+        dlg.value = false;
+        emit('reload');
+      } catch (e) { ElementPlus.ElMessage.error(e.message); }
+    };
+    const del = async (row) => {
+      try { await API.del(props.api + '/' + row.id); ElementPlus.ElMessage.success('已删除'); emit('reload'); }
+      catch (e) { ElementPlus.ElMessage.error(e.message); }
+    };
+    return { dlg, editId, form, open, save, del };
+  }
+});
+
+const app = createApp({
+  setup() {
+    const tab = ref('work');
+    const booted = ref(false);
+    const me = ref(null);
+    const stats = ref(null);
+
+    // 会话与聊天
+    const sessions = ref([]);
+    const sessSearch = ref('');
+    const currentId = ref(0);
+    const msgs = ref([]);
+    const maxMsgId = ref(0);
+    const draft = ref('');
+    const sending = ref(false);
+    const chatBody = ref(null);
+    const viewing = ref('');
+    const profile = ref(null);
+    const contactList = ref([]);
+    const noteDraft = ref('');
+    const transferDlg = ref(false);
+    const transferTo = ref(null);
+    const agentOptions = ref([]);
+
+    // 快捷回复
+    const quickMsgs = ref([]);
+    const showQuick = ref(false);
+
+    // CRUD 数据
+    const welcomeMsgs = ref([]);
+    const autoReplies = ref([]);
+    const blacklist = ref([]);
+    const preInq = ref([]);
+    const preqOn = ref(true);
+
+    // 租户
+    const links = ref(null);
+    const agents = ref([]);
+    const brand = reactive({ company_name: '', title: '', sub: '', avatar: '💬', color: '#1677ff' });
+    const bcText = ref('');
+    const bcSending = ref(false);
+
+    // 个人
+    const profileForm = reactive({ nickname: '', avatar: '👨‍💼', auto_accept: true, sound_enabled: true });
+    const pwOld = ref(''); const pwNew = ref('');
+
+    // 录音
+    const recording = ref(false); const recSecs = ref(0);
+    let mediaRecorder = null, recChunks = [], recTimer = null, recStartAt = 0, recSendFlag = false;
+
+    // 二维码 + 海报
+    const qrVisible = ref(false); const qrData = ref(''); const qrBox = ref(null);
+    const posterUrl = ref('');
+    const posterOpts = reactive({
+      size: 230, correctLevel: 'medium', dotStyle: 'square', finderStyle: 'square',
+      colorMode: 'solid', colorMain: '#07C160', colorGrad1: '#07C160', colorGrad2: '#0BB96B',
+      colorBg: '#ffffff', logoShape: 'circle', logoShadow: 'on',
+      title: '微信扫码咨询', footer: '官方客服 24h 在线', logoDataUrl: '',
+    });
+    try { const saved = JSON.parse(localStorage.getItem('kfxt_poster_opts') || '{}'); Object.assign(posterOpts, saved); } catch (e) {}
+    const savePosterOpts = () => { try { localStorage.setItem('kfxt_poster_opts', JSON.stringify(posterOpts)); } catch (e) {} };
+    const renderPoster = () => {
+      if (!window.CSQrPoster || !qrData.value) { posterUrl.value = ''; return; }
+      const c = document.createElement('canvas');
+      try {
+        window.CSQrPoster.draw(c, qrData.value, JSON.parse(JSON.stringify(posterOpts)), () => {
+          try { posterUrl.value = c.toDataURL('image/png'); } catch (e) {}
+        });
+      } catch (e) { posterUrl.value = ''; }
+    };
+    Vue.watch(posterOpts, () => { savePosterOpts(); renderPoster(); }, { deep: true });
+    const onQrOpen = () => nextTick(() => {
+      if (qrBox.value) qrBox.value.innerHTML = '';
+      if (window.QRCode && qrData.value) new QRCode(qrBox.value, { text: qrData.value, width: 220, height: 220 });
+      renderPoster();
+    });
+    const showQr = (url) => { qrData.value = url; qrVisible.value = true; };
+    const downloadPoster = () => {
+      if (!posterUrl.value) return;
+      const a = document.createElement('a');
+      a.href = posterUrl.value; a.download = 'poster_' + Date.now() + '.png';
+      document.body.appendChild(a); a.click(); a.remove();
+    };
+    const pickPosterLogo = () => {
+      const inp = document.createElement('input');
+      inp.type = 'file'; inp.accept = 'image/*';
+      inp.onchange = (e) => {
+        const f = e.target.files && e.target.files[0];
+        if (!f) return;
+        const rd = new FileReader();
+        rd.onload = () => { posterOpts.logoDataUrl = rd.result; };
+        rd.readAsDataURL(f);
+      };
+      inp.click();
+    };
+    const downloadQrBox = (which, prefix) => {
+      const box = which === 'wa' ? waQrBox.value : (which === 'tg' ? tgQrBox.value : qrBox.value);
+      const img = box && (box.querySelector('img') || box.querySelector('canvas'));
+      if (!img) { ElementPlus.ElMessage.warning('二维码尚未生成'); return; }
+      const url = img.src || (img.toDataURL && img.toDataURL());
+      if (!url) { ElementPlus.ElMessage.warning('无法导出'); return; }
+      const a = document.createElement('a');
+      a.href = url; a.download = prefix + '-' + Date.now() + '.png';
+      document.body.appendChild(a); a.click(); a.remove();
+    };
+
+    // 获客渠道（WhatsApp / Telegram）
+    const waNumber = ref(''); const tgUser = ref('');
+    const waQrBox = ref(null); const tgQrBox = ref(null);
+    const genWaQr = () => nextTick(() => {
+      if (!waQrBox.value) return;
+      waQrBox.value.innerHTML = '';
+      const num = waNumber.value.replace(/[^0-9]/g, '');
+      if (num && window.QRCode) new QRCode(waQrBox.value, { text: 'https://wa.me/' + num, width: 150, height: 150 });
+    });
+    const genTgQr = () => nextTick(() => {
+      if (!tgQrBox.value) return;
+      tgQrBox.value.innerHTML = '';
+      const u = tgUser.value.replace(/^@/, '');
+      if (u && window.QRCode) new QRCode(tgQrBox.value, { text: 'https://t.me/' + u, width: 150, height: 150 });
+    });
+
+    let pollTimer = null;
+
+    const tabTitle = computed(() => ({
+      work: '会话接待', stats: '数据面板', quick: '快捷回复', welcome: '欢迎语', auto: '自动回复',
+      broadcast: '群发', blacklist: 'IP 黑名单', preinq: '询前表单', links: '获客链接', agents: '子客服管理',
+      brand: '访客端外观', visitors: '访客资源', security: '安全与维护', profile: '个人设置',
+    }[tab.value]));
+    const current = computed(() => sessions.value.find(s => s.id === currentId.value) || null);
+    const filteredSessions = computed(() => {
+      const q = sessSearch.value.trim().toLowerCase();
+      if (!q) return sessions.value;
+      return sessions.value.filter(s => (s.name || '').toLowerCase().includes(q) || (s.lastMsg || '').toLowerCase().includes(q));
+    });
+    const expireText = computed(() => {
+      if (!me.value || !me.value.expires_at) return '永久有效';
+      const d = new Date(me.value.expires_at);
+      const days = Math.ceil((d - Date.now()) / 86400000);
+      return days > 0 ? `剩余 ${days} 天` : '已到期';
+    });
+
+    const shortTime = (t) => { if (!t) return ''; const d = new Date(t); return `${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')} ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`; };
+    const fmtTime = shortTime;
+    const sourceText = (s) => ({ app: '客服码', web: '网页链接', direct: '直接访问' }[s] || s);
+    const contactLabel = (t) => ({ note: '备注', mobile: '手机', qq: 'QQ', wechat: '微信', email: '邮箱', other: '其他' }[t] || t);
+    const barW = (v, list) => { const max = Math.max(1, ...list.map(x => x.count)); return Math.round(v / max * 100) + '%'; };
+    const quotaW = (u, l) => Math.min(100, l > 0 ? Math.round(u / l * 100) : 100) + '%';
+
+    // ---------- 数据加载 ----------
+    const loadMe = async () => {
+      me.value = await API.me();
+      if (me.value.role === 'admin') { location.href = '/admin.html'; return; }
+      profileForm.nickname = me.value.nickname || '';
+      if (me.value.role === 'agent') {
+        profileForm.avatar = me.value.avatar || '👨‍💼';
+        profileForm.auto_accept = !!me.value.auto_accept;
+        profileForm.sound_enabled = !!me.value.sound_enabled;
+      }
+    };
+
+    const loadQuick = async () => { try { quickMsgs.value = await API.get('/api/quick-msgs'); } catch (e) {} };
+    const loadWelcome = async () => { try { welcomeMsgs.value = await API.get('/api/welcome-messages'); } catch (e) {} };
+    const loadAuto = async () => { try { autoReplies.value = await API.get('/api/auto-reply'); } catch (e) {} };
+    const loadBlacklist = async () => { try { blacklist.value = await API.get('/api/ip-blacklist'); } catch (e) {} };
+    const loadPreInq = async () => { try { preInq.value = await API.get('/api/pre-inquiry'); } catch (e) {} };
+    const loadStats = async () => { try { stats.value = await API.get('/api/stats/dashboard'); } catch (e) {} };
+    const loadLinks = async () => { try { links.value = await API.get('/api/tenant/links'); renderCodeQrs(); } catch (e) {} };
+    const loadAgents = async () => { try { agents.value = await API.get('/api/tenant/agents'); } catch (e) {} };
+    const loadBrand = async () => {
+      try {
+        const b = await API.get('/api/tenant/settings');
+        brand.company_name = b.brand_company; brand.title = b.brand_title; brand.sub = b.brand_sub;
+        brand.avatar = b.brand_avatar; brand.color = b.brand_color;
+        preqOn.value = !!b.pre_inquiry_on;
+        kwList.value = (b.filter_keywords || '').split(',').map(s => s.trim()).filter(Boolean);
+        Object.assign(sec, {
+          notice_on: !!b.notice_on, notice_text: b.notice_text || '',
+          filter_keywords: b.filter_keywords || '', auto_blacklist: !!b.auto_blacklist,
+          dedup_on: !!b.dedup_on, ip_limit_on: !!b.ip_limit_on, ip_limit_count: b.ip_limit_count || 5,
+        });
+      } catch (e) {}
+    };
+    const loadAgentOptions = async () => {
+      try { const r = await API.get('/api/agents'); agentOptions.value = r.agents || []; } catch (e) {}
+    };
+
+    // ---------- 轮询 ----------
+    let lastUnreadTotal = 0;
+    const pollOnce = async () => {
+      try {
+        const r = await API.get('/api/poll?role=agent&session=' + currentId.value + '&sinceMsg=' + maxMsgId.value);
+        sessions.value = r.sessions || [];
+        const unreadTotal = sessions.value.reduce((a, s) => a + s.unread, 0);
+        if ((r.messages || []).some(m => m.from === 'visitor') || (unreadTotal > lastUnreadTotal && lastUnreadTotal >= 0)) beep();
+        lastUnreadTotal = unreadTotal;
+        if (r.messages && r.messages.length) {
+          msgs.value.push(...r.messages);
+          scrollBottom();
+          if (r.messages.some(m => m.from === 'visitor')) markRead(currentId.value);
+        }
+      } catch (e) { if (String(e.message).includes('登录已失效')) throw e; }
+    };
+    const startPoll = () => { stopPoll(); pollTimer = setInterval(async () => { try { await pollOnce(); } catch (e) {} }, 2500); };
+    const stopPoll = () => { if (pollTimer) { clearInterval(pollTimer); pollTimer = null; } };
+
+    const beep = () => {
+      if (me.value && me.value.role === 'agent' && !me.value.sound_enabled) return;
+      try {
+        const ctx = new (window.AudioContext || window.webkitAudioContext)();
+        const o = ctx.createOscillator(); const g = ctx.createGain();
+        o.connect(g); g.connect(ctx.destination);
+        o.frequency.value = 880; g.gain.value = .12;
+        o.start(); o.stop(ctx.currentTime + .18);
+      } catch (e) {}
+    };
+
+    const scrollBottom = () => nextTick(() => { if (chatBody.value) chatBody.value.scrollTop = chatBody.value.scrollHeight; });
+
+    const openSession = async (id) => {
+      currentId.value = id;
+      msgs.value = [];
+      maxMsgId.value = 0;
+      profile.value = null;
+      try {
+        const r = await API.get('/api/sessions/' + id + '/messages');
+        msgs.value = r.messages || [];
+        if (msgs.value.length) maxMsgId.value = msgs.value[msgs.value.length - 1].id;
+        scrollBottom();
+        markRead(id);
+        // 资料与联系方式
+        profile.value = await API.get('/api/sessions/' + id + '/profile');
+        contactList.value = await API.get('/api/sessions/' + id + '/contacts');
+        noteDraft.value = (contactList.value.find(c => c.type === 'note') || {}).value || '';
+        if (!agentOptions.value.length) await loadAgentOptions();
+      } catch (e) { ElementPlus.ElMessage.error(e.message); }
+    };
+    const markRead = async (id) => {
+      try { await API.post('/api/sessions/' + id + '/read'); const s = sessions.value.find(x => x.id === id); if (s) s.unread = 0; } catch (e) {}
+    };
+
+    const send = async () => {
+      const text = draft.value.trim();
+      if (!text || !currentId.value || sending.value) return;
+      sending.value = true;
+      try {
+        const r = await API.post('/api/sessions/' + currentId.value + '/messages', { text });
+        msgs.value.push(r.message);
+        maxMsgId.value = r.message.id;
+        draft.value = '';
+        showQuick.value = false;
+        scrollBottom();
+        const s = sessions.value.find(x => x.id === currentId.value);
+        if (s) { s.lastMsg = text.slice(0, 60); s.agent_id = s.agent_id || (me.value.role === 'agent' ? me.value.id : s.agent_id); }
+      } catch (e) { ElementPlus.ElMessage.error(e.message); }
+      finally { sending.value = false; }
+    };
+    const onKey = (e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(); } };
+
+    const useQuick = (q) => { draft.value = q.content; showQuick.value = false; };
+
+    // 图片/语音
+    const onImage = async (ev) => {
+      const file = ev.target.files[0];
+      ev.target.value = '';
+      if (!file || !currentId.value) return;
+      if (file.size > 5 * 1024 * 1024) { ElementPlus.ElMessage.warning('图片不能超过 5MB'); return; }
+      const data = await new Promise(res => { const fr = new FileReader(); fr.onload = () => res(fr.result); fr.readAsDataURL(file); });
+      try {
+        const up = await API.post('/api/upload', { data, kind: 'image', filename: file.name });
+        const r = await API.post('/api/sessions/' + currentId.value + '/messages', { text: '', attachments: [up] });
+        msgs.value.push(r.message); maxMsgId.value = r.message.id; scrollBottom();
+      } catch (e) { ElementPlus.ElMessage.error(e.message); }
+    };
+    const startRec = async () => {
+      if (!navigator.mediaDevices || !window.MediaRecorder) { ElementPlus.ElMessage.warning('当前浏览器不支持录音'); return; }
+      try {
+        let mime = '';
+        for (const m of ['audio/mp4', 'audio/webm;codecs=opus', 'audio/webm']) { if (MediaRecorder.isTypeSupported(m)) { mime = m; break; } }
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        mediaRecorder = mime ? new MediaRecorder(stream, { mimeType: mime }) : new MediaRecorder(stream);
+        recChunks = [];
+        mediaRecorder.ondataavailable = (e) => { if (e.data && e.data.size) recChunks.push(e.data); };
+        mediaRecorder.onstop = async () => {
+          stream.getTracks().forEach(t => t.stop());
+          if (!recSendFlag || !recChunks.length) return;
+          const blob = new Blob(recChunks, { type: mediaRecorder.mimeType || 'audio/webm' });
+          const data = await new Promise(res => { const fr = new FileReader(); fr.onload = () => res(fr.result); fr.readAsDataURL(blob); });
+          try {
+            const up = await API.post('/api/upload', { data, kind: 'audio', filename: 'voice.webm' });
+            const r = await API.post('/api/sessions/' + currentId.value + '/messages', { text: '', attachments: [up] });
+            msgs.value.push(r.message); maxMsgId.value = r.message.id; scrollBottom();
+          } catch (e) { ElementPlus.ElMessage.error(e.message); }
+        };
+        recSendFlag = false;
+        mediaRecorder.start();
+        recording.value = true; recSecs.value = 0; recStartAt = Date.now();
+        recTimer = setInterval(() => { recSecs.value = Math.floor((Date.now() - recStartAt) / 1000); if (recSecs.value >= 60) stopRec(true); }, 500);
+      } catch (e) { ElementPlus.ElMessage.warning('无法获取麦克风权限'); }
+    };
+    const stopRec = (sendIt) => {
+      if (!mediaRecorder) return;
+      recSendFlag = sendIt;
+      clearInterval(recTimer);
+      recording.value = false;
+      try { mediaRecorder.stop(); } catch (e) {}
+    };
+
+    // 会话操作
+    const closeSession = async () => {
+      try {
+        await API.post('/api/sessions/' + currentId.value + '/close');
+        sessions.value = sessions.value.filter(s => s.id !== currentId.value);
+        currentId.value = 0; msgs.value = [];
+      } catch (e) { ElementPlus.ElMessage.error(e.message); }
+    };
+    const doTransfer = async () => {
+      if (transferTo.value === null) { ElementPlus.ElMessage.warning('请选择目标'); return; }
+      try {
+        await API.post('/api/sessions/' + currentId.value + '/transfer', { to_agent_id: transferTo.value });
+        ElementPlus.ElMessage.success('已转接');
+        transferDlg.value = false;
+        currentId.value = 0; msgs.value = [];
+        await pollOnce();
+      } catch (e) { ElementPlus.ElMessage.error(e.message); }
+    };
+
+    // 联系方式
+    const contactDlg = ref(false);
+    const editingContact = reactive({ type: '', value: '' });
+    const editContact = (c) => { editingContact.type = c.type; editingContact.value = c.value; contactDlg.value = true; };
+    const saveContact = async () => {
+      try {
+        await API.put('/api/sessions/' + currentId.value + '/contacts/' + editingContact.type, { value: editingContact.value });
+        const c = contactList.value.find(x => x.type === editingContact.type);
+        if (c) c.value = editingContact.value;
+        contactDlg.value = false;
+      } catch (e) { ElementPlus.ElMessage.error(e.message); }
+    };
+    const saveNote = async () => {
+      if (!currentId.value) return;
+      try { await API.put('/api/sessions/' + currentId.value + '/contacts/note', { value: noteDraft.value }); } catch (e) {}
+    };
+
+    // 群发
+    const sendBroadcast = async () => {
+      bcSending.value = true;
+      try {
+        const r = await API.post('/api/broadcast/send', { text: bcText.value.trim() });
+        ElementPlus.ElMessage.success('已群发 ' + r.count + ' 个会话');
+        bcText.value = '';
+      } catch (e) { ElementPlus.ElMessage.error(e.message); }
+      finally { bcSending.value = false; }
+    };
+
+    // 获客链接
+    const copy = (s) => { navigator.clipboard && navigator.clipboard.writeText(s); ElementPlus.ElMessage.success('已复制'); };
+    const createLink = async () => { try { await API.post('/api/tenant/link'); ElementPlus.ElMessage.success('已生成'); await loadLinks(); } catch (e) { ElementPlus.ElMessage.error(e.message); } };
+    const renewLink = async () => { try { await API.post('/api/tenant/link/renew'); ElementPlus.ElMessage.success('已更换'); await loadLinks(); } catch (e) { ElementPlus.ElMessage.error(e.message); } };
+    const newCode = async () => { try { await API.post('/api/tenant/service-code'); ElementPlus.ElMessage.success('已生成新客服码'); await loadLinks(); } catch (e) { ElementPlus.ElMessage.error(e.message); } };
+    const delCode = async (c) => { try { await API.del('/api/tenant/service-code?code=' + c.code); await loadLinks(); } catch (e) { ElementPlus.ElMessage.error(e.message); } };
+    const blockSession = async () => {
+      if (!currentId.value) return;
+      try {
+        const r = await API.post('/api/sessions/' + currentId.value + '/block');
+        ElementPlus.ElMessage.success('已拉黑 ' + r.ip);
+      } catch (e) { ElementPlus.ElMessage.error(e.message); }
+    };
+    const blockIp = async (ip) => {
+      try {
+        await API.post('/api/ip-blacklist', { ip, reason: '访客资源手动拉黑' });
+        ElementPlus.ElMessage.success('已拉黑 ' + ip);
+      } catch (e) { ElementPlus.ElMessage.error(e.message); }
+    };
+    // 关键词标签式管理
+    const kwList = ref([]);
+    const kwInput = ref('');
+    const kwSaving = ref(false);
+    const addKw = () => {
+      const v = kwInput.value.trim().slice(0, 30);
+      if (!v) return;
+      if (kwList.value.includes(v)) { kwInput.value = ''; return; }
+      kwList.value.push(v);
+      kwInput.value = '';
+    };
+    const removeKw = (kw) => { kwList.value = kwList.value.filter(x => x !== kw); };
+    const saveFilter = async () => {
+      kwSaving.value = true;
+      try {
+        await API.put('/api/tenant/settings', { filter_keywords: kwList.value.join(','), auto_blacklist: sec.auto_blacklist });
+        sec.filter_keywords = kwList.value.join(',');
+        ElementPlus.ElMessage.success('已保存');
+      } catch (e) { ElementPlus.ElMessage.error(e.message); }
+      finally { kwSaving.value = false; }
+    };
+    const agentCmd = async (cmd, row) => {
+      if (cmd === 'toggle') { await toggleAgent(row); }
+      else if (cmd === 'del') {
+        try {
+          await ElementPlus.ElMessageBox.confirm('删除该子客服？其名下会话将退回待接入池', '警告', { type: 'warning' });
+          await delAgent(row);
+        } catch (e) {}
+      }
+    };
+    const renameVisitor = async () => {
+      if (!currentId.value) return;
+      try {
+        const { value } = await ElementPlus.ElMessageBox.prompt('修改访客名称（列表与聊天中将显示新名称）', '重命名', { inputValue: current.value ? current.value.name : '', inputPattern: /\S+/, inputErrorMessage: '名称不能为空' });
+        const name = value.trim().slice(0, 30);
+        if (!name) return;
+        await API.put('/api/sessions/' + currentId.value + '/name', { name });
+        const s = sessions.value.find(x => x.id === currentId.value);
+        if (s) s.name = name;
+        if (profile.value) profile.value.session.name = name;
+        ElementPlus.ElMessage.success('已重命名');
+      } catch (e) { /* 取消 */ }
+    };
+    const renderCodeQrs = () => {
+      nextTick(() => {
+        document.querySelectorAll('.code-qr[data-code]').forEach((el) => {
+          if (el.dataset.done) return;
+          el.dataset.done = '1';
+          el.innerHTML = '';
+          if (window.QRCode) new QRCode(el, { text: el.dataset.code, width: 72, height: 72 });
+        });
+      });
+    };
+    Vue.watch(links, () => renderCodeQrs(), { deep: false });
+
+    // 子客服
+    const agentDlg = ref(false);
+    const agentMode = ref('create');
+    const agentForm = reactive({ username: '', nickname: '', password: '' });
+    const createdAgentVisible = ref(false);
+    const createdAgent = reactive({ account: '', password: '' });
+    const openAgentEdit = (row) => { agentMode.value = 'edit'; agentForm.username = row.username; agentForm.nickname = row.nickname; agentForm.password = ''; agentDlg.value = true; };
+    const saveAgent = async () => {
+      try {
+        if (agentMode.value === 'create') {
+          const r = await API.post('/api/tenant/agents', { username: agentForm.username, nickname: agentForm.nickname, password: agentForm.password });
+          createdAgent.account = r.login_account; createdAgent.password = r.plain.password;
+          createdAgentVisible.value = true;
+        } else {
+          const id = agents.value.find(a => a.username === agentForm.username)?.id;
+          if (id) await API.put('/api/tenant/agents/' + id, { nickname: agentForm.nickname });
+        }
+        agentDlg.value = false;
+        await loadAgents();
+      } catch (e) { ElementPlus.ElMessage.error(e.message); }
+    };
+    const resetAgentPw = async (row) => {
+      try {
+        ElementPlus.ElMessageBox.prompt('输入新密码（至少 6 位）', '重置密码', { inputValue: '' }).then(async ({ value }) => {
+          if (!value || value.length < 6) { ElementPlus.ElMessage.warning('密码至少 6 位'); return; }
+          await API.put('/api/tenant/agents/' + row.id, { password: value });
+          ElementPlus.ElMessage.success('已重置为：' + value);
+        }).catch(() => {});
+      } catch (e) {}
+    };
+    const toggleAgent = async (row) => { try { await API.put('/api/tenant/agents/' + row.id, { status: row.status === 'active' ? 'disabled' : 'active' }); await loadAgents(); } catch (e) { ElementPlus.ElMessage.error(e.message); } };
+    const delAgent = async (row) => { try { await API.del('/api/tenant/agents/' + row.id); ElementPlus.ElMessage.success('已删除'); await loadAgents(); } catch (e) { ElementPlus.ElMessage.error(e.message); } };
+
+    // 品牌与设置
+    const saveBrand = async () => {
+      try {
+        await API.put('/api/tenant/settings', {
+          brand_company: brand.company_name, brand_title: brand.title, brand_sub: brand.sub,
+          brand_avatar: brand.avatar, brand_color: brand.color,
+        });
+        ElementPlus.ElMessage.success('已保存');
+      } catch (e) { ElementPlus.ElMessage.error(e.message); }
+    };
+    const savePreqOn = async () => {
+      try { await API.put('/api/tenant/settings', { pre_inquiry_on: preqOn.value }); } catch (e) { ElementPlus.ElMessage.error(e.message); }
+    };
+    const saveProfile = async () => {
+      try {
+        const data = { nickname: profileForm.nickname };
+        if (me.value.role === 'agent') { data.avatar = profileForm.avatar; data.auto_accept = profileForm.auto_accept; data.sound_enabled = profileForm.sound_enabled; }
+        await API.updateProfile(data);
+        ElementPlus.ElMessage.success('已保存');
+        await loadMe();
+      } catch (e) { ElementPlus.ElMessage.error(e.message); }
+    };
+    const changePw = async () => {
+      if (!pwOld.value || !pwNew.value) { ElementPlus.ElMessage.warning('请填写完整'); return; }
+      try { await API.changePassword(pwOld.value, pwNew.value); ElementPlus.ElMessage.success('密码已修改'); pwOld.value = pwNew.value = ''; }
+      catch (e) { ElementPlus.ElMessage.error(e.message); }
+    };
+    const exportCsv = async () => {
+      try {
+        const res = await API.get('/api/export/sessions');
+        const blob = await res.blob();
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url; a.download = 'sessions_' + Date.now() + '.csv';
+        document.body.appendChild(a); a.click(); a.remove();
+        URL.revokeObjectURL(url);
+      } catch (e) { ElementPlus.ElMessage.error(e.message); }
+    };
+    const logout = () => { API.clearToken(); location.href = '/login.html'; };
+
+    // ===== 安全与维护 / 访客资源 / 引导 / 深色 =====
+    const sec = reactive({ notice_on: false, notice_text: '', filter_keywords: '', auto_blacklist: false, dedup_on: false, ip_limit_on: false, ip_limit_count: 5 });
+    const loginLogs = ref([]);
+    const visitors = ref([]);
+    const cleanupOpts = [
+      { label: '清理 1 天前的会话', days: 1 },
+      { label: '清理 3 天前的会话', days: 3 },
+      { label: '清理 7 天前的会话', days: 7 },
+      { label: '清理全部会话', days: -1 },
+    ];
+    const loadSecurityPage = async () => {
+      try {
+        loginLogs.value = await API.get('/api/tenant/login-logs');
+      } catch (e) {}
+    };
+    const saveSecurity = async () => {
+      try {
+        await API.put('/api/tenant/settings', { ...sec });
+        ElementPlus.ElMessage.success('已保存');
+      } catch (e) { ElementPlus.ElMessage.error(e.message); }
+    };
+    const doCleanup = async (days, scope) => {
+      try {
+        const r = await API.post('/api/tenant/cleanup', { days, scope });
+        ElementPlus.ElMessage.success('已清理 ' + (r.deleted || 0) + ' 条' + (r.label ? '（' + r.label + '）' : ''));
+        if (scope === 'blacklist') await loadBlacklist();
+        else { await pollOnce(); if (currentId.value) { msgs.value = []; await openSession(currentId.value); } currentId.value = 0; msgs.value = []; }
+      } catch (e) { ElementPlus.ElMessage.error(e.message); }
+    };
+    const loadVisitors = async () => {
+      try { visitors.value = await API.get('/api/tenant/visitors'); } catch (e) {}
+    };
+    const openVisitorSessions = (row) => {
+      if (row.last_session_id) { tab.value = 'work'; openSession(row.last_session_id); }
+      else ElementPlus.ElMessage.info('该访客暂无会话记录');
+    };
+
+    // 接入引导（真实配置状态）
+    const guide = computed(() => {
+      if (!me.value || me.value.role !== 'tenant') return [];
+      return [
+        { k: 'welcome', icon: '👋', label: '设置欢迎语', desc: '访客进入自动打招呼', done: welcomeMsgs.value.length > 0, go: () => tab.value = 'welcome' },
+        { k: 'auto', icon: '🤖', label: '设置自动回复', desc: '关键词自动应答', done: autoReplies.value.length > 0, go: () => tab.value = 'auto' },
+        { k: 'link', icon: '🔗', label: '生成获客链接', desc: '专属链接 / 客服码', done: !!(links.value && (links.value.domain_link || (links.value.codes || []).length)), go: () => tab.value = 'links' },
+        { k: 'preq', icon: '📝', label: '配置询前表单', desc: '进入前收集联系方式', done: preInq.value.length > 0, go: () => tab.value = 'preinq' },
+        { k: 'agent', icon: '👨‍💼', label: '添加子客服', desc: '多人协作接待', done: agents.value.length > 0, go: () => tab.value = 'agents' },
+      ];
+    });
+    const guideDone = computed(() => guide.value.filter(g => g.done).length);
+
+    // 深色主题
+    const dark = ref(false);
+    try { dark.value = localStorage.getItem('kfxt_dark') === '1'; } catch (e) {}
+    const applyDark = () => { document.body.classList.toggle('dark', dark.value); };
+    const toggleDark = () => { dark.value = !dark.value; try { localStorage.setItem('kfxt_dark', dark.value ? '1' : '0'); } catch (e) {} applyDark(); };
+    applyDark();
+
+    // CRUD 字段配置
+    const quickFields = [
+      { k: 'title', label: '标题' },
+      { k: 'content', label: '内容', type: 'textarea' },
+      { k: 'group_name', label: '分组', def: '通用' },
+      { k: 'sort', label: '排序', type: 'number', def: 0 },
+    ];
+    const welcomeFields = [
+      { k: 'content', label: '内容', type: 'textarea' },
+      { k: 'trig', label: '触发方式', type: 'select', def: 'once', options: [{ v: 'once', l: '仅首次进入' }, { v: 'every', l: '每次进入' }] },
+      { k: 'enabled', label: '启用', type: 'bool' },
+      { k: 'sort', label: '顺序', type: 'number', def: 0 },
+    ];
+    const autoFields = [
+      { k: 'keyword', label: '关键词' },
+      { k: 'reply', label: '回复内容', type: 'textarea' },
+      { k: 'enabled', label: '启用', type: 'bool' },
+    ];
+    const blFields = [
+      { k: 'ip', label: 'IP 地址' },
+      { k: 'reason', label: '原因' },
+    ];
+    const preqFields = [
+      { k: 'label', label: '字段名' },
+      { k: 'type', label: '类型', type: 'select', def: 'text', options: [{ v: 'text', l: '单行文本' }, { v: 'textarea', l: '多行文本' }] },
+      { k: 'required', label: '必填', type: 'bool' },
+      { k: 'placeholder', label: '提示语' },
+      { k: 'sort', label: '排序', type: 'number', def: 0 },
+    ];
+
+    // 头像上传（图片，走 /api/upload；emoji 直接输入）
+    const uploadAvatar = async (ev, target) => {
+      const file = ev.target.files[0];
+      ev.target.value = '';
+      if (!file) return;
+      if (file.size > 2 * 1024 * 1024) { ElementPlus.ElMessage.warning('头像不能超过 2MB'); return; }
+      const data = await new Promise(res => { const fr = new FileReader(); fr.onload = () => res(fr.result); fr.readAsDataURL(file); });
+      try {
+        const up = await API.post('/api/upload', { data, kind: 'image', filename: file.name });
+        if (target === 'brand') brand.avatar = up.url;
+        else profileForm.avatar = up.url;
+        ElementPlus.ElMessage.success('头像已上传，记得保存');
+      } catch (e) { ElementPlus.ElMessage.error(e.message); }
+    };
+    const isImg = (v) => typeof v === 'string' && (v.startsWith('http') || v.startsWith('/uploads'));
+
+    onMounted(async () => {
+      try {
+        await loadMe();
+        if (me.value.role === 'admin') { location.href = '/admin.html'; return; }
+        await Promise.all([pollOnce(), loadQuick(), loadWelcome(), loadAuto(), loadStats()]);
+        if (me.value.role === 'tenant') {
+          await Promise.all([loadLinks(), loadAgents(), loadBrand(), loadBlacklist(), loadPreInq(), loadAgentOptions()]);
+        }
+        booted.value = true;
+        startPoll();
+      } catch (e) {
+        // 401 时 api.js 已跳转登录页；此处保持加载态不渲染骨架
+        if (!String(e.message).includes('登录已失效')) ElementPlus.ElMessage.error(e.message);
+      }
+    });
+    onUnmounted(stopPoll);
+
+    return {
+      tab, tabTitle, booted, me, expireText, stats, sessions, sessSearch, filteredSessions, currentId, current,
+      msgs, draft, sending, chatBody, viewing, profile, contactList, noteDraft, transferDlg, transferTo, agentOptions,
+      quickMsgs, showQuick, welcomeMsgs, autoReplies, blacklist, preInq, preqOn, links, agents, brand,
+      bcText, bcSending, profileForm, pwOld, pwNew, recording, recSecs, qrVisible, qrData, qrBox,
+      posterUrl, posterOpts, downloadPoster, pickPosterLogo, onQrOpen, downloadQrBox,
+      waNumber, tgUser, waQrBox, tgQrBox, genWaQr, genTgQr,
+      uploadAvatar, isImg,
+      sec, loginLogs, visitors, cleanupOpts, loadSecurityPage, saveSecurity, doCleanup, loadVisitors, openVisitorSessions,
+      guide, guideDone, dark, toggleDark, renameVisitor, renderCodeQrs,
+      blockSession, blockIp, kwList, kwInput, kwSaving, addKw, removeKw, saveFilter, agentCmd,
+      quickFields, welcomeFields, autoFields, blFields, preqFields,
+      shortTime, fmtTime, sourceText, contactLabel, barW, quotaW,
+      openSession, send, onKey, useQuick, onImage, startRec, stopRec, closeSession, doTransfer,
+      editContact, saveContact, contactDlg, editingContact, saveNote, sendBroadcast,
+      copy, createLink, renewLink, newCode, delCode, showQr,
+      agentDlg, agentMode, agentForm, openAgentEdit, saveAgent, resetAgentPw, toggleAgent, delAgent,
+      createdAgentVisible, createdAgent,
+      saveBrand, savePreqOn, saveProfile, changePw, exportCsv, logout,
+      loadQuick, loadWelcome, loadAuto, loadBlacklist, loadPreInq,
+    };
+  }
+});
+app.component('crud-table', CrudTable);
+app.use(ElementPlus).mount('#app');
+</script>
+</body>
+</html>
