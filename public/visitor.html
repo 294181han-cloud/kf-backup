@@ -338,8 +338,8 @@ textarea.form-input { resize: none; min-height: 78px; }
         <span class="online-dot"></span>
       </div>
       <div style="min-width:0;">
-        <div class="v-title">{{ brand.company_name }}<span v-if="brand.vip_badge" class="vip-badge">{{ brand.vip_badge }}</span></div>
-        <div class="v-sub">{{ brand.welcome_sub }}</div>
+        <div class="v-title" v-if="brand.show_nickname">{{ brand.company_name }}<span v-if="brand.vip_badge" class="vip-badge">{{ brand.vip_badge }}</span></div>
+        <div class="v-sub" v-if="brand.show_support">{{ brand.welcome_sub }}</div>
       </div>
       <div class="v-status">{{ onlineText }}</div>
     </div>

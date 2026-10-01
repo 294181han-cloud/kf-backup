@@ -179,6 +179,8 @@ function dispatch_api(string $method, string $uri): void
     if ($uri === '/api/tenant/link/renew')       handle_tenant_link_renew($method);
     if ($uri === '/api/tenant/settings')         handle_tenant_settings($method);
     if ($uri === '/api/tenant/links')            handle_tenant_links($method);
+    if ($uri === '/api/tenant/link/history')     handle_tenant_link_history($method);
+    if (preg_match('#^/api/tenant/link/disable/(\d+)$#', $uri, $m)) handle_tenant_link_disable($method, $m);
     if ($uri === '/api/tenant/login-logs')       handle_tenant_login_logs($method);
     if ($uri === '/api/tenant/cleanup')          handle_tenant_cleanup($method);
     if ($uri === '/api/tenant/visitors')         handle_tenant_visitors($method);

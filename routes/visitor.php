@@ -94,6 +94,9 @@ function tenant_brand(array $tenant): array
         'user_head_type'  => ts_get($tid, 'user_head_type', 'default'),
         'user_head'       => ts_get($tid, 'user_head', ''),
         'user_name_type'  => ts_get($tid, 'user_name_type', 'default'),
+        // 码设置显示开关
+        'show_nickname'   => ts_get($tid, 'code_nickname_on', '1') === '1',
+        'show_support'    => ts_get($tid, 'code_support_on', '1') === '1',
     ];
 }
 

@@ -234,6 +234,11 @@ function handle_tenant_settings(string $method): void
             'tpl_nav_on'      => ts_get($tid, 'tpl_nav_on', '1') === '1',
             'tpl_nav_title'   => ts_get($tid, 'tpl_nav_title', ''),
             'vip_badge'       => ts_get($tid, 'vip_badge', ''),
+            // 码设置（获客码页）
+            'me_avatar'       => ts_get($tid, 'me_avatar', ''),
+            'code_logo_type'  => ts_get($tid, 'code_logo_type', 'wechat'),
+            'code_nickname_on' => ts_get($tid, 'code_nickname_on', '1') === '1',
+            'code_support_on' => ts_get($tid, 'code_support_on', '1') === '1',
             'footer_text'     => ts_get($tid, 'footer_text', ''),
             // 公告（访客端顶部横幅）
             'notice_on'      => ts_get($tid, 'notice_on', '0') === '1',
@@ -281,12 +286,18 @@ function handle_tenant_settings(string $method): void
             'link_mode' => ['no', 'copy', 'jump'],
             'user_head_type' => ['default', 'random', 'custom'],
             'user_name_type' => ['default', 'random'],
+            'code_logo_type' => ['avatar', 'wechat', 'alipay', 'mix'],
         ];
         foreach ($enums as $k => $allow) {
             if (array_key_exists($k, $data)) {
                 $v = in_array($data[$k], $allow, true) ? $data[$k] : $allow[0];
                 ts_set($tid, $k, $v);
             }
+        }
+        // 码设置专用键
+        if (array_key_exists('me_avatar', $data)) ts_set($tid, 'me_avatar', mb_substr(trim((string)$data['me_avatar']), 0, 500));
+        foreach (['code_nickname_on', 'code_support_on'] as $bk) {
+            if (array_key_exists($bk, $data)) ts_set($tid, $bk, $data[$bk] ? '1' : '0');
         }
         json_out(['ok' => true]);
     }
@@ -399,6 +410,33 @@ function handle_tenant_visitors(string $method): void
     }
     unset($v);
     json_out($out);
+}
+
+/* ---------- 链接历史（管理码：含已作废的历史记录） ---------- */
+function handle_tenant_link_history(string $method): void
+{
+    if ($method !== 'GET') { json_error('方法不允许', 405); return; }
+    $ctx = require_tenant();
+    $st = db()->prepare('SELECT id, subdomain, link, active, created_at FROM domain_links WHERE tenant_id = ? ORDER BY id DESC LIMIT 50');
+    $st->execute([$ctx['id']]);
+    $links = $st->fetchAll();
+    $st = $db2 = db()->prepare('SELECT id, code, link, created_at FROM service_codes WHERE tenant_id = ? ORDER BY id DESC LIMIT 100');
+    $st->execute([$ctx['id']]);
+    $codes = $st->fetchAll();
+    foreach ($links as &$r) { $r['active'] = (bool)$r['active']; $r['created_at'] = dt_to_iso($r['created_at']); }
+    unset($r);
+    foreach ($codes as &$r) { $r['created_at'] = dt_to_iso($r['created_at']); }
+    unset($r);
+    json_out(['links' => $links, 'codes' => $codes]);
+}
+
+/* ---------- 作废链接（专属链接历史） ---------- */
+function handle_tenant_link_disable(string $method, array $m): void
+{
+    if ($method !== 'POST') { json_error('方法不允许', 405); return; }
+    $ctx = require_tenant();
+    db()->prepare('UPDATE domain_links SET active = 0 WHERE id = ? AND tenant_id = ?')->execute([(int)$m[1], $ctx['id']]);
+    json_out(['ok' => true]);
 }
 
 /* ---------- 入口链接汇总 ---------- */
