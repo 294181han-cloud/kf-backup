@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>登录 - 客服系统</title>
+<link rel="stylesheet" href="/assets/vendor/element-plus.css">
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+  min-height: 100vh;
+  display: flex; align-items: center; justify-content: center;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', sans-serif;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  padding: 20px;
+}
+.login-card {
+  width: 100%; max-width: 400px;
+  background: #fff; border-radius: 16px;
+  padding: 40px 36px 32px;
+  box-shadow: 0 20px 60px rgba(0,0,0,.3);
+}
+.login-logo { text-align: center; margin-bottom: 8px; font-size: 44px; }
+.login-title { text-align: center; font-size: 22px; font-weight: 600; color: #1f2329; margin-bottom: 4px; }
+.login-sub { text-align: center; font-size: 13px; color: #8f959e; margin-bottom: 28px; }
+.el-input { margin-bottom: 18px; }
+.el-input__wrapper { padding: 4px 14px; border-radius: 10px; }
+.login-btn { width: 100%; height: 44px; font-size: 16px; border-radius: 10px; margin-top: 4px; }
+.login-tip { margin-top: 18px; font-size: 12px; color: #8f959e; line-height: 1.8; text-align: center; }
+.login-tip .tag { display: inline-block; padding: 1px 8px; background: #f2f3f5; border-radius: 4px; color: #4e5969; margin: 0 2px; }
+.footer { position: fixed; bottom: 16px; left: 0; right: 0; text-align: center; color: rgba(255,255,255,.65); font-size: 12px; }
+</style>
+</head>
+<body>
+<div id="app">
+  <div class="login-card">
+    <div class="login-logo">💬</div>
+    <div class="login-title">客服系统</div>
+    <div class="login-sub">多账号独立客服工作台</div>
+    <el-input v-model="account" size="large" placeholder="卡密 / 卡密/客服账号" clearable @keyup.enter="doLogin">
+      <template #prefix><span>🔑</span></template>
+    </el-input>
+    <el-input v-model="password" size="large" type="password" placeholder="密码" show-password @keyup.enter="doLogin">
+      <template #prefix><span>🔒</span></template>
+    </el-input>
+    <el-button class="login-btn" type="primary" size="large" :loading="loading" @click="doLogin">登 录</el-button>
+    <div class="login-tip">
+      租户：直接输入 <span class="tag">卡密</span> 登录<br>
+      子客服：<span class="tag">卡密/客服用户名</span> &nbsp;管理员：<span class="tag">admin</span>
+    </div>
+  </div>
+</div>
+<div class="footer">Powered by 客服系统</div>
+<script src="/assets/vendor/vue.global.js?v=2.0.1"></script>
+<script src="/assets/vendor/element-plus.js?v=2.0.1"></script>
+<script src="/assets/api.js?v=2.0.1"></script>
+<script>
+const { createApp, ref } = Vue;
+createApp({
+  setup() {
+    const account = ref('');
+    const password = ref('');
+    const loading = ref(false);
+    const doLogin = async () => {
+      if (!account.value || !password.value) { ElementPlus.ElMessage.warning('请输入账号和密码'); return; }
+      loading.value = true;
+      try {
+        const r = await API.login(account.value.trim(), password.value);
+        API.setToken(r.token);
+        ElementPlus.ElMessage.success('登录成功');
+        setTimeout(() => location.href = r.redirect || '/app.html', 400);
+      } catch (e) {
+        ElementPlus.ElMessage.error(e.message);
+      } finally { loading.value = false; }
+    };
+    return { account, password, loading, doLogin };
+  }
+}).use(ElementPlus).mount('#app');
+</script>
+</body>
+</html>
