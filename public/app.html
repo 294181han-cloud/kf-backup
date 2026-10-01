@@ -1815,8 +1815,6 @@ const app = createApp({
         { k: 'welcome', icon: '👋', label: '设置欢迎语', desc: '访客进入自动打招呼', done: welcomeMsgs.value.length > 0, go: () => tab.value = 'welcome' },
         { k: 'auto', icon: '🤖', label: '设置自动回复', desc: '关键词自动应答', done: autoReplies.value.length > 0, go: () => tab.value = 'auto' },
         { k: 'link', icon: '🔗', label: '生成获客链接', desc: '专属链接 / 客服码', done: !!(links.value && (links.value.domain_link || (links.value.codes || []).length)), go: () => tab.value = 'links' },
-        { k: 'preq', icon: '📝', label: '配置询前表单', desc: '进入前收集联系方式', done: preInq.value.length > 0, go: () => tab.value = 'preinq' },
-        { k: 'agent', icon: '👨‍💼', label: '添加子客服', desc: '多人协作接待', done: agents.value.length > 0, go: () => tab.value = 'agents' },
       ];
     });
     const guideDone = computed(() => guide.value.filter(g => g.done).length);
