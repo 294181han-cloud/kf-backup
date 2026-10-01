@@ -12,8 +12,8 @@ body { margin: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'P
 .layout { display: flex; height: 100vh; overflow: hidden; }
 
 /* ---------- 侧栏 ---------- */
-.side { width: 212px; background: #f4f6f9; color: #333; display: flex; flex-direction: column; flex-shrink: 0; transition: width .2s; overflow: hidden; border-right: 1px solid #eeeaea; }
-.side.collapsed { width: 60px; }
+.side { width: 188px; background: #f4f6f9; color: #333; display: flex; flex-direction: column; flex-shrink: 0; transition: width .2s; overflow: hidden; border-right: 1px solid #eeeaea; }
+.side.collapsed { width: 54px; }
 .side.collapsed .nav-item { justify-content: center; padding: 11px 0; }
 .side.collapsed .nav-item .nv-text, .side.collapsed .nav-group, .side.collapsed .side-hero, .side.collapsed .logo .lg-text { display: none; }
 .side.collapsed .logo { justify-content: center; }
@@ -1481,7 +1481,6 @@ const app = createApp({
           const rset = new Set(r.recalledIds);
           msgs.value.forEach(m => { if (rset.has(m.id)) { m.recalled = true; m.recalledByVisitor = m.from === 'visitor'; } });
         }
-        const unreadTotal = sessions.value.reduce((a, s) => a + s.unread, 0);
         if ((r.messages || []).some(m => m.from === 'visitor') || (unreadTotal > lastUnreadTotal && lastUnreadTotal >= 0)) beep();
         lastUnreadTotal = unreadTotal;
         if (r.messages && r.messages.length) {
@@ -2235,6 +2234,32 @@ const app = createApp({
 });
 app.component('crud-table', CrudTable);
 app.use(ElementPlus).mount('#app');
+</script>
+<script>
+window.addEventListener('error', function (ev) {
+  try {
+    var bar = document.getElementById('global-err-bar');
+    if (!bar) {
+      bar = document.createElement('div');
+      bar.id = 'global-err-bar';
+      bar.style.cssText = 'position:fixed;top:0;left:0;right:0;z-index:99999;background:#f56c6c;color:#fff;font-size:12px;padding:6px 12px;word-break:break-all;';
+      (document.body || document.documentElement).appendChild(bar);
+    }
+    bar.textContent = 'JS错误: ' + (ev.message || '') + ' @ ' + (ev.filename || '') + ':' + (ev.lineno || '');
+  } catch (e) {}
+});
+window.addEventListener('unhandledrejection', function (ev) {
+  try {
+    var bar = document.getElementById('global-err-bar');
+    if (!bar) {
+      bar = document.createElement('div');
+      bar.id = 'global-err-bar';
+      bar.style.cssText = 'position:fixed;top:0;left:0;right:0;z-index:99999;background:#f56c6c;color:#fff;font-size:12px;padding:6px 12px;word-break:break-all;';
+      (document.body || document.documentElement).appendChild(bar);
+    }
+    bar.textContent = 'Promise错误: ' + ((ev.reason && ev.reason.message) || ev.reason || '');
+  } catch (e) {}
+});
 </script>
 </body>
 </html>
