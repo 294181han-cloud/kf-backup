@@ -12,25 +12,27 @@ body { margin: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'P
 .layout { display: flex; height: 100vh; overflow: hidden; }
 
 /* ---------- 侧栏 ---------- */
-.side { width: 212px; background: #001529; color: #fff; display: flex; flex-direction: column; flex-shrink: 0; transition: width .2s; overflow: hidden; }
+.side { width: 212px; background: #f4f6f9; color: #333; display: flex; flex-direction: column; flex-shrink: 0; transition: width .2s; overflow: hidden; border-right: 1px solid #eeeaea; }
 .side.collapsed { width: 60px; }
 .side.collapsed .nav-item { justify-content: center; padding: 11px 0; }
 .side.collapsed .nav-item .nv-text, .side.collapsed .nav-group, .side.collapsed .side-hero, .side.collapsed .logo .lg-text { display: none; }
 .side.collapsed .logo { justify-content: center; }
-.side .logo { font-size: 16px; font-weight: 600; padding: 16px 18px 14px; display: flex; align-items: center; gap: 8px; }
-.side-tools { border-top: 1px solid rgba(255,255,255,.08); }
+.side.collapsed .side-tools { justify-content: center; }
+.side .logo { font-size: 16px; font-weight: 700; padding: 16px 18px 12px; display: flex; align-items: center; gap: 8px; color: #1f2329; }
+.side-tools { border-top: 1px solid #eeeaea; }
 .theme-dot { width: 14px; height: 14px; border-radius: 50%; cursor: pointer; display: inline-block; border: 2px solid transparent; }
-.theme-dot.on { border-color: #fff; box-shadow: 0 0 6px rgba(255,255,255,.5); }
+.theme-dot.on { border-color: #1890ff; box-shadow: 0 0 5px rgba(24,144,255,.5); }
 .lg-text { }
 .side .nav { flex: 1; overflow-y: auto; padding-bottom: 10px; scrollbar-width: none; -ms-overflow-style: none; }
 .side .nav::-webkit-scrollbar { width: 0; height: 0; display: none; }
 .side-hero {
   text-align: center;
-  border-bottom: 1px solid rgba(255,255,255,.06);
+  border-bottom: 1px solid #eeeaea;
   flex-shrink: 0; padding: 12px 12px 10px;
-  margin-bottom: 4px;
+  margin: 0 10px 6px; border-radius: 10px;
+  background: #fff;
 }
-.hero-name { color: #fff; font-size: 14px; font-weight: 700; margin-bottom: 5px; }
+.hero-name { color: #333; font-size: 14px; font-weight: 700; margin-bottom: 5px; }
 .hero-meta { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
 .hero-badge { font-size: 10px; padding: 1px 7px; border-radius: 4px; background: #1677ff; color: #fff; flex-shrink: 0; }
 .hero-badge.agent { background: #00b42a; }
@@ -39,31 +41,27 @@ body { margin: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'P
 /* 对标对方 .sidebar-menu 参数 */
 .nav-item {
   height: 38px; margin: 1px 8px; padding-left: 16px; line-height: 38px;
-  cursor: pointer; color: rgba(255,255,255,.6); font-size: 13px;
+  cursor: pointer; color: #333; font-size: 13px;
   display: flex; align-items: center; gap: 10px;
   border-radius: 8px; transition: all .15s; overflow: hidden;
 }
-.nav-item:hover { color: #fff; background: rgba(255,255,255,.06); }
-.nav-item.active {
-  color: #fff; font-weight: 500;
-  background: linear-gradient(90deg, rgba(22,119,255,.25), transparent);
-  box-shadow: inset 3px 0 0 #1677ff;
-}
+.nav-item:hover { background: #f5f5f5; }
+.nav-item.active { background: #f5f5f5; color: #1890ff; font-weight: 600; box-shadow: inset 3px 0 0 #1890ff; }
 .nav-group {
   padding: 10px 16px 3px; font-size: 10px; letter-spacing: 1.5px;
-  color: rgba(255,255,255,.25); text-transform: uppercase;
+  color: #999; text-transform: uppercase;
 }
-.side .me { padding: 12px 16px; border-top: 1px solid rgba(255,255,255,.08); font-size: 12px; color: #a9aeb8; line-height: 1.8; cursor: pointer; }
-.side .me:hover { color: #fff; }
-.side .me b { color: #fff; font-size: 13px; }
+.side .me { padding: 12px 16px; font-size: 12px; color: #666; line-height: 1.8; cursor: pointer; }
+.side .me:hover { color: #1890ff; }
+.side .me b { color: #333; font-size: 13px; }
 
 /* ---------- 主区 ---------- */
 .main { flex: 1; display: flex; flex-direction: column; min-width: 0; }
-.topbar { background: #fff; height: 52px; display: flex; align-items: center; padding: 0 20px; box-shadow: 0 1px 4px rgba(0,0,0,.05); }
+.topbar { background: #fff; height: 52px; display: flex; align-items: center; padding: 0 20px; border-bottom: 1px solid #eeeaea; }
 .topbar .title { font-size: 16px; font-weight: 600; color: #1f2329; }
-.unread-chip { background: #f53f3f; color: #fff; font-size: 12px; padding: 2px 10px; border-radius: 999px; }
-.clock { font-size: 13px; color: #86909c; font-variant-numeric: tabular-nums; }
-.content { flex: 1; overflow-y: auto; padding: 20px 24px; max-width: 1100px; margin: 0 auto; width: 100%; background: #f0f2f5; }
+.unread-chip { background: #e12c2c; color: #fff; font-size: 12px; padding: 2px 10px; border-radius: 999px; }
+.clock { font-size: 13px; color: #999; font-variant-numeric: tabular-nums; }
+.content { flex: 1; overflow-y: auto; padding: 20px 24px; max-width: 1100px; margin: 0 auto; width: 100%; background: #f7f7f7; }
 .content.workbench { padding: 0; overflow: hidden; display: flex; max-width: 1400px; }
 
 /* ---------- 工作台三栏 ---------- */
@@ -79,8 +77,9 @@ body { margin: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'P
 .sess-col .search { padding: 10px 12px; border-bottom: 1px solid #f2f3f5; }
 .sess-list { flex: 1; overflow-y: auto; }
 .sess-item { padding: 12px 14px; cursor: pointer; border-bottom: 1px solid #f7f8fa; }
-.sess-item:hover { background: #f7f8fa; }
-.sess-item.active { background: #e8f3ff; }
+.sess-item:hover { background: #f5f5f5; }
+.sess-item.active { background: #f5f5f5; }
+.sess-item.active .name { color: #1890ff; }
 .sess-item .row1 { display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px; }
 .sess-item .name { font-size: 14px; font-weight: 600; color: #1f2329; max-width: 150px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .sess-item .time { font-size: 11px; color: #a0a6ad; }
@@ -93,7 +92,11 @@ body { margin: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'P
 .tag-wait { font-size: 10px; background: #fff7e8; color: #d25f00; border-radius: 3px; padding: 1px 4px; flex-shrink: 0; }
 .tag-agent { font-size: 10px; background: #e8f3ff; color: #165dff; border-radius: 3px; padding: 1px 4px; max-width: 64px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex-shrink: 0; }
 
-.chat-col { flex: 1; display: flex; flex-direction: column; min-width: 0; background: #f7f8fa; }
+.chat-col { flex: 1; display: flex; flex-direction: column; min-width: 0; background: #f7f7f7; }
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: #e4e4e5; }
+    ::-webkit-scrollbar-thumb { background: #c0bebc; border-radius: 3px; }
+    ::-webkit-scrollbar-thumb:hover { background: #a9a7a5; }
 .chat-head { background: #fff; padding: 10px 18px; display: flex; align-items: center; gap: 10px; border-bottom: 1px solid #e5e6eb; position: sticky; top: 0; z-index: 2; }
 .chat-head .name { font-size: 15px; font-weight: 600; }
 .chat-body { flex: 1; overflow-y: auto; padding: 16px 18px; }
@@ -105,7 +108,7 @@ body { margin: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'P
 .msg-sender { font-size: 11px; color: #a0a6ad; margin-bottom: 3px; }
 .msg-row.mine .msg-sender { text-align: right; }
 .msg-bubble { padding: 9px 12px; border-radius: 9px; font-size: 14px; line-height: 1.6; word-break: break-word; white-space: pre-wrap; background: #fff; color: #1f2329; border-top-left-radius: 2px; box-shadow: 0 1px 2px rgba(0,0,0,.04); }
-.msg-row.mine .msg-bubble { background: #1677ff; color: #fff; border-radius: 9px; border-top-right-radius: 2px; }
+.msg-row.mine .msg-bubble { background: #daf3fd; color: #333; border-radius: 9px; border-top-right-radius: 2px; }
 .msg-row.sys { justify-content: center; }
 .msg-row.sys .msg-bubble { background: transparent; box-shadow: none; color: #a0a6ad; font-size: 12px; padding: 2px; }
 .msg-bubble img { max-width: 100%; border-radius: 6px; display: block; margin-top: 4px; cursor: pointer; }
@@ -119,12 +122,12 @@ body { margin: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'P
 .tool-btn:active { transform: scale(.9); }
 .quick-toggle-row { padding: 0 2px 6px; }
 .quick-toggle-btn {
-  border: none; background: #f0f7ff; color: #165dff; border-radius: 8px;
+  border: 1px solid #eeeaea; background: #fff; color: #333; border-radius: 8px;
   padding: 6px 12px; font-size: 13px; font-weight: 500; cursor: pointer;
   transition: all .15s;
 }
-.quick-toggle-btn:hover { background: #e3f0ff; }
-.quick-toggle-btn.on { background: #165dff; color: #fff; }
+.quick-toggle-btn:hover { background: #f5f5f5; }
+.quick-toggle-btn.on { background: #464649ad; color: #fff; border-color: transparent; }
 .send-btn { background: #1677ff; color: #fff; border: none; border-radius: 6px; padding: 7px 22px; font-size: 14px; cursor: pointer; margin-left: auto; }
 .send-btn:disabled { opacity: .5; }
 
@@ -136,10 +139,10 @@ body { margin: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'P
 .info-item .v { text-align: right; word-break: break-all; }
 
 /* ---------- 通用面板 ---------- */
-.panel { background: linear-gradient(180deg, #fffffffa, #f8fafcf2); border-radius: 14px; padding: 18px 20px; margin-bottom: 20px; border: 1px solid #f0f0f0; box-shadow: 0 18px 40px #0f172a0f; }
+.panel { background: #fff; border-radius: 10px; padding: 18px 20px; margin-bottom: 16px; border: 1px solid #eeeaea; }
 .panel-title { font-size: 15px; font-weight: 600; margin-bottom: 14px; color: #1f2329; display: flex; justify-content: space-between; align-items: center; }
 .stat-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; margin-bottom: 16px; }
-.stat-card { background: linear-gradient(180deg, #fffffffa, #f8fafcf2); border-radius: 14px; padding: 16px 18px; border: 1px solid #f0f0f0; box-shadow: 0 18px 40px #0f172a0f; }
+.stat-card { background: #fff; border-radius: 10px; padding: 16px 18px; border: 1px solid #eeeaea; }
 .stat-card .v { font-size: 24px; font-weight: 700; }
 .stat-card .l { font-size: 12px; color: #86909c; margin-top: 4px; }
 .bar-row { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; font-size: 12.5px; }
@@ -162,13 +165,13 @@ body { margin: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'P
 .quick-scroll::-webkit-scrollbar { height: 4px; }
 .quick-scroll::-webkit-scrollbar-thumb { background: #e0e3e8; border-radius: 2px; }
 .quick-btn {
-  flex-shrink: 0; border: 1px solid #c9e2ff; background: #f0f7ff; border-radius: 8px;
-  padding: 7px 14px; font-size: 13px; cursor: pointer; color: #165dff; font-weight: 500;
+  flex-shrink: 0; border: none; background: #464649ad; border-radius: 8px;
+  padding: 7px 14px; font-size: 13px; cursor: pointer; color: #fff;
   max-width: 240px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
   transition: all .18s ease; opacity: 0; transform: translateX(-10px);
 }
 .quick-bar.open .quick-btn { opacity: 1; transform: none; }
-.quick-btn:hover { background: #165dff; border-color: #165dff; color: #fff; transform: translateY(-1px); }
+.quick-btn:hover { background: #464649; transform: translateY(-1px); }
 .recording-bar { display: flex; align-items: center; gap: 8px; font-size: 13px; color: #4e5769; padding: 4px 0; }
 .chat-search { background: #fff; padding: 8px 14px; display: flex; align-items: center; gap: 10px; border-bottom: 1px solid #e5e6eb; }
 .msg-bubble.search-hit { outline: 2px solid #ffc300; background: #fffbe6 !important; }
@@ -178,6 +181,7 @@ body { margin: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'P
 .read-flag.read { color: #00b42a; }
 .recall-flag-v { margin-left: 8px; color: #f77234; font-size: 10.5px; }
 .msg-row.from-them { display: flex; margin-bottom: 14px; gap: 8px; align-items: flex-start; }
+.msg-row.from-them .msg-bubble { background: #eff0f1; color: #333; }
 .guide-progress { height: 8px; border-radius: 4px; background: #f2f3f5; overflow: hidden; margin-bottom: 16px; }
 .pol-row { display: flex; justify-content: space-between; align-items: center; padding: 10px 0; border-bottom: 1px solid #f2f3f5; font-size: 13.5px; color: #4e5969; }
 .guide-progress-bar { height: 100%; border-radius: 4px; background: linear-gradient(90deg, #1677ff, #00b42a); transition: width .4s; }
@@ -249,7 +253,7 @@ body.dark .guide-step { border-color: #3a4048 !important; color: #c9cdd4; }
       <div class="logo">💬 客服工作台</div>
       <div class="side-hero" v-if="me">
         <div style="margin-bottom:5px;">
-          <span style="width:40px;height:40px;border-radius:50%;background:rgba(255,255,255,.12);display:inline-flex;align-items:center;justify-content:center;font-size:20px;">{{ me.role === 'tenant' ? '👑' : '🎧' }}</span>
+          <span style="width:40px;height:40px;border-radius:50%;background:linear-gradient(135deg,#1890ff,#4d9bff);display:inline-flex;align-items:center;justify-content:center;font-size:20px;">{{ me.role === 'tenant' ? '👑' : '🎧' }}</span>
           <div class="hero-name">{{ me.nickname || me.kami }}</div>
         </div>
         <div class="hero-meta">
@@ -292,7 +296,7 @@ body.dark .guide-step { border-color: #3a4048 !important; color: #c9cdd4; }
           <span v-for="t in themeDots" :key="t.v" class="theme-dot" :class="{on: themeKey===t.v}" :style="{background:t.c}" :title="t.label" @click="setTheme(t.v)"></span>
         </span>
       </div>
-      <div class="me">
+      <div class="me" style="border-top:1px solid #eeeaea;">
         <span style="cursor:pointer;display:inline-block;margin-bottom:6px;" @click="toggleDark">{{ dark ? '☀️ 浅色模式' : '🌙 深色模式' }}</span><br>
         <span @click="logout" style="cursor:pointer;">
         <b>{{ me ? (me.nickname || me.kami || '') : '' }}</b><br>
@@ -1852,15 +1856,15 @@ const app = createApp({
     ];
     const applyTheme = () => {
       const map = {
-        default: { theme: '#1677ff', grad: 'linear-gradient(135deg,#1677ff,#4d9bff)', side: '#001529' },
-        purple:  { theme: '#8b7cf6', grad: 'linear-gradient(135deg,#8b7cf6,#a89bff)', side: '#17123a' },
-        sky:     { theme: '#2196f3', grad: 'linear-gradient(135deg,#2196f3,#64b5f6)', side: '#0d2136' },
-        green:   { theme: '#00b96b', grad: 'linear-gradient(135deg,#00b96b,#36d399)', side: '#0b2b1e' },
+        default: { theme: '#1890ff', grad: 'linear-gradient(135deg,#1890ff,#4d9bff)', side: '#f4f6f9' },
+        purple:  { theme: '#722ed1', grad: 'linear-gradient(135deg,#722ed1,#9254de)', side: '#f6f2fb' },
+        sky:     { theme: '#13c2c2', grad: 'linear-gradient(135deg,#13c2c2,#36cfc9)', side: '#effbfb' },
+        green:   { theme: '#52c41a', grad: 'linear-gradient(135deg,#52c41a,#73d13d)', side: '#f2fbef' },
       };
       const t = map[themeKey.value] || map.default;
       document.documentElement.style.setProperty('--theme', t.theme);
       document.documentElement.style.setProperty('--theme-grad', t.grad);
-      document.querySelectorAll('.side').forEach(el => { el.style.background = t.side; });
+      document.querySelectorAll('.side').forEach(el => { el.style.borderRightColor = t.theme + '33'; });
     };
     const setTheme = (v) => { themeKey.value = v; try { localStorage.setItem('kfxt_theme', v); } catch (e) {} applyTheme(); };
     applyTheme();
