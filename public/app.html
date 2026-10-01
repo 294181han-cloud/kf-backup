@@ -12,7 +12,7 @@ body { margin: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'P
 .layout { display: flex; height: 100vh; overflow: hidden; }
 
 /* ---------- 侧栏 ---------- */
-.side { width: 190px; background: #1f2329; color: #fff; display: flex; flex-direction: column; flex-shrink: 0; }
+.side { width: 212px; background: #001529; color: #fff; display: flex; flex-direction: column; flex-shrink: 0; }
 .side .logo { font-size: 16px; font-weight: 600; padding: 16px 18px 14px; display: flex; align-items: center; gap: 8px; }
 .side .nav { flex: 1; overflow-y: auto; padding-bottom: 10px; }
 .side-hero {
@@ -26,10 +26,14 @@ body { margin: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'P
 .hero-badge.agent { background: #00b42a; }
 .hero-kami { color: #a9aeb8; font-size: 11px; word-break: break-all; }
 .hero-expire { color: #8b95a7; font-size: 11px; margin-top: 5px; }
-.nav-item { padding: 10px 18px; cursor: pointer; color: #a9aeb8; font-size: 13.5px; display: flex; align-items: center; gap: 9px; border-left: 3px solid transparent; }
-.nav-item:hover { color: #fff; background: rgba(255,255,255,.06); }
-.nav-item.active { color: #fff; background: rgba(22,119,255,.18); border-left-color: #1677ff; }
-.nav-group { padding: 14px 18px 6px; font-size: 11px; color: #6b7280; letter-spacing: 1px; }
+.nav-item {
+  margin: 2px 10px; padding: 10px 14px; cursor: pointer; color: rgba(255,255,255,.65);
+  font-size: 13.5px; display: flex; align-items: center; gap: 10px;
+  border-radius: 8px; transition: all .15s;
+}
+.nav-item:hover { color: #fff; background: rgba(255,255,255,.08); }
+.nav-item.active { color: #fff; background: #1677ff; box-shadow: 0 2px 8px rgba(22,119,255,.4); }
+.nav-group { padding: 14px 20px 6px; font-size: 11px; color: rgba(255,255,255,.35); letter-spacing: 1px; }
 .side .me { padding: 12px 16px; border-top: 1px solid rgba(255,255,255,.08); font-size: 12px; color: #a9aeb8; line-height: 1.8; cursor: pointer; }
 .side .me:hover { color: #fff; }
 .side .me b { color: #fff; font-size: 13px; }
@@ -38,6 +42,8 @@ body { margin: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'P
 .main { flex: 1; display: flex; flex-direction: column; min-width: 0; }
 .topbar { background: #fff; height: 52px; display: flex; align-items: center; padding: 0 20px; box-shadow: 0 1px 4px rgba(0,0,0,.05); }
 .topbar .title { font-size: 16px; font-weight: 600; color: #1f2329; }
+.unread-chip { background: #f53f3f; color: #fff; font-size: 12px; padding: 2px 10px; border-radius: 999px; }
+.clock { font-size: 13px; color: #86909c; font-variant-numeric: tabular-nums; }
 .content { flex: 1; overflow-y: auto; padding: 16px 20px; max-width: 1100px; margin: 0 auto; width: 100%; }
 .content.workbench { padding: 0; overflow: hidden; display: flex; max-width: 1400px; }
 
@@ -61,7 +67,7 @@ body { margin: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'P
 .tag-agent { font-size: 10px; background: #e8f3ff; color: #165dff; border-radius: 3px; padding: 1px 4px; max-width: 64px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex-shrink: 0; }
 
 .chat-col { flex: 1; display: flex; flex-direction: column; min-width: 0; background: #f7f8fa; }
-.chat-head { background: #fff; padding: 10px 18px; display: flex; align-items: center; gap: 10px; border-bottom: 1px solid #e5e6eb; }
+.chat-head { background: #fff; padding: 10px 18px; display: flex; align-items: center; gap: 10px; border-bottom: 1px solid #e5e6eb; position: sticky; top: 0; z-index: 2; }
 .chat-head .name { font-size: 15px; font-weight: 600; }
 .chat-body { flex: 1; overflow-y: auto; padding: 16px 18px; }
 .chat-empty { flex: 1; display: flex; align-items: center; justify-content: center; color: #a0a6ad; font-size: 14px; flex-direction: column; gap: 10px; }
@@ -94,10 +100,10 @@ body { margin: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'P
 .info-item .v { text-align: right; word-break: break-all; }
 
 /* ---------- 通用面板 ---------- */
-.panel { background: #fff; border-radius: 10px; padding: 18px 20px; margin-bottom: 16px; }
+.panel { background: #fff; border-radius: 12px; padding: 18px 20px; margin-bottom: 16px; border: 1px solid #f0f1f3; box-shadow: 0 1px 2px rgba(0,0,0,.03); }
 .panel-title { font-size: 15px; font-weight: 600; margin-bottom: 14px; color: #1f2329; display: flex; justify-content: space-between; align-items: center; }
 .stat-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; margin-bottom: 16px; }
-.stat-card { background: #fff; border-radius: 10px; padding: 16px; }
+.stat-card { background: #fff; border-radius: 12px; padding: 16px 18px; border: 1px solid #f0f1f3; box-shadow: 0 1px 2px rgba(0,0,0,.03); }
 .stat-card .v { font-size: 24px; font-weight: 700; }
 .stat-card .l { font-size: 12px; color: #86909c; margin-top: 4px; }
 .bar-row { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; font-size: 12.5px; }
@@ -199,7 +205,10 @@ body.dark .guide-step { border-color: #3a4048 !important; color: #c9cdd4; }
     <div class="side">
       <div class="logo">💬 客服工作台</div>
       <div class="side-hero" v-if="me">
-        <div class="hero-name">{{ me.nickname || me.kami }}</div>
+        <div style="display:flex;align-items:center;gap:9px;margin-bottom:7px;">
+          <span style="width:34px;height:34px;border-radius:50%;background:rgba(255,255,255,.15);display:inline-flex;align-items:center;justify-content:center;font-size:17px;flex-shrink:0;">{{ me.role === 'tenant' ? '👑' : '🎧' }}</span>
+          <div class="hero-name" style="margin:0;">{{ me.nickname || me.kami }}</div>
+        </div>
         <div class="hero-meta">
           <span class="hero-badge" :class="me.role">{{ me.role === 'tenant' ? '卡密主人' : '子客服' }}</span>
           <span class="mono hero-kami">{{ me.role === 'tenant' ? me.kami : (me.kami + '/' + me.username) }}</span>
@@ -240,7 +249,13 @@ body.dark .guide-step { border-color: #3a4048 !important; color: #c9cdd4; }
     </div>
 
     <div class="main">
-      <div class="topbar"><div class="title">{{ tabTitle }}</div></div>
+      <div class="topbar">
+        <div class="title">{{ tabTitle }}</div>
+        <div style="margin-left:auto;display:flex;align-items:center;gap:14px;">
+          <span v-if="unreadTotal > 0" class="unread-chip">{{ unreadTotal }} 条未读</span>
+          <span class="clock">{{ clock }}</span>
+        </div>
+      </div>
 
       <!-- ============ 会话工作台 ============ -->
       <div class="content workbench" v-if="tab==='work'">
@@ -1709,6 +1724,12 @@ const app = createApp({
       { k: 'xiaohongshu', label: '小红书', g1: '#FF2442' },
       { k: 'yangqianguan', label: '钱罐子', g1: '#FF8800' },
     ];
+    // 顶栏时钟 + 未读总数
+    const clock = ref('');
+    const tickClock = () => { clock.value = new Date().toLocaleString('zh-CN', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit' }); };
+    tickClock(); setInterval(tickClock, 1000);
+    const unreadTotal = Vue.computed(() => sessions.value.reduce((a, s) => a + (s.unread || 0), 0));
+
     // 深色主题
     const dark = ref(false);
     try { dark.value = localStorage.getItem('kfxt_dark') === '1'; } catch (e) {}
@@ -1791,7 +1812,7 @@ const app = createApp({
       guide, guideDone, dark, toggleDark, renameVisitor, renderCodeQrs, tplList,
       blockSession, blockIp, kwList, kwInput, kwSaving, addKw, removeKw, saveFilter, agentCmd, restartPoll,
       chatSearchOn, chatSearchKw, searchHit, visibleMsgs, canRecall, recallMsg, isRead,
-      pol, savePolicy, uploadPolHead,
+      pol, savePolicy, uploadPolHead, clock, unreadTotal,
       quickFields, welcomeFields, autoFields, blFields, preqFields,
       shortTime, fmtTime, sourceText, contactLabel, barW, quotaW,
       openSession, send, onKey, useQuick, sendQuick, onImage, startRec, stopRec, closeSession, doTransfer,
