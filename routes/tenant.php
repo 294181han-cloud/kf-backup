@@ -210,6 +210,31 @@ function handle_tenant_settings(string $method): void
             'brand_position' => ts_get($tid, 'brand_position', 'right-bottom'),
             'pre_inquiry_on' => ts_get($tid, 'pre_inquiry_on', '0') === '1',
             'visitor_template' => ts_get($tid, 'visitor_template', 'default'),
+            // 验证策略
+            'robot'          => ts_get($tid, 'robot', 'no'),
+            'robot_frequency' => ts_get($tid, 'robot_frequency', 'first'),
+            'robot_code'     => ts_get($tid, 'robot_code', ''),
+            // 链接模式
+            'link_mode'      => ts_get($tid, 'link_mode', 'no'),
+            // 头像/昵称
+            'user_head_type' => ts_get($tid, 'user_head_type', 'default'),
+            'user_head'      => ts_get($tid, 'user_head', ''),
+            'user_name_type' => ts_get($tid, 'user_name_type', 'default'),
+            // 访客过滤
+            'filtration_wx'   => ts_get($tid, 'filtration_wx', '0') === '1',
+            'filtration_pc'   => ts_get($tid, 'filtration_pc', '0') === '1',
+            'filtration_area' => ts_get($tid, 'filtration_area', '0') === '1',
+            // 弹窗公告 / 滚动通知
+            'publicity_on'    => ts_get($tid, 'publicity_on', '0') === '1',
+            'publicity_title' => ts_get($tid, 'publicity_title', ''),
+            'publicity_content' => ts_get($tid, 'publicity_content', ''),
+            'inform_on'       => ts_get($tid, 'inform_on', '0') === '1',
+            'inform_text'     => ts_get($tid, 'inform_text', ''),
+            // 导航深度配置
+            'tpl_nav_on'      => ts_get($tid, 'tpl_nav_on', '1') === '1',
+            'tpl_nav_title'   => ts_get($tid, 'tpl_nav_title', ''),
+            'vip_badge'       => ts_get($tid, 'vip_badge', ''),
+            'footer_text'     => ts_get($tid, 'footer_text', ''),
             // 公告（访客端顶部横幅）
             'notice_on'      => ts_get($tid, 'notice_on', '0') === '1',
             'notice_text'    => ts_get($tid, 'notice_text', ''),
@@ -227,7 +252,11 @@ function handle_tenant_settings(string $method): void
         $data = body();
         $labels = ['brand_company' => '品牌名称', 'brand_title' => '欢迎标题', 'brand_sub' => '欢迎副标题',
             'brand_avatar' => '头像', 'brand_color' => '主题色', 'brand_position' => '窗口位置',
-            'notice_text' => '公告内容', 'filter_keywords' => '黑名单关键词', 'visitor_template' => '访客端模板'];
+            'notice_text' => '公告内容', 'filter_keywords' => '黑名单关键词', 'visitor_template' => '访客端模板',
+            'robot' => '验证策略', 'robot_frequency' => '验证频率', 'robot_code' => '邀请码/密码',
+            'link_mode' => '链接模式', 'user_head_type' => '访客头像类型', 'user_head' => '自定义访客头像',
+            'user_name_type' => '访客名称类型', 'publicity_title' => '弹窗公告标题', 'publicity_content' => '弹窗公告内容',
+            'inform_text' => '滚动通知文案', 'tpl_nav_title' => '导航栏标题', 'vip_badge' => 'VIP标识', 'footer_text' => '底部标识'];
         foreach ($labels as $k => $label) {
             if (array_key_exists($k, $data)) {
                 $v = mb_substr(trim((string)$data[$k]), 0, 500);
@@ -239,11 +268,25 @@ function handle_tenant_settings(string $method): void
                 ts_set($tid, $k, $v);
             }
         }
-        foreach (['pre_inquiry_on', 'notice_on', 'auto_blacklist', 'dedup_on', 'ip_limit_on'] as $k) {
+        foreach (['pre_inquiry_on', 'notice_on', 'auto_blacklist', 'dedup_on', 'ip_limit_on', 'filtration_wx', 'filtration_pc', 'filtration_area', 'publicity_on', 'inform_on', 'tpl_nav_on'] as $k) {
             if (array_key_exists($k, $data)) ts_set($tid, $k, $data[$k] ? '1' : '0');
         }
         if (array_key_exists('ip_limit_count', $data)) {
             ts_set($tid, 'ip_limit_count', (string)max(1, min(100, (int)$data['ip_limit_count'])));
+        }
+        // 枚举键校验
+        $enums = [
+            'robot' => ['no', 'click', 'slide', 'code', 'invite', 'password'],
+            'robot_frequency' => ['first', 'every'],
+            'link_mode' => ['no', 'copy', 'jump'],
+            'user_head_type' => ['default', 'random', 'custom'],
+            'user_name_type' => ['default', 'random'],
+        ];
+        foreach ($enums as $k => $allow) {
+            if (array_key_exists($k, $data)) {
+                $v = in_array($data[$k], $allow, true) ? $data[$k] : $allow[0];
+                ts_set($tid, $k, $v);
+            }
         }
         json_out(['ok' => true]);
     }

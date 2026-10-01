@@ -73,6 +73,27 @@ function tenant_brand(array $tenant): array
         'notice_on'     => ts_get($tid, 'notice_on', '0') === '1',
         'template'      => ts_get($tid, 'visitor_template', 'default'),
         'notice_text'   => ts_get($tid, 'notice_text', ''),
+        // 验证策略
+        'robot'          => ts_get($tid, 'robot', 'no'),
+        'robot_frequency' => ts_get($tid, 'robot_frequency', 'first'),
+        'robot_type_is_code' => in_array(ts_get($tid, 'robot', 'no'), ['invite', 'password'], true),
+        // 弹窗公告 / 滚动通知
+        'publicity_on'    => ts_get($tid, 'publicity_on', '0') === '1',
+        'publicity_title' => ts_get($tid, 'publicity_title', ''),
+        'publicity_content' => ts_get($tid, 'publicity_content', ''),
+        'inform_on'       => ts_get($tid, 'inform_on', '0') === '1',
+        'inform_text'     => ts_get($tid, 'inform_text', ''),
+        // 导航深度配置
+        'tpl_nav_on'      => ts_get($tid, 'tpl_nav_on', '1') === '1',
+        'tpl_nav_title'   => ts_get($tid, 'tpl_nav_title', ''),
+        'vip_badge'       => ts_get($tid, 'vip_badge', ''),
+        'footer_text'     => ts_get($tid, 'footer_text', ''),
+        // 链接模式
+        'link_mode'       => ts_get($tid, 'link_mode', 'no'),
+        // 访客头像/名称类型
+        'user_head_type'  => ts_get($tid, 'user_head_type', 'default'),
+        'user_head'       => ts_get($tid, 'user_head', ''),
+        'user_name_type'  => ts_get($tid, 'user_name_type', 'default'),
     ];
 }
 
@@ -130,6 +151,25 @@ function handle_visitor_init(string $method): void
     $ip = get_client_ip();
     if (is_ip_blocked($tid, $ip)) json_error('您的访问受限，如有疑问请更换网络或联系客服', 403);
 
+    // ===== 访客过滤（对标：非微信/非移动/非国内） =====
+    $uaStr = $_SERVER['HTTP_USER_AGENT'] ?? '';
+    if (ts_get($tid, 'filtration_wx', '0') === '1' && !str_contains($uaStr, 'MicroMessenger')) {
+        json_error('请使用微信访问本页面', 403);
+    }
+    if (ts_get($tid, 'filtration_pc', '0') === '1' && !preg_match('/Mobile|Android|iPhone|iPad/i', $uaStr)) {
+        json_error('请使用手机访问本页面', 403);
+    }
+    if (ts_get($tid, 'filtration_area', '0') === '1') {
+        $geo = lookup_geo($ip);
+        if ($geo !== '') {
+            $parts = explode('|', $geo);
+            $cc = trim($parts[4] ?? '');
+            if ($cc !== '' && strtoupper($cc) !== 'CN') {
+                json_error('当前地区暂不提供服务', 403);
+            }
+        }
+    }
+
     $pdo = db();
     $now = now_dt();
     $visitorToken = trim((string)input('visitor_token', ''));
@@ -162,7 +202,30 @@ function handle_visitor_init(string $method): void
         }
     }
 
-    // ② 新建会话：IP 频率限制（每分钟新建会话超过 N 个自动拉黑）
+    // ②a 验证策略（仅新建会话时校验；first=有历史会话的复用已在前面的复用分支处理）
+    $robot = ts_get($tid, 'robot', 'no');
+    if ($robot !== 'no') {
+        $freq = ts_get($tid, 'robot_frequency', 'first');
+        $needVerify = true;
+        if ($freq === 'first' && $visitorToken !== '') {
+            // 有 token 且 24h 内有历史会话 → 视为老访客，跳过
+            $hist = fetch_count($pdo, 'SELECT COUNT(*) FROM v_sessions WHERE tenant_id = ? AND visitor_token = ? AND last_time >= ?',
+                [$tid, $visitorToken, now_dt(time() - 86400)]);
+            if ($hist > 0) $needVerify = false;
+        }
+        if ($needVerify) {
+            if ($robot === 'invite' || $robot === 'password') {
+                $code = ts_get($tid, 'robot_code', '');
+                $vv = trim((string)input('verify_value', ''));
+                if ($code === '' || $vv !== $code) json_error($robot === 'invite' ? '邀请码错误' : '密码错误', 403);
+            } else {
+                // click/slide/code 前端完成交互后标记
+                if (!input('verify_passed')) json_error('请先完成验证', 403);
+            }
+        }
+    }
+
+    // ②b 新建会话：IP 频率限制（每分钟新建会话超过 N 个自动拉黑）
     if (ts_get($tid, 'ip_limit_on', '0') === '1') {
         $limit = max(1, (int)ts_get($tid, 'ip_limit_count', '5'));
         $recent = fetch_count($pdo, 'SELECT COUNT(*) FROM v_sessions WHERE tenant_id = ? AND ip = ? AND created_at > ?',
@@ -194,10 +257,24 @@ function handle_visitor_init(string $method): void
     $fromUrl = mb_substr((string)input('from_url', '直接访问'), 0, 255) ?: '直接访问';
     if ($visitorToken === '') $visitorToken = 'vt_' . bin2hex(random_bytes(8));
 
+    // 访客头像/昵称策略
+    $headType = ts_get($tid, 'user_head_type', 'default');
+    $visitorAvatar = '';
+    if ($headType === 'random') {
+        $pool = ['🐱','🐶','🦊','🐼','🐨','🐯','🦁','🐸','🐵','🐰','🐷','🐔','🦄','🐝','🐬','🐳','🦋','🌻','🌟','🍀'];
+        $visitorAvatar = $pool[random_int(0, count($pool) - 1)];
+    } elseif ($headType === 'custom') {
+        $visitorAvatar = ts_get($tid, 'user_head', '');
+    }
+    if (ts_get($tid, 'user_name_type', 'default') === 'random') {
+        $pool2 = ['小太阳','软糖','布丁','星星','月月','豆豆','团子','奶盖','咕咕','泡泡','奶茶','西柚','柚子','软软','阿玛','小鹿','桃桃','雪碧','布偶','汽水'];
+        $name = $pool2[random_int(0, count($pool2) - 1)] . random_int(10, 99);
+    }
+
     $firstMsg = $question !== '' ? $question : '等待接入...';
-    $pdo->prepare('INSERT INTO v_sessions (tenant_id, agent_id, visitor_name, visitor_token, ip, from_url, last_msg, last_time, unread, status, source, quota_key, last_online_at, ua) VALUES (?,?,?,?,?,?,?,?,0,\'online\',?,?,?,?)')
+    $pdo->prepare('INSERT INTO v_sessions (tenant_id, agent_id, visitor_name, visitor_token, ip, from_url, last_msg, last_time, unread, status, source, quota_key, last_online_at, ua, visitor_avatar) VALUES (?,?,?,?,?,?,?,?,0,\'online\',?,?,?,?,?)')
         ->execute([$tid, $ctx['agent_id'], $name, $visitorToken, $ip, $fromUrl, $firstMsg, $now,
-            $code !== '' ? 'app' : 'web', $quotaKey, $now, mb_substr($_SERVER['HTTP_USER_AGENT'] ?? '', 0, 500)]);
+            $code !== '' ? 'app' : 'web', $quotaKey, $now, mb_substr($_SERVER['HTTP_USER_AGENT'] ?? '', 0, 500), $visitorAvatar]);
     $sid = (int)$pdo->lastInsertId();
 
     if ($phone !== '') {
@@ -211,11 +288,14 @@ function handle_visitor_init(string $method): void
 
     $sess = $pdo->prepare('SELECT * FROM v_sessions WHERE id = ?');
     $sess->execute([$sid]);
+    $sessRow = $sess->fetch();
     json_out([
         'session_id' => $sid,
         'visitor_token' => $visitorToken,
+        'visitor_avatar' => $visitorAvatar,
+        'visitor_name' => $name,
         'reused' => false,
-        'session' => visitor_session_out($sess->fetch()),
+        'session' => visitor_session_out($sessRow),
     ]);
 }
 

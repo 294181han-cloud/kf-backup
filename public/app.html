@@ -113,6 +113,7 @@ body { margin: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'P
 .read-flag.read { color: #00b42a; }
 .msg-row.from-them { display: flex; margin-bottom: 14px; gap: 8px; align-items: flex-start; }
 .guide-progress { height: 8px; border-radius: 4px; background: #f2f3f5; overflow: hidden; margin-bottom: 16px; }
+.pol-row { display: flex; justify-content: space-between; align-items: center; padding: 10px 0; border-bottom: 1px solid #f2f3f5; font-size: 13.5px; color: #4e5969; }
 .guide-progress-bar { height: 100%; border-radius: 4px; background: linear-gradient(90deg, #1677ff, #00b42a); transition: width .4s; }
 .guide-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 12px; }
 .guide-card { display: flex; align-items: center; gap: 10px; border: 1.5px dashed #e5e6eb; border-radius: 12px; padding: 13px 14px; background: #fafbfc; }
@@ -193,6 +194,7 @@ body.dark .guide-step { border-color: #3a4048 !important; color: #c9cdd4; }
           <div class="nav-item" :class="{active: tab==='links'}" @click="tab='links'">🔗 获客链接</div>
           <div class="nav-item" :class="{active: tab==='agents'}" @click="tab='agents'">👨‍💼 子客服</div>
           <div class="nav-item" :class="{active: tab==='brand'}" @click="tab='brand'">🎨 访客端外观</div>
+          <div class="nav-item" :class="{active: tab==='policy'}" @click="tab='policy'">🧩 访客策略</div>
           <div class="nav-item" :class="{active: tab==='visitors'}" @click="tab='visitors'; loadVisitors()">📋 访客资源</div>
           <div class="nav-item" :class="{active: tab==='security'}" @click="tab='security'; loadSecurityPage()">🛡️ 安全与维护</div>
         </template>
@@ -564,6 +566,18 @@ body.dark .guide-step { border-color: #3a4048 !important; color: #c9cdd4; }
             <el-form-item label="主题色">
               <el-color-picker v-model="brand.color"/>&nbsp;&nbsp;<span class="mono">{{ brand.color }}</span>
             </el-form-item>
+            <el-form-item label="平台导航条">
+              <el-switch v-model="brand.tpl_nav_on" active-text="显示仿 App 导航条"/>
+            </el-form-item>
+            <el-form-item label="导航标题" v-if="brand.tpl_nav_on">
+              <el-input v-model="brand.tpl_nav_title" placeholder="留空使用模板默认（如：微信客服）" style="max-width:260px;"/>
+            </el-form-item>
+            <el-form-item label="VIP 标识">
+              <el-input v-model="brand.vip_badge" placeholder="如：VIP / 官方 / 认证，留空不显示" maxlength="10" style="max-width:200px;"/>
+            </el-form-item>
+            <el-form-item label="底部标识">
+              <el-input v-model="brand.footer_text" placeholder="页面底部平台标识文字，留空不显示" maxlength="20" style="max-width:260px;"/>
+            </el-form-item>
             <el-form-item label="访客端模板">
               <div class="tpl-grid">
                 <div v-for="t in tplList" :key="t.k" class="tpl-card" :class="{active: brand.tpl===t.k}" @click="brand.tpl=t.k">
@@ -576,6 +590,93 @@ body.dark .guide-step { border-color: #3a4048 !important; color: #c9cdd4; }
             </el-form-item>
           </el-form>
           <el-button type="primary" @click="saveBrand">保存外观</el-button>
+        </div>
+      </div>
+
+      <!-- ============ 访客策略 ============ -->
+      <div class="content" v-if="tab==='policy' && me.role==='tenant'">
+        <div class="panel" style="max-width:640px;margin:0 auto;">
+          <div class="panel-title">验证策略（访客进入前的验证方式）</div>
+          <el-form label-width="90px">
+            <el-form-item label="验证方式">
+              <el-select v-model="pol.robot" style="width:220px;">
+                <el-option label="无验证" value="no"/>
+                <el-option label="点击验证" value="click"/>
+                <el-option label="滑块验证" value="slide"/>
+                <el-option label="图形验证码" value="code"/>
+                <el-option label="邀请码" value="invite"/>
+                <el-option label="访问密码" value="password"/>
+              </el-select>
+            </el-form-item>
+            <el-form-item label="验证频率" v-if="pol.robot!=='no'">
+              <el-radio-group v-model="pol.robot_frequency">
+                <el-radio-button value="first">仅首次</el-radio-button>
+                <el-radio-button value="every">每次访问</el-radio-button>
+              </el-radio-group>
+            </el-form-item>
+            <el-form-item label="邀请码" v-if="pol.robot==='invite' || pol.robot==='password'">
+              <el-input v-model="pol.robot_code" placeholder="访客需输入此码才能进入" style="max-width:260px;"/>
+            </el-form-item>
+          </el-form>
+          <el-button type="primary" size="small" @click="savePolicy">保存验证策略</el-button>
+        </div>
+
+        <div class="panel" style="max-width:640px;margin:0 auto;">
+          <div class="panel-title">访客过滤</div>
+          <p class="muted" style="margin:0 0 10px;">⚠️ 规则过严会导致正常用户进不来，开启后请用真实设备测试。</p>
+          <div class="pol-row"><span>非微信过滤（仅允许微信内置浏览器）</span><el-switch v-model="pol.filtration_wx"/></div>
+          <div class="pol-row"><span>非移动设备过滤（仅允许手机访问）</span><el-switch v-model="pol.filtration_pc"/></div>
+          <div class="pol-row"><span>非国内过滤（按 IP 归属地）</span><el-switch v-model="pol.filtration_area"/></div>
+          <p class="muted" style="font-size:11.5px;">代理/IDC 机房/模拟器过滤需要付费 IP 库，暂不支持。</p>
+          <el-button type="primary" size="small" style="margin-top:10px;" @click="savePolicy">保存过滤</el-button>
+        </div>
+
+        <div class="panel" style="max-width:640px;margin:0 auto;">
+          <div class="panel-title">消息链接处理</div>
+          <el-radio-group v-model="pol.link_mode">
+            <el-radio-button value="no">不处理</el-radio-button>
+            <el-radio-button value="copy">复制打开</el-radio-button>
+            <el-radio-button value="jump">直接跳转</el-radio-button>
+          </el-radio-group>
+          <p class="muted" style="margin:10px 0;">访客消息中的链接如何处理。直接跳转有离站风险，建议「复制打开」。</p>
+          <el-button type="primary" size="small" @click="savePolicy">保存</el-button>
+        </div>
+
+        <div class="panel" style="max-width:640px;margin:0 auto;">
+          <div class="panel-title">访客头像与名称</div>
+          <div class="pol-row">
+            <span>访客头像</span>
+            <el-radio-group v-model="pol.user_head_type" size="small">
+              <el-radio-button value="default">默认</el-radio-button>
+              <el-radio-button value="random">随机表情</el-radio-button>
+              <el-radio-button value="custom">自定义</el-radio-button>
+            </el-radio-group>
+          </div>
+          <div style="margin:8px 0 12px;display:flex;align-items:center;gap:8px;" v-if="pol.user_head_type==='custom'">
+            <img v-if="pol.user_head" :src="pol.user_head" style="width:36px;height:36px;border-radius:8px;object-fit:cover;">
+            <el-button size="small" @click="$refs.polHeadInput.click()">{{ pol.user_head ? '更换' : '上传头像' }}</el-button>
+            <input ref="polHeadInput" type="file" accept="image/*" style="display:none" @change="uploadPolHead"/>
+          </div>
+          <div class="pol-row">
+            <span>访客名称</span>
+            <el-radio-group v-model="pol.user_name_type" size="small">
+              <el-radio-button value="default">日期+编号</el-radio-button>
+              <el-radio-button value="random">随机昵称</el-radio-button>
+            </el-radio-group>
+          </div>
+          <el-button type="primary" size="small" style="margin-top:10px;" @click="savePolicy">保存</el-button>
+        </div>
+
+        <div class="panel" style="max-width:640px;margin:0 auto;">
+          <div class="panel-title">弹窗公告 / 滚动通知</div>
+          <div class="pol-row"><span>弹窗公告（访客进入时弹出）</span><el-switch v-model="pol.publicity_on"/></div>
+          <div style="margin:10px 0;" v-if="pol.publicity_on">
+            <el-input v-model="pol.publicity_title" placeholder="公告标题" style="margin-bottom:8px;"/>
+            <el-input type="textarea" :rows="3" v-model="pol.publicity_content" placeholder="公告内容（支持换行）"/>
+          </div>
+          <div class="pol-row" style="margin-top:14px;"><span>滚动通知（聊天窗顶部滚动字幕）</span><el-switch v-model="pol.inform_on"/></div>
+          <el-input v-model="pol.inform_text" placeholder="滚动通知文案" style="margin-top:8px;" v-if="pol.inform_on"/>
+          <el-button type="primary" size="small" style="margin-top:12px;" @click="savePolicy">保存公告</el-button>
         </div>
       </div>
 
@@ -956,7 +1057,7 @@ const app = createApp({
     // 租户
     const links = ref(null);
     const agents = ref([]);
-    const brand = reactive({ company_name: '', title: '', sub: '', avatar: '💬', color: '#1677ff', tpl: 'default' });
+    const brand = reactive({ company_name: '', title: '', sub: '', avatar: '💬', color: '#1677ff', tpl: 'default', tpl_nav_on: true, tpl_nav_title: '', vip_badge: '', footer_text: '' });
     const bcText = ref('');
     const bcSending = ref(false);
 
@@ -1045,7 +1146,7 @@ const app = createApp({
     const tabTitle = computed(() => ({
       work: '会话接待', stats: '数据面板', quick: '快捷回复', welcome: '欢迎语', auto: '自动回复',
       broadcast: '群发', blacklist: 'IP 黑名单', preinq: '询前表单', links: '获客链接', agents: '子客服管理',
-      brand: '访客端外观', visitors: '访客资源', security: '安全与维护', profile: '个人设置',
+      brand: '访客端外观', policy: '访客策略', visitors: '访客资源', security: '安全与维护', profile: '个人设置',
     }[tab.value]));
     const current = computed(() => sessions.value.find(s => s.id === currentId.value) || null);
     const filteredSessions = computed(() => {
@@ -1092,8 +1193,20 @@ const app = createApp({
         const b = await API.get('/api/tenant/settings');
         brand.company_name = b.brand_company; brand.title = b.brand_title; brand.sub = b.brand_sub;
         brand.avatar = b.brand_avatar; brand.color = b.brand_color; brand.tpl = b.visitor_template || 'default';
+        brand.tpl_nav_on = b.tpl_nav_on !== false; brand.tpl_nav_title = b.tpl_nav_title || '';
+        brand.vip_badge = b.vip_badge || ''; brand.footer_text = b.footer_text || '';
         preqOn.value = !!b.pre_inquiry_on;
         kwList.value = (b.filter_keywords || '').split(',').map(s => s.trim()).filter(Boolean);
+        Object.assign(pol, {
+          robot: b.robot || 'no', robot_frequency: b.robot_frequency || 'first', robot_code: b.robot_code || '',
+          filtration_wx: !!b.filtration_wx, filtration_pc: !!b.filtration_pc, filtration_area: !!b.filtration_area,
+          link_mode: b.link_mode || 'no', user_head_type: b.user_head_type || 'default', user_head: b.user_head || '',
+          user_name_type: b.user_name_type || 'default',
+          publicity_on: !!b.publicity_on, publicity_title: b.publicity_title || '', publicity_content: b.publicity_content || '',
+          inform_on: !!b.inform_on, inform_text: b.inform_text || '',
+          tpl_nav_on: b.tpl_nav_on !== false, tpl_nav_title: b.tpl_nav_title || '',
+          vip_badge: b.vip_badge || '', footer_text: b.footer_text || '',
+        });
         Object.assign(sec, {
           notice_on: !!b.notice_on, notice_text: b.notice_text || '',
           filter_keywords: b.filter_keywords || '', auto_blacklist: !!b.auto_blacklist,
@@ -1412,6 +1525,8 @@ const app = createApp({
         await API.put('/api/tenant/settings', {
           brand_company: brand.company_name, brand_title: brand.title, brand_sub: brand.sub,
           brand_avatar: brand.avatar, brand_color: brand.color, visitor_template: brand.tpl,
+          tpl_nav_on: brand.tpl_nav_on, tpl_nav_title: brand.tpl_nav_title,
+          vip_badge: brand.vip_badge, footer_text: brand.footer_text,
         });
         ElementPlus.ElMessage.success('已保存');
       } catch (e) { ElementPlus.ElMessage.error(e.message); }
@@ -1446,6 +1561,31 @@ const app = createApp({
     };
     const logout = () => { API.clearToken(); location.href = '/login.html'; };
 
+    // ===== 访客策略 =====
+    const pol = reactive({
+      robot: 'no', robot_frequency: 'first', robot_code: '',
+      filtration_wx: false, filtration_pc: false, filtration_area: false,
+      link_mode: 'no', user_head_type: 'default', user_head: '', user_name_type: 'default',
+      publicity_on: false, publicity_title: '', publicity_content: '',
+      inform_on: false, inform_text: '',
+    });
+    const uploadPolHead = async (ev) => {
+      const file = ev.target.files[0];
+      ev.target.value = '';
+      if (!file) return;
+      const data = await new Promise(res => { const fr = new FileReader(); fr.onload = () => res(fr.result); fr.readAsDataURL(file); });
+      try {
+        const up = await API.post('/api/upload', { data, kind: 'image', filename: file.name });
+        pol.user_head = up.url;
+        ElementPlus.ElMessage.success('已上传，记得保存');
+      } catch (e) { ElementPlus.ElMessage.error(e.message); }
+    };
+    const savePolicy = async () => {
+      try {
+        await API.put('/api/tenant/settings', { ...pol });
+        ElementPlus.ElMessage.success('已保存');
+      } catch (e) { ElementPlus.ElMessage.error(e.message); }
+    };
     // ===== 安全与维护 / 访客资源 / 引导 / 深色 =====
     const sec = reactive({ notice_on: false, notice_text: '', filter_keywords: '', auto_blacklist: false, dedup_on: false, ip_limit_on: false, ip_limit_count: 5 });
     const loginLogs = ref([]);
@@ -1601,6 +1741,7 @@ const app = createApp({
       guide, guideDone, dark, toggleDark, renameVisitor, renderCodeQrs, tplList,
       blockSession, blockIp, kwList, kwInput, kwSaving, addKw, removeKw, saveFilter, agentCmd,
       chatSearchOn, chatSearchKw, searchHit, visibleMsgs, canRecall, recallMsg, isRead,
+      pol, savePolicy, uploadPolHead,
       quickFields, welcomeFields, autoFields, blFields, preqFields,
       shortTime, fmtTime, sourceText, contactLabel, barW, quotaW,
       openSession, send, onKey, useQuick, onImage, startRec, stopRec, closeSession, doTransfer,

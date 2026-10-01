@@ -254,6 +254,49 @@ textarea.form-input { resize: none; min-height: 78px; }
 .form-btn:disabled { opacity: .6; }
 .form-btn:active { transform: scale(.98); }
 
+/* ================= 验证层 ================= */
+.verify-wrap { flex: 1; display: flex; align-items: center; justify-content: center; padding: 24px; }
+.verify-card { background: var(--card); border-radius: 20px; padding: 32px 26px; width: 100%; max-width: 340px; text-align: center; box-shadow: 0 10px 40px rgba(30,60,120,.08); }
+.verify-card.bg { padding: 0; overflow: hidden; background-size: cover; background-position: center; }
+.verify-card.bg .verify-inner { background: rgba(255,255,255,.92); margin: 90px 14px 14px; border-radius: 14px; padding: 22px 18px; }
+.verify-title { font-size: 16px; font-weight: 700; margin-bottom: 14px; }
+.verify-btn {
+  width: 100%; height: 46px; border: none; border-radius: 12px;
+  background: var(--theme-grad); color: #fff; font-size: 15px; font-weight: 600; cursor: pointer;
+}
+.verify-input {
+  width: 100%; border: 1.5px solid var(--line); border-radius: 12px; padding: 11px 13px;
+  font-size: 15px; outline: none; margin-bottom: 12px; text-align: center; letter-spacing: 2px;
+}
+.verify-code-row { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; }
+.verify-code-img { font-family: Consolas, monospace; font-size: 22px; font-weight: 700; letter-spacing: 5px; font-style: italic;
+  background: linear-gradient(90deg,#eef2f7,#e3ecf5); padding: 8px 14px; border-radius: 10px; user-select: none; color: #33445f; }
+.slide-track { position: relative; height: 44px; background: #eef1f6; border-radius: 12px; overflow: hidden; margin-bottom: 12px; }
+.slide-tip { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font-size: 13px; color: var(--ink-3); }
+.slide-block {
+  position: absolute; top: 3px; left: 3px; width: 38px; height: 38px; border-radius: 10px;
+  background: var(--theme-grad); cursor: grab; display: flex; align-items: center; justify-content: center; color: #fff;
+}
+.slide-ok { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; background: #e8f8ee; color: #00b42a; font-size: 14px; font-weight: 600; }
+/* 弹窗公告 */
+.pub-mask { position: fixed; inset: 0; background: rgba(15,23,42,.55); z-index: 60; display: flex; align-items: center; justify-content: center; padding: 24px; }
+.pub-card { background: var(--card); border-radius: 18px; max-width: 340px; width: 100%; overflow: hidden; animation: cardIn .25s; }
+.pub-head { background: var(--theme-grad); color: #fff; padding: 12px 16px; font-weight: 700; font-size: 15px; display: flex; justify-content: space-between; }
+.pub-close { cursor: pointer; opacity: .85; }
+.pub-body { padding: 18px 18px 22px; font-size: 14px; line-height: 1.8; color: var(--ink-2); white-space: pre-wrap; max-height: 50vh; overflow-y: auto; }
+/* 滚动通知 */
+.inform-bar { background: #fffbe6; border-bottom: 1px solid #ffe58f; overflow: hidden; flex-shrink: 0; height: 32px; display: flex; align-items: center; }
+.inform-track { white-space: nowrap; display: inline-block; padding-left: 100%; animation: marquee 14s linear infinite; font-size: 12.5px; color: #9a6d1b; }
+@keyframes marquee { to { transform: translateX(-100%); } }
+/* 底部标识 */
+.v-footer-text { text-align: center; font-size: 11px; color: var(--ink-3); padding: 4px 0 6px; background: var(--bg); flex-shrink: 0; }
+/* 消息链接 */
+.msg-link { color: inherit; text-decoration: underline; cursor: pointer; word-break: break-all; }
+.msg-link-copy { display: inline-flex; align-items: center; gap: 3px; background: rgba(0,0,0,.08); border-radius: 6px; padding: 1px 8px; cursor: pointer; font-size: 13px; }
+.msg-row.me .msg-link-copy { background: rgba(255,255,255,.2); }
+/* VIP 标识 */
+.vip-badge { display: inline-block; font-size: 10px; font-weight: 700; color: var(--theme); background: rgba(255,255,255,.85); border: 1px solid var(--theme); border-radius: 4px; padding: 0 5px; margin-left: 6px; vertical-align: 1px; }
+
 /* 图片预览 */
 .img-viewer {
   position: fixed; inset: 0; background: rgba(0,0,0,.92); z-index: 100;
@@ -288,17 +331,22 @@ textarea.form-input { resize: none; min-height: 78px; }
 
   <!-- 主界面 -->
   <template v-else>
-    <div class="nav-bar"><span class="nav-back">‹</span><span class="nav-title">{{ navTitle }}</span><span class="nav-menu">···</span></div>
+    <div class="nav-bar" v-if="ui.navOn"><span class="nav-back">‹</span><span class="nav-title">{{ ui.navTitle }}</span><span class="nav-menu">···</span></div>
     <div class="v-header">
       <div class="v-avatar">
         <img v-if="isImg(brand.avatar)" :src="brand.avatar"><template v-else>{{ brand.avatar }}</template>
         <span class="online-dot"></span>
       </div>
       <div style="min-width:0;">
-        <div class="v-title">{{ brand.company_name }}</div>
+        <div class="v-title">{{ brand.company_name }}<span v-if="brand.vip_badge" class="vip-badge">{{ brand.vip_badge }}</span></div>
         <div class="v-sub">{{ brand.welcome_sub }}</div>
       </div>
       <div class="v-status">{{ onlineText }}</div>
+    </div>
+
+    <!-- 滚动通知 -->
+    <div class="inform-bar" v-if="brand.inform_on && brand.inform_text">
+      <span class="inform-track">📢 {{ brand.inform_text }}</span>
     </div>
 
     <!-- 公告横幅 -->
@@ -319,13 +367,13 @@ textarea.form-input { resize: none; min-height: 78px; }
           <div class="msg-bubble recall-capsule">{{ m.from === 'visitor' ? '你撤回了一条消息' : '对方撤回了一条消息' }}</div>
         </template>
         <template v-else>
-          <div class="msg-ava" v-if="m.from === 'visitor'">🙋</div>
+          <div class="msg-ava" v-if="m.from === 'visitor'">{{ myAvatar || '🙋' }}</div>
           <div class="msg-ava" v-else>
             <img v-if="isImg(brand.avatar)" :src="brand.avatar"><template v-else>{{ brand.avatar }}</template>
           </div>
           <div class="msg-box">
             <div class="msg-bubble">
-              <template v-if="m.text">{{ m.text }}</template>
+              <template v-if="m.text"><template v-for="(seg, si) in linkSegs(m.text)" :key="si"><a v-if="seg.isUrl && linkMode === 'jump'" class="msg-link" :href="seg.t" target="_blank" rel="noopener noreferrer">{{ seg.t }}</a><span v-else-if="seg.isUrl && linkMode === 'copy'" class="msg-link-copy" @click="copyLink(seg.t)">🔗 复制链接</span><template v-else>{{ seg.t }}</template></template></template>
               <template v-for="(a, i) in (m.attachments || [])" :key="i">
                 <img v-if="a.type === 'image'" :src="a.url" @click="viewImage(a.url)">
                 <audio v-if="a.type === 'audio'" :src="a.url" controls></audio>
@@ -354,7 +402,8 @@ textarea.form-input { resize: none; min-height: 78px; }
       </div>
     </div>
 
-    <div class="v-footer-wrap" v-else>
+    <template v-else>
+    <div class="v-footer-wrap">
       <div class="v-tool">
         <button class="v-tool-btn" @click="pickImage"><span class="ic">🖼️</span>图片</button>
         <button class="v-tool-btn" @click="startRec"><span class="ic">🎤</span>语音</button>
@@ -367,7 +416,52 @@ textarea.form-input { resize: none; min-height: 78px; }
         <button class="v-btn" :disabled="!draft.trim() || sending" @click="send">发送</button>
       </div>
     </div>
+    <div class="v-footer-text" v-if="brand.footer_text">{{ brand.footer_text }}</div>
+    </template>
+
+  <!-- 验证层 -->
+  <template v-if="page === 'verify'">
+    <div class="verify-wrap">
+      <div class="verify-card" :class="{bg: verifyBg}" :style="verifyBg ? {backgroundImage:'url('+verifyBg+')'} : {}">
+        <div class="verify-inner">
+          <div class="verify-title">{{ verifyTitle }}</div>
+          <template v-if="robotType === 'click'">
+            <button class="verify-btn" v-if="!verifyPassed" @click="verifyPassed = true">点击验证</button>
+            <div class="slide-ok" v-else>✓ 验证通过，正在进入…</div>
+          </template>
+          <template v-else-if="robotType === 'slide'">
+            <div class="slide-track" v-if="!verifyPassed">
+              <div class="slide-tip">按住滑块拖到最右侧</div>
+              <div class="slide-block" style="touch-action:none;" @pointerdown="slideStart" @pointermove="slideMove" @pointerup="slideEnd">»</div>
+            </div>
+            <div class="slide-ok" v-else>✓ 验证通过，正在进入…</div>
+          </template>
+          <template v-else-if="robotType === 'code'">
+            <div class="verify-code-row">
+              <span class="verify-code-img">{{ codeText }}</span>
+              <span style="cursor:pointer;font-size:16px;" @click="genCode">↻</span>
+            </div>
+            <input class="verify-input" v-model="codeInput" placeholder="输入图中字符" maxlength="4">
+            <button class="verify-btn" @click="codeVerify">验证</button>
+          </template>
+          <template v-else>
+            <input class="verify-input" v-model="verifyValue" :placeholder="robotType === 'invite' ? '请输入邀请码' : '请输入访问密码'" type="password">
+            <button class="verify-btn" @click="verifyGo">进入</button>
+          </template>
+          <div v-if="verifyErr" style="color:#f53f3f;font-size:12.5px;margin-top:10px;">{{ verifyErr }}</div>
+        </div>
+      </div>
+    </div>
   </template>
+
+  <!-- 弹窗公告 -->
+  <div class="pub-mask" v-if="pubShow">
+    <div class="pub-card">
+      <div class="pub-head"><span>{{ pubTitle }}</span><span class="pub-close" @click="pubShow = false">✕</span></div>
+      <div class="pub-body">{{ pubContent }}</div>
+      <div style="padding:0 18px 18px;"><button class="verify-btn" @click="pubShow = false">我知道了</button></div>
+    </div>
+  </div>
 
   <!-- 询前表单 -->
   <div class="mask" v-if="showForm">
@@ -531,6 +625,15 @@ createApp({
         const tplKey = cfg.brand.template || 'default';
         window.__tpl = applyTemplate(tplKey);
         navTitle.value = TEMPLATES[tplKey] ? TEMPLATES[tplKey].nav : '在线客服';
+        robotType.value = cfg.brand.robot || 'no';
+        linkMode.value = cfg.brand.link_mode || 'no';
+        if (!cfg.brand.tpl_nav_on) document.body.dataset.navOff = '1';
+        if (cfg.brand.tpl_nav_title) navTitle.value = cfg.brand.tpl_nav_title;
+        if (cfg.brand.publicity_on && cfg.brand.publicity_content) {
+          const pk = 'kfxt_pub_' + (qs.get('code') || qs.get('t') || 'x');
+          let seen = false; try { seen = sessionStorage.getItem(pk) === '1'; } catch (e) {}
+          if (!seen) { pubTitle.value = cfg.brand.publicity_title || '公告'; pubContent.value = cfg.brand.publicity_content; pubShow.value = true; try { sessionStorage.setItem(pk, '1'); } catch (e) {} }
+        }
         if (cfg.quota_full && cfg.quota_full !== '') {
           blockedDesc.value = '本周客服名额已满，请稍后再来';
           page.value = 'blocked';
@@ -570,7 +673,14 @@ createApp({
         }
         await startSession({});
       } catch (e) {
-        blockedDesc.value = '链接无效，请联系客服获取新的链接';
+        const em = String(e.message);
+        if (em.includes('验证') || em.includes('邀请码') || em.includes('密码')) {
+          verifyErr.value = (em.includes('邀请码') || em.includes('密码')) ? em : '';
+          page.value = 'verify';
+          if (robotType.value === 'code') genCode();
+          return;
+        }
+        blockedDesc.value = em || '链接无效，请联系客服获取新的链接';
         page.value = 'blocked';
       }
     };
@@ -579,6 +689,8 @@ createApp({
       const p = { ...params(), ...extra, from_url: document.referrer || '直接访问' };
       const vt = loadToken();
       if (vt) p.visitor_token = vt;
+      if (verifyPassed.value) p.verify_passed = 1;
+      if (verifyValue.value.trim()) p.verify_value = verifyValue.value.trim();
       const r = await fetch('/api/visitor/init', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(p)
@@ -586,6 +698,7 @@ createApp({
       if (!r.session_id) throw new Error(r.error || '接入失败');
       sessionId.value = r.session_id;
       storeToken(r.visitor_token);
+      if (r.visitor_avatar) myAvatar.value = r.visitor_avatar;
       page.value = 'chat';
       await loadHistory();
       // 欢迎语
@@ -736,6 +849,81 @@ createApp({
     const onlineText = ref('客服在线');
     const navTitle = ref('在线客服');
 
+    // ===== 验证策略 =====
+    const robotType = ref('no');
+    const verifyTitle = ref('安全验证');
+    const verifyBg = ref('');
+    const verifyPassed = ref(false);
+    const verifyValue = ref('');
+    const verifyErr = ref('');
+    const codeText = ref('');
+    const codeInput = ref('');
+    const genCode = () => {
+      const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+      codeText.value = Array.from({length: 4}, () => chars[Math.floor(Math.random()*chars.length)]).join('');
+    };
+    const codeVerify = () => {
+      if (codeInput.value.toUpperCase() === codeText.value.toUpperCase()) { verifyPassed.value = true; verifyErr.value = ''; doEnter(); }
+      else { verifyErr.value = '验证码错误'; genCode(); codeInput.value = ''; }
+    };
+    const verifyGo = async () => {
+      if (!verifyValue.value.trim()) { verifyErr.value = '请输入'; return; }
+      verifyErr.value = '';
+      await doEnter({ verify_value: verifyValue.value.trim() });
+    };
+    // 滑块
+    let slideDragging = false, slideStartX = 0, slideW = 0;
+    const slideStart = (e) => { slideDragging = true; slideStartX = e.clientX; slideW = e.target.parentElement.clientWidth - 44; e.target.setPointerCapture(e.pointerId); };
+    const slideMove = (e) => {
+      if (!slideDragging) return;
+      let dx = Math.max(0, Math.min(slideW, e.clientX - slideStartX));
+      e.target.style.left = (3 + dx) + 'px';
+      if (dx >= slideW - 2) { slideDragging = false; verifyPassed.value = true; doEnter(); }
+    };
+    const slideEnd = (e) => {
+      if (!verifyPassed.value && e.target) e.target.style.left = '3px';
+      slideDragging = false;
+    };
+    // 验证通过后进入（无询前表单直接入口场景）
+    const doEnter = async (extra) => {
+      try {
+        await startSession(extra || {});
+        page.value = 'chat';
+      } catch (e) {
+        verifyErr.value = e.message;
+        if (robotType.value === 'code') { genCode(); codeInput.value = ''; }
+      }
+    };
+
+    // ===== 弹窗公告 =====
+    const pubShow = ref(false);
+    const pubTitle = ref('');
+    const pubContent = ref('');
+
+    // ===== 链接处理 =====
+    const linkMode = ref('no');
+    const URL_RE = /(https?:\/\/[^\s<>"']+)/g;
+    const linkSegs = (text) => {
+      const segs = []; let last = 0; let mm;
+      URL_RE.lastIndex = 0;
+      while ((mm = URL_RE.exec(text)) !== null) {
+        if (mm.index > last) segs.push({ t: text.slice(last, mm.index), isUrl: false });
+        segs.push({ t: mm[1], isUrl: true });
+        last = mm.index + mm[1].length;
+      }
+      if (last < text.length) segs.push({ t: text.slice(last), isUrl: false });
+      return segs;
+    };
+    const copyLink = (url) => { navigator.clipboard && navigator.clipboard.writeText(url); alert('链接已复制，请在浏览器中打开'); };
+
+    // ===== 访客自己头像 =====
+    const myAvatar = ref('');
+    const myName = ref('');
+    const ui = Vue.computed(() => ({
+      navOn: document.body.dataset.navOff !== '1',
+      navTitle: navTitle.value,
+    }));
+
     onMounted(boot);
     onUnmounted(stopPoll);
 
@@ -745,6 +933,9 @@ createApp({
       showForm, formItems, formValues, formSubmitting, submitForm,
       recording, recSecs, startRec, stopRec,
       send, pickImage, onImage, fmtTime, scrollBottom, onlineText, isImg, visibleMessages, navTitle, canRecall, recallMine,
+      ui, robotType, verifyTitle, verifyBg, verifyPassed, verifyValue, verifyErr, codeText, codeInput,
+      genCode, codeVerify, verifyGo, slideStart, slideMove, slideEnd, doEnter,
+      pubShow, pubTitle, pubContent, linkMode, linkSegs, copyLink, myAvatar,
     };
   }
 }).mount('#app');
