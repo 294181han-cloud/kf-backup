@@ -77,7 +77,7 @@ function handle_session_messages(string $method, array $m): void
 
     if ($method === 'GET') {
         $since = (int)input('since', 0);
-        $sql = 'SELECT id, session_id, from_type AS `from`, sender_id, sender_name, text, msg_type, attachments, created_at FROM messages WHERE session_id = ?' . ($since > 0 ? ' AND id > ?' : '') . ' ORDER BY id ASC';
+        $sql = 'SELECT id, session_id, from_type AS `from`, sender_id, sender_name, text, msg_type, attachments, recalled_at, created_at FROM messages WHERE session_id = ?' . ($since > 0 ? ' AND id > ?' : '') . ' ORDER BY id ASC';
         $st = $pdo->prepare($sql);
         $st->execute($since > 0 ? [$sid, $since] : [$sid]);
         json_out(['messages' => array_map('to_msg', $st->fetchAll())]);
@@ -565,7 +565,7 @@ function handle_agent_poll(string $method): void
     }
     if ($session && $sinceMsg > 0) {
         session_of($ctx, $session); // 越权检查
-        $st = $pdo->prepare('SELECT id, session_id, from_type AS `from`, sender_id, sender_name, text, msg_type, attachments, created_at FROM messages WHERE session_id = ? AND id > ? ORDER BY id ASC');
+        $st = $pdo->prepare('SELECT id, session_id, from_type AS `from`, sender_id, sender_name, text, msg_type, attachments, recalled_at, created_at FROM messages WHERE session_id = ? AND id > ? ORDER BY id ASC');
         $st->execute([$session, $sinceMsg]);
         $msgs = array_map('to_msg', $st->fetchAll());
     }

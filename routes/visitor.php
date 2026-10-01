@@ -286,7 +286,7 @@ function handle_visitor_messages(string $method): void
     $since = (int)input('since', 0);
     if (!$sid) json_error('缺少 session_id');
     $pdo = db();
-    $sql = 'SELECT id, session_id, from_type AS `from`, sender_name, text, msg_type, attachments, created_at FROM messages WHERE session_id = ?' . ($since > 0 ? ' AND id > ?' : '') . ' ORDER BY id ASC';
+    $sql = 'SELECT id, session_id, from_type AS `from`, sender_name, text, msg_type, attachments, recalled_at, created_at FROM messages WHERE session_id = ?' . ($since > 0 ? ' AND id > ?' : '') . ' ORDER BY id ASC';
     $st = $pdo->prepare($sql);
     $st->execute($since > 0 ? [$sid, $since] : [$sid]);
     json_out(['messages' => array_map('to_msg', $st->fetchAll())]);
@@ -323,7 +323,7 @@ function handle_visitor_poll(string $method): void
     $pdo->prepare('UPDATE v_sessions SET last_online_at = ? WHERE id = ?')->execute([now_dt(), $sid]);
     // 已读回执：访客在线即视为已读客服消息
     $pdo->prepare("UPDATE messages SET read_at = NOW() WHERE session_id = ? AND from_type = 'agent' AND read_at IS NULL")->execute([$sid]);
-    $st = $pdo->prepare('SELECT id, session_id, from_type AS `from`, sender_name, text, msg_type, attachments, created_at FROM messages WHERE session_id = ? AND id > ? ORDER BY id ASC');
+    $st = $pdo->prepare('SELECT id, session_id, from_type AS `from`, sender_name, text, msg_type, attachments, recalled_at, created_at FROM messages WHERE session_id = ? AND id > ? ORDER BY id ASC');
     $st->execute([$sid, $sinceMsg]);
     json_out(['messages' => array_map('to_msg', $st->fetchAll()), 'now' => time()]);
 }
