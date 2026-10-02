@@ -87,6 +87,8 @@
    */
   function draw(canvas, link, opts, done) {
     opts = opts || {};
+    if (opts.style === 'wechat') return drawWechat(canvas, link, opts, done);
+    if (opts.style === 'ticket') return drawTicket(canvas, link, opts, done);
     var qsize = Number(opts.size) || 230;
     var pad = 22;                 // 左右留白
     var codeArea = qsize;         // 二维码边长
@@ -227,4 +229,163 @@
   }
 
   global.CSQrPoster = { draw: draw, buildMatrix: buildMatrix };
+
+  /* ================= 风格预设（v2.24） ================= */
+
+  var FONT = 'system-ui, -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif';
+
+  function loadImg(src, cb) {
+    if (!src) return cb(null);
+    var im = new Image();
+    im.onload = function () { cb(im); };
+    im.onerror = function () { cb(null); };
+    im.src = src;
+  }
+
+  // 方形码点整幅绘制（定位图案含在矩阵内，连续方块，最接近参考图）
+  function paintQRSquare(ctx, link, x0, y0, size, color, lvl) {
+    var m = buildMatrix(link, LV[lvl] || 1);
+    var count = m.count, cell = size / count, r, c;
+    ctx.fillStyle = color;
+    for (r = 0; r < count; r++) {
+      for (c = 0; c < count; c++) {
+        if (!m.dark(r, c)) continue;
+        ctx.fillRect(Math.floor(x0 + c * cell), Math.floor(y0 + r * cell), Math.ceil(cell) + 0.4, Math.ceil(cell) + 0.4);
+      }
+    }
+    return m;
+  }
+
+  function setFont(ctx, weight, size) {
+    ctx.font = (weight ? weight + ' ' : '') + size + 'px ' + FONT;
+  }
+
+  /* ---- 微信经典：白底 + 大黑标题 + 方码 + 中央绿徽 + 红角标 + 底部绿条 ---- */
+  function drawWechatBubble(ctx, cx, cy) {
+    ctx.fillStyle = '#fff';
+    roundRect(ctx, cx - 30, cy - 24, 60, 42, 16); ctx.fill();
+    ctx.beginPath();
+    ctx.moveTo(cx - 14, cy + 14); ctx.lineTo(cx - 24, cy + 32); ctx.lineTo(cx - 2, cy + 16);
+    ctx.closePath(); ctx.fill();
+    ctx.fillStyle = '#07C160';
+    ctx.beginPath();
+    ctx.arc(cx - 13, cy - 3, 4.5, 0, Math.PI * 2);
+    ctx.arc(cx, cy - 3, 4.5, 0, Math.PI * 2);
+    ctx.arc(cx + 13, cy - 3, 4.5, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  function drawWechat(canvas, link, opts, done) {
+    var W = 560, H = 790;
+    canvas.width = W; canvas.height = H;
+    var ctx = canvas.getContext('2d');
+    ctx.fillStyle = '#ffffff'; ctx.fillRect(0, 0, W, H);
+
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillStyle = '#16181d';
+    setFont(ctx, 700, 40);
+    ctx.fillText(String(opts.title || '微信扫码咨询'), W / 2, 74);
+
+    var qs = 430, qx = (W - qs) / 2, qy = 150;
+    paintQRSquare(ctx, link, qx, qy, qs, '#181a20', opts.correctLevel);
+
+    var cx = W / 2, cy = qy + qs / 2;
+    ctx.save();
+    ctx.shadowColor = 'rgba(0,0,0,.22)'; ctx.shadowBlur = 14;
+    ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(cx, cy, 62, 0, Math.PI * 2); ctx.fill();
+    ctx.restore();
+    ctx.fillStyle = '#07C160'; ctx.beginPath(); ctx.arc(cx, cy, 52, 0, Math.PI * 2); ctx.fill();
+
+    var finish = function () {
+      var badge = String(opts.badgeText || '').trim();
+      if (badge) {
+        setFont(ctx, 700, 28);
+        var tw = ctx.measureText(badge).width;
+        var bw = Math.max(96, tw + 44), bx = (W - bw) / 2, by = qy + qs + 26;
+        ctx.fillStyle = '#fa5151'; roundRect(ctx, bx, by, bw, 48, 12); ctx.fill();
+        ctx.fillStyle = '#fff'; ctx.fillText(badge, W / 2, by + 25);
+      }
+      ctx.fillStyle = '#07C160'; ctx.fillRect(0, H - 104, W, 104);
+      ctx.fillStyle = '#fff'; setFont(ctx, 700, 36);
+      ctx.fillText(String(opts.footer || '微信官方客服'), W / 2, H - 52);
+      if (done) done();
+    };
+    if (opts.logoDataUrl) {
+      loadImg(opts.logoDataUrl, function (im) {
+        if (im) {
+          ctx.save(); ctx.beginPath(); ctx.arc(cx, cy, 44, 0, Math.PI * 2); ctx.clip();
+          ctx.drawImage(im, cx - 44, cy - 44, 88, 88); ctx.restore();
+        } else drawWechatBubble(ctx, cx, cy);
+        finish();
+      });
+    } else { drawWechatBubble(ctx, cx, cy); finish(); }
+  }
+
+  /* ---- 票券卡片：浅蓝底 + 卡片（头像/名称/标签 + 撕裂线 + 码 + 文案组 + 步骤） ---- */
+  function drawTicket(canvas, link, opts, done) {
+    var W = 620, H = 800;
+    canvas.width = W; canvas.height = H;
+    var ctx = canvas.getContext('2d');
+    ctx.fillStyle = '#e9eff8'; ctx.fillRect(0, 0, W, H);
+
+    ctx.save();
+    ctx.shadowColor = 'rgba(31,58,110,.14)'; ctx.shadowBlur = 24; ctx.shadowOffsetY = 8;
+    ctx.fillStyle = '#fff'; roundRect(ctx, 20, 20, W - 40, H - 40, 26); ctx.fill();
+    ctx.restore();
+    ctx.strokeStyle = '#bcd4f2'; ctx.lineWidth = 2;
+    roundRect(ctx, 21, 21, W - 42, H - 42, 25); ctx.stroke();
+
+    var avX = 92, avY = 88, avR = 36;
+    var finishHeader = function (im) {
+      ctx.fillStyle = '#e8f1fd'; ctx.beginPath(); ctx.arc(avX, avY, avR, 0, Math.PI * 2); ctx.fill();
+      if (im) {
+        ctx.save(); ctx.beginPath(); ctx.arc(avX, avY, avR, 0, Math.PI * 2); ctx.clip();
+        ctx.drawImage(im, avX - avR, avY - avR, avR * 2, avR * 2); ctx.restore();
+      } else {
+        ctx.fillStyle = '#1677ff';
+        ctx.beginPath(); ctx.arc(avX, avY - 9, 13, 0, Math.PI * 2); ctx.fill();
+        ctx.beginPath(); ctx.arc(avX, avY + 24, 22, Math.PI, 0); ctx.fill();
+      }
+      ctx.textAlign = 'left'; ctx.textBaseline = 'alphabetic';
+      ctx.fillStyle = '#14181f'; setFont(ctx, 700, 30);
+      ctx.fillText(String(opts.name || '官方客服'), 148, 84);
+      ctx.fillStyle = '#97a3b3'; setFont(ctx, 0, 19);
+      ctx.fillText('在线咨询 · 无需注册', 148, 118);
+
+      var tag = String(opts.tagText || '客服');
+      setFont(ctx, 700, 26);
+      var tgW = ctx.measureText(tag).width + 40, tgX = W - 20 - 24 - tgW;
+      ctx.fillStyle = '#e8f1fd'; roundRect(ctx, tgX, 64, tgW, 46, 23); ctx.fill();
+      ctx.fillStyle = '#1677ff'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.fillText(tag, tgX + tgW / 2, 88);
+
+      ctx.strokeStyle = '#bcd4f2'; ctx.lineWidth = 2; ctx.setLineDash([12, 10]);
+      ctx.beginPath(); ctx.moveTo(20, 152); ctx.lineTo(W - 20, 152); ctx.stroke();
+      ctx.setLineDash([]);
+      ctx.fillStyle = '#e9eff8';
+      ctx.beginPath(); ctx.arc(20, 152, 15, 0, Math.PI * 2); ctx.fill();
+      ctx.beginPath(); ctx.arc(W - 20, 152, 15, 0, Math.PI * 2); ctx.fill();
+
+      var qs = 380, qx = (W - qs) / 2, qy = 196;
+      paintQRSquare(ctx, link, qx, qy, qs, '#1677ff', opts.correctLevel);
+
+      ctx.fillStyle = '#1677ff'; setFont(ctx, 700, 32);
+      ctx.fillText(String(opts.caption || '扫码联系在线客服'), W / 2, qy + qs + 58);
+      ctx.fillStyle = '#97a3b3'; setFont(ctx, 0, 20);
+      ctx.fillText(String(opts.subLine || '微信 / 支付宝 / 浏览器 均可识别'), W / 2, qy + qs + 96);
+
+      var steps = String(opts.steps || '① 扫码 ② 直接开聊');
+      setFont(ctx, 700, 27);
+      var sw = ctx.measureText(steps).width + 72;
+      ctx.fillStyle = '#e8f1fd'; roundRect(ctx, (W - sw) / 2, qy + qs + 120, sw, 56, 28); ctx.fill();
+      ctx.fillStyle = '#1677ff';
+      ctx.fillText(steps, W / 2, qy + qs + 149);
+
+      ctx.fillStyle = '#9aa6b6'; setFont(ctx, 0, 17);
+      ctx.fillText(String(opts.note || '本码长期有效 · 请勿转发给无关人员'), W / 2, H - 40);
+      if (done) done();
+    };
+    if (opts.avatarDataUrl) loadImg(opts.avatarDataUrl, function (im) { finishHeader(im); });
+    else finishHeader(null);
+  }
 })(window);

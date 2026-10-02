@@ -999,11 +999,18 @@ const app = createApp({
     // ===== 推广海报：背景图 + 二维码位置大小 + 上下文字独立定制 =====
     // pos 用九宫值：top-left / top / top-right / left / center / right / bottom-left / bottom / bottom-right
     const POSTER_DEFAULT = {
+      style: 'custom',                        // custom（自上传背景自由排版）/ wechat（微信经典）/ ticket（票券卡片）
       bgUrl: '', topText: '', bottomText: '',
       qrPos: 'center', qrScale: 50,          // qrScale：0-100 滑杆 → 导出宽 150-470px
       topPos: 'top', topSize: 36, topColor: '#1a2233', topBold: true,
       botPos: 'bottom', botSize: 30, botColor: '#5c6b85', botBold: false,
       cardOn: true,                           // 二维码底衬白卡
+      // 微信经典预设
+      wTitle: '微信扫码咨询', wFooter: '官方客服 24 小时在线', badge: '', logoUrl: '',
+      // 票券卡片预设
+      tName: '', tag: '客服', caption: '扫码联系在线客服',
+      subLine: '微信 / 支付宝 / 浏览器 均可识别', steps: '① 扫码 ② 直接开聊',
+      note: '本码长期有效 · 请勿转发给无关人员', avatarUrl: '',
     };
     const posterCfg = reactive({ ...POSTER_DEFAULT });
     try {
@@ -1012,7 +1019,50 @@ const app = createApp({
       Object.assign(posterCfg, saved);
       for (const k of Object.keys(POSTER_DEFAULT)) if (posterCfg[k] === undefined) posterCfg[k] = POSTER_DEFAULT[k];
     } catch (e) {}
-    Vue.watch(posterCfg, () => { try { localStorage.setItem('kfxt_code_poster', JSON.stringify(posterCfg)); } catch (e) {} }, { deep: true });
+    Vue.watch(posterCfg, () => { try { localStorage.setItem('kfxt_code_poster', JSON.stringify(posterCfg)); } catch (e) {} renderPreset(); }, { deep: true });
+    // ===== 风格预设渲染（wechat / ticket）：canvas 成图，预览即下载内容 =====
+    const presetPng = ref('');
+    const renderPreset = () => new Promise((res) => {
+      if (posterCfg.style === 'custom' || !window.CSQrPoster || !currentLink.value) { presetPng.value = ''; return res(''); }
+      const c = document.createElement('canvas');
+      try {
+        window.CSQrPoster.draw(c, currentLink.value, {
+          style: posterCfg.style, correctLevel: 'medium',
+          title: posterCfg.wTitle, footer: posterCfg.wFooter, badgeText: posterCfg.badge, logoDataUrl: posterCfg.logoUrl,
+          name: posterCfg.tName, tagText: posterCfg.tag, caption: posterCfg.caption,
+          subLine: posterCfg.subLine, steps: posterCfg.steps, note: posterCfg.note, avatarDataUrl: posterCfg.avatarUrl,
+        }, () => {
+          try { presetPng.value = c.toDataURL('image/png'); } catch (e) { presetPng.value = ''; }
+          res(presetPng.value);
+        });
+      } catch (e) { presetPng.value = ''; res(''); }
+    });
+    const pickPosterPresetImg = (key) => {
+      const inp = document.createElement('input');
+      inp.type = 'file'; inp.accept = 'image/*';
+      inp.onchange = (e) => {
+        const f = e.target.files && e.target.files[0];
+        if (!f) return;
+        if (f.size > 5 * 1024 * 1024) { ElementPlus.ElMessage.warning('图片不能超过 5MB'); return; }
+        const rd = new FileReader();
+        rd.onload = () => { posterCfg[key] = rd.result; };
+        rd.readAsDataURL(f);
+      };
+      inp.click();
+    };
+    // 切到预设时填充贴心默认值：角标=当前客服码编号，名称=品牌名，头像=品牌图片头像
+    const fillPresetDefaults = () => {
+      if (posterCfg.style === 'custom' || !currentLink.value) return;
+      if (posterCfg.style === 'wechat' && !posterCfg.badge) {
+        const c = (links.value.codes || []).find(x => x.link === currentLink.value);
+        if (c && c.code) posterCfg.badge = c.code;
+      }
+      if (posterCfg.style === 'ticket') {
+        if (!posterCfg.tName) posterCfg.tName = String(brand.company_name || (me.value && me.value.nickname) || '官方客服').slice(0, 16);
+        if (!posterCfg.avatarUrl && brand.avatar && isImg(brand.avatar)) posterCfg.avatarUrl = brand.avatar;
+      }
+    };
+    Vue.watch([currentLink, tab], () => { fillPresetDefaults(); renderPreset(); });
     const POSTER_POS = [
       { v: 'top-left', l: '左上' }, { v: 'top', l: '上' }, { v: 'top-right', l: '右上' },
       { v: 'left', l: '左' }, { v: 'center', l: '中' }, { v: 'right', l: '右' },
@@ -1091,6 +1141,15 @@ const app = createApp({
     };
     const downloadPoster2 = async () => {
       if (!currentLink.value) { ElementPlus.ElMessage.warning('尚未生成客服码'); return; }
+      // 风格预设：直接下载生成的 PNG
+      if (posterCfg.style !== 'custom') {
+        const png = presetPng.value || await renderPreset();
+        if (!png) { ElementPlus.ElMessage.error('海报生成失败，请重试'); return; }
+        const a = document.createElement('a');
+        a.href = png; a.download = 'poster_' + posterCfg.style + '_' + Date.now() + '.png';
+        document.body.appendChild(a); a.click(); a.remove();
+        return;
+      }
       try {
         const W = 750;
         const qrSize = Math.round(150 + (Number(posterCfg.qrScale) || 50) * 3.2);   // 150-470px
@@ -1323,6 +1382,7 @@ const app = createApp({
       SOUND_OPTS, sndCfg, playSound, saveSnd,
       manageDlg, history, codeCfg, qrWrap, currentLink, renderMainQr,
       posterCfg, posterQrBox, posterBgInput, pickPosterBg, onPosterBg, downloadPoster2,
+      presetPng, pickPosterPresetImg,
       POSTER_POS, qrFreeStyle, qrLayerStyle, textStyle,
       cropDlg, cropSrc, cropZoomPct, cropStage, cropStyle, cropImgLoaded, cropDown, cropMove, cropUp, cropWheel, cropClose, openCrop, cropConfirm, avatarPreview,
       geoTag, visitorTag, visitorTagFull, copyQrImage, downloadQrImage, codeRotateHint, rotateCode, loadHistory, disableLink, saveCodeCfg, meAvatarUrl,

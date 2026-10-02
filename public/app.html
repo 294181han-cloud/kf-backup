@@ -419,11 +419,11 @@
             </div>
           </div>
 
-          <!-- ============ 推广海报：背景图 + 二维码位置大小 + 文字独立定制 ============ -->
+          <!-- ============ 推广海报：风格预设 / 背景图 + 二维码位置大小 + 文字独立定制 ============ -->
           <div class="poster-sec">
-            <div class="cip-title">推广海报<span style="font-weight:400;font-size:12px;color:#999;margin-left:8px;">背景图 / 二维码位置大小 / 上下文字独立定制，所见即所得</span></div>
+            <div class="cip-title">推广海报<span style="font-weight:400;font-size:12px;color:#999;margin-left:8px;">风格预设 / 自上传背景自由排版，所见即所得</span></div>
             <div class="poster-flex">
-              <div class="poster-stage">
+              <div class="poster-stage" v-if="posterCfg.style === 'custom'">
                 <img class="poster-bg" v-if="posterCfg.bgUrl" :src="posterCfg.bgUrl" alt="">
                 <div class="poster-qr-layer" v-if="posterCfg.cardOn" :style="qrLayerStyle"></div>
                 <div class="poster-qr-free" :style="qrFreeStyle">
@@ -432,7 +432,19 @@
                 <div class="poster-free-text" v-if="posterCfg.topText" :style="textStyle('top')">{{ posterCfg.topText }}</div>
                 <div class="poster-free-text" v-if="posterCfg.bottomText" :style="textStyle('bot')">{{ posterCfg.bottomText }}</div>
               </div>
+              <div class="poster-stage" v-else>
+                <img v-if="presetPng" :src="presetPng" style="width:100%;display:block;border-radius:12px;" alt="海报预览">
+                <div v-else style="padding:60px 0;text-align:center;color:#a0a6ad;font-size:13px;">海报生成中…</div>
+              </div>
               <div class="poster-ctrl">
+                <div class="cs-row"><span class="cs-label">海报风格：</span>
+                  <el-radio-group v-model="posterCfg.style" size="small">
+                    <el-radio-button value="custom">自定义</el-radio-button>
+                    <el-radio-button value="wechat">微信经典</el-radio-button>
+                    <el-radio-button value="ticket">票券卡片</el-radio-button>
+                  </el-radio-group>
+                </div>
+                <template v-if="posterCfg.style === 'custom'">
                 <div class="cs-row"><span class="cs-label">二维码位置：</span>
                   <div class="pos-grid">
                     <button v-for="p in POSTER_POS" :key="p.v" type="button" class="pos-cell" :class="{on: posterCfg.qrPos===p.v}" :title="p.l" @click="posterCfg.qrPos=p.v">{{ p.l }}</button>
@@ -469,10 +481,49 @@
                   <el-button size="small" v-if="posterCfg.bgUrl" @click="posterCfg.bgUrl = ''">清除背景</el-button>
                   <input ref="posterBgInput" type="file" accept="image/png,image/jpeg,image/gif,image/webp" style="display:none" @change="onPosterBg">
                 </div>
+                </template>
+                <template v-else-if="posterCfg.style === 'wechat'">
+                <div class="cs-row"><span class="cs-label">大标题：</span>
+                  <el-input v-model="posterCfg.wTitle" maxlength="20" style="width:220px;"></el-input>
+                </div>
+                <div class="cs-row"><span class="cs-label">底部文案：</span>
+                  <el-input v-model="posterCfg.wFooter" maxlength="20" style="width:220px;"></el-input>
+                </div>
+                <div class="cs-row"><span class="cs-label">码下角标：</span>
+                  <el-input v-model="posterCfg.badge" maxlength="10" placeholder="如：Cc3，留空不显示" style="width:220px;"></el-input>
+                </div>
+                <div class="cs-row"><span class="cs-label">中心徽章：</span>
+                  <el-button size="small" @click="pickPosterPresetImg('logoUrl')">上传 Logo</el-button>
+                  <el-button size="small" v-if="posterCfg.logoUrl" @click="posterCfg.logoUrl=''">清除</el-button>
+                  <span class="muted" style="font-size:11px;">不上传则使用内置对话气泡</span>
+                </div>
+                </template>
+                <template v-else>
+                <div class="cs-row"><span class="cs-label">客服名称：</span>
+                  <el-input v-model="posterCfg.tName" maxlength="16" style="width:220px;"></el-input>
+                </div>
+                <div class="cs-row"><span class="cs-label">右上标签：</span>
+                  <el-input v-model="posterCfg.tag" maxlength="6" style="width:220px;"></el-input>
+                </div>
+                <div class="cs-row"><span class="cs-label">主文案：</span>
+                  <el-input v-model="posterCfg.caption" maxlength="14" style="width:220px;"></el-input>
+                </div>
+                <div class="cs-row"><span class="cs-label">副行：</span>
+                  <el-input v-model="posterCfg.subLine" maxlength="24" style="width:220px;"></el-input>
+                </div>
+                <div class="cs-row"><span class="cs-label">底部提示：</span>
+                  <el-input v-model="posterCfg.note" maxlength="30" style="width:220px;"></el-input>
+                </div>
+                <div class="cs-row"><span class="cs-label">头像：</span>
+                  <el-button size="small" @click="pickPosterPresetImg('avatarUrl')">上传头像</el-button>
+                  <el-button size="small" v-if="posterCfg.avatarUrl" @click="posterCfg.avatarUrl=''">清除</el-button>
+                  <span class="muted" style="font-size:11px;">不上传则使用默认人像</span>
+                </div>
+                </template>
                 <div class="cip-btns" style="text-align:left;">
                   <el-button size="small" type="primary" @click="downloadPoster2">下载海报</el-button>
                 </div>
-                <div class="cip-note" style="color:#999;">未上传背景时为白底海报；预览即最终效果，配置自动保存在本浏览器</div>
+                <div class="cip-note" style="color:#999;">自定义：未上传背景时为白底海报；预览即最终效果，配置自动保存在本浏览器</div>
               </div>
             </div>
           </div>
@@ -1106,10 +1157,10 @@
 <script src="/assets/vendor/vue.global.js?v=2.0.1"></script>
 <script src="/assets/vendor/element-plus.js?v=2.0.1"></script>
 <script src="/assets/vendor/qrcode.min.js?v=2.0.1"></script>
-<script src="/assets/qr-poster.js?v=2.0.1"></script>
+<script src="/assets/qr-poster.js?v=2.1.0"></script>
 <script src="/assets/api.js?v=2.0.1"></script>
 <script src="/assets/js/app-components.js?v=2.1.0"></script>
-<script src="/assets/js/app.js?v=2.7.0"></script>
+<script src="/assets/js/app.js?v=2.7.1"></script>
 <script src="/assets/js/app-boot.js?v=2.1.1"></script>
 </body>
 </html>
