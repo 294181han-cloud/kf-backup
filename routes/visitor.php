@@ -9,21 +9,6 @@ declare(strict_types=1);
 /** 解析访客上下文：返回 ['tenant'=>行, 'agent_id'=>int] 或 null */
 function resolve_visitor_context(): ?array
 {
-    // TEMP-DEBUG2：输出每一步匹配过程
-    if (isset($_GET['__dbg2'])) {
-        header('Content-Type: application/json; charset=utf-8');
-        $h = strtolower($_SERVER['HTTP_HOST'] ?? '');
-        $h = preg_replace('/:\d+$/', '', $h);
-        $trace = ['host' => $h, 'code_param' => (string)input('code', ''), 'steps' => []];
-        $pdoX = db();
-        $stX = $pdoX->query('SELECT sc.code, sc.agent_id, tn.id AS tid, tn.kami, sc.link FROM service_codes sc JOIN tenants tn ON tn.id = sc.tenant_id');
-        foreach ($stX->fetchAll() as $scX) {
-            $lh = strtolower((string)(parse_url((string)($scX['link'] ?? ''), PHP_URL_HOST) ?: ''));
-            $trace['steps'][] = ['kami' => $scX['kami'], 'link' => $scX['link'], 'parsed' => $lh, 'match' => ($lh !== '' && $h === $lh)];
-        }
-        $GLOBALS['__dbg_trace'] = $trace;   // 不 exit：继续走正常流程，观察最终返回
-    }
-
     $pdo = db();
     $code = trim((string)input('code', ''));
     $t = trim((string)input('t', ''));
@@ -55,27 +40,18 @@ function resolve_visitor_context(): ?array
             }
         }
         // 客服码根路径子域（v2.28 链接格式）：service_codes.link 的 Host 精确匹配
-        $st = $pdo->prepare('SELECT sc.code, sc.agent_id, tn.* FROM service_codes sc JOIN tenants tn ON tn.id = sc.tenant_id');
+        // 列名防冲突：tenants 历史遗留 link 列会覆盖 sc.link（tn.* 通配的坑），显式别名
+        $st = $pdo->prepare('SELECT sc.link AS sc_link, sc.code, sc.agent_id, tn.* FROM service_codes sc JOIN tenants tn ON tn.id = sc.tenant_id');
         $st->execute();
-        $dbgLoop = [];
         foreach ($st->fetchAll() as $sc) {
-            $linkRaw = $sc['link'] ?? '';
-            $dbgLoop[] = ['raw' => var_export($linkRaw, true), 'is_str' => is_string($linkRaw), 'empty' => ($linkRaw === '')];
+            $linkRaw = $sc['sc_link'] ?? '';
             if (!is_string($linkRaw) || $linkRaw === '') continue;
             $linkHost = strtolower((string)(parse_url($linkRaw, PHP_URL_HOST) ?: ''));
-            $dbgLoop[count($dbgLoop)-1]['host_parsed'] = $linkHost;
-            $dbgLoop[count($dbgLoop)-1]['eq'] = ($linkHost !== '' && $host === $linkHost);
             if ($linkHost !== '' && $host === $linkHost) {
-                if (isset($GLOBALS['__dbg_trace'])) { $GLOBALS['__dbg_trace']['returned'] = 'service-code-hit'; }
+                unset($sc['sc_link']);
                 return ['tenant' => $sc, 'agent_id' => (int)$sc['agent_id']];
             }
         }
-        if (isset($GLOBALS['__dbg_trace'])) { $GLOBALS['__dbg_trace']['loop'] = $dbgLoop; }
-    }
-    if (isset($GLOBALS['__dbg_trace'])) {
-        header('Content-Type: application/json; charset=utf-8');
-        echo json_encode(['result' => 'null-return', 'trace' => $GLOBALS['__dbg_trace']], JSON_UNESCAPED_UNICODE);
-        exit;
     }
     return null;
 }

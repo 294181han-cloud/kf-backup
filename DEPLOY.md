@@ -600,3 +600,11 @@ v2.14 撤回同步改动遗漏了 `$recalledIds` 的块外初始化——**未�
 - **修复更换码后访客进不去**：v2.28 链接格式改为泛解析根路径直达后，`resolve_visitor_context`
   的子域匹配只查 domain_links，漏了 service_codes 的新格式链接——新码页面能开但 /api/visitor/config
   报「链接无效」。补 Host 精确匹配 service_codes.link 分支（agent_id 一并透传）
+
+### v2.28 补丁2（更换码访客无法进入的真正根因，2026-10-02 深夜）
+- 上一补丁加了 service_codes 的 Host 匹配后仍失败。临时诊断端点逐层追踪发现：
+  正式循环里 `$sc['link']` 全为空串，而同请求的诊断查询取值正常
+- 根因：`SELECT sc.code, sc.agent_id, tn.* FROM service_codes JOIN tenants` 中
+  **线上 tenants 表存在历史遗留 `link` 列**（本地 schema 无），`tn.*` 同名列覆盖 `sc.link`
+- 修复：查询改 `sc.link AS sc_link` 显式别名，读值用 `sc_link`（不再受 tn.* 通配冲突影响）
+- 诊断代码已全部移除
