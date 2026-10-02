@@ -188,6 +188,9 @@ const app = createApp({
         items: g.vs.map(v => SET_ITEMS.find(x => x.v === v)).filter(it => it && (!it.t || isTenant)),
       })).filter(g => g.items.length);
     });
+    // 侧栏直接铺开（中文分组名更直观），不再用顶部子导航
+    const NAV_GROUP_LABELS = { '内容': '内 容', '访客': '访 客', '外观': '外 观', '系统': '系 统' };
+    const navGroups = computed(() => setGroups.value.map(g => ({ g: NAV_GROUP_LABELS[g.g] || g.g, items: g.items })));
     const openSetting = (v) => {
       tab.value = 'setting';
       if (v) setTab.value = v;
@@ -1854,6 +1857,7 @@ const app = createApp({
       shortTime, fmtTime, sourceText, contactLabel, barW, quotaW,
       sessIcon,
       setTab, setGroups, openSetting, switchSetting,
+      navGroups,
       audioPlaying, audioDur, waveBars, toggleAudio,
       asrText, asrBusy, transcribe,
       openSession, send, onKey, useQuick, sendQuick, quickClick, onImage, startRec, stopRec, closeSession, doTransfer,

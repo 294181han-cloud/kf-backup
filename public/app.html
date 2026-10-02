@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>客服工作台</title>
 <link rel="stylesheet" href="/assets/vendor/element-plus.css">
-<link rel="stylesheet" href="/assets/css/app.css?v=3.2.0">
+<link rel="stylesheet" href="/assets/css/app.css?v=3.4.0">
 <script src="/assets/ui/ui-registry.js?v=2.6.0"></script>
 <script src="/assets/ui/ui-loader.js?v=2.6.0" data-ui-cat="auto"></script>
 </head>
@@ -31,13 +31,6 @@
     <!-- ============ 侧栏导航 ============ -->
     <div class="side">
       <div class="logo">💬 客服工作台</div>
-      <div class="side-hero" v-if="me">
-        <div class="hero-avatar">
-          <img v-if="meAvatarUrl" :src="meAvatarUrl">
-          <template v-else>{{ me.role === 'tenant' ? '👑' : '🎧' }}</template>
-        </div>
-        <div class="hero-online">在线</div>
-      </div>
       <div class="nav">
         <div class="nav-group" style="padding-top:6px;">工 作</div>
         <div class="nav-item" :class="{active: tab==='work'}" @click="tab='work'; restartPoll()"><span class="nv-ic">💬</span><span class="nv-text">工作台</span><span class="nv-dot" v-if="unreadTotal>0"></span></div>
@@ -46,16 +39,29 @@
         <template v-if="me && me.role==='tenant'">
           <div class="nav-item" :class="{active: tab==='links'}" @click="tab='links'"><span class="nv-ic">🔗</span><span class="nv-text">客服码</span></div>
         </template>
-        <div class="nav-group">设 置</div>
-        <div class="nav-item" :class="{active: tab==='setting'}" @click="openSetting(setTab)"><span class="nv-ic">⚙️</span><span class="nv-text">设置</span></div>
+        <template v-for="g in navGroups" :key="g.g">
+          <div class="nav-group">{{ g.g }}</div>
+          <div class="nav-item" v-for="it in g.items" :key="it.v"
+               :class="{active: tab==='setting' && setTab===it.v}"
+               @click="openSetting(it.v)">
+            <span class="nv-ic">{{ it.i }}</span><span class="nv-text">{{ it.n }}</span>
+          </div>
+        </template>
       </div>
       <div class="me">
-        <span style="cursor:pointer;display:inline-block;margin-bottom:6px;" @click="toggleDark">{{ dark ? '☀️ 浅色模式' : '🌙 深色模式' }}</span><br>
-        <span @click="logout" style="cursor:pointer;">
-        <b>{{ me ? (me.nickname || me.kami || '') : '' }}</b><br>
-        <template v-if="me && me.role==='tenant'">{{ me.kami }} · {{ expireText }}</template>
-        <template v-else-if="me">子客服 {{ me.username }}</template>
-        <br>退出登录 →</span>
+        <div class="me-top">
+          <span class="me-ava"><img v-if="meAvatarUrl" :src="meAvatarUrl"><template v-else>{{ me && me.role === 'tenant' ? '👑' : '🎧' }}</template></span>
+          <div class="me-id">
+            <b>{{ me ? (me.nickname || me.kami || '') : '' }}</b>
+            <span class="me-sub mono" v-if="me && me.role==='tenant'">{{ me.kami }} · {{ expireText }}</span>
+            <span class="me-sub" v-else-if="me">子客服 {{ me.username }}</span>
+          </div>
+          <button type="button" class="me-copy" v-if="me && me.role==='tenant'" title="复制卡密" @click.stop="copy(me.kami)">⧉</button>
+        </div>
+        <div class="me-row">
+          <button type="button" class="me-btn" @click="toggleDark">{{ dark ? '☀️ 浅色' : '🌙 深色' }}</button>
+          <button type="button" class="me-btn danger" @click="logout">退出登录</button>
+        </div>
       </div>
     </div>
 
@@ -70,16 +76,6 @@
         </div>
       </div>
 
-      <!-- 设置页子导航（把内容/访客/外观/系统四大类收进来，侧栏就不用堆那么多项） -->
-      <div class="subnav" v-if="tab==='setting'">
-        <template v-for="g in setGroups" :key="g.g">
-          <span class="sn-group">{{ g.g }}</span>
-          <button type="button" v-for="it in g.items" :key="it.v" class="sn-item" :class="{on: setTab===it.v}" @click="switchSetting(it.v)">
-            <span class="sn-ic">{{ it.i }}</span>{{ it.n }}
-          </button>
-        </template>
-        <span class="sn-sp"></span>
-      </div>
 
       <!-- ============ 会话工作台 ============ -->
       <div class="content workbench" v-if="tab==='work'" :class="{'has-chat': !!currentId}">
@@ -1273,7 +1269,7 @@
 <script src="/assets/qr-poster.js?v=2.1.03"></script>
 <script src="/assets/api.js?v=2.0.1"></script>
 <script src="/assets/js/app-components.js?v=2.1.0"></script>
-<script src="/assets/js/app.js?v=3.0.1"></script>
+<script src="/assets/js/app.js?v=3.1.0"></script>
 <script src="/assets/js/app-boot.js?v=2.1.1"></script>
 </body>
 </html>

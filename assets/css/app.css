@@ -654,6 +654,39 @@ body.dark .sess-col .search { border-bottom-color: #2b313a; }
 body.dark .sess-scope-tabs { border-bottom-color: #2b313a; }
 body.dark .info-col { border-left-color: #2b313a; }
 
+/* =====================================================================
+   v2.43 深色下再提对比度（用户反馈聊天气泡等文字看不清）
+   ===================================================================== */
+body.dark { --v-ink: #eef1f6; --v-ink-2: #c2cad6; --v-ink-3: #98a3b4; }
+/* 聊天气泡：对方气泡提亮 + 描边，避免与聊天底色糊在一起 */
+body.dark .chat-col { background: #14181e; }
+body.dark .msg-row.from-them .msg-bubble { background: #2f3641; color: #f0f3f8; box-shadow: 0 1px 2px rgba(0, 0, 0, .3), inset 0 0 0 1px #3a424d; }
+body.dark .msg-row.from-them .msg-bubble::after { border-right-color: #2f3641; }
+body.dark .msg-row.mine .msg-bubble { background: #2f9e5f; color: #ffffff; }
+body.dark .msg-row.mine .msg-bubble::after { border-left-color: #2f9e5f; }
+body.dark .msg-sender { color: #9aa4b5; }
+body.dark .msg-time, body.dark .b-time { color: #a9b3c2; }
+body.dark .msg-bubble a, body.dark .msg-link { color: #9fd0ff; }
+/* 系统提示 / 撤回胶囊 */
+body.dark .msg-row.sys .msg-bubble { background: #262c34; color: #a9b3c2; }
+/* 侧栏与列表文字整体提亮 */
+body.dark .side .logo { color: #f0f3f8; }
+body.dark .nav-item { color: #c6ccd8; }
+body.dark .nav-item.active { background: color-mix(in srgb, var(--theme, #1677ff) 26%, #1e2229); color: #8fc0ff; }
+body.dark .nav-group { color: #7d879a; }
+body.dark .sess-item .last, body.dark .sess-item .time { color: #98a3b4; }
+body.dark .ch-sub > span { color: #a9b3c2; }
+body.dark .info-item { color: #d6dbe4; }
+body.dark .info-item .k { color: #98a3b4; }
+body.dark .panel-title { color: #f0f3f8; }
+body.dark .stat-card .l { color: #a9b3c2; }
+body.dark .el-table td.el-table__cell, body.dark .el-table th.el-table__cell { color: #d6dbe4; }
+body.dark .el-form-item__label { color: #c6ccd8; }
+body.dark .el-input__inner, body.dark .el-textarea__inner { color: #eef1f6; }
+body.dark .el-input__inner::placeholder, body.dark .el-textarea__inner::placeholder { color: #7d879a; }
+body.dark .vb-sec, body.dark .msg-bubble .vb-sec { color: #e8ecf3; opacity: .9; }
+body.dark .code-stage-hint, body.dark .cp-hd-hint { color: #a9b3c2; }
+
 /* 聊天里的快捷消息设置弹窗 */
 .qd .qd-add { display: flex; gap: 8px; align-items: center; margin-bottom: 14px; }
 .qd .qd-list { max-height: 46vh; overflow-y: auto; }
@@ -803,9 +836,49 @@ body { background: var(--v-bg); color: var(--v-ink); -webkit-font-smoothing: ant
 /* ---------- 侧栏 ---------- */
 .side { width: 198px; background: #fff; border-right: 1px solid var(--v-line); }
 .side.collapsed { width: 62px; }
-.side .logo { padding: 18px 16px 12px; font-size: 15.5px; font-weight: 700; letter-spacing: .2px; }
+.side .logo { padding: 12px 16px 6px; font-size: 15px; font-weight: 700; letter-spacing: .2px; }
+/* 紧凑导航：16 项也能一屏放下，不用滚动 */
+.side .nav { padding-bottom: 4px; }
+.nav-group { padding: 6px 16px 1px; font-size: 9.5px; letter-spacing: 1.2px; }
+.nav-item { height: 28px; line-height: normal; margin: 1px 8px; padding: 0 9px; font-size: 12.5px; border-radius: 8px; gap: 8px; }
+.nav-item .nv-ic { width: 16px; font-size: 13px; }
+.nav-item.active { background: color-mix(in srgb, var(--theme, #1677ff) 12%, #fff); color: var(--theme, #1677ff); font-weight: 650; }
+
+/* ---------- 侧栏底部：账号卡片（重新排版） ---------- */
+.side .me { padding: 8px 10px 10px; }
+.me-top { display: flex; align-items: center; gap: 8px; }
+.me-ava {
+  width: 30px; height: 30px; border-radius: 10px; flex-shrink: 0;
+  display: inline-flex; align-items: center; justify-content: center; font-size: 17px;
+  background: linear-gradient(135deg, var(--theme, #1677ff), color-mix(in srgb, var(--theme, #1677ff) 55%, #fff));
+  box-shadow: 0 4px 12px color-mix(in srgb, var(--theme, #1677ff) 30%, transparent);
+  overflow: hidden;
+}
+.me-ava img { width: 100%; height: 100%; object-fit: cover; }
+.me-id { min-width: 0; flex: 1; }
+.me-id b { display: block; font-size: 13px; color: var(--v-ink, #161b24); line-height: 1.3;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.me-sub { display: block; font-size: 10.5px; color: var(--v-ink-3, #97a1b3); margin-top: 2px; line-height: 1.3;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.me-copy { border: 0; background: #f2f5fa; color: #6b7688; border-radius: 7px; width: 24px; height: 24px;
+  cursor: pointer; font-size: 13px; flex-shrink: 0; }
+.me-copy:hover { background: #e6ecf5; color: var(--theme, #1677ff); }
+.me-row { display: flex; gap: 6px; margin-top: 8px; }
+.me-btn {
+  flex: 1; border: 1px solid var(--v-line-2, #e3e8f0); background: #fff; color: #4b5563;
+  border-radius: 8px; padding: 5px 8px; font-size: 11.5px; cursor: pointer; font-family: inherit;
+  transition: all .15s; white-space: nowrap;
+}
+.me-btn:hover { border-color: color-mix(in srgb, var(--theme, #1677ff) 45%, #fff); color: var(--theme, #1677ff); }
+.me-btn.danger:hover { border-color: #f4c7c8; color: #e5484d; background: #fdeeee; }
+body.dark .me-ava { box-shadow: 0 4px 12px rgba(0, 0, 0, .4); }
+body.dark .me-id b { color: #eef1f6; }
+body.dark .me-copy { background: #262c34; color: #9aa4b5; }
+body.dark .me-btn { background: #232830; border-color: #333a44; color: #c6ccd8; }
+body.dark .me-btn:hover { border-color: #4a545f; color: #fff; }
+body.dark .me-btn.danger:hover { background: #3a2124; border-color: #5a3236; color: #ff9ea1; }
 .side-hero {
-  margin: 0 12px 8px; padding: 14px 12px 12px;
+  margin: 0 12px 8px; padding: 10px 12px;
   background: linear-gradient(150deg, color-mix(in srgb, var(--theme, #1677ff) 9%, #fff), #fff 70%);
   border: 1px solid var(--v-line); border-radius: 14px; box-shadow: var(--v-shadow);
 }
@@ -815,17 +888,9 @@ body { background: var(--v-bg); color: var(--v-ink); -webkit-font-smoothing: ant
   box-shadow: 0 6px 16px color-mix(in srgb, var(--theme, #1677ff) 32%, transparent);
 }
 .hero-online { font-size: 11.5px; font-weight: 600; }
-.nav-group { padding: 12px 18px 4px; font-size: 10px; letter-spacing: 1.4px; color: #a8b0c0; }
-.nav-item {
-  height: 40px; line-height: normal; margin: 2px 10px; padding: 0 12px;
-  border-radius: 10px; font-size: 13.5px; color: #414c5e; gap: 10px;
-}
-.nav-item .nv-ic { width: 18px; text-align: center; font-size: 14px; opacity: .75; flex-shrink: 0; }
+.nav-item .nv-ic { opacity: .8; text-align: center; flex-shrink: 0; }
 .nav-item:hover { background: #f5f7fb; color: var(--v-ink); }
-.nav-item.active {
-  background: color-mix(in srgb, var(--theme, #1677ff) 11%, #fff);
-  color: var(--theme, #1677ff); font-weight: 650; box-shadow: none;
-}
+.nav-item.active { box-shadow: none; }
 .nav-item.active .nv-ic { opacity: 1; }
 .nav-dot { width: 7px; height: 7px; border-radius: 50%; background: #f5455c; margin-left: auto; flex-shrink: 0;
   box-shadow: 0 0 0 3px color-mix(in srgb, #f5455c 22%, #fff); }
@@ -1053,8 +1118,10 @@ body.dark .ch-chip, body.dark .geo-tag { background: #262b33; color: #b6bfcd; }
 body.dark .ch-chip.src { background: color-mix(in srgb, var(--theme, #1677ff) 26%, #1e2229); }
 body.dark .msg-bubble { background: #2a3038; color: #e7eaf0; }
 body.dark .msg-row.from-them .msg-bubble::after { border-right-color: #2a3038; }
-body.dark .msg-row.mine .msg-bubble { background: #3f9a63; color: #f2fff7; }
-body.dark .msg-row.mine .msg-bubble::after { border-left-color: #3f9a63; }
+body.dark .msg-row.mine .msg-bubble { background: #2b8a55; color: #ffffff; }
+body.dark .msg-row.mine .msg-bubble::after { border-left-color: #2b8a55; }
+body.dark .msg-row.mine .vb-asr-btn { background: rgba(0, 0, 0, .22); color: #eafff2; }
+body.dark .msg-row.mine .vb-sec { color: #ffffff; }
 body.dark .info-item { border-bottom-color: #2b313a; }
 body.dark .el-table th.el-table__cell { background: #232830 !important; }
 body.dark .clock { background: #262b33; }
