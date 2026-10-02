@@ -43,28 +43,10 @@ createApp({
 
     const isImg = (v) => typeof v === 'string' && (v.startsWith('http') || v.startsWith('/uploads'));
 
-    // ===== 19 个平台皮肤模板（对标 kefulogin）=====
+    // ===== 访客端模板（只保留有真实界面结构的；纯换色的伪模板已于 v2.21 清理）=====
     const TEMPLATES = {
       default:      { label: '默认客服', nav: '在线客服',   color: '#1677ff', g1: '#1677ff', g2: '#4d9bff', dark: false },
-      weixin:       { label: '微信',     nav: '微信客服',   color: '#07C160', g1: '#07C160', g2: '#2bd576', dark: false },
-      alipay:       { label: '支付宝',   nav: '支付宝客服中心', color: '#1677FF', g1: '#1677FF', g2: '#3d8bff', dark: false },
-      meituan:      { label: '美团',     nav: '美团外卖·客服中心', color: '#FFC300', g1: '#FFD100', g2: '#FFC300', dark: true },
-      jingdong:     { label: '京东',     nav: '京东客服',   color: '#E2231A', g1: '#E93B35', g2: '#E2231A', dark: false },
-      pinduoduo:    { label: '拼多多',   nav: '拼多多官方客服', color: '#E02E24', g1: '#FF4A3C', g2: '#E02E24', dark: false },
-      douyin:       { label: '抖音',     nav: '抖音客服中心', color: '#161823', g1: '#2a2d36', g2: '#161823', dark: true },
-      xianyu:       { label: '闲鱼',     nav: '闲鱼·客服中心', color: '#FFE311', g1: '#FFF04D', g2: '#FFE311', dark: true },
-      tmall:        { label: '天猫',     nav: '天猫客服中心', color: '#FF0036', g1: '#FF2E5C', g2: '#FF0036', dark: false },
-      taobao:       { label: '淘宝',     nav: '淘宝客服',   color: '#FF5000', g1: '#FF7A1E', g2: '#FF5000', dark: false },
-      tencent:      { label: '腾讯客服', nav: '腾讯客服',   color: '#0052D9', g1: '#0052D9', g2: '#3B7FFF', dark: false },
-      baitiao:      { label: '京东白条', nav: '白条金融客服', color: '#4A5AFF', g1: '#5C6BFF', g2: '#4A5AFF', dark: false },
-      fenqile:      { label: '分期乐',   nav: '分期乐客服', color: '#FF6A00', g1: '#FF8A1E', g2: '#FF6A00', dark: false },
-      delivery:     { label: '外卖平台', nav: '外卖平台客服', color: '#00A6FF', g1: '#00BFFF', g2: '#00A6FF', dark: false },
-      tongcheng58:  { label: '58同城',   nav: '58同城客服', color: '#FF6E00', g1: '#FF8A1E', g2: '#FF6E00', dark: false },
-      weilidai:     { label: '微粒贷',   nav: '微粒贷金融客服', color: '#00B389', g1: '#00D69F', g2: '#00B389', dark: false },
-      whatsapp:     { label: 'WhatsApp', nav: 'Customer Service', color: '#25D366', g1: '#25D366', g2: '#1FB857', dark: false },
-      worldcup:     { label: '世界杯',   nav: '赛事服务客服', color: '#1B5E20', g1: '#2E7D32', g2: '#1B5E20', dark: false },
-      xiaohongshu:  { label: '小红书',   nav: '小红书客服中心', color: '#FF2442', g1: '#FF4A66', g2: '#FF2442', dark: false },
-      yangqianguan: { label: '钱罐子',   nav: '钱罐子客服', color: '#FF8800', g1: '#FFAA1E', g2: '#FF8800', dark: false },
+      whatsapp:     { label: 'WhatsApp', nav: 'Customer Service', color: '#008069', g1: '#008069', g2: '#00a884', dark: false },
     };
     const applyTemplate = (key) => {
       const k = TEMPLATES[key] ? key : 'default';

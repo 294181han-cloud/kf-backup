@@ -1,4 +1,4 @@
-/* visitor.css - 访客端样式（由 public/visitor.html 内联样式提取；含 19 套平台皮肤模板） */
+/* visitor.css - 访客端样式（由 public/visitor.html 内联样式提取；含 WhatsApp 平台模板） */
 * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
 :root {
   --theme: #1677ff;
@@ -73,8 +73,61 @@ body {
   opacity: .95;
 }
 body[data-tpl="default"] .nav-bar { display: none; }
-body[data-tpl="meituan"] .nav-bar, body[data-tpl="xianyu"] .nav-bar { color: #4a3b00; }
-body[data-tpl="douyin"] .nav-bar { color: #fff; }
+
+/* ================= WhatsApp 模板（真实界面结构，v2.21） =================
+   参考 WhatsApp 聊天页：米色涂鸦墙纸、气泡带尾巴（访客绿/客服白）、药丸输入条。
+   结构与关键颜色写死在此（品牌色只影响 --theme 点缀，不会破坏界面形态）。 */
+body[data-tpl="whatsapp"] {
+  --bg: #efe7dd;
+  background-color: #efe7dd;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='280' height='280' viewBox='0 0 280 280'%3E%3Cg fill='none' stroke='%23d5cab9' stroke-width='1.7' stroke-linecap='round' stroke-linejoin='round' opacity='.55'%3E%3Ccircle cx='42' cy='44' r='11'/%3E%3Cpath d='M38 44h8M42 40v8'/%3E%3Cpath d='M118 26l9 9-9 9-9-9z'/%3E%3Cpath d='M198 40c-5-7 5-15 9-8 4-7 14 1 9 8l-9 10z'/%3E%3Cpath d='M246 96h18m-9-9v18'/%3E%3Ccircle cx='132' cy='132' r='13'/%3E%3Cpath d='M127 130a5 5 0 0 1 10 0M127 137a7 7 0 0 0 10 0'/%3E%3Cpath d='M196 128h16l-3 15h-10zM200 143v7M208 143v7M214 122v8'/%3E%3Cpath d='M52 186c0-11 15-11 15 0s-15 11-15 0z'/%3E%3Cpath d='M128 196q11-13 22 0t-11 14z'/%3E%3Cpath d='M206 186l7 7m0-7-7 7'/%3E%3Cpath d='M60 246l12 12m0-12-12 12'/%3E%3Ccircle cx='150' cy='252' r='8'/%3E%3Cpath d='M147 252h6m-3-3v6'/%3E%3Cpath d='M236 236l14-6-6 14-3-5z'/%3E%3C/g%3E%3C/svg%3E");
+  background-size: 280px auto;
+}
+body[data-tpl="whatsapp"] .v-body { background: transparent; }
+/* 头部：纯 WhatsApp 青绿（不跟随品牌渐变） */
+body[data-tpl="whatsapp"] .v-header { background: linear-gradient(135deg, #008069, #00947c); }
+/* 气泡：圆角 + 顶部尾巴；访客浅绿、客服白 */
+body[data-tpl="whatsapp"] .msg-row .msg-bubble {
+  border-radius: 8px; position: relative;
+  box-shadow: 0 1px .5px rgba(11,20,26,.13);
+}
+body[data-tpl="whatsapp"] .msg-row.visitor .msg-bubble {
+  background: #d9fdd3; color: #111b21; border-top-right-radius: 3px;
+}
+body[data-tpl="whatsapp"] .msg-row.visitor .msg-bubble::after {
+  content: ''; position: absolute; top: 0; right: -7px;
+  width: 7px; height: 13px; background: #d9fdd3;
+  clip-path: polygon(0 0, 100% 0, 0 100%);
+}
+body[data-tpl="whatsapp"] .msg-row.agent .msg-bubble {
+  background: #fff; color: #111b21; border-top-left-radius: 3px;
+}
+body[data-tpl="whatsapp"] .msg-row.agent .msg-bubble::after {
+  content: ''; position: absolute; top: 0; left: -7px;
+  width: 7px; height: 13px; background: #fff;
+  clip-path: polygon(0 0, 100% 0, 100% 100%);
+}
+body[data-tpl="whatsapp"] .msg-time { color: #667781; }
+/* 输入区：贴在墙纸上的白色药丸输入条 */
+body[data-tpl="whatsapp"] .v-footer-wrap {
+  background: transparent; box-shadow: none; border-radius: 0;
+  padding-bottom: calc(6px + env(safe-area-inset-bottom));
+}
+body[data-tpl="whatsapp"] .v-input {
+  background: #fff; border: none; border-radius: 999px;
+  padding: 11px 16px; box-shadow: 0 1px 2px rgba(11,20,26,.12);
+}
+body[data-tpl="whatsapp"] .v-input:focus { background: #fff; }
+body[data-tpl="whatsapp"] .v-btn { border-radius: 999px; }
+body[data-tpl="whatsapp"] .v-footer-text { background: transparent; }
+/* 公告/滚动通知：WhatsApp 样式圆角提示卡 */
+body[data-tpl="whatsapp"] .notice-bar {
+  margin: 8px 12px; border-radius: 10px; border: none;
+  background: #fdf4c9; color: #54656d; box-shadow: 0 1px 1px rgba(11,20,26,.08);
+}
+body[data-tpl="whatsapp"] .inform-bar {
+  background: #fdf4c9; border-bottom: none; color: #54656d;
+}
 .nav-back, .nav-menu { font-size: 17px; opacity: .85; width: 24px; text-align: center; }
 .recall-capsule {
   background: rgba(26,34,51,.05) !important; color: var(--ink-3) !important;

@@ -650,28 +650,10 @@ const app = createApp({
     });
     const guideDone = computed(() => guide.value.filter(g => g.done).length);
 
-    // 访客端模板列表（与 visitor.html TEMPLATES 对齐）
+    // 访客端模板列表（与 visitor.js TEMPLATES 对齐；只保留有真实界面结构的模板）
     const tplList = [
       { k: 'default', label: '默认客服', g1: '#1677ff' },
-      { k: 'weixin', label: '微信', g1: '#07C160' },
-      { k: 'alipay', label: '支付宝', g1: '#1677FF' },
-      { k: 'meituan', label: '美团', g1: '#FFC300' },
-      { k: 'jingdong', label: '京东', g1: '#E2231A' },
-      { k: 'pinduoduo', label: '拼多多', g1: '#E02E24' },
-      { k: 'douyin', label: '抖音', g1: '#161823' },
-      { k: 'xianyu', label: '闲鱼', g1: '#FFE311' },
-      { k: 'tmall', label: '天猫', g1: '#FF0036' },
-      { k: 'taobao', label: '淘宝', g1: '#FF5000' },
-      { k: 'tencent', label: '腾讯客服', g1: '#0052D9' },
-      { k: 'baitiao', label: '京东白条', g1: '#4A5AFF' },
-      { k: 'fenqile', label: '分期乐', g1: '#FF6A00' },
-      { k: 'delivery', label: '外卖平台', g1: '#00A6FF' },
-      { k: 'tongcheng58', label: '58同城', g1: '#FF6E00' },
-      { k: 'weilidai', label: '微粒贷', g1: '#00B389' },
-      { k: 'whatsapp', label: 'WhatsApp', g1: '#25D366' },
-      { k: 'worldcup', label: '世界杯', g1: '#1B5E20' },
-      { k: 'xiaohongshu', label: '小红书', g1: '#FF2442' },
-      { k: 'yangqianguan', label: '钱罐子', g1: '#FF8800' },
+      { k: 'whatsapp', label: 'WhatsApp', g1: '#008069' },
     ];
     // ===== 后台UI（模板+配色选择；注册表 assets/ui/ui-registry.js，加载器 ui-loader.js） =====
     // pc 分类由本页加载器实例管理（即时生效）；mobile 分类写 localStorage 供访客页本机预览。
