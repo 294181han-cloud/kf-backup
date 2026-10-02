@@ -190,6 +190,8 @@ const app = createApp({
           inform_on: !!b.inform_on, inform_text: b.inform_text || '',
           tpl_nav_on: b.tpl_nav_on !== false, tpl_nav_title: b.tpl_nav_title || '',
           vip_badge: b.vip_badge || '', footer_text: b.footer_text || '',
+          closed_keep_days: b.closed_keep_days != null ? b.closed_keep_days : 3,
+          max_sessions: b.max_sessions != null ? b.max_sessions : 0,
         });
         Object.assign(sec, {
           notice_on: !!b.notice_on, notice_text: b.notice_text || '',
@@ -204,10 +206,14 @@ const app = createApp({
 
     // ---------- 轮询 ----------
     let lastUnreadTotal = 0;
+    // 三级会话分区（v2.25）：online=在线 / archived=已归档 / closed=已结束
+    const sessScope = ref('online');
+    const sessCounts = reactive({ online: 0, archived: 0, closed: 0, online_unread: 0, archived_unread: 0 });
     const pollOnce = async () => {
       try {
-        const r = await API.get('/api/poll?role=agent&session=' + currentId.value + '&sinceMsg=' + maxMsgId.value);
+        const r = await API.get('/api/poll?role=agent&session=' + currentId.value + '&sinceMsg=' + maxMsgId.value + '&scope=' + sessScope.value);
         sessions.value = r.sessions || [];
+        if (r.counts) Object.assign(sessCounts, r.counts);
         readUpto.value = r.readUpto != null ? r.readUpto : readUpto.value;
         // 撤回同步：最近撤回的消息标记（客服撤回→胶囊；访客撤回→内容保留+撤回角标）
         if (Array.isArray(r.recalledIds) && r.recalledIds.length) {
@@ -387,6 +393,22 @@ const app = createApp({
         await API.post('/api/sessions/' + currentId.value + '/close');
         sessions.value = sessions.value.filter(s => s.id !== currentId.value);
         currentId.value = 0; msgs.value = [];
+        await pollOnce();
+      } catch (e) { ElementPlus.ElMessage.error(e.message); }
+    };
+    // 归档 / 取消归档（v2.25）
+    const archiveSession = async (on) => {
+      const sid = currentId.value;
+      if (!sid) return;
+      try {
+        await API.post('/api/sessions/' + sid + '/archive', { on: on ? 1 : 0 });
+        ElementPlus.ElMessage.success(on ? '已归档' : '已取消归档');
+        if (!on) await pollOnce();
+        else {
+          sessions.value = sessions.value.filter(s => s.id !== sid);
+          currentId.value = 0; msgs.value = [];
+          await pollOnce();
+        }
       } catch (e) { ElementPlus.ElMessage.error(e.message); }
     };
     const doTransfer = async () => {
@@ -582,6 +604,7 @@ const app = createApp({
       robot: 'no', robot_frequency: 'first', robot_code: '',
       filtration_wx: false, filtration_pc: false, filtration_area: false,
       link_mode: 'no', user_head_type: 'default', user_head: '', user_name_type: 'default',
+      closed_keep_days: 3, max_sessions: 0,
       publicity_on: false, publicity_title: '', publicity_content: '',
       inform_on: false, inform_text: '',
     });
@@ -1146,6 +1169,7 @@ const app = createApp({
       blockSession, blockIp, kwList, kwInput, kwSaving, addKw, removeKw, saveFilter, agentCmd, restartPoll,
       chatSearchOn, chatSearchKw, searchHit, visibleMsgs, canRecall, recallMsg, isRead,
       pol, savePolicy, uploadPolHead, clock, unreadTotal, sessCollapsed,
+      sessScope, sessCounts, archiveSession,
       manageDlg, history, codeCfg, qrWrap, currentLink, renderMainQr,
       posterCfg, posterQrBox, posterBgInput, pickPosterBg, onPosterBg, downloadPoster2,
       POSTER_POS, qrFreeStyle, qrLayerStyle, textStyle,

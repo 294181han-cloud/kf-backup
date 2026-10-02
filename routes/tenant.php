@@ -214,6 +214,9 @@ function handle_tenant_settings(string $method): void
             'robot'          => ts_get($tid, 'robot', 'no'),
             'robot_frequency' => ts_get($tid, 'robot_frequency', 'first'),
             'robot_code'     => ts_get($tid, 'robot_code', ''),
+            // 会话管理（v2.25）：已结束保留天数（0=永久）、会话总数额度（0=不限）
+            'closed_keep_days' => (int)($t['closed_keep_days'] ?? 3),
+            'max_sessions'     => (int)($t['max_sessions'] ?? 0),
             // 链接模式
             'link_mode'      => ts_get($tid, 'link_mode', 'no'),
             // 头像/昵称
@@ -298,6 +301,14 @@ function handle_tenant_settings(string $method): void
         if (array_key_exists('me_avatar', $data)) ts_set($tid, 'me_avatar', mb_substr(trim((string)$data['me_avatar']), 0, 500));
         foreach (['code_nickname_on', 'code_support_on'] as $bk) {
             if (array_key_exists($bk, $data)) ts_set($tid, $bk, $data[$bk] ? '1' : '0');
+        }
+        // 会话管理（v2.25）：写租户级字段（非 ts 键值）
+        $tidInt = (int)$tid;
+        foreach (['closed_keep_days', 'max_sessions'] as $col) {
+            if (array_key_exists($col, $data)) {
+                $v = max(0, min(3650, (int)$data[$col]));
+                db()->prepare("UPDATE tenants SET $col = ? WHERE id = ?")->execute([$v, $tidInt]);
+            }
         }
         json_out(['ok' => true]);
     }

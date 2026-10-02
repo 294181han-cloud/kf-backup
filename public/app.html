@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>客服工作台</title>
 <link rel="stylesheet" href="/assets/vendor/element-plus.css">
-<link rel="stylesheet" href="/assets/css/app.css?v=2.3.2">
+<link rel="stylesheet" href="/assets/css/app.css?v=2.4.0">
 <script src="/assets/ui/ui-registry.js?v=2.5.1"></script>
 <script src="/assets/ui/ui-loader.js?v=2.5.1" data-ui-cat="auto"></script>
 </head>
@@ -84,6 +84,17 @@
       <div class="content workbench" v-if="tab==='work'" :class="{'has-chat': !!currentId}">
         <div class="sess-col" :class="{collapsed: sessCollapsed}">
           <button class="sess-collapse-btn" :title="sessCollapsed ? '展开会话列表' : '收起会话列表'" @click="sessCollapsed = !sessCollapsed">{{ sessCollapsed ? '»' : '«' }}</button>
+          <div class="sess-scope-tabs" v-if="!sessCollapsed">
+            <button class="scope-tab" :class="{on: sessScope==='online'}" @click="sessScope='online'">
+              在线聊天<span class="scope-n" v-if="sessCounts.online">{{ sessCounts.online }}</span><span class="scope-dot" v-if="sessCounts.online_unread" :title="sessCounts.online_unread + ' 条未读'"></span>
+            </button>
+            <button class="scope-tab" :class="{on: sessScope==='archived'}" @click="sessScope='archived'">
+              已归档<span class="scope-n" v-if="sessCounts.archived">{{ sessCounts.archived }}</span><span class="scope-dot" v-if="sessCounts.archived_unread" :title="sessCounts.archived_unread + ' 条未读'"></span>
+            </button>
+            <button class="scope-tab" :class="{on: sessScope==='closed'}" @click="sessScope='closed'">
+              已结束<span class="scope-n" v-if="sessCounts.closed">{{ sessCounts.closed }}</span>
+            </button>
+          </div>
           <div class="search" v-if="!sessCollapsed">
             <el-input v-model="sessSearch" placeholder="搜索访客/消息" size="small" clearable></el-input>
           </div>
@@ -117,8 +128,10 @@
                 <el-popconfirm title="拉黑该访客 IP？拉黑后其无法再进入或发消息" @confirm="blockSession">
                   <template #reference><el-button size="small" type="danger" plain>🚫 拉黑</el-button></template>
                 </el-popconfirm>
-                <el-button size="small" @click="transferDlg=true">转接</el-button>
-                <el-popconfirm title="结束该会话？" @confirm="closeSession">
+                <el-button size="small" v-if="sessScope==='archived'" type="warning" plain @click="archiveSession(false)">↩ 取消归档</el-button>
+                <el-button size="small" v-else-if="sessScope==='online'" @click="archiveSession(true)">📦 归档</el-button>
+                <el-button size="small" v-if="sessScope!=='closed'" @click="transferDlg=true">转接</el-button>
+                <el-popconfirm v-if="sessScope!=='closed'" title="结束该会话？结束后移入「已结束」，按保留天数自动清理" @confirm="closeSession">
                   <template #reference><el-button size="small" type="danger">结束会话</el-button></template>
                 </el-popconfirm>
               </span>
@@ -594,6 +607,21 @@
         </div>
 
         <div class="panel" style="max-width:640px;margin:0 auto;">
+          <div class="panel-title">会话管理</div>
+          <el-form label-width="110px">
+            <el-form-item label="结束保留天数">
+              <el-input-number v-model="pol.closed_keep_days" :min="0" :max="3650" style="width:140px;"></el-input-number>
+              <span class="muted" style="margin-left:10px;font-size:12px;">「已结束」会话保留 N 天后自动删除；0 = 永久保留</span>
+            </el-form-item>
+            <el-form-item label="会话总额度">
+              <el-input-number v-model="pol.max_sessions" :min="0" :max="1000000" style="width:140px;"></el-input-number>
+              <span class="muted" style="margin-left:10px;font-size:12px;">会话总数（含归档/已结束）达到上限后新访客无法进入；0 = 不限</span>
+            </el-form-item>
+          </el-form>
+          <el-button type="primary" size="small" @click="savePolicy">保存会话管理</el-button>
+        </div>
+
+        <div class="panel" style="max-width:640px;margin:0 auto;">
           <div class="panel-title">访客过滤</div>
           <p class="muted" style="margin:0 0 10px;">⚠️ 规则过严会导致正常用户进不来，开启后请用真实设备测试。</p>
           <div class="pol-row"><span>非微信过滤（仅允许微信内置浏览器）</span><el-switch v-model="pol.filtration_wx"></el-switch></div>
@@ -992,7 +1020,7 @@
 <script src="/assets/qr-poster.js?v=2.0.1"></script>
 <script src="/assets/api.js?v=2.0.1"></script>
 <script src="/assets/js/app-components.js?v=2.1.0"></script>
-<script src="/assets/js/app.js?v=2.3.6"></script>
+<script src="/assets/js/app.js?v=2.4.0"></script>
 <script src="/assets/js/app-boot.js?v=2.1.1"></script>
 </body>
 </html>

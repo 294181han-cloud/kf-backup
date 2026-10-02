@@ -250,6 +250,12 @@ function handle_visitor_init(string $method): void
     if ($used >= $limit) {
         json_error('本周客服名额已满，请下周再来或联系客服', 403);
     }
+    // 会话总数额度（v2.25）：0=不限；到顶后新访客被拒（老访客恢复会话不受影响）
+    $maxSessions = (int)($t['max_sessions'] ?? 0);
+    if ($maxSessions > 0) {
+        $total = fetch_count($pdo, 'SELECT COUNT(*) FROM v_sessions WHERE tenant_id = ?', [$tid]);
+        if ($total >= $maxSessions) json_error('当前咨询人数较多，请稍后再试', 403);
+    }
 
     // 访客名：自定义 or 自动编号
     $rawName = mb_substr(trim((string)input('name', '')), 0, 30);
@@ -433,6 +439,11 @@ function handle_visitor_send(string $method): void
     $ip = $s['ip'] ?: get_client_ip();
     if (is_ip_blocked($tid, $ip)) json_error('您的访问受限', 403);
     if ($s['status'] === 'closed') json_error('会话已结束', 403);
+    // 归档会话有新消息 → 自动取消归档（活跃对话回到在线列表，带未读提示）
+    if ($s['status'] === 'archived') {
+        $pdo->prepare("UPDATE v_sessions SET status = 'online', archived_at = NULL WHERE id = ?")->execute([$sid]);
+        $s['status'] = 'online';
+    }
 
     // 限频
     $cfg = config();

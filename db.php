@@ -48,6 +48,8 @@ function init_schema(): void
         expires_at DATETIME NULL,
         quota_web INT UNSIGNED NOT NULL DEFAULT 200,
         quota_app INT UNSIGNED NOT NULL DEFAULT 200,
+        closed_keep_days INT UNSIGNED NOT NULL DEFAULT 3,
+        max_sessions INT UNSIGNED NOT NULL DEFAULT 0,
         max_agents INT UNSIGNED NOT NULL DEFAULT 5,
         created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
         last_login_at DATETIME NULL
@@ -85,8 +87,11 @@ function init_schema(): void
         source VARCHAR(16) NOT NULL DEFAULT 'direct',
         quota_key VARCHAR(16) NOT NULL DEFAULT '',
         last_online_at DATETIME NULL,
+        closed_at DATETIME NULL,
+        archived_at DATETIME NULL,
         created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
         KEY idx_tenant_time (tenant_id, last_time),
+        KEY idx_status_time (tenant_id, status, last_time),
         KEY idx_tenant_agent (tenant_id, agent_id),
         KEY idx_token (visitor_token)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");

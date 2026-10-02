@@ -79,14 +79,28 @@ body { margin: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'P
 }
 .sess-collapse-btn:hover { color: #1677ff; border-color: #1677ff; }
 .sess-col .search { padding: 10px 12px; border-bottom: 1px solid #f2f3f5; }
+/* 三级会话分区 tab（在线/已归档/已结束） */
+.sess-scope-tabs { display: flex; border-bottom: 1px solid #f2f3f5; padding: 6px 8px 0; gap: 2px; }
+.scope-tab {
+  flex: 1; border: none; background: none; cursor: pointer; padding: 6px 2px 7px;
+  font-size: 12px; color: #86909c; border-bottom: 2px solid transparent;
+  display: flex; align-items: center; justify-content: center; gap: 4px;
+}
+.scope-tab:hover { color: #1890ff; }
+.scope-tab.on { color: #1890ff; font-weight: 600; border-bottom-color: #1890ff; }
+.scope-n { font-size: 10px; background: #f2f3f5; color: #86909c; border-radius: 8px; padding: 0 5px; min-width: 15px; line-height: 15px; }
+.scope-tab.on .scope-n { background: #e8f3ff; color: #165dff; }
+.scope-dot { width: 7px; height: 7px; border-radius: 50%; background: #f53f3f; flex-shrink: 0; animation: blink 1.2s infinite; }
 .sess-list { flex: 1; overflow-y: auto; }
 .sess-item { padding: 12px 14px; cursor: pointer; border-bottom: 1px solid #f7f8fa; }
 .sess-item:hover { background: #f5f5f5; }
 .sess-item.active { background: #f5f5f5; }
 .sess-item.active .name { color: #1890ff; }
-.sess-item .row1 { display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px; }
-.sess-item .name { font-size: 14px; font-weight: 600; color: #1f2329; max-width: 150px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.sess-item .time { font-size: 11px; color: #a0a6ad; }
+/* 行1：名字区自适应宽度，标签跟随其后，时间不挤占 —— 长名字省略、标签尽量完整显示 */
+.sess-item .row1 { display: flex; align-items: center; gap: 6px; margin-bottom: 4px; }
+.sess-item .name { font-size: 14px; font-weight: 600; color: #1f2329; flex: 0 1 auto; min-width: 56px; max-width: 60%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sess-item .name .geo-tag { max-width: 100%; }
+.sess-item .time { font-size: 11px; color: #a0a6ad; margin-left: auto; flex-shrink: 0; }
 .sess-item .row2 { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
 .sess-item .last { font-size: 12px; color: #86909c; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; }
 .sess-item .dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
@@ -94,7 +108,9 @@ body { margin: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'P
 .sess-item .dot.offline { background: #c9cdd4; }
 .badge { background: #f53f3f; color: #fff; font-size: 11px; min-width: 17px; height: 17px; border-radius: 9px; display: inline-flex; align-items: center; justify-content: center; padding: 0 5px; }
 .tag-agent { font-size: 10px; background: #e8f3ff; color: #165dff; border-radius: 3px; padding: 1px 4px; max-width: 64px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex-shrink: 0; }
-.geo-tag { display: inline-block; font-size: 10px; color: #86909c; background: #f2f3f5; border-radius: 4px; padding: 0 5px; margin-left: 5px; max-width: 120px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; vertical-align: 1px; }
+.geo-tag { display: inline-block; font-size: 10px; color: #86909c; background: #f2f3f5; border-radius: 4px; padding: 0 5px; margin-left: 5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; vertical-align: 1px; }
+/* 会话列表：标签弹性收缩可长至整行剩余空间（避免短名字仍被 ... 截断的浪费） */
+.sess-item .name .geo-tag { max-width: 220px; vertical-align: middle; }
 .chat-head .geo-tag { font-size: 11px; background: #f2f3f5; }
 
 .chat-col { flex: 1; display: flex; flex-direction: column; min-width: 0; background: #f7f7f7; }

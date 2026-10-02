@@ -23,22 +23,53 @@ function session_of(array $ctx, int $sid): array
 }
 
 /* ---------- 会话列表 ---------- */
+/** 会话分区过滤（v2.25 三级）：online=在线（未结束未归档） archived=已归档 closed=已结束 */
+function session_scope_sql(string $scope): string
+{
+    if ($scope === 'archived') return " AND s.status = 'archived'";
+    if ($scope === 'closed') return " AND s.status = 'closed'";
+    return " AND s.status NOT IN ('closed', 'archived')";
+}
+
+/** 已结束会话自动清理（poll 时懒执行；closed_keep_days=0 表示永久保留） */
+function cleanup_closed_sessions(int $tenantId): void
+{
+    $days = fetch_count(db(), 'SELECT closed_keep_days FROM tenants WHERE id = ?', [$tenantId]);
+    if ($days <= 0) return;
+    $pdo = db();
+    $st = $pdo->prepare('SELECT id FROM v_sessions WHERE tenant_id = ? AND status = \'closed\' AND closed_at IS NOT NULL AND closed_at < ? LIMIT 100');
+    $st->execute([$tenantId, now_dt(time() - $days * 86400)]);
+    $ids = $st->fetchAll(PDO::FETCH_COLUMN);
+    if (!$ids) return;
+    $idList = implode(',', array_map('intval', $ids));
+    try {
+        $pdo->beginTransaction();
+        $pdo->exec("DELETE FROM messages WHERE tenant_id = $tenantId AND session_id IN ($idList)");
+        $pdo->exec("DELETE FROM contacts WHERE tenant_id = $tenantId AND session_id IN ($idList)");
+        $pdo->exec("DELETE FROM welcome_sent WHERE tenant_id = $tenantId AND session_id IN ($idList)");
+        $pdo->exec("DELETE FROM v_sessions WHERE tenant_id = $tenantId AND id IN ($idList)");
+        $pdo->commit();
+    } catch (\Throwable $e) { try { $pdo->rollBack(); } catch (\Throwable $e2) {} }
+}
+
 function handle_sessions(string $method): void
 {
     if ($method !== 'GET') { json_error('方法不允许', 405); return; }
     $ctx = require_workspace();
     $pdo = db();
     $cfg = config();
-    $onlineSql = "CASE WHEN s.status = 'closed' THEN 'closed'
+    $scope = in_array((string)input('scope', 'online'), ['online', 'archived', 'closed'], true) ? (string)input('scope', 'online') : 'online';
+    $onlineSql = "CASE WHEN s.status IN ('closed','archived') THEN s.status
         WHEN s.last_online_at IS NOT NULL AND s.last_online_at > DATE_SUB(NOW(), INTERVAL " . (int)$cfg['session_online_secs'] . " SECOND) THEN 'online'
         ELSE 'offline' END";
     $sql = "SELECT s.id, s.agent_id, a.nickname AS agent_name, s.visitor_name AS name,
         (SELECT value FROM contacts WHERE session_id = s.id AND type = 'note' LIMIT 1) AS note,
         s.ip, s.from_url AS `from`, s.last_msg AS lastMsg, s.last_time AS lastTime, s.unread, s.source, s.geo, s.ua,
+        s.archived_at, s.closed_at,
         $onlineSql AS status,
         (SELECT COUNT(*) FROM messages WHERE session_id = s.id) AS message_count
         FROM v_sessions s LEFT JOIN agents a ON a.id = s.agent_id AND a.tenant_id = s.tenant_id
-        WHERE s.tenant_id = ? AND s.status != 'closed'" . session_visible_sql($ctx) . "
+        WHERE s.tenant_id = ?" . session_scope_sql($scope) . session_visible_sql($ctx) . "
         ORDER BY s.last_time DESC LIMIT 500";
     $rows = $pdo->prepare($sql);
     $rows->execute([$ctx['tenant_id']]);
@@ -56,7 +87,24 @@ function handle_sessions(string $method): void
         unset($r['ua']);
     }
     unset($r);
-    json_out($out);
+    // 各分区计数（供 tab 徽标：在线/归档的未读合计提示）
+    $vis = session_visible_sql($ctx);
+    $cnt = $pdo->prepare("SELECT
+        SUM(status NOT IN ('closed','archived')) AS online_cnt,
+        SUM(status = 'archived') AS archived_cnt,
+        SUM(status = 'closed') AS closed_cnt,
+        COALESCE(SUM(CASE WHEN status NOT IN ('closed','archived') THEN unread ELSE 0 END), 0) AS online_unread,
+        COALESCE(SUM(CASE WHEN status = 'archived' THEN unread ELSE 0 END), 0) AS archived_unread
+        FROM v_sessions s WHERE s.tenant_id = ?" . $vis);
+    $cnt->execute([$ctx['tenant_id']]);
+    $c = $cnt->fetch() ?: [];
+    json_out(['sessions' => $out, 'counts' => [
+        'online' => (int)($c['online_cnt'] ?? 0),
+        'archived' => (int)($c['archived_cnt'] ?? 0),
+        'closed' => (int)($c['closed_cnt'] ?? 0),
+        'online_unread' => (int)($c['online_unread'] ?? 0),
+        'archived_unread' => (int)($c['archived_unread'] ?? 0),
+    ]]);
 }
 
 /* ---------- 同租户客服列表（转接用） ---------- */
@@ -135,7 +183,7 @@ function handle_session_rename(string $method, array $m): void
     json_out(['ok' => true, 'name' => $name]);
 }
 
-/* ---------- 关闭会话 ---------- */
+/* ---------- 关闭会话（移入已结束，按保留天数自动清理） ---------- */
 function handle_session_close(string $method, array $m): void
 {
     if ($method !== 'POST') { json_error('方法不允许', 405); return; }
@@ -143,10 +191,29 @@ function handle_session_close(string $method, array $m): void
     $ctx = require_workspace();
     session_of($ctx, $sid);
     $pdo = db();
-    $pdo->prepare("UPDATE v_sessions SET status = 'closed' WHERE id = ?")->execute([$sid]);
+    $pdo->prepare("UPDATE v_sessions SET status = 'closed', closed_at = ?, archived_at = NULL WHERE id = ?")->execute([now_dt(), $sid]);
     $pdo->prepare("INSERT INTO messages (tenant_id, session_id, from_type, sender_name, text, msg_type, created_at) VALUES (?,?,'system','系统','会话已结束','text',?)")
         ->execute([$ctx['tenant_id'], $sid, now_dt()]);
     json_out(['ok' => true]);
+}
+
+/* ---------- 归档 / 取消归档 ---------- */
+function handle_session_archive(string $method, array $m): void
+{
+    if ($method !== 'POST') { json_error('方法不允许', 405); return; }
+    $sid = (int)$m[1];
+    $ctx = require_workspace();
+    $s = session_of($ctx, $sid);
+    $on = ((string)input('on', '1')) === '1';
+    $pdo = db();
+    if ($on) {
+        if ($s['status'] === 'closed') json_error('已结束的会话不能归档，请先取消结束', 400);
+        $pdo->prepare("UPDATE v_sessions SET status = 'archived', archived_at = ? WHERE id = ?")->execute([now_dt(), $sid]);
+    } else {
+        if ($s['status'] !== 'archived') json_error('该会话不在归档中', 400);
+        $pdo->prepare("UPDATE v_sessions SET status = 'online', archived_at = NULL WHERE id = ?")->execute([$sid]);
+    }
+    json_out(['ok' => true, 'archived' => $on]);
 }
 
 /* ---------- 标记已读 ---------- */
@@ -541,16 +608,20 @@ function handle_agent_poll(string $method): void
     $ctx = require_workspace();
     $pdo = db();
     $cfg = config();
-    $onlineSql = "CASE WHEN s.status = 'closed' THEN 'closed'
+    // 已结束会话自动清理（懒执行；closed_keep_days=0 永久保留）
+    try { cleanup_closed_sessions($ctx['tenant_id']); } catch (\Throwable $e) {}
+    $scope = in_array((string)input('scope', 'online'), ['online', 'archived', 'closed'], true) ? (string)input('scope', 'online') : 'online';
+    $onlineSql = "CASE WHEN s.status IN ('closed','archived') THEN s.status
         WHEN s.last_online_at IS NOT NULL AND s.last_online_at > DATE_SUB(NOW(), INTERVAL " . (int)$cfg['session_online_secs'] . " SECOND) THEN 'online'
         ELSE 'offline' END";
     $st = $pdo->prepare("SELECT s.id, s.agent_id, a.nickname AS agent_name, s.visitor_name AS name,
         (SELECT value FROM contacts WHERE session_id = s.id AND type = 'note' LIMIT 1) AS note,
         s.ip, s.from_url AS `from`, s.last_msg AS lastMsg, s.last_time AS lastTime, s.unread, s.source, s.geo, s.ua,
+        s.archived_at, s.closed_at,
         $onlineSql AS status,
         (SELECT COUNT(*) FROM messages WHERE session_id = s.id) AS message_count
         FROM v_sessions s LEFT JOIN agents a ON a.id = s.agent_id AND a.tenant_id = s.tenant_id
-        WHERE s.tenant_id = ? AND s.status != 'closed'" . session_visible_sql($ctx) . "
+        WHERE s.tenant_id = ?" . session_scope_sql($scope) . session_visible_sql($ctx) . "
         ORDER BY s.last_time DESC LIMIT 500");
     $st->execute([$ctx['tenant_id']]);
     $sessions = [];
@@ -566,6 +637,24 @@ function handle_agent_poll(string $method): void
         unset($r['ua']);
         $sessions[] = $r;
     }
+    // 各分区计数（tab 徽标 + 未读提示）
+    $vis = session_visible_sql($ctx);
+    $cnt = $pdo->prepare("SELECT
+        SUM(status NOT IN ('closed','archived')) AS online_cnt,
+        SUM(status = 'archived') AS archived_cnt,
+        SUM(status = 'closed') AS closed_cnt,
+        COALESCE(SUM(CASE WHEN status NOT IN ('closed','archived') THEN unread ELSE 0 END), 0) AS online_unread,
+        COALESCE(SUM(CASE WHEN status = 'archived' THEN unread ELSE 0 END), 0) AS archived_unread
+        FROM v_sessions s WHERE s.tenant_id = ?" . $vis);
+    $cnt->execute([$ctx['tenant_id']]);
+    $c = $cnt->fetch() ?: [];
+    $counts = [
+        'online' => (int)($c['online_cnt'] ?? 0),
+        'archived' => (int)($c['archived_cnt'] ?? 0),
+        'closed' => (int)($c['closed_cnt'] ?? 0),
+        'online_unread' => (int)($c['online_unread'] ?? 0),
+        'archived_unread' => (int)($c['archived_unread'] ?? 0),
+    ];
 
     $msgs = [];
     $readUpto = 0;
@@ -605,5 +694,5 @@ function handle_agent_poll(string $method): void
             }
         }
     } catch (\Throwable $e) { /* 地理补查失败不影响轮询 */ }
-    json_out(['sessions' => $sessions, 'messages' => $msgs, 'readUpto' => $readUpto, 'recalledIds' => $recalledIds, 'now' => time()]);
+    json_out(['sessions' => $sessions, 'messages' => $msgs, 'readUpto' => $readUpto, 'recalledIds' => $recalledIds, 'now' => time(), 'counts' => $counts]);
 }

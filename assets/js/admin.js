@@ -41,7 +41,7 @@ createApp({
     const dlgVisible = ref(false);
     const dlgMode = ref('create');
     const dlgSaving = ref(false);
-    const dlg = reactive({ id: 0, kami: '', nickname: '', expires_at: null, quota_web: 200, quota_app: 200, max_agents: 5, remark: '', password: '' });
+    const dlg = reactive({ id: 0, kami: '', nickname: '', expires_at: null, quota_web: 200, quota_app: 200, max_agents: 5, closed_keep_days: 3, max_sessions: 1000, remark: '', password: '' });
     const createdVisible = ref(false);
     const created = reactive({ kami: '', password: '' });
     const genVisible = ref(false);
@@ -49,12 +49,12 @@ createApp({
 
     const openCreate = () => {
       dlgMode.value = 'create';
-      Object.assign(dlg, { id: 0, kami: '', nickname: '', expires_at: null, quota_web: defVal.default_quota_web, quota_app: defVal.default_quota_app, max_agents: defVal.default_max_agents, remark: '', password: '' });
+      Object.assign(dlg, { id: 0, kami: '', nickname: '', expires_at: null, quota_web: defVal.default_quota_web, quota_app: defVal.default_quota_app, max_agents: defVal.default_max_agents, closed_keep_days: 3, max_sessions: 1000, remark: '', password: '' });
       dlgVisible.value = true;
     };
     const openEdit = (row) => {
       dlgMode.value = 'edit';
-      Object.assign(dlg, { id: row.id, kami: row.kami, nickname: row.nickname, expires_at: row.expires_at, quota_web: row.quota_web, quota_app: row.quota_app, max_agents: row.max_agents, remark: row.remark, password: '' });
+      Object.assign(dlg, { id: row.id, kami: row.kami, nickname: row.nickname, expires_at: row.expires_at, quota_web: row.quota_web, quota_app: row.quota_app, max_agents: row.max_agents, closed_keep_days: row.closed_keep_days != null ? row.closed_keep_days : 3, max_sessions: row.max_sessions != null ? row.max_sessions : 0, remark: row.remark, password: '' });
       dlgVisible.value = true;
     };
     const fillGenKami = async () => {

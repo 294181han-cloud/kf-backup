@@ -58,6 +58,7 @@ function tenant_out(array $t, ?int $sessions = null): array
         'id' => (int)$t['id'], 'kami' => $t['kami'], 'nickname' => $t['nickname'], 'remark' => $t['remark'],
         'status' => $t['status'], 'expires_at' => $t['expires_at'],
         'quota_web' => (int)$t['quota_web'], 'quota_app' => (int)$t['quota_app'], 'max_agents' => (int)$t['max_agents'],
+        'closed_keep_days' => (int)($t['closed_keep_days'] ?? 3), 'max_sessions' => (int)($t['max_sessions'] ?? 0),
         'created_at' => $t['created_at'], 'last_login_at' => $t['last_login_at'],
         'expired' => $t['expires_at'] && strtotime($t['expires_at']) < time(),
         'sessions' => $sessions,
@@ -102,6 +103,8 @@ function handle_admin_tenants(string $method): void
         $quotaWeb = max(0, (int)($data['quota_web'] ?? kv_get('default_quota_web', '200')));
         $quotaApp = max(0, (int)($data['quota_app'] ?? kv_get('default_quota_app', '200')));
         $maxAgents = max(0, min(50, (int)($data['max_agents'] ?? kv_get('default_max_agents', '5'))));
+        $closedKeepDays = max(0, min(3650, (int)($data['closed_keep_days'] ?? 3)));   // 已结束保留天数（0=永久）
+        $maxSessions = max(0, (int)($data['max_sessions'] ?? 1000));                  // 会话总数额度（0=不限）
         $expires = null;
         if (!empty($data['expires_at'])) {
             $ts = strtotime((string)$data['expires_at']);
@@ -109,8 +112,8 @@ function handle_admin_tenants(string $method): void
             $expires = date('Y-m-d H:i:s', $ts);
         }
 
-        $pdo->prepare('INSERT INTO tenants (kami, password_hash, nickname, remark, expires_at, quota_web, quota_app, max_agents) VALUES (?,?,?,?,?,?,?,?)')
-            ->execute([$kami, password_hash($password, PASSWORD_DEFAULT), $nickname, $remark, $expires, $quotaWeb, $quotaApp, $maxAgents]);
+        $pdo->prepare('INSERT INTO tenants (kami, password_hash, nickname, remark, expires_at, quota_web, quota_app, max_agents, closed_keep_days, max_sessions) VALUES (?,?,?,?,?,?,?,?,?,?)')
+            ->execute([$kami, password_hash($password, PASSWORD_DEFAULT), $nickname, $remark, $expires, $quotaWeb, $quotaApp, $maxAgents, $closedKeepDays, $maxSessions]);
         $id = (int)$pdo->lastInsertId();
 
         json_out(['ok' => true,
@@ -152,8 +155,8 @@ function handle_admin_tenants_id(string $method, int $id): void
             $v = in_array($data['status'], ['active', 'banned'], true) ? $data['status'] : 'active';
             $set[] = 'status = ?'; $vals[] = $v;
         }
-        foreach (['quota_web', 'quota_app', 'max_agents'] as $f) {
-            if (array_key_exists($f, $data)) { $set[] = "$f = ?"; $vals[] = max(0, (int)$data[$f]); }
+        foreach (['quota_web', 'quota_app', 'max_agents', 'closed_keep_days', 'max_sessions'] as $f) {
+            if (array_key_exists($f, $data)) { $set[] = "$f = ?"; $vals[] = max(0, min(3650, (int)$data[$f])); }
         }
         if (array_key_exists('expires_at', $data)) {
             $ev = trim((string)$data['expires_at']);

@@ -56,6 +56,12 @@ function ensure_upgrade(): void
         try { $pdo->exec("ALTER TABLE v_sessions ADD COLUMN visitor_avatar VARCHAR(255) NOT NULL DEFAULT ''"); } catch (\Throwable $e) { /* 列已存在 */ }
         try { $pdo->exec("UPDATE v_sessions SET geo = '' WHERE geo LIKE '%|%'"); } catch (\Throwable $e) { /* 旧英文格式清空 */ }
         try { $pdo->exec("ALTER TABLE v_sessions ADD COLUMN geo VARCHAR(150) NOT NULL DEFAULT ''"); } catch (\Throwable $e) { /* 列已存在 */ }
+        // v2.25 三级会话：已结束会话自动清理时间 + 归档时间；租户级会话总数上限
+        try { $pdo->exec("ALTER TABLE tenants ADD COLUMN closed_keep_days INT UNSIGNED NOT NULL DEFAULT 3"); } catch (\Throwable $e) { /* 列已存在 */ }
+        try { $pdo->exec("ALTER TABLE tenants ADD COLUMN max_sessions INT UNSIGNED NOT NULL DEFAULT 0"); } catch (\Throwable $e) { /* 列已存在（0=不限，存量租户默认不限） */ }
+        try { $pdo->exec("ALTER TABLE v_sessions ADD COLUMN closed_at DATETIME NULL"); } catch (\Throwable $e) { /* 列已存在 */ }
+        try { $pdo->exec("ALTER TABLE v_sessions ADD COLUMN archived_at DATETIME NULL"); } catch (\Throwable $e) { /* 列已存在 */ }
+        try { $pdo->exec("ALTER TABLE v_sessions ADD INDEX idx_status_time (tenant_id, status, last_time)"); } catch (\Throwable $e) { /* 已存在 */ }
     } catch (\Throwable $e) { /* 忽略 */ }
 }
 try { ensure_installed(); } catch (\Throwable $e) { /* 初始化失败由后续请求重试 */ }
@@ -159,6 +165,7 @@ function dispatch_api(string $method, string $uri): void
     if (preg_match('#^/api/sessions/(\d+)/messages$#', $uri, $m))  handle_session_messages($method, $m);
     if (preg_match('#^/api/sessions/(\d+)/name$#', $uri, $m))      handle_session_rename($method, $m);
     if (preg_match('#^/api/sessions/(\d+)/close$#', $uri, $m))     handle_session_close($method, $m);
+    if (preg_match('#^/api/sessions/(\d+)/archive$#', $uri, $m))   handle_session_archive($method, $m);
     if (preg_match('#^/api/sessions/(\d+)/read$#', $uri, $m))      handle_session_read($method, $m);
     if (preg_match('#^/api/sessions/(\d+)/transfer$#', $uri, $m))  handle_session_transfer($method, $m);
     if (preg_match('#^/api/sessions/(\d+)/block$#', $uri, $m))   handle_session_block($method, $m);
