@@ -371,7 +371,7 @@ const app = createApp({
       const tryOpen = () => {
         tries++;
         try {
-          const rows = document.querySelectorAll('.crud-table .el-table__row');
+          const rows = document.querySelectorAll('.el-table__row');
           for (const row of rows) {
             if ((row.textContent || '').includes(q.title)) {
               const btn = Array.from(row.querySelectorAll('button')).find(b => b.textContent.trim() === '编辑');
