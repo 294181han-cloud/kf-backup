@@ -1019,7 +1019,13 @@ const app = createApp({
       Object.assign(posterCfg, saved);
       for (const k of Object.keys(POSTER_DEFAULT)) if (posterCfg[k] === undefined) posterCfg[k] = POSTER_DEFAULT[k];
     } catch (e) {}
-    Vue.watch(posterCfg, () => { try { localStorage.setItem('kfxt_code_poster', JSON.stringify(posterCfg)); } catch (e) {} renderPreset(); }, { deep: true });
+    Vue.watch(posterCfg, () => {
+      try { localStorage.setItem('kfxt_code_poster', JSON.stringify(posterCfg)); } catch (e) {}
+      // 仅在风格切换瞬间填充默认值（避免用户手动清空又被自动补回）
+      if (posterCfg.style !== presetLastStyle) { presetLastStyle = posterCfg.style; fillPresetDefaults(); }
+      renderPreset();
+    }, { deep: true });
+    let presetLastStyle = posterCfg.style;
     // ===== 风格预设渲染（wechat / ticket）：canvas 成图，预览即下载内容 =====
     const presetPng = ref('');
     const renderPreset = () => new Promise((res) => {
