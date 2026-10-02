@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>客服工作台</title>
 <link rel="stylesheet" href="/assets/vendor/element-plus.css">
-<link rel="stylesheet" href="/assets/css/app.css?v=2.9.1">
+<link rel="stylesheet" href="/assets/css/app.css?v=2.9.2">
 <script src="/assets/ui/ui-registry.js?v=2.6.0"></script>
 <script src="/assets/ui/ui-loader.js?v=2.6.0" data-ui-cat="auto"></script>
 </head>
@@ -66,9 +66,6 @@
         </template>
         <div class="nav-group">账 号</div>
         <div class="nav-item" :class="{active: tab==='profile'}" @click="tab='profile'"><span class="nv-ic">⚙️</span><span class="nv-text">个人设置</span></div>
-      </div>
-      <div class="side-tools" style="padding:10px 12px 4px;display:flex;align-items:center;justify-content:space-between;">
-        <span style="cursor:pointer;font-size:16px;" title="收起/展开菜单" @click="sideCollapsed = !sideCollapsed">{{ sideCollapsed ? '➡' : '⬅' }}</span>
       </div>
       <div class="me">
         <span style="cursor:pointer;display:inline-block;margin-bottom:6px;" @click="toggleDark">{{ dark ? '☀️ 浅色模式' : '🌙 深色模式' }}</span><br>
@@ -197,7 +194,14 @@
                       <span v-if="m.text">{{ m.text }}</span>
                       <template v-for="(a,i) in (m.attachments||[])" :key="i">
                         <img v-if="a.type==='image'" :src="a.url" @click="viewing=a.url">
-                        <audio v-if="a.type==='audio'" :src="a.url" controls></audio>
+                        <div v-if="a.type==='audio'" class="voice-bubble" :class="{playing: audioPlaying===a.url}" @click.stop="toggleAudio(a.url)">
+                          <span class="vb-play">
+                            <svg v-if="audioPlaying!==a.url" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5.5v13l11-6.5z"/></svg>
+                            <svg v-else viewBox="0 0 24 24" fill="currentColor"><rect x="7" y="5.5" width="3.4" height="13" rx="1.2"/><rect x="13.6" y="5.5" width="3.4" height="13" rx="1.2"/></svg>
+                          </span>
+                          <span class="vb-wave"><i v-for="(h, wi) in waveBars(a.url)" :key="wi" :style="{height: h + 'px'}"></i></span>
+                          <span class="vb-sec">{{ audioDur[a.url] ? audioDur[a.url] + '″' : '' }}</span>
+                        </div>
                       </template>
                     </div>
                     <div class="msg-time">
@@ -1243,7 +1247,7 @@
 <script src="/assets/qr-poster.js?v=2.1.03"></script>
 <script src="/assets/api.js?v=2.0.1"></script>
 <script src="/assets/js/app-components.js?v=2.1.0"></script>
-<script src="/assets/js/app.js?v=2.9.1"></script>
+<script src="/assets/js/app.js?v=2.9.2"></script>
 <script src="/assets/js/app-boot.js?v=2.1.1"></script>
 </body>
 </html>

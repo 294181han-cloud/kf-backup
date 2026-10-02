@@ -140,6 +140,7 @@ createApp({
           if (m.from === 'agent') gotAgent = true;   // 客服新消息 → 接收提示音
         }
       }
+      prefetchAudio(list);
       if (added) scrollBottom();
       if (gotAgent && snd.recv_on) playSnd(snd.recv_which);
     };
@@ -463,6 +464,39 @@ createApp({
       toastTimer = setTimeout(() => { toastMsg.value = ''; }, 1800);
     };
 
+    // ===== 语音气泡（播放键 + 波形 + 秒数，替代原生 audio 控件）=====
+    const audioPlaying = ref('');
+    const audioDur = reactive({});
+    let curAudio = null;
+    // 固定长度的伪波形（按 url 生成，稳定不变）
+    const waveBars = (url) => {
+      let h = 0; const s = String(url || '');
+      for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) % 9973;
+      const out = [];
+      for (let i = 0; i < 14; i++) { h = (h * 1103515245 + 12345) % 2147483648; out.push(6 + (h % 14)); }
+      return out;
+    };
+    const prefetchAudio = (list) => {
+      (list || []).forEach(m => (m.attachments || []).forEach(a => {
+        if (a.type !== 'audio' || audioDur[a.url] != null) return;
+        audioDur[a.url] = 0;
+        try {
+          const el = new Audio(); el.preload = 'metadata'; el.src = a.url;
+          el.onloadedmetadata = () => { audioDur[a.url] = Math.max(1, Math.round(el.duration || 0)); };
+        } catch (e) {}
+      }));
+    };
+    const toggleAudio = (url) => {
+      try {
+        if (curAudio && audioPlaying.value === url) { curAudio.pause(); audioPlaying.value = ''; return; }
+        if (curAudio) { try { curAudio.pause(); } catch (e) {} }
+        curAudio = new Audio(url);
+        curAudio.onloadedmetadata = () => { audioDur[url] = Math.max(1, Math.round(curAudio.duration || 0)); };
+        curAudio.onended = () => { audioPlaying.value = ''; };
+        curAudio.play().then(() => { audioPlaying.value = url; }).catch(() => { audioPlaying.value = ''; toast('播放失败，请重试'); });
+      } catch (e) { toast('播放失败'); }
+    };
+
     // ===== 首屏快捷提问 =====
     const SUGGEST = ['你好，在吗？', '我想咨询一下', '怎么联系你们？'];
     const suggest = (t) => {
@@ -580,6 +614,7 @@ createApp({
       send, pickImage, onImage, fmtTime, scrollBottom, onlineText, isImg, visibleMessages, navTitle, canRecall, recallMine,
       needDaySep, dayText,
       atBottom, onBodyScroll, scrollBottomNow, onDraftInput,
+      audioPlaying, audioDur, waveBars, toggleAudio,
       ui, robotType, verifyTitle, verifyBg, verifyPassed, verifyValue, verifyErr, codeText, codeInput,
       genCode, codeVerify, verifyGo, slideStart, slideMove, slideEnd, doEnter,
       pubShow, pubTitle, pubContent, linkMode, linkSegs, copyLink, myAvatar,

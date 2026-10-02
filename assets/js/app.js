@@ -302,6 +302,7 @@ const app = createApp({
         if (r.messages && r.messages.length) {
           const fresh = r.messages.filter(m => !msgs.value.some(x => x.id === m.id)); // 去重防重复显示
           msgs.value.push(...fresh);
+          prefetchAudio(r.messages);
           // 关键：推进"已拉取到的最大 id"，否则同一条消息每次轮询都被当成新消息（会一直响）
           const lastId = r.messages[r.messages.length - 1].id;
           if (lastId > maxMsgId.value) maxMsgId.value = lastId;
@@ -446,6 +447,7 @@ const app = createApp({
       try {
         const r = await API.get('/api/sessions/' + id + '/messages');
         msgs.value = r.messages || [];
+        prefetchAudio(msgs.value);
         if (msgs.value.length) maxMsgId.value = msgs.value[msgs.value.length - 1].id;
         scrollBottom();
         markRead(id);
@@ -565,6 +567,38 @@ const app = createApp({
     // ===== 已读回执 =====
     const readUpto = ref(0);
     const isRead = (m) => m.id <= readUpto.value;
+
+    // ===== 语音气泡（播放键 + 波形 + 秒数，替代原生 audio 控件）=====
+    const audioPlaying = ref('');
+    const audioDur = reactive({});
+    let curAudio = null;
+    const waveBars = (url) => {
+      let h = 0; const s = String(url || '');
+      for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) % 9973;
+      const out = [];
+      for (let i = 0; i < 14; i++) { h = (h * 1103515245 + 12345) % 2147483648; out.push(6 + (h % 14)); }
+      return out;
+    };
+    const prefetchAudio = (list) => {
+      (list || []).forEach(m => (m.attachments || []).forEach(a => {
+        if (a.type !== 'audio' || audioDur[a.url] != null) return;
+        audioDur[a.url] = 0;
+        try {
+          const el = new Audio(); el.preload = 'metadata'; el.src = a.url;
+          el.onloadedmetadata = () => { audioDur[a.url] = Math.max(1, Math.round(el.duration || 0)); };
+        } catch (e) {}
+      }));
+    };
+    const toggleAudio = (url) => {
+      try {
+        if (curAudio && audioPlaying.value === url) { curAudio.pause(); audioPlaying.value = ''; return; }
+        if (curAudio) { try { curAudio.pause(); } catch (e) {} }
+        curAudio = new Audio(url);
+        curAudio.onloadedmetadata = () => { audioDur[url] = Math.max(1, Math.round(curAudio.duration || 0)); };
+        curAudio.onended = () => { audioPlaying.value = ''; };
+        curAudio.play().then(() => { audioPlaying.value = url; }).catch(() => { audioPlaying.value = ''; });
+      } catch (e) {}
+    };
 
     // ===== 可见消息（撤回的显示为系统胶囊） =====
     const visibleMsgs = Vue.computed(() => msgs.value);
@@ -1745,6 +1779,7 @@ const app = createApp({
       quickFields, welcomeFields, autoFields, blFields, preqFields,
       shortTime, fmtTime, sourceText, contactLabel, barW, quotaW,
       sessIcon,
+      audioPlaying, audioDur, waveBars, toggleAudio,
       openSession, send, onKey, useQuick, sendQuick, quickClick, onImage, startRec, stopRec, closeSession, doTransfer,
       pendingAtts, rmPendingAtt, quickCtx, openQuickCtx, editQuick,
       imgZoom, imgRot, imgWheel, downloadImage,
