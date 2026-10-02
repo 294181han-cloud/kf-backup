@@ -393,10 +393,17 @@ function handle_visitor_messages(string $method): void
     $since = (int)input('since', 0);
     if (!$sid) json_error('缺少 session_id');
     $pdo = db();
-    $sql = 'SELECT id, session_id, from_type AS `from`, sender_name, text, msg_type, attachments, recalled_at, created_at FROM messages WHERE session_id = ?' . ($since > 0 ? ' AND id > ?' : '') . ' ORDER BY id ASC';
+    $sql = 'SELECT id, session_id, from_type AS `from`, sender_name, text, msg_type, attachments, recalled_at, read_at, created_at FROM messages WHERE session_id = ?' . ($since > 0 ? ' AND id > ?' : '') . ' ORDER BY id ASC';
     $st = $pdo->prepare($sql);
     $st->execute($since > 0 ? [$sid, $since] : [$sid]);
-    json_out(['messages' => array_map('to_msg', $st->fetchAll())]);
+    // 访客自己的消息带上「客服是否已读」回执（read_at 由客服端打开会话时写入）
+    $rows = $st->fetchAll();
+    $msgs = array_map(function ($r) {
+        $m = to_msg($r);
+        if (($m['from'] ?? '') === 'visitor') $m['read'] = !empty($r['read_at']);
+        return $m;
+    }, $rows);
+    json_out(['messages' => $msgs]);
 }
 
 /* ---------- POST /api/visitor/upload ---------- */
@@ -460,9 +467,15 @@ function handle_visitor_poll(string $method): void
         }
         if ($agentAvatar === '') $agentAvatar = (string)ts_get($tid2, 'brand_avatar', '💬');
     }
-    $st = $pdo->prepare('SELECT id, session_id, from_type AS `from`, sender_name, text, msg_type, attachments, recalled_at, created_at FROM messages WHERE session_id = ? AND id > ? ORDER BY id ASC');
+    $st = $pdo->prepare('SELECT id, session_id, from_type AS `from`, sender_name, text, msg_type, attachments, recalled_at, read_at, created_at FROM messages WHERE session_id = ? AND id > ? ORDER BY id ASC');
     $st->execute([$sid, $sinceMsg]);
-    json_out(['messages' => array_map('to_msg', $st->fetchAll()), 'recalledIds' => $recalledIds,
+    $rows2 = $st->fetchAll();
+    $msgs2 = array_map(function ($r) {
+        $m = to_msg($r);
+        if (($m['from'] ?? '') === 'visitor') $m['read'] = !empty($r['read_at']);
+        return $m;
+    }, $rows2);
+    json_out(['messages' => $msgs2, 'recalledIds' => $recalledIds,
         'agent_avatar' => $agentAvatar, 'session_status' => $sessStatus, 'now' => time()]);
 }
 /* ---------- POST /api/visitor/send ---------- */

@@ -244,6 +244,8 @@ function handle_tenant_settings(string $method): void
             'code_nickname_on' => ts_get($tid, 'code_nickname_on', '1') === '1',
             'code_support_on' => ts_get($tid, 'code_support_on', '1') === '1',
             'footer_text'     => ts_get($tid, 'footer_text', ''),
+            // 「请求访客上传图片」话术（客服在工作台点该按钮时发给访客的文案）
+            'ask_image_text'  => ts_get($tid, 'ask_image_text', '方便的话，请上传一下相关图片，帮您更快定位问题～'),
             // 公告（访客端顶部横幅）
             'notice_on'      => ts_get($tid, 'notice_on', '0') === '1',
             'notice_text'    => ts_get($tid, 'notice_text', ''),
@@ -292,6 +294,7 @@ function handle_tenant_settings(string $method): void
             'link_mode' => '链接模式', 'user_head_type' => '访客头像类型', 'user_head' => '自定义访客头像',
             'user_name_type' => '访客名称类型', 'publicity_title' => '弹窗公告标题', 'publicity_content' => '弹窗公告内容',
             'inform_text' => '滚动通知文案', 'tpl_nav_title' => '导航栏标题', 'vip_badge' => 'VIP标识', 'footer_text' => '底部标识',
+            'ask_image_text' => '请求上传图片话术',
             // 声音选择（v2.27）：water 水滴 / pling / weixin 微信 / dindon / click 点击
             'agent_snd_recv_which' => '客服端接收提示音', 'agent_snd_send_which' => '客服端发送提示音',
             'visitor_snd_recv_which' => '访客端接收提示音', 'visitor_snd_send_which' => '访客端发送提示音'];

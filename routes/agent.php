@@ -147,7 +147,11 @@ function handle_session_messages(string $method, array $m): void
         $allowTypes = ['text', 'image', 'audio', 'mixed', 'ask_image'];
         $reqType = in_array($reqType, $allowTypes, true) ? $reqType : '';
         $isAsk = ($reqType === 'ask_image');
-        if ($isAsk && $text === '') $text = '方便的话，请上传一下相关图片，帮您更快定位问题～';
+        // 「请求访客上传图片」的默认话术：租户可在「访客策略 → 聊天话术」里自定义（留空则用内置默认）
+        if ($isAsk && $text === '') {
+            $askTxt = trim((string)ts_get((int)$ctx['tenant_id'], 'ask_image_text', ''));
+            $text = $askTxt !== '' ? $askTxt : '方便的话，请上传一下相关图片，帮您更快定位问题～';
+        }
         if ($text === '' && !$attachArr) json_error('消息不能为空');
 
         // 记录前先取会话（拿 agent_id 判断接手）

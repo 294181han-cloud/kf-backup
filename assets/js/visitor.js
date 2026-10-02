@@ -339,7 +339,7 @@ createApp({
 
     // ---- 录音 ----
     const startRec = async () => {
-      if (!navigator.mediaDevices || !window.MediaRecorder) { alert('当前浏览器不支持录音，请使用文字沟通'); return; }
+      if (!navigator.mediaDevices || !window.MediaRecorder) { alert('当前浏览器不支持录音，请使用文字沟通'); return false; }
       try {
         // 优先 mp4（iOS 微信兼容），否则 webm
         let mime = '';
@@ -377,8 +377,10 @@ createApp({
           recSecs.value = Math.floor((Date.now() - recStartAt) / 1000);
           if (recSecs.value >= 60) stopRec(true);
         }, 500);
+        return true;
       } catch (e) {
         alert('无法获取麦克风权限，请使用文字沟通');
+        return false;
       }
     };
     let recSendFlag = false;
@@ -388,6 +390,69 @@ createApp({
       clearInterval(recTimer);
       recording.value = false;
       try { mediaRecorder.stop(); } catch (e) {}
+    };
+
+    // ===== 语音：按住说话（微信式，松开发送 / 上滑取消）=====
+    const voiceMode = ref(false);
+    const holding = ref(false);
+    const holdSecs = ref(0);
+    const holdCancel = ref(false);
+    let holdTimer = null, holdY0 = 0;
+    let holdPressed = false;   // 手指是否仍按住（麦克风授权期间可能已松手）
+    const toggleVoice = () => {
+      voiceMode.value = !voiceMode.value;
+      if (!voiceMode.value) nextTick(() => { if (inputRef.value) inputRef.value.focus(); });
+    };
+    const startHold = async (e) => {
+      if (holding.value || holdPressed) return;
+      holdPressed = true;
+      // 捕获指针：手指移出按钮也能收到 pointerup
+      try { if (e.target && e.target.setPointerCapture && e.pointerId != null) e.target.setPointerCapture(e.pointerId); } catch (err) {}
+      const t = (e.touches && e.touches[0]) ? e.touches[0] : e;
+      holdY0 = t.clientY;
+      holdCancel.value = false;
+      const ok = await startRec();
+      if (!ok) { holdPressed = false; voiceMode.value = false; return; }
+      // 权限弹窗期间用户已经松手 → 直接取消这次录音，避免"松手后还在录"
+      if (!holdPressed) { stopRec(false); return; }
+      holding.value = true;
+      holdSecs.value = 0;
+      clearInterval(holdTimer);
+      holdTimer = setInterval(() => { holdSecs.value = Math.floor((Date.now() - recStartAt) / 1000); }, 200);
+    };
+    const moveHold = (e) => {
+      if (!holding.value) return;
+      const t = (e.touches && e.touches[0]) ? e.touches[0] : e;
+      holdCancel.value = (holdY0 - t.clientY) > 56;   // 上滑 56px 进入取消
+    };
+    const endHold = () => {
+      holdPressed = false;
+      if (!holding.value) return;
+      clearInterval(holdTimer);
+      const secs = Math.floor((Date.now() - recStartAt) / 1000);
+      const tooShort = secs < 1;
+      const cancel = holdCancel.value || tooShort;
+      holding.value = false;
+      holdCancel.value = false;
+      stopRec(!cancel);
+      if (tooShort && !holdCancel.value) toast('说话时间太短');
+    };
+
+    // ===== 轻提示 =====
+    const toastMsg = ref('');
+    let toastTimer = null;
+    const toast = (t) => {
+      toastMsg.value = t;
+      clearTimeout(toastTimer);
+      toastTimer = setTimeout(() => { toastMsg.value = ''; }, 1800);
+    };
+
+    // ===== 首屏快捷提问 =====
+    const SUGGEST = ['你好，在吗？', '我想咨询一下', '怎么联系你们？'];
+    const suggest = (t) => {
+      voiceMode.value = false;
+      draft.value = t;
+      nextTick(() => { if (inputRef.value) inputRef.value.focus(); scrollBottom(); });
     };
 
     const viewImage = (url) => { viewing.value = url; };
@@ -480,6 +545,8 @@ createApp({
       bodyRef, inputRef, imgInput, viewing, viewImage,
       showForm, formItems, formValues, formSubmitting, submitForm,
       recording, recSecs, startRec, stopRec,
+      voiceMode, holding, holdSecs, holdCancel, toggleVoice, startHold, moveHold, endHold,
+      toastMsg, SUGGEST, suggest,
       send, pickImage, onImage, fmtTime, scrollBottom, onlineText, isImg, visibleMessages, navTitle, canRecall, recallMine,
       ui, robotType, verifyTitle, verifyBg, verifyPassed, verifyValue, verifyErr, codeText, codeInput,
       genCode, codeVerify, verifyGo, slideStart, slideMove, slideEnd, doEnter,

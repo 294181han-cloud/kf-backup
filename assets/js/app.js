@@ -230,6 +230,7 @@ const app = createApp({
           vip_badge: b.vip_badge || '', footer_text: b.footer_text || '',
           closed_keep_days: b.closed_keep_days != null ? b.closed_keep_days : 3,
           max_sessions: b.max_sessions != null ? b.max_sessions : 0,
+          ask_image_text: b.ask_image_text || '方便的话，请上传一下相关图片，帮您更快定位问题～',
         });
         Object.assign(sndCfg, {
           agent_recv_on: b.agent_snd_recv_on !== false,
@@ -341,7 +342,8 @@ const app = createApp({
       if (!currentId.value || sending.value) return;
       sending.value = true;
       try {
-        const r = await API.post('/api/sessions/' + currentId.value + '/messages', { text: '', msg_type: 'ask_image' });
+        const text = (pol.ask_image_text || '').trim();
+        const r = await API.post('/api/sessions/' + currentId.value + '/messages', { text, msg_type: 'ask_image' });
         msgs.value.push(r.message);
         maxMsgId.value = r.message.id;
         scrollBottom();
@@ -506,7 +508,7 @@ const app = createApp({
       } catch (e) { ElementPlus.ElMessage.error(e.message); }
     };
     const startRec = async () => {
-      if (!navigator.mediaDevices || !window.MediaRecorder) { ElementPlus.ElMessage.warning('当前浏览器不支持录音'); return; }
+      if (!navigator.mediaDevices || !window.MediaRecorder) { ElementPlus.ElMessage.warning('当前浏览器不支持录音'); return false; }
       try {
         let mime = '';
         for (const m of ['audio/mp4', 'audio/webm;codecs=opus', 'audio/webm']) { if (MediaRecorder.isTypeSupported(m)) { mime = m; break; } }
@@ -529,7 +531,8 @@ const app = createApp({
         mediaRecorder.start();
         recording.value = true; recSecs.value = 0; recStartAt = Date.now();
         recTimer = setInterval(() => { recSecs.value = Math.floor((Date.now() - recStartAt) / 1000); if (recSecs.value >= 60) stopRec(true); }, 500);
-      } catch (e) { ElementPlus.ElMessage.warning('无法获取麦克风权限'); }
+        return true;
+      } catch (e) { ElementPlus.ElMessage.warning('无法获取麦克风权限'); return false; }
     };
     const stopRec = (sendIt) => {
       if (!mediaRecorder) return;
@@ -537,6 +540,41 @@ const app = createApp({
       clearInterval(recTimer);
       recording.value = false;
       try { mediaRecorder.stop(); } catch (e) {}
+    };
+
+    // ===== 语音：按住说话（松开发送 / 上滑取消，与访客端一致）=====
+    const voiceHold = reactive({ on: false, cancel: false, secs: 0 });
+    let vhTimer = null, vhY0 = 0, vhPressed = false;
+    const startHoldVoice = async (e) => {
+      if (voiceHold.on || vhPressed) return;
+      if (!currentId.value) { ElementPlus.ElMessage.warning('请先选择会话'); return; }
+      vhPressed = true;
+      try { if (e.target && e.target.setPointerCapture && e.pointerId != null) e.target.setPointerCapture(e.pointerId); } catch (err) {}
+      const t = (e.touches && e.touches[0]) ? e.touches[0] : e;
+      vhY0 = t.clientY;
+      voiceHold.cancel = false;
+      const ok = await startRec();
+      if (!ok) { vhPressed = false; return; }
+      if (!vhPressed) { stopRec(false); return; }   // 授权弹窗期间已松手
+      voiceHold.on = true; voiceHold.secs = 0;
+      clearInterval(vhTimer);
+      vhTimer = setInterval(() => { voiceHold.secs = Math.floor((Date.now() - recStartAt) / 1000); }, 200);
+    };
+    const moveHoldVoice = (e) => {
+      if (!voiceHold.on) return;
+      const t = (e.touches && e.touches[0]) ? e.touches[0] : e;
+      voiceHold.cancel = (vhY0 - t.clientY) > 56;
+    };
+    const endHoldVoice = () => {
+      vhPressed = false;
+      if (!voiceHold.on) return;
+      clearInterval(vhTimer);
+      const tooShort = Math.floor((Date.now() - recStartAt) / 1000) < 1;
+      const explicit = voiceHold.cancel;
+      const cancel = explicit || tooShort;
+      voiceHold.on = false; voiceHold.cancel = false;
+      stopRec(!cancel);
+      if (tooShort && !explicit) ElementPlus.ElMessage.warning('说话时间太短');
     };
 
     // 会话操作
@@ -807,6 +845,8 @@ const app = createApp({
       closed_keep_days: 3, max_sessions: 0,
       publicity_on: false, publicity_title: '', publicity_content: '',
       inform_on: false, inform_text: '',
+      // 「请求访客上传图片」话术（可自定义）
+      ask_image_text: '方便的话，请上传一下相关图片，帮您更快定位问题～',
     });
     const uploadPolHead = async (ev) => {
       const file = ev.target.files[0];
@@ -1575,6 +1615,7 @@ const app = createApp({
       sessScope, sessCounts, archiveSession,
       ctxMenu, openCtxMenu, closeCtxMenu, ctxMenuArchive, ctxMenuClose, ctxMenuDelete,
       SOUND_OPTS, sndCfg, playSound, saveSnd,
+      voiceHold, startHoldVoice, moveHoldVoice, endHoldVoice,
       manageDlg, history, codeCfg, qrWrap, currentLink, renderMainQr,
       codeCanvas, logoFile, previewDlg, previewSrc, codeValue, codeStyle, codeCheck,
       checkChannel, checkChannelLabel,

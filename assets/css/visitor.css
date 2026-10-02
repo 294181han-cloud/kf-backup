@@ -449,3 +449,135 @@ body[data-tpl="whatsapp"] .v-tool-btn { background: rgba(255, 255, 255, .92); bo
 body[data-tpl="whatsapp"] .v-input-row .v-btn { box-shadow: 0 3px 10px rgba(0, 128, 105, .3); }
 .v-header { padding-top: calc(14px + env(safe-area-inset-top)); }
 .welcome-card h3 { letter-spacing: .2px; }
+
+/* =====================================================================
+   v2.35 访客端视觉升级：给「扫码进来咨询的人」一个更现代、更好用的界面
+   ===================================================================== */
+/* ---------- 头部 ---------- */
+.v-header { padding: 15px 16px; gap: 12px; box-shadow: 0 6px 20px rgba(6, 40, 32, .16); }
+.v-avatar {
+  width: 47px; height: 47px; font-size: 24px;
+  box-shadow: 0 6px 18px rgba(4, 30, 24, .25), inset 0 0 0 2px rgba(255, 255, 255, .55);
+}
+.v-id { flex: 1; min-width: 0; }
+.v-title { font-size: 16px; font-weight: 750; letter-spacing: .2px; }
+.v-sub {
+  font-size: 11.5px; opacity: .9; margin-top: 3px;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.v-status {
+  display: inline-flex; align-items: center; gap: 5px; flex-shrink: 0;
+  font-size: 11.5px; font-weight: 600; padding: 5px 11px; border-radius: 999px;
+  background: rgba(255, 255, 255, .2); border: 1px solid rgba(255, 255, 255, .34);
+  backdrop-filter: blur(6px);
+}
+.v-status .st-dot {
+  width: 7px; height: 7px; border-radius: 50%; background: #8df5b4;
+  box-shadow: 0 0 0 3px rgba(141, 245, 180, .26);
+}
+body[data-tpl="whatsapp"] .nav-bar {
+  background: linear-gradient(135deg, #008069, #00947c);
+  padding-bottom: 8px;
+}
+body[data-tpl="whatsapp"] .v-header { background: linear-gradient(135deg, #008069, #00947c); box-shadow: 0 8px 22px rgba(0, 88, 72, .22); }
+
+/* ---------- 首屏欢迎（含快捷提问） ---------- */
+.welcome-card {
+  max-width: 336px; padding: 26px 22px 20px; border-radius: 22px;
+  box-shadow: 0 20px 50px rgba(6, 40, 32, .13), inset 0 0 0 1px rgba(255, 255, 255, .6);
+}
+.welcome-card .w-ava {
+  width: 66px; height: 66px; font-size: 33px; margin-bottom: 14px;
+  box-shadow: 0 10px 24px rgba(6, 40, 32, .14), inset 0 0 0 3px #fff;
+}
+.welcome-card h3 { font-size: 17px; margin-bottom: 7px; }
+.welcome-card p { font-size: 12.5px; line-height: 1.65; }
+.w-chips { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; margin-top: 16px; }
+.w-chip {
+  border: 1px solid var(--line); background: #fff; color: var(--ink-2);
+  border-radius: 999px; padding: 7px 14px; font-size: 12.5px; cursor: pointer;
+  transition: all .16s ease; font-family: inherit;
+}
+.w-chip:hover, .w-chip:active {
+  border-color: color-mix(in srgb, var(--theme) 45%, #fff);
+  color: var(--theme); background: color-mix(in srgb, var(--theme) 7%, #fff);
+}
+.w-tip { display: flex; align-items: center; justify-content: center; gap: 6px; margin-top: 15px; font-size: 11px; color: var(--ink-3); }
+.w-tip i { width: 6px; height: 6px; border-radius: 50%; background: #2ee66b; box-shadow: 0 0 0 3px rgba(46, 230, 107, .18); }
+
+/* ---------- 气泡：时间收到气泡里（微信/WhatsApp 观感） ---------- */
+.b-time {
+  float: right; margin: 5px -2px -3px 10px;
+  font-size: 10.5px; opacity: .55; white-space: nowrap; user-select: none;
+}
+.b-time .b-tick { font-style: normal; margin-left: 3px; font-weight: 700; color: #2f8fe6; }
+.msg-row.visitor .b-time .b-tick { color: #0b7f66; }
+.msg-row { animation: msgIn .18s ease-out; }
+@keyframes msgIn { from { opacity: 0; transform: translateY(6px); } }
+.msg-time { margin-top: 3px; }
+
+/* ---------- 工具条 + 按住说话 ---------- */
+.v-tool { gap: 8px; padding: 0 2px 9px; }
+.v-tool-btn {
+  display: inline-flex; align-items: center; gap: 5px;
+  background: var(--card); border: 1px solid var(--line); border-radius: 999px;
+  padding: 7px 13px; font-size: 12.5px; color: var(--ink-2); cursor: pointer;
+  transition: all .16s ease; font-family: inherit;
+}
+.v-tool-btn svg { width: 17px; height: 17px; display: block; }
+.v-tool-btn:hover, .v-tool-btn:active { background: var(--bg); }
+.v-tool-btn.on {
+  color: var(--theme); border-color: color-mix(in srgb, var(--theme) 40%, #fff);
+  background: color-mix(in srgb, var(--theme) 8%, #fff);
+}
+.v-hold-row { padding: 2px 2px 4px; }
+.v-hold-btn {
+  width: 100%; height: 50px; border-radius: 15px;
+  border: 1px solid var(--line); background: var(--card); color: var(--ink-2);
+  font-size: 15px; font-weight: 650; font-family: inherit; cursor: pointer;
+  user-select: none; touch-action: none; transition: all .12s ease;
+}
+.v-hold-btn.on {
+  background: color-mix(in srgb, var(--theme) 12%, #fff);
+  border-color: color-mix(in srgb, var(--theme) 55%, #fff);
+  color: var(--theme); transform: scale(.99);
+}
+.v-hold-btn.cancel { background: #fdeeee; border-color: #f4c7c8; color: #e5484d; }
+body[data-tpl="whatsapp"] .v-hold-btn { background: rgba(255, 255, 255, .95); border-color: transparent; }
+
+/* 录音提示层 */
+.hold-tip {
+  position: fixed; left: 50%; bottom: 190px; transform: translateX(-50%); z-index: 60;
+  min-width: 196px; padding: 16px 22px 14px; border-radius: 20px; text-align: center;
+  background: rgba(16, 24, 32, .86); color: #fff; backdrop-filter: blur(9px);
+  box-shadow: 0 16px 44px rgba(0, 0, 0, .3);
+}
+.hold-tip.cancel { background: rgba(168, 44, 48, .92); }
+.ht-wave { display: flex; align-items: center; justify-content: center; gap: 3px; height: 26px; margin-bottom: 6px; }
+.ht-wave i { width: 4px; height: 8px; border-radius: 3px; background: #74eda8; animation: wave 1s infinite ease-in-out; }
+.ht-wave i:nth-child(2) { animation-delay: .1s; }
+.ht-wave i:nth-child(3) { animation-delay: .2s; }
+.ht-wave i:nth-child(4) { animation-delay: .3s; }
+.ht-wave i:nth-child(5) { animation-delay: .4s; }
+.ht-wave i:nth-child(6) { animation-delay: .5s; }
+.ht-wave i:nth-child(7) { animation-delay: .6s; }
+@keyframes wave { 0%, 100% { height: 7px; opacity: .7; } 50% { height: 24px; opacity: 1; } }
+.hold-tip.cancel .ht-wave i { background: #ffb3b5; }
+.ht-time { font-size: 23px; font-weight: 750; font-variant-numeric: tabular-nums; letter-spacing: .5px; }
+.ht-t { font-size: 11.5px; opacity: .82; margin-top: 3px; }
+
+/* 轻提示 */
+.v-toast {
+  position: fixed; left: 50%; top: 50%; transform: translate(-50%, -50%); z-index: 220;
+  background: rgba(16, 24, 32, .86); color: #fff; font-size: 13px;
+  padding: 10px 18px; border-radius: 11px; animation: fadeIn .15s;
+}
+
+/* 输入区更精致 */
+.v-input { background: #fff; box-shadow: 0 1px 3px rgba(6, 40, 32, .07); }
+.v-btn {
+  background: var(--theme-grad); border-radius: 999px; font-weight: 650;
+  box-shadow: 0 6px 16px color-mix(in srgb, var(--theme) 34%, transparent);
+}
+body[data-tpl="whatsapp"] .v-btn { box-shadow: 0 6px 16px rgba(0, 128, 105, .32); }
+.v-footer-wrap { box-shadow: 0 -8px 30px rgba(6, 40, 32, .10); }
