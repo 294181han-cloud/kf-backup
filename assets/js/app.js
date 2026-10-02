@@ -1060,7 +1060,8 @@ const app = createApp({
       renderPosterQr();
     };
     const renderCodeCard = () => { renderMainQr(); saveCodeStyle(); };
-    Vue.watch([currentLink, tab], renderMainQr);
+    // 切换/进入客服码页签时也查一次（服务端 5 分钟缓存，不会反复扣费）
+    Vue.watch([currentLink, tab], () => { renderMainQr(); if (tab.value === 'links') checkCode(false); });
 
     const codeExportCanvas = (scale) => {
       const c = document.createElement('canvas');
@@ -1110,7 +1111,7 @@ const app = createApp({
       if (!currentLink.value) { codeCheck.state = 'none'; codeCheck.text = '尚未生成'; codeCheck.tag = '未生成'; return; }
       codeCheck.loading = true;
       try {
-        const r = await API.post('/api/tenant/code/check', { force: force ? 1 : 0, channel: CODE_CHANNEL[codeStyle.logo] || 'wx' });
+        const r = (await API.post('/api/tenant/code/check', { force: force ? 1 : 0, channel: CODE_CHANNEL[codeStyle.logo] || 'wx' })) || {};
         codeCheck.state = r.state || 'err';
         codeCheck.text = r.text || '检测失败';
         codeCheck.tag = r.tag || codeCheck.text;
@@ -1363,7 +1364,7 @@ const app = createApp({
         if (links.value && links.value.domain_link) await API.post('/api/tenant/link/renew');
         else await API.post('/api/tenant/service-code');
         ElementPlus.ElMessage.success('已更换');
-        await loadLinks(); renderMainQr();
+        await loadLinks(); renderMainQr(); checkCode(true);
       } catch (e) { ElementPlus.ElMessage.error(e.message); }
     };
     const loadHistory = async () => {

@@ -402,12 +402,12 @@ body.dark .guide-step { border-color: #3a4048 !important; color: #c9cdd4; }
     .code-pill:hover { filter: brightness(.97); }
     .code-state { display: inline-flex; align-items: center; gap: 5px; font-size: 12px; border-radius: 999px; padding: 2px 10px;
                   border: 1px solid #dfe4ea; background: #f6f7f9; color: #6b7280; }
-    .code-state.st-ok, .code-state.st-idle { color: #0f9d58; background: #e8f7ef; border-color: #b9e6cd; }
-    .code-state.st-ok::before, .code-state.st-idle::before { content: "✓"; font-weight: 700; }
+    .code-state.st-ok { color: #0f9d58; background: #e8f7ef; border-color: #b9e6cd; }
+    .code-state.st-ok::before { content: "✓"; font-weight: 700; }
     .code-state.st-red { color: #e5484d; background: #fdeeee; border-color: #f4c7c8; font-weight: 600; }
     .code-state.st-red::before { content: "!"; font-weight: 700; }
     .code-state.st-off, .code-state.st-warn { color: #b26a00; background: #fff6e5; border-color: #f3ddac; }
-    .code-state.st-err, .code-state.st-none { color: #8a919c; }
+    .code-state.st-err, .code-state.st-none, .code-state.st-idle { color: #8a919c; }
     .cb-danger.el-button { color: #e5484d; border-color: #f4c7c8; background: #fff; }
 
     .code-panel { border: 1px solid #eef1f5; border-radius: 12px; padding: 14px 16px 16px; background: #fff; }
