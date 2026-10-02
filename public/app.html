@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>客服工作台</title>
 <link rel="stylesheet" href="/assets/vendor/element-plus.css">
-<link rel="stylesheet" href="/assets/css/app.css?v=2.3.1">
+<link rel="stylesheet" href="/assets/css/app.css?v=2.3.2">
 <script src="/assets/ui/ui-registry.js?v=2.5.1"></script>
 <script src="/assets/ui/ui-loader.js?v=2.5.1" data-ui-cat="auto"></script>
 </head>
@@ -382,24 +382,50 @@
             </div>
           </div>
 
-          <!-- ============ 推广海报：背景图 + 居中二维码 + 自定义上下文字 ============ -->
+          <!-- ============ 推广海报：背景图 + 二维码位置大小 + 文字独立定制 ============ -->
           <div class="poster-sec">
-            <div class="cip-title">推广海报<span style="font-weight:400;font-size:12px;color:#999;margin-left:8px;">可上传背景图，二维码居中，自定义上下文字</span></div>
+            <div class="cip-title">推广海报<span style="font-weight:400;font-size:12px;color:#999;margin-left:8px;">背景图 / 二维码位置大小 / 上下文字独立定制，所见即所得</span></div>
             <div class="poster-flex">
               <div class="poster-stage">
                 <img class="poster-bg" v-if="posterCfg.bgUrl" :src="posterCfg.bgUrl" alt="">
-                <div class="poster-card">
-                  <div class="poster-top-text" v-if="posterCfg.topText">{{ posterCfg.topText }}</div>
+                <div class="poster-qr-layer" v-if="posterCfg.cardOn" :style="qrLayerStyle"></div>
+                <div class="poster-qr-free" :style="qrFreeStyle">
                   <div class="poster-qr-box" ref="posterQrBox"></div>
-                  <div class="poster-bottom-text" v-if="posterCfg.bottomText">{{ posterCfg.bottomText }}</div>
                 </div>
+                <div class="poster-free-text" v-if="posterCfg.topText" :style="textStyle('top')">{{ posterCfg.topText }}</div>
+                <div class="poster-free-text" v-if="posterCfg.bottomText" :style="textStyle('bot')">{{ posterCfg.bottomText }}</div>
               </div>
               <div class="poster-ctrl">
+                <div class="cs-row"><span class="cs-label">二维码位置：</span>
+                  <div class="pos-grid">
+                    <button v-for="p in POSTER_POS" :key="p.v" type="button" class="pos-cell" :class="{on: posterCfg.qrPos===p.v}" :title="p.l" @click="posterCfg.qrPos=p.v">{{ p.l }}</button>
+                  </div>
+                </div>
+                <div class="cs-row"><span class="cs-label">二维码大小：</span>
+                  <el-slider v-model="posterCfg.qrScale" :min="10" :max="100" style="width:200px;margin-right:10px;"/>
+                  <el-checkbox v-model="posterCfg.cardOn" size="small">底衬白卡</el-checkbox>
+                </div>
                 <div class="cs-row"><span class="cs-label">上方文字：</span>
-                  <el-input v-model="posterCfg.topText" placeholder="二维码上方文字，如：扫码添加客服" maxlength="30" style="width:240px;"/>
+                  <el-input v-model="posterCfg.topText" placeholder="如：扫码添加客服" maxlength="30" style="width:170px;"/>
+                  <div class="pos-grid small">
+                    <button v-for="p in POSTER_POS" :key="'t'+p.v" type="button" class="pos-cell" :class="{on: posterCfg.topPos===p.v}" :title="'上文字：'+p.l" @click="posterCfg.topPos=p.v">{{ p.l }}</button>
+                  </div>
+                </div>
+                <div class="cs-row"><span class="cs-label">上字样式：</span>
+                  <el-input-number v-model="posterCfg.topSize" :min="16" :max="60" size="small" style="width:90px;"/>
+                  <el-color-picker v-model="posterCfg.topColor" size="small"/>
+                  <el-checkbox v-model="posterCfg.topBold" size="small">加粗</el-checkbox>
                 </div>
                 <div class="cs-row"><span class="cs-label">下方文字：</span>
-                  <el-input v-model="posterCfg.bottomText" placeholder="二维码下方文字，如：24 小时在线" maxlength="30" style="width:240px;"/>
+                  <el-input v-model="posterCfg.bottomText" placeholder="如：24 小时在线" maxlength="30" style="width:170px;"/>
+                  <div class="pos-grid small">
+                    <button v-for="p in POSTER_POS" :key="'b'+p.v" type="button" class="pos-cell" :class="{on: posterCfg.botPos===p.v}" :title="'下文字：'+p.l" @click="posterCfg.botPos=p.v">{{ p.l }}</button>
+                  </div>
+                </div>
+                <div class="cs-row"><span class="cs-label">下字样式：</span>
+                  <el-input-number v-model="posterCfg.botSize" :min="16" :max="60" size="small" style="width:90px;"/>
+                  <el-color-picker v-model="posterCfg.botColor" size="small"/>
+                  <el-checkbox v-model="posterCfg.botBold" size="small">加粗</el-checkbox>
                 </div>
                 <div class="cs-row"><span class="cs-label">背景图：</span>
                   <el-button size="small" @click="pickPosterBg">上传背景图</el-button>
@@ -409,7 +435,7 @@
                 <div class="cip-btns" style="text-align:left;">
                   <el-button size="small" type="primary" @click="downloadPoster2">下载海报</el-button>
                 </div>
-                <div class="cip-note" style="color:#999;">未上传背景时为白底海报；上传后背景铺满，二维码与文字居中显示</div>
+                <div class="cip-note" style="color:#999;">未上传背景时为白底海报；预览即最终效果，配置自动保存在本浏览器</div>
               </div>
             </div>
           </div>
@@ -965,7 +991,7 @@
 <script src="/assets/qr-poster.js?v=2.0.1"></script>
 <script src="/assets/api.js?v=2.0.1"></script>
 <script src="/assets/js/app-components.js?v=2.1.0"></script>
-<script src="/assets/js/app.js?v=2.3.3"></script>
-<script src="/assets/js/app-boot.js?v=2.1.0"></script>
+<script src="/assets/js/app.js?v=2.3.4"></script>
+<script src="/assets/js/app-boot.js?v=2.1.1"></script>
 </body>
 </html>

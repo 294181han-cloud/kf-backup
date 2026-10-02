@@ -847,18 +847,69 @@ const app = createApp({
     };
     Vue.watch([currentLink, tab], renderMainQr);
 
-    // ===== 推广海报：背景图 + 居中二维码 + 自定义上下文字 =====
-    const posterCfg = reactive({ bgUrl: '', topText: '', bottomText: '' });
-    try { Object.assign(posterCfg, JSON.parse(localStorage.getItem('kfxt_code_poster') || '{}')); } catch (e) {}
+    // ===== 推广海报：背景图 + 二维码位置大小 + 上下文字独立定制 =====
+    // pos 用九宫值：top-left / top / top-right / left / center / right / bottom-left / bottom / bottom-right
+    const POSTER_DEFAULT = {
+      bgUrl: '', topText: '', bottomText: '',
+      qrPos: 'center', qrScale: 50,          // qrScale：0-100 滑杆 → 导出宽 150-470px
+      topPos: 'top', topSize: 36, topColor: '#1a2233', topBold: true,
+      botPos: 'bottom', botSize: 30, botColor: '#5c6b85', botBold: false,
+      cardOn: true,                           // 二维码底衬白卡
+    };
+    const posterCfg = reactive({ ...POSTER_DEFAULT });
+    try {
+      const saved = JSON.parse(localStorage.getItem('kfxt_code_poster') || '{}');
+      // 存量配置迁移：旧版无 qrPos 等字段，补默认
+      Object.assign(posterCfg, saved);
+      for (const k of Object.keys(POSTER_DEFAULT)) if (posterCfg[k] === undefined) posterCfg[k] = POSTER_DEFAULT[k];
+    } catch (e) {}
     Vue.watch(posterCfg, () => { try { localStorage.setItem('kfxt_code_poster', JSON.stringify(posterCfg)); } catch (e) {} }, { deep: true });
+    const POSTER_POS = [
+      { v: 'top-left', l: '左上' }, { v: 'top', l: '上' }, { v: 'top-right', l: '右上' },
+      { v: 'left', l: '左' }, { v: 'center', l: '中' }, { v: 'right', l: '右' },
+      { v: 'bottom-left', l: '左下' }, { v: 'bottom', l: '下' }, { v: 'bottom-right', l: '右下' },
+    ];
+    // 区域锚点 → (x 比例, y 比例)；文字用区域中心，二维码用区域左上角再按对齐偏移
+    const anchorOf = (pos) => ({
+      'top-left': [0.08, 0.08], 'top': [0.5, 0.08], 'top-right': [0.92, 0.08],
+      'left': [0.08, 0.5], 'center': [0.5, 0.5], 'right': [0.92, 0.5],
+      'bottom-left': [0.08, 0.92], 'bottom': [0.5, 0.92], 'bottom-right': [0.92, 0.92],
+    }[pos] || [0.5, 0.5]);
     const posterQrBox = ref(null);
     const posterBgInput = ref(null);
+    // 预览层：九宫锚点（百分比定位）+ 缩放（预览舞台宽 280px）
+    const qrFreeStyle = Vue.computed(() => {
+      const [ax, ay] = anchorOf(posterCfg.qrPos);
+      const px = Math.round(56 + (Number(posterCfg.qrScale) || 50) * 1.4);   // 70-196px
+      const tx = ax < 0.3 ? `${(ax * 100).toFixed(0)}%` : (ax > 0.7 ? `calc(${(ax * 100).toFixed(0)}% - ${px}px)` : `calc(50% - ${px / 2}px)`);
+      const ty = ay < 0.3 ? `${(ay * 100).toFixed(0)}%` : (ay > 0.7 ? `calc(${(ay * 100).toFixed(0)}% - ${px}px)` : `calc(50% - ${px / 2}px)`);
+      return { position: 'absolute', left: tx, top: ty, width: px + 'px', height: px + 'px' };
+    });
+    const qrLayerStyle = Vue.computed(() => {
+      const s = qrFreeStyle.value;
+      return { position: 'absolute', left: `calc(${s.left} - 8px)`, top: `calc(${s.top} - 8px)`, width: `calc(${s.width} + 16px)`, height: `calc(${s.height} + 16px)` };
+    });
+    const textStyle = (which) => {
+      const pos = which === 'top' ? posterCfg.topPos : posterCfg.botPos;
+      const [ax, ay] = anchorOf(pos);
+      return {
+        position: 'absolute', left: (ax * 100).toFixed(0) + '%', top: (ay * 100).toFixed(0) + '%',
+        transform: 'translate(-50%,-50%)', maxWidth: '84%',
+        fontSize: Math.max(9, Math.round(((which === 'top' ? posterCfg.topSize : posterCfg.botSize) || 30) / 2.4)) + 'px',
+        color: which === 'top' ? (posterCfg.topColor || '#1a2233') : (posterCfg.botColor || '#5c6b85'),
+        fontWeight: (which === 'top' ? posterCfg.topBold !== false : posterCfg.botBold === true) ? 700 : 500,
+        textShadow: '0 1px 3px rgba(255,255,255,.9)',
+        whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+      };
+    };
     const renderPosterQr = () => {
-      if (!posterQrBox.value) return;
-      posterQrBox.value.innerHTML = '';
-      if (window.QRCode && currentLink.value) {
-        try { new QRCode(posterQrBox.value, { text: currentLink.value, width: 190, height: 190, correctLevel: QRCode.CorrectLevel.M }); } catch (e) {}
-      }
+      nextTick(() => {
+        if (!posterQrBox.value) return;
+        posterQrBox.value.innerHTML = '';
+        if (window.QRCode && currentLink.value) {
+          try { new QRCode(posterQrBox.value, { text: currentLink.value, width: 190, height: 190, correctLevel: QRCode.CorrectLevel.M }); } catch (e) {}
+        }
+      });
     };
     const pickPosterBg = () => { if (posterBgInput.value) posterBgInput.value.click(); };
     const onPosterBg = async (ev) => {
@@ -892,55 +943,56 @@ const app = createApp({
     const downloadPoster2 = async () => {
       if (!currentLink.value) { ElementPlus.ElMessage.warning('尚未生成客服码'); return; }
       try {
-        const W = 750, cardW = 470, qrSize = 380, pad = 26;
+        const W = 750;
+        const qrSize = Math.round(150 + (Number(posterCfg.qrScale) || 50) * 3.2);   // 150-470px
         let bgImg = null;
         if (posterCfg.bgUrl) { try { bgImg = await loadImgOnce(posterCfg.bgUrl); } catch (e) { bgImg = null; } }
-        // 卡片总高：上文字 + QR + 下文字（各留 14 间距）
+        let H = bgImg ? Math.round(W * bgImg.height / bgImg.width) : 1000;
         const meas = document.createElement('canvas').getContext('2d');
         const topT = (posterCfg.topText || '').trim(), botT = (posterCfg.bottomText || '').trim();
-        const topSize = topT ? fitText(meas, topT, cardW - pad * 2, 36) : 0;
-        const botSize = botT ? fitText(meas, botT, cardW - pad * 2, 30) : 0;
-        const cardH = pad + (topT ? topSize + 14 : 0) + qrSize + (botT ? botSize + 14 : 0) + pad;
-        let H = bgImg ? Math.round(W * bgImg.height / bgImg.width) : 1000;
-        if (H < cardH + 100) H = cardH + 100;
+        const topSize = topT ? fitText(meas, topT, W - 100, Number(posterCfg.topSize) || 36) : 0;
+        const botSize = botT ? fitText(meas, botT, W - 100, Number(posterCfg.botSize) || 30) : 0;
         const c = document.createElement('canvas');
         c.width = W; c.height = H;
         const ctx = c.getContext('2d');
         ctx.fillStyle = '#ffffff'; ctx.fillRect(0, 0, W, H);
-        if (bgImg) { // cover 铺满
+        if (bgImg) {
           const s = Math.max(W / bgImg.width, H / bgImg.height);
           const dw = bgImg.width * s, dh = bgImg.height * s;
           ctx.drawImage(bgImg, (W - dw) / 2, (H - dh) / 2, dw, dh);
         }
-        // 中央白卡 + QR + 文字
-        const cx = (W - cardW) / 2, cy = (H - cardH) / 2;
-        ctx.fillStyle = 'rgba(255,255,255,.96)';
-        roundRect(ctx, cx, cy, cardW, cardH, 28); ctx.fill();
-        let y = cy + pad;
-        if (topT) {
-          ctx.fillStyle = '#1a2233'; ctx.textAlign = 'center'; ctx.textBaseline = 'top';
-          ctx.font = `700 ${topSize}px sans-serif`;
-          ctx.fillText(topT, W / 2, y); y += topSize + 14;
+        // 二维码：按九宫锚点定位（x 轴对齐区域内水平位置，y 同理），可选底衬白卡
+        const [qx, qy] = anchorOf(posterCfg.qrPos);
+        const alignX = qx < 0.3 ? 'left' : (qx > 0.7 ? 'right' : 'center');
+        const alignY = qy < 0.3 ? 'top' : (qy > 0.7 ? 'bottom' : 'middle');
+        const qrX = alignX === 'left' ? qx * W : (alignX === 'right' ? qx * W - qrSize : qx * W - qrSize / 2);
+        const qrY = alignY === 'top' ? qy * H : (alignY === 'bottom' ? qy * H - qrSize : qy * H - qrSize / 2);
+        if (posterCfg.cardOn) {
+          const cp = 16;
+          ctx.fillStyle = 'rgba(255,255,255,.94)';
+          roundRect(ctx, qrX - cp, qrY - cp, qrSize + cp * 2, qrSize + cp * 2, 22); ctx.fill();
         }
-        const qrCv = posterQrBox.value && (posterQrBox.value.querySelector('canvas') || posterQrBox.value.querySelector('img'));
         let drew = false;
-        // 导出用高清二维码（离屏按目标尺寸重绘，避免预览 190px 放大发糊）
         try {
           const holder = document.createElement('div');
           new QRCode(holder, { text: currentLink.value, width: qrSize, height: qrSize, correctLevel: QRCode.CorrectLevel.M });
           const hi = holder.querySelector('canvas');
-          if (hi) { ctx.drawImage(hi, (W - qrSize) / 2, y, qrSize, qrSize); drew = true; }
+          if (hi) { ctx.drawImage(hi, qrX, qrY, qrSize, qrSize); drew = true; }
         } catch (e) {}
-        if (!drew && qrCv && qrCv.tagName === 'CANVAS') { ctx.drawImage(qrCv, (W - qrSize) / 2, y, qrSize, qrSize); drew = true; }
-        else if (!drew && qrCv) { const im = await loadImgOnce(qrCv.src); ctx.drawImage(im, (W - qrSize) / 2, y, qrSize, qrSize); drew = true; }
-        if (!drew) { ElementPlus.ElMessage.warning('二维码尚未生成'); return; }
-        y += qrSize;
-        if (botT) {
-          y += 14;
-          ctx.fillStyle = '#5c6b85'; ctx.textAlign = 'center'; ctx.textBaseline = 'top';
-          ctx.font = `500 ${botSize}px sans-serif`;
-          ctx.fillText(botT, W / 2, y);
+        if (!drew) { const qrCv = posterQrBox.value && (posterQrBox.value.querySelector('canvas') || posterQrBox.value.querySelector('img'));
+          if (qrCv && qrCv.tagName === 'CANVAS') { ctx.drawImage(qrCv, qrX, qrY, qrSize, qrSize); drew = true; }
+          else if (qrCv) { const im = await loadImgOnce(qrCv.src); ctx.drawImage(im, qrX, qrY, qrSize, qrSize); drew = true; }
         }
+        if (!drew) { ElementPlus.ElMessage.warning('二维码尚未生成'); return; }
+        // 文字：各自九宫定位（锚点即文字中心）
+        const drawText = (text, pos, size, color, bold) => {
+          const [ax, ay] = anchorOf(pos);
+          ctx.fillStyle = color; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+          ctx.font = `${bold ? 700 : 500} ${size}px sans-serif`;
+          ctx.fillText(text, ax * W, ay * H);
+        };
+        if (topT) drawText(topT, posterCfg.topPos, topSize, posterCfg.topColor || '#1a2233', posterCfg.topBold !== false);
+        if (botT) drawText(botT, posterCfg.botPos, botSize, posterCfg.botColor || '#5c6b85', posterCfg.botBold === true);
         const a = document.createElement('a');
         a.href = c.toDataURL('image/png'); a.download = '客服码海报-' + Date.now() + '.png';
         document.body.appendChild(a); a.click(); a.remove();
@@ -1101,6 +1153,7 @@ const app = createApp({
       pol, savePolicy, uploadPolHead, clock, unreadTotal, sessCollapsed,
       manageDlg, history, codeCfg, qrWrap, currentLink, renderMainQr,
       posterCfg, posterQrBox, posterBgInput, pickPosterBg, onPosterBg, downloadPoster2,
+      POSTER_POS, qrFreeStyle, qrLayerStyle, textStyle,
       cropDlg, cropSrc, cropZoomPct, cropStage, cropStyle, cropImgLoaded, cropDown, cropMove, cropUp, cropWheel, cropClose, openCrop, cropConfirm, avatarPreview,
       geoTag,copyQrImage, downloadQrImage, codeRotateHint, rotateCode, loadHistory, disableLink, saveCodeCfg, meAvatarUrl,
       quickFields, welcomeFields, autoFields, blFields, preqFields,
