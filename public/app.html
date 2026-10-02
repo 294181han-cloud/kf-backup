@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>客服工作台</title>
 <link rel="stylesheet" href="/assets/vendor/element-plus.css">
-<link rel="stylesheet" href="/assets/css/app.css?v=3.5.0">
+<link rel="stylesheet" href="/assets/css/app.css?v=3.6.0">
 <script src="/assets/ui/ui-registry.js?v=2.6.0"></script>
 <script src="/assets/ui/ui-loader.js?v=2.6.0" data-ui-cat="auto"></script>
 </head>
@@ -694,123 +694,130 @@
 
       <!-- ============ 访客策略 ============ -->
       <div class="content" v-if="tab==='setting' && setTab==='policy' && me.role==='tenant'">
-        <div class="panel" style="max-width:960px;margin:0 auto;">
-          <div class="panel-title">验证策略（访客进入前的验证方式）</div>
-          <el-form label-width="90px">
-            <el-form-item label="验证方式">
-              <el-select v-model="pol.robot" style="width:220px;">
-                <el-option label="无验证" value="no"></el-option>
-                <el-option label="点击验证" value="click"></el-option>
-                <el-option label="滑块验证" value="slide"></el-option>
-                <el-option label="图形验证码" value="code"></el-option>
-                <el-option label="邀请码" value="invite"></el-option>
-                <el-option label="访问密码" value="password"></el-option>
-              </el-select>
-            </el-form-item>
-            <el-form-item label="验证频率" v-if="pol.robot!=='no'">
-              <el-radio-group v-model="pol.robot_frequency">
-                <el-radio-button value="first">仅首次</el-radio-button>
-                <el-radio-button value="every">每次访问</el-radio-button>
-              </el-radio-group>
-            </el-form-item>
-            <el-form-item label="邀请码" v-if="pol.robot==='invite' || pol.robot==='password'">
-              <el-input v-model="pol.robot_code" placeholder="访客需输入此码才能进入" style="max-width:260px;"></el-input>
-            </el-form-item>
-          </el-form>
-          <el-button type="primary" size="small" @click="savePolicy">保存验证策略</el-button>
-        </div>
+        <div class="grid2">
+          <!-- 左列 -->
+          <div class="g-col">
+            <div class="panel">
+              <div class="panel-title">验证策略（访客进入前的验证方式）</div>
+              <el-form label-width="90px">
+                <el-form-item label="验证方式">
+                  <el-select v-model="pol.robot" style="width:220px;">
+                    <el-option label="无验证" value="no"></el-option>
+                    <el-option label="点击验证" value="click"></el-option>
+                    <el-option label="滑块验证" value="slide"></el-option>
+                    <el-option label="图形验证码" value="code"></el-option>
+                    <el-option label="邀请码" value="invite"></el-option>
+                    <el-option label="访问密码" value="password"></el-option>
+                  </el-select>
+                </el-form-item>
+                <el-form-item label="验证频率" v-if="pol.robot!=='no'">
+                  <el-radio-group v-model="pol.robot_frequency">
+                    <el-radio-button value="first">仅首次</el-radio-button>
+                    <el-radio-button value="every">每次访问</el-radio-button>
+                  </el-radio-group>
+                </el-form-item>
+                <el-form-item label="邀请码" v-if="pol.robot==='invite' || pol.robot==='password'">
+                  <el-input v-model="pol.robot_code" placeholder="访客需输入此码才能进入" style="max-width:260px;"></el-input>
+                </el-form-item>
+              </el-form>
+              <el-button type="primary" size="small" @click="savePolicy">保存验证策略</el-button>
+            </div>
 
-        <div class="panel" style="max-width:960px;margin:0 auto;">
-          <div class="panel-title">聊天话术</div>
-          <el-form label-width="130px">
-            <el-form-item label="请求上传图片">
-              <el-input type="textarea" :rows="2" v-model="pol.ask_image_text" maxlength="200" show-word-limit
-                placeholder="工作台点「请求访客上传图片」时发给访客的话" style="max-width:560px;"></el-input>
-              <div class="muted" style="font-size:11.5px;margin-top:6px;line-height:1.7;">
-                客服在工作台聊天工具条点「🖼 请求访客上传图片」时，访客端会看到这句话 + 一个「上传图片」按钮。<br>
-                留空则使用默认话术「方便的话，请上传一下相关图片，帮您更快定位问题～」。
+            <div class="panel">
+              <div class="panel-title">会话管理</div>
+              <el-form label-width="110px">
+                <el-form-item label="结束保留天数">
+                  <el-input-number v-model="pol.closed_keep_days" :min="0" :max="3650" style="width:140px;"></el-input-number>
+                  <span class="muted" style="margin-left:10px;font-size:12px;">「已结束」会话保留 N 天后自动删除；0 = 永久保留</span>
+                </el-form-item>
+              </el-form>
+              <p class="muted" style="margin:0 0 10px;font-size:12px;">会话总额度由平台管理员在租户管理中设置（数据面板可查看当前用量）；额度不足时可删除或结束旧会话腾出空间。</p>
+              <el-button type="primary" size="small" @click="savePolicy">保存会话管理</el-button>
+            </div>
+
+            <div class="panel">
+              <div class="panel-title">访客过滤</div>
+              <p class="muted" style="margin:0 0 10px;">⚠️ 规则过严会导致正常用户进不来，开启后请用真实设备测试。</p>
+              <div class="pol-row"><span>非微信过滤（仅允许微信内置浏览器）</span><el-switch v-model="pol.filtration_wx"></el-switch></div>
+              <div class="pol-row"><span>非移动设备过滤（仅允许手机访问）</span><el-switch v-model="pol.filtration_pc"></el-switch></div>
+              <div class="pol-row"><span>非国内过滤（按 IP 归属地）</span><el-switch v-model="pol.filtration_area"></el-switch></div>
+              <p class="muted" style="font-size:11.5px;">代理/IDC 机房/模拟器过滤需要付费 IP 库，暂不支持。</p>
+              <el-button type="primary" size="small" style="margin-top:10px;" @click="savePolicy">保存过滤</el-button>
+            </div>
+
+            <div class="panel">
+              <div class="panel-title">弹窗公告 / 滚动通知</div>
+              <div class="pol-row"><span>弹窗公告（访客进入时弹出）</span><el-switch v-model="pol.publicity_on"></el-switch></div>
+              <div style="margin:10px 0;" v-if="pol.publicity_on">
+                <el-input v-model="pol.publicity_title" placeholder="公告标题" style="margin-bottom:8px;"></el-input>
+                <el-input type="textarea" :rows="3" v-model="pol.publicity_content" placeholder="公告内容（支持换行）"></el-input>
               </div>
-            </el-form-item>
-          </el-form>
-          <el-button type="primary" size="small" @click="savePolicy">保存话术</el-button>
-        </div>
-
-        <div class="panel" style="max-width:960px;margin:0 auto;">
-          <div class="panel-title">会话管理</div>
-          <el-form label-width="110px">
-            <el-form-item label="结束保留天数">
-              <el-input-number v-model="pol.closed_keep_days" :min="0" :max="3650" style="width:140px;"></el-input-number>
-              <span class="muted" style="margin-left:10px;font-size:12px;">「已结束」会话保留 N 天后自动删除；0 = 永久保留</span>
-            </el-form-item>
-          </el-form>
-          <p class="muted" style="margin:0 0 10px;font-size:12px;">会话总额度由平台管理员在租户管理中设置（数据面板可查看当前用量）；额度不足时可删除或结束旧会话腾出空间。</p>
-          <el-button type="primary" size="small" @click="savePolicy">保存会话管理</el-button>
-        </div>
-
-
-        <div class="panel" style="max-width:960px;margin:0 auto;">
-          <div class="panel-title">访客过滤</div>
-          <p class="muted" style="margin:0 0 10px;">⚠️ 规则过严会导致正常用户进不来，开启后请用真实设备测试。</p>
-          <div class="pol-row"><span>非微信过滤（仅允许微信内置浏览器）</span><el-switch v-model="pol.filtration_wx"></el-switch></div>
-          <div class="pol-row"><span>非移动设备过滤（仅允许手机访问）</span><el-switch v-model="pol.filtration_pc"></el-switch></div>
-          <div class="pol-row"><span>非国内过滤（按 IP 归属地）</span><el-switch v-model="pol.filtration_area"></el-switch></div>
-          <p class="muted" style="font-size:11.5px;">代理/IDC 机房/模拟器过滤需要付费 IP 库，暂不支持。</p>
-          <el-button type="primary" size="small" style="margin-top:10px;" @click="savePolicy">保存过滤</el-button>
-        </div>
-
-        <div class="panel" style="max-width:960px;margin:0 auto;">
-          <div class="panel-title">消息链接处理</div>
-          <el-radio-group v-model="pol.link_mode">
-            <el-radio-button value="no">不处理</el-radio-button>
-            <el-radio-button value="copy">复制打开</el-radio-button>
-            <el-radio-button value="jump">直接跳转</el-radio-button>
-          </el-radio-group>
-          <p class="muted" style="margin:10px 0;">访客消息中的链接如何处理。直接跳转有离站风险，建议「复制打开」。</p>
-          <el-button type="primary" size="small" @click="savePolicy">保存</el-button>
-        </div>
-
-        <div class="panel" style="max-width:960px;margin:0 auto;">
-          <div class="panel-title">访客头像与名称</div>
-          <div class="pol-row">
-            <span>访客头像</span>
-            <el-radio-group v-model="pol.user_head_type" size="small">
-              <el-radio-button value="default">自动分配（不重复）</el-radio-button>
-              <el-radio-button value="random">随机动物</el-radio-button>
-              <el-radio-button value="custom">自定义</el-radio-button>
-            </el-radio-group>
+              <div class="pol-row" style="margin-top:14px;"><span>滚动通知（聊天窗顶部滚动字幕）</span><el-switch v-model="pol.inform_on"></el-switch></div>
+              <el-input v-model="pol.inform_text" placeholder="滚动通知文案" style="margin-top:8px;" v-if="pol.inform_on"></el-input>
+              <el-button type="primary" size="small" style="margin-top:12px;" @click="savePolicy">保存公告</el-button>
+            </div>
           </div>
-          <p class="muted" style="margin:0 0 10px;font-size:11.5px;line-height:1.7;">
-            自动分配：给每个新访客发一个动物 emoji 头像，并优先挑<b>当天还没被其他访客用过</b>的，头像更丰富、不撞脸；<br>
-            随机动物：完全随机；自定义：所有访客统一使用你上传的头像。
-          </p>
-          <div style="margin:8px 0 12px;display:flex;align-items:center;gap:8px;" v-if="pol.user_head_type==='custom'">
-            <img v-if="pol.user_head" :src="pol.user_head" style="width:36px;height:36px;border-radius:8px;object-fit:cover;">
-            <el-button size="small" @click="$refs.polHeadInput.click()">{{ pol.user_head ? '更换' : '上传头像' }}</el-button>
-            <input ref="polHeadInput" type="file" accept="image/*" style="display:none" @change="uploadPolHead"/>
-          </div>
-          <div class="pol-row">
-            <span>访客名称</span>
-            <el-radio-group v-model="pol.user_name_type" size="small">
-              <el-radio-button value="default">跟随头像（如 熊猫）</el-radio-button>
-              <el-radio-button value="random">随机昵称</el-radio-button>
-            </el-radio-group>
-          </div>
-          <p class="muted" style="margin:0 0 10px;font-size:11.5px;line-height:1.7;">
-            跟随头像：访客名直接用头像对应的中文（🐼→熊猫、🐘→大象、🌳→大树、🪙→比特币），一眼能对上；访客自己填了昵称则用他填的。
-          </p>
-          <el-button type="primary" size="small" style="margin-top:10px;" @click="savePolicy">保存</el-button>
-        </div>
 
-        <div class="panel" style="max-width:960px;margin:0 auto;">
-          <div class="panel-title">弹窗公告 / 滚动通知</div>
-          <div class="pol-row"><span>弹窗公告（访客进入时弹出）</span><el-switch v-model="pol.publicity_on"></el-switch></div>
-          <div style="margin:10px 0;" v-if="pol.publicity_on">
-            <el-input v-model="pol.publicity_title" placeholder="公告标题" style="margin-bottom:8px;"></el-input>
-            <el-input type="textarea" :rows="3" v-model="pol.publicity_content" placeholder="公告内容（支持换行）"></el-input>
+          <!-- 右列 -->
+          <div class="g-col">
+            <div class="panel">
+              <div class="panel-title">聊天话术</div>
+              <el-form label-width="130px">
+                <el-form-item label="请求上传图片">
+                  <el-input type="textarea" :rows="2" v-model="pol.ask_image_text" maxlength="200" show-word-limit
+                    placeholder="工作台点「请求访客上传图片」时发给访客的话"></el-input>
+                  <div class="muted" style="font-size:11.5px;margin-top:6px;line-height:1.7;">
+                    客服在工作台聊天工具条点「🖼 请求访客上传图片」时，访客端会看到这句话 + 一个「上传图片」按钮。<br>
+                    留空则使用默认话术「方便的话，请上传一下相关图片，帮您更快定位问题～」。
+                  </div>
+                </el-form-item>
+              </el-form>
+              <el-button type="primary" size="small" @click="savePolicy">保存话术</el-button>
+            </div>
+
+            <div class="panel">
+              <div class="panel-title">访客头像与名称</div>
+              <div class="pol-row">
+                <span>访客头像</span>
+                <el-radio-group v-model="pol.user_head_type" size="small">
+                  <el-radio-button value="default">自动分配（不重复）</el-radio-button>
+                  <el-radio-button value="random">随机动物</el-radio-button>
+                  <el-radio-button value="custom">自定义</el-radio-button>
+                </el-radio-group>
+              </div>
+              <p class="muted" style="margin:0 0 10px;font-size:11.5px;line-height:1.7;">
+                自动分配：给每个新访客发一个动物 emoji 头像，并优先挑<b>当天还没被其他访客用过</b>的，头像更丰富、不撞脸；<br>
+                随机动物：完全随机；自定义：所有访客统一使用你上传的头像。
+              </p>
+              <div style="margin:8px 0 12px;display:flex;align-items:center;gap:8px;" v-if="pol.user_head_type==='custom'">
+                <img v-if="pol.user_head" :src="pol.user_head" style="width:36px;height:36px;border-radius:8px;object-fit:cover;">
+                <el-button size="small" @click="$refs.polHeadInput.click()">{{ pol.user_head ? '更换' : '上传头像' }}</el-button>
+                <input ref="polHeadInput" type="file" accept="image/*" style="display:none" @change="uploadPolHead"/>
+              </div>
+              <div class="pol-row">
+                <span>访客名称</span>
+                <el-radio-group v-model="pol.user_name_type" size="small">
+                  <el-radio-button value="default">跟随头像（如 熊猫）</el-radio-button>
+                  <el-radio-button value="random">随机昵称</el-radio-button>
+                </el-radio-group>
+              </div>
+              <p class="muted" style="margin:0 0 10px;font-size:11.5px;line-height:1.7;">
+                跟随头像：访客名直接用头像对应的中文（🐼→熊猫、🐘→大象、🌳→大树、🪙→比特币），一眼能对上；访客自己填了昵称则用他填的。
+              </p>
+              <el-button type="primary" size="small" style="margin-top:10px;" @click="savePolicy">保存</el-button>
+            </div>
+
+            <div class="panel">
+              <div class="panel-title">消息链接处理</div>
+              <el-radio-group v-model="pol.link_mode">
+                <el-radio-button value="no">不处理</el-radio-button>
+                <el-radio-button value="copy">复制打开</el-radio-button>
+                <el-radio-button value="jump">直接跳转</el-radio-button>
+              </el-radio-group>
+              <p class="muted" style="margin:10px 0;">访客消息中的链接如何处理。直接跳转有离站风险，建议「复制打开」。</p>
+              <el-button type="primary" size="small" @click="savePolicy">保存</el-button>
+            </div>
           </div>
-          <div class="pol-row" style="margin-top:14px;"><span>滚动通知（聊天窗顶部滚动字幕）</span><el-switch v-model="pol.inform_on"></el-switch></div>
-          <el-input v-model="pol.inform_text" placeholder="滚动通知文案" style="margin-top:8px;" v-if="pol.inform_on"></el-input>
-          <el-button type="primary" size="small" style="margin-top:12px;" @click="savePolicy">保存公告</el-button>
         </div>
       </div>
 
@@ -864,68 +871,77 @@
 
       <!-- ============ 安全与维护 ============ -->
       <div class="content" v-if="tab==='setting' && setTab==='security' && me.role==='tenant'">
-        <div class="panel">
-          <div class="panel-title">公告（访客端顶部横幅）</div>
-          <el-switch v-model="sec.notice_on" active-text="在访客聊天窗口顶部展示公告"></el-switch>
-          <el-input type="textarea" :rows="3" v-model="sec.notice_text" maxlength="200" show-word-limit
-            placeholder="欢迎光临客服中心..." style="margin-top:10px;" :disabled="!sec.notice_on"></el-input>
-          <el-button type="primary" size="small" style="margin-top:10px;" @click="saveSecurity">保存公告</el-button>
-        </div>
-        <div class="panel">
-          <div class="panel-title">关键词拉黑</div>
-          <div class="kw-tags">
-            <el-tag v-for="kw in kwList" :key="kw" closable type="danger" effect="light" style="margin:0 8px 8px 0;" @close="removeKw(kw)">{{ kw }}</el-tag>
-            <span v-if="!kwList.length" class="muted" style="font-size:12px;">暂无关键词，在下方输入后回车添加</span>
+        <div class="grid-auto">
+          <div class="panel">
+            <div class="panel-title">公告（访客端顶部横幅）</div>
+            <el-switch v-model="sec.notice_on" active-text="在访客聊天窗口顶部展示公告"></el-switch>
+            <el-input type="textarea" :rows="3" v-model="sec.notice_text" maxlength="200" show-word-limit
+              placeholder="欢迎光临客服中心..." style="margin-top:10px;" :disabled="!sec.notice_on"></el-input>
+            <el-button type="primary" size="small" style="margin-top:10px;" @click="saveSecurity">保存公告</el-button>
           </div>
-          <div style="display:flex;gap:8px;max-width:320px;">
-            <el-input v-model="kwInput" placeholder="输入关键词，回车添加" size="default" @keydown.enter.prevent="addKw"></el-input>
-            <el-button @click="addKw">添加</el-button>
+
+          <div class="panel">
+            <div class="panel-title">关键词拉黑</div>
+            <div class="kw-tags">
+              <el-tag v-for="kw in kwList" :key="kw" closable type="danger" effect="light" style="margin:0 8px 8px 0;" @close="removeKw(kw)">{{ kw }}</el-tag>
+              <span v-if="!kwList.length" class="muted" style="font-size:12px;">暂无关键词，在下方输入后回车添加</span>
+            </div>
+            <div style="display:flex;gap:8px;">
+              <el-input v-model="kwInput" placeholder="输入关键词，回车添加" size="default" @keydown.enter.prevent="addKw"></el-input>
+              <el-button @click="addKw">添加</el-button>
+            </div>
+            <div style="margin:14px 0 10px;"><el-switch v-model="sec.auto_blacklist" active-text="访客消息命中关键词时自动拉黑"></el-switch></div>
+            <p class="muted" style="margin:0 0 12px;">⚠️ 谨慎使用自动拉黑，过度匹配会误伤正常访客。</p>
+            <el-button type="primary" size="small" :loading="kwSaving" @click="saveFilter">保存关键词</el-button>
           </div>
-          <div style="margin:14px 0 10px;"><el-switch v-model="sec.auto_blacklist" active-text="访客消息命中关键词时自动拉黑"></el-switch></div>
-          <p class="muted" style="margin:0 0 12px;">⚠️ 谨慎使用自动拉黑，过度匹配会误伤正常访客。</p>
-          <el-button type="primary" size="small" :loading="kwSaving" @click="saveFilter">保存关键词</el-button>
-        </div>
-        <div class="panel">
-          <div class="panel-title">访问策略</div>
-          <div style="margin-bottom:14px;"><el-switch v-model="sec.dedup_on" active-text="访客去重：同一访客 24 小时内多次进入只接待一次（复用会话，不占新额度）"></el-switch></div>
-          <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px;flex-wrap:wrap;">
-            <el-switch v-model="sec.ip_limit_on" active-text="IP 频率限制："></el-switch>
-            <el-input-number v-model="sec.ip_limit_count" :min="1" :max="100" size="small" :disabled="!sec.ip_limit_on"></el-input-number>
-            <span class="muted">次新访客/分钟，超过自动拉黑该 IP</span>
+
+          <div class="panel">
+            <div class="panel-title">访问策略</div>
+            <div style="margin-bottom:14px;"><el-switch v-model="sec.dedup_on" active-text="访客去重：同一访客 24 小时内多次进入只接待一次（复用会话，不占新额度）"></el-switch></div>
+            <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px;flex-wrap:wrap;">
+              <el-switch v-model="sec.ip_limit_on" active-text="IP 频率限制："></el-switch>
+              <el-input-number v-model="sec.ip_limit_count" :min="1" :max="100" size="small" :disabled="!sec.ip_limit_on"></el-input-number>
+              <span class="muted">次新访客/分钟，超过自动拉黑该 IP</span>
+            </div>
+            <el-button type="primary" size="small" @click="saveSecurity">保存策略</el-button>
           </div>
-          <el-button type="primary" size="small" @click="saveSecurity">保存策略</el-button>
-        </div>
-        <div class="panel">
-          <div class="panel-title">登录记录（最近 20 次）</div>
-          <el-table :data="loginLogs" size="small" stripe>
-            <el-table-column label="时间" width="160"><template #default="{row}">{{ shortTime(row.created_at) }}</template></el-table-column>
-            <el-table-column label="身份" width="130"><template #default="{row}">{{ row.role==='tenant' ? '卡密主人' : ('子客服 ' + row.ident) }}</template></el-table-column>
-            <el-table-column prop="device" label="设备" width="120"></el-table-column>
-            <el-table-column prop="ip" label="IP" width="140"></el-table-column>
-            <el-table-column prop="ua_short" label="浏览器标识" min-width="150" show-overflow-tooltip></el-table-column>
-          </el-table>
-          <div v-if="!loginLogs.length" class="muted" style="padding:20px;text-align:center;">暂无登录记录</div>
-        </div>
-        <div class="panel">
-          <div class="panel-title">数据清理（不可恢复，谨慎操作）</div>
-          <div class="link-line" v-for="opt in cleanupOpts" :key="opt.label">
-            <span style="flex:1;">{{ opt.label }}</span>
-            <el-popconfirm :title="'确认' + opt.label + '？不可恢复！'" @confirm="doCleanup(opt.days, 'sessions')">
-              <template #reference><el-button size="small" type="danger" plain>清理</el-button></template>
-            </el-popconfirm>
+
+          <div class="panel">
+            <div class="panel-title">数据清理（不可恢复，谨慎操作）</div>
+            <div class="link-line" v-for="opt in cleanupOpts" :key="opt.label">
+              <span style="flex:1;">{{ opt.label }}</span>
+              <el-popconfirm :title="'确认' + opt.label + '？不可恢复！'" @confirm="doCleanup(opt.days, 'sessions')">
+                <template #reference><el-button size="small" type="danger" plain>清理</el-button></template>
+              </el-popconfirm>
+            </div>
+            <div class="link-line">
+              <span style="flex:1;">清空 IP 黑名单</span>
+              <el-popconfirm title="确认清空全部黑名单？" @confirm="doCleanup(-1, 'blacklist')">
+                <template #reference><el-button size="small" type="danger" plain>清空</el-button></template>
+              </el-popconfirm>
+            </div>
           </div>
-          <div class="link-line">
-            <span style="flex:1;">清空 IP 黑名单</span>
-            <el-popconfirm title="确认清空全部黑名单？" @confirm="doCleanup(-1, 'blacklist')">
-              <template #reference><el-button size="small" type="danger" plain>清空</el-button></template>
-            </el-popconfirm>
+
+          <div class="panel wide">
+            <div class="panel-title">登录记录（最近 20 次）</div>
+            <el-table :data="loginLogs" size="small" stripe max-height="220">
+              <el-table-column label="时间" width="160"><template #default="{row}">{{ shortTime(row.created_at) }}</template></el-table-column>
+              <el-table-column label="身份" width="140"><template #default="{row}">{{ row.role==='tenant' ? '卡密主人' : ('子客服 ' + row.ident) }}</template></el-table-column>
+              <el-table-column prop="device" label="设备" width="140"></el-table-column>
+              <el-table-column prop="ip" label="IP" width="150"></el-table-column>
+              <el-table-column prop="ua_short" label="浏览器标识" min-width="160" show-overflow-tooltip></el-table-column>
+            </el-table>
+            <div v-if="!loginLogs.length" class="muted" style="padding:20px;text-align:center;">暂无登录记录</div>
           </div>
         </div>
       </div>
 
       <!-- ============ 个人设置 ============ -->
       <div class="content" v-if="tab==='setting' && setTab==='profile'">
-        <div class="panel" style="max-width:820px;margin:0 auto;">
+        <div class="grid2">
+        <!-- 左列：个人资料 + 修改密码 -->
+        <div class="g-col">
+        <div class="panel">
           <div class="panel-title">个人资料</div>
           <div style="display:flex;align-items:center;gap:16px;margin-bottom:16px;">
             <div style="position:relative;">
@@ -964,8 +980,21 @@
           </el-form>
           <el-button type="primary" @click="saveProfile">保存</el-button>
         </div>
+
+        <div class="panel">
+          <div class="panel-title">修改密码</div>
+          <el-form label-width="80px">
+            <el-form-item label="旧密码"><el-input v-model="pwOld" type="password" show-password></el-input></el-form-item>
+            <el-form-item label="新密码"><el-input v-model="pwNew" type="password" show-password placeholder="至少 6 位"></el-input></el-form-item>
+          </el-form>
+          <el-button type="primary" @click="changePw">修改密码</el-button>
+        </div>
+        </div>
+
+        <!-- 右列：声音设置 + 消息通知 -->
+        <div class="g-col">
         <!-- ============ 声音设置（v2.27，租户级；仅租户可改，子客服只读试听） ============ -->
-        <div class="panel" style="max-width:820px;margin:0 auto;" v-if="me && me.role==='tenant'">
+        <div class="panel" v-if="me && me.role==='tenant'">
           <div class="panel-title">声音设置（客服端 / 访客端分开，接收 / 发送分开）</div>
           <div class="snd-group">
             <div class="snd-group-title">🎧 客服端（工作台）</div>
@@ -1008,7 +1037,7 @@
           <p class="muted" style="margin:0 0 10px;font-size:12px;">访客端浏览器要求用户先与页面交互过才允许播放声音（各平台自动策略，无法绕过）。</p>
           <el-button type="primary" size="small" @click="saveSnd">保存声音设置</el-button>
         </div>
-        <div class="panel" style="max-width:820px;margin:0 auto;">
+        <div class="panel">
           <div class="panel-title">消息通知</div>
           <div class="pol-row">
             <span>桌面通知（页面在后台时弹系统提醒）</span>
@@ -1018,13 +1047,7 @@
             开启需要浏览器授权（点开关会弹出"允许通知"）。没开启时也会：<b>有新消息响提示音</b>（声音设置里可分别配置收发音）+ <b>浏览器标题显示未读数</b>如「(3) 客服工作台」。
           </p>
         </div>
-        <div class="panel" style="max-width:820px;margin:0 auto;">
-          <div class="panel-title">修改密码</div>
-          <el-form label-width="80px">
-            <el-form-item label="旧密码"><el-input v-model="pwOld" type="password" show-password></el-input></el-form-item>
-            <el-form-item label="新密码"><el-input v-model="pwNew" type="password" show-password placeholder="至少 6 位"></el-input></el-form-item>
-          </el-form>
-          <el-button type="primary" @click="changePw">修改密码</el-button>
+        </div>
         </div>
       </div>
     </div>
