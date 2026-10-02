@@ -208,4 +208,3 @@ function dispatch_api(string $method, string $uri): void
 }
 
 dispatch_api($method, $uri);
-; // v2.8-probe 145423

@@ -1,0 +1,36 @@
+/* admin.css - 平台管理台样式（由 public/admin.html 内联样式提取） */
+body { margin: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif; background: #f2f3f5; }
+.layout { display: flex; min-height: 100vh; }
+.side {
+  width: 200px; background: #1f2329; color: #fff; flex-shrink: 0;
+  display: flex; flex-direction: column; padding-top: 12px;
+}
+.side .logo { font-size: 17px; font-weight: 600; padding: 18px 20px 16px; color: #fff; display: flex; align-items: center; gap: 8px; }
+.side .nav { flex: 1; }
+.side .nav-item {
+  padding: 12px 20px; cursor: pointer; color: #a9aeb8; font-size: 14px;
+  display: flex; align-items: center; gap: 10px; border-left: 3px solid transparent;
+}
+.side .nav-item:hover { color: #fff; background: rgba(255,255,255,.06); }
+.side .nav-item.active { color: #fff; background: rgba(22,119,255,.18); border-left-color: #1677ff; }
+.side .foot { padding: 14px 20px; font-size: 12px; color: #6b7280; cursor: pointer; }
+.main { flex: 1; display: flex; flex-direction: column; min-width: 0; }
+.topbar {
+  background: #fff; height: 54px; display: flex; align-items: center; padding: 0 24px;
+  box-shadow: 0 1px 4px rgba(0,0,0,.06); justify-content: space-between;
+}
+.topbar .title { font-size: 16px; font-weight: 600; color: #1f2329; }
+.content { padding: 20px 24px; flex: 1; overflow-y: auto; max-width: 1240px; margin: 0 auto; width: 100%; }
+.stat-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 14px; margin-bottom: 18px; }
+.stat-card { background: #fff; border-radius: 10px; padding: 18px; }
+.stat-card .v { font-size: 26px; font-weight: 700; color: #1f2329; }
+.stat-card .l { font-size: 13px; color: #86909c; margin-top: 4px; }
+.panel { background: #fff; border-radius: 10px; padding: 18px 20px; margin-bottom: 18px; }
+.panel-title { font-size: 15px; font-weight: 600; margin-bottom: 14px; color: #1f2329; }
+.bar-row { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; font-size: 13px; }
+.bar-row .name { width: 130px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #4e5969; }
+.bar-row .bar { flex: 1; background: #f2f3f5; border-radius: 4px; height: 18px; position: relative; }
+.bar-row .bar > div { height: 100%; border-radius: 4px; background: linear-gradient(90deg,#1677ff,#69b1ff); min-width: 2px; }
+.bar-row .num { width: 46px; text-align: right; color: #86909c; }
+.mono { font-family: Consolas, monospace; }
+.mb { margin-bottom: 14px; }

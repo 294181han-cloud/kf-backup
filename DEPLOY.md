@@ -26,10 +26,13 @@
 ├── db.php               # PDO + 建表 + 种子
 ├── helpers.php          # JWT / 上传 / 限频 / 工具
 ├── routes/              # auth / visitor / agent / tenant / admin 五组路由
-├── public/              # login.html / app.html / admin.html / visitor.html
-├── assets/              # api.js + vendor/（vue、element-plus、qrcode）
+├── public/              # login.html / app.html / admin.html / visitor.html（纯模板）
+├── assets/              # api.js + qr-poster.js + vendor/（vue、element-plus、echarts、qrcode）
+│   ├── css/             #   app.css / admin.css / visitor.css（页面样式）
+│   └── js/              #   app.js / app-components.js / app-boot.js / admin.js / visitor.js（页面逻辑）
 ├── uploads/             # 上传文件（图片/语音）
 ├── data/                # installed.lock 安装锁（勿删，删除后会重跑建表）
+├── AGENTS.md            # 开发协作规范（两人 + AI 共用）
 └── 404.html / 502.html  # 宝塔错误页
 ```
 
@@ -218,3 +221,25 @@ v2.14 撤回同步改动遗漏了 `$recalledIds` 的块外初始化——**未�
 1. agent.php 补 `$recalledIds = []` 初始化
 2. index.php 关闭 `display_errors`（生产环境任何 Warning/Notice 都不得混入 API 响应——全局兜底）
 3. api.js JSON 解析容错（剥离可能混入的非 JSON 前缀，防同类问题复发）
+## 19. v2.16 变更记录（目录模块化重构，2026-10-02）
+
+### 重构（内容逐字搬移，零逻辑改动，已做字节级校验）
+- **前端页面拆分**：app / admin / visitor 三个页面的内联 `<style>`/`<script>` 提取为独立模块——
+  样式 → `assets/css/<page>.css`，逻辑 → `assets/js/<page>.js`（app 另拆 `app-components.js` 共享组件与 `app-boot.js` 全局错误条）；
+  页面 HTML 只留模板标记（app.html 2331→921 行）。资产引用版本升至 `?v=2.1.0`（vendor 未动仍 2.0.1）
+- **login.html 保持原样**（量小且为兜底入口，见 AGENTS.md 约定）
+
+### 清理
+- 删除根目录一次性诊断脚本：`_p17.ps1` / `_p18.py` / `_p19.py` / `_p33.py` / `_off_test.py` / `tools_css_check.py`
+- 删除 `public/assets/vendor/`（1.6MB，与 `assets/vendor/` 完全重复且全仓库零引用）
+- 删除 index.php 末尾残留探针 `; // v2.8-probe 145423`
+
+### 新增
+- `AGENTS.md`：目录地图、前后端模块约定、两人 + AI 协作与验证流程、历史坑速查
+- `.editorconfig`：UTF-8 / LF（ps1 保留 CRLF）统一编辑行为
+- README / DEPLOY 文件结构说明同步更新
+
+### 验证方式（供后续重构参考）
+- 提取内容与 git HEAD 原区间逐行比对（8/8 完全一致），新 HTML 与设计结构逐行比对（3/3 一致）
+- 本地静态服务器 + 浏览器加载四页冒烟，控制台错误与重构前基线一致（仅 API 404 属预期）
+- 推送后 selftest.ps1 112 项回归 + 线上页面过检

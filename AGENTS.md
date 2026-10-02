@@ -1,0 +1,90 @@
+# AGENTS.md — 开发协作规范（人类 + AI 共用）
+
+> 目标读者：参与本项目的两个人、以及任何被指派到本仓库的 AI 编程助手。
+> 原则：模块化、小步提交、推送即上线——所以**推送前必须验证**。
+
+## 1. 项目一句话
+
+多租户客服 SaaS（PHP 8.4 + MySQL 8，无 Composer；前端 Vue 3 全局构建 + Element Plus，无打包步骤）。
+平台管理员发卡密 → 每个卡密是一个完全隔离的客服系统（子客服/话术/获客链接/额度计费）。
+
+| 角色 | 账号格式 | 页面 |
+|------|---------|------|
+| 平台管理员 | `admin` | /admin.html |
+| 租户（卡密） | `卡密` | /app.html |
+| 子客服 | `卡密/用户名` | /app.html |
+| 访客 | 免登录 | /visitor.html?t=卡密 或 ?code=客服码 |
+
+## 2. 目录地图（改东西前先看这里）
+
+```
+├── index.php            # 唯一入口：安装/升级、静态兜底、页面分发、API 路由表
+├── config.php           # 数据库等配置（有意入库：私人仓库，服务器直读）
+├── db.php               # PDO 单例 + 全部建表 + 种子数据
+├── helpers.php          # JWT / 上传 / 限频 / IP 归属地 / json_out 等工具函数
+├── routes/              # API 处理器，按角色分文件：
+│   ├── auth.php         #   登录 / me / 改密 / 资料
+│   ├── visitor.php      #   访客公开接口（init/send/poll…）
+│   ├── agent.php        #   工作台（会话/消息/轮询）
+│   ├── tenant.php       #   租户管理（子客服/客服码/设置/访客资源…）
+│   └── admin.php        #   平台管理（租户/域名池/全局设置）
+├── public/              # 四个页面，只放 HTML 模板（v2.1.0 起无内联样式/脚本）
+│   ├── login.html       #   登录页（唯一保留内联 style/script 的页面，量小勿拆）
+│   ├── app.html         #   客服工作台（模板引用 assets/js/app*.js）
+│   ├── admin.html       #   平台管理台
+│   └── visitor.html     #   访客端（19 套平台皮肤）
+├── assets/
+│   ├── api.js           # 共享 API 客户端（fetch 封装、401 跳登录、JSON 容错）
+│   ├── qr-poster.js     # 共享二维码海报绘制
+│   ├── css/             # 页面样式：app.css / admin.css / visitor.css
+│   ├── js/              # 页面逻辑：app.js / app-components.js / app-boot.js / admin.js / visitor.js
+│   └── vendor/          # 第三方库（vue/element-plus/echarts/qrcode），不修改
+├── selftest.ps1         # 112 项全流程回归（直接跑线上！幂等可重跑）
+├── DEPLOY.md            # 部署运维 + v1~v5 全部变更记录（新变更追加在文末）
+└── uploads/ data/       # 运行数据（有意入库；服务器上 git pull 不覆盖）
+```
+
+## 3. 前端模块约定（v2.1.0 重构后）
+
+- **模板**（`public/*.html`）：只写 Vue 模板标记与结构，不放 `<style>`/`<script>` 内联块。
+- **逻辑**（`assets/js/<page>.js`）：每页一个主文件；跨页共享组件放 `app-components.js`。
+- **样式**（`assets/css/<page>.css`）：每页一个，类名与模板对应。
+- **加载顺序（app.html）**：vue → element-plus → qrcode → qr-poster → api.js → app-components.js → app.js → app-boot.js。
+  app.js 顶层 `const` 依赖 app-components.js 先执行（经典 script 共享全局词法环境，顺序不可乱）。
+- **缓存版本**：改了任何 css/js 内容，必须把该文件引用的 `?v=` 号 +1（当前 2.1.0），否则用户拿到 7 天旧缓存。
+- vendor 库永远不改；缺什么加文件到 vendor/ 并在页面引用。
+
+## 4. 后端约定
+
+- 新接口 = 在 `routes/<角色>.php` 写 `handle_xxx()`，再在 `index.php` 的 `dispatch_api()` 注册一行。
+- 所有业务查询必须带 `tenant_id` 过滤；跨租户一律 404/403（防越权是本项目安全基线）。
+- 出错用 `json_error('...', 400)` —— 错误码避开 404/500（宝塔错误页会拦截 JSON）。
+- `index.php` 关闭了 `display_errors`：任何 Warning 文本混入 JSON 都会打挂前端解析，别打开它。
+- 新表/新列：幂等写法放 `ensure_upgrade()`（try ALTER + 忽略已存在），别要求手工迁移。
+- 消息轮询是 2.5s 自适应（接待中 1.2s / 空闲 3s），无 WebSocket（FPM 环境勿引入常驻进程）。
+
+## 5. 协作与部署流程（两人 + AI）
+
+1. **开工先 `git pull`**——两人同时改 `assets/js/app.js` 之类热点文件时，先同步再改，改完尽快推。
+2. **小步提交**：一个提交只做一件事（修 bug / 加功能 / 重构分开），message 用 `类型: 描述`（见 git log 惯例）。
+3. **推送 = 自动部署到生产**（webhook → 服务器 git pull）。禁止推送未验证的代码。
+4. **验证三步**（AI 改动后同样适用）：
+   - 后端改了 → 跑 `powershell -ExecutionPolicy Bypass -File selftest.ps1`（注意：直接打线上，幂等，会自建自清测试租户）
+   - 前端改了 → 打开 https://kf.ylcz.cc/ 对应页面过一遍功能；控制台不能有红错（app-boot.js 会在页面顶部显示错误条）
+   - 大改 → 本地 `python -m http.server 8000` 起在仓库根目录，浏览器开 `http://localhost:8000/public/<page>.html` 冒烟（API 会 404 属预期，看的是 JS 报错）
+5. **变更记录**：功能级变更在 DEPLOY.md 文末追加一节 `## vN.N 变更记录`。
+
+## 6. 历史坑（勿重复踩）
+
+- Element Plus 全局名是 `ElementPlus`（不是 `ELEMENT`）。
+- PowerShell 5.1 的 curl.exe 多行输出是数组：判断内容前先 `-join "`n"`。
+- api.js 的 JSON 解析有容错（剥离混入前缀），但根因永远是后端混入了非 JSON 输出。
+- 撤回/已读等增量同步依赖 poll 返回的 `recalledIds`/`readUpto`，改动 poll 结构要两端（agent+visitor）一起改。
+- 服务器禁用 shell_exec（无 ffmpeg），语音按原始格式存，前端选兼容编码录制。
+
+## 7. AI 助手指令
+
+- 改前端逻辑前先读对应模板页，确认引用的变量/方法在 `assets/js/<page>.js` 的 setup() 返回对象里存在。
+- `app.js` 的 setup() 是单函数作用域，内部互相引用密集；拆分/重命名需全文搜索引用点。
+- 不要生成新的根目录散装脚本（`_p*.py` 之类一次性补丁已清理，用后即删，勿再现）。
+- 不要动 `uploads/`、`data/`、`config.php` 的入库状态（这是项目约定，非失误）。
