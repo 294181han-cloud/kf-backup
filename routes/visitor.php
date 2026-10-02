@@ -39,6 +39,15 @@ function resolve_visitor_context(): ?array
                 return ['tenant' => $dl, 'agent_id' => 0];
             }
         }
+        // 客服码根路径子域（v2.28 链接格式）：service_codes.link 的 Host 精确匹配
+        $st = $pdo->prepare('SELECT sc.code, sc.agent_id, tn.* FROM service_codes sc JOIN tenants tn ON tn.id = sc.tenant_id');
+        $st->execute();
+        foreach ($st->fetchAll() as $sc) {
+            $linkHost = strtolower(parse_url($sc['link'], PHP_URL_HOST) ?: '');
+            if ($linkHost !== '' && $host === $linkHost) {
+                return ['tenant' => $sc, 'agent_id' => (int)$sc['agent_id']];
+            }
+        }
     }
     return null;
 }

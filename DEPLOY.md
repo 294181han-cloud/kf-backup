@@ -595,3 +595,8 @@ v2.14 撤回同步改动遗漏了 `$recalledIds` 的块外初始化——**未�
 ### 验证
 - 线上测试租户：两套预设渲染与样图比对一致；字段编辑实时出图；下载导出 PNG；
   自定义模式回归无变化
+
+### v2.28 补丁（更换码修复，2026-10-02 晚）
+- **修复更换码后访客进不去**：v2.28 链接格式改为泛解析根路径直达后，`resolve_visitor_context`
+  的子域匹配只查 domain_links，漏了 service_codes 的新格式链接——新码页面能开但 /api/visitor/config
+  报「链接无效」。补 Host 精确匹配 service_codes.link 分支（agent_id 一并透传）
