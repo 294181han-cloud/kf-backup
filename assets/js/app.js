@@ -684,9 +684,9 @@ const app = createApp({
       let tplId = cat.defaultTemplate, colorId = null;
       try {
         tplId = localStorage.getItem('kfxt_ui_' + key + '_tpl') || tplId;
-        colorId = localStorage.getItem('kfxt_ui_' + key) || (key === 'pc' && window.UI ? UI.current().id : null);
+        colorId = localStorage.getItem('kfxt_ui_' + key) || null;
       } catch (e) {}
-      if (key === 'pc' && window.UI) { tplId = UI.template().id; colorId = UI.current().id; }
+      if (window.UI && window.UI.cat === key) { tplId = UI.template().id; colorId = UI.current().id; }
       const t = tpls.find((x) => x.id === tplId) || tpls[0];
       const colors = (t && t.colors) || [];
       if (!colors.find((x) => x.id === colorId)) colorId = colors.length ? colors[0].id : '';
@@ -707,12 +707,14 @@ const app = createApp({
       const tplChanged = tplId !== sel.tpl;
       sel.tpl = tplId;
       sel.color = colorId;
-      if (key === 'pc' && window.UI) {
+      if (window.UI && window.UI.cat === key) {
+        // 选择的分类就是当前页面加载器实例 → 即时生效
         if (tplChanged) UI.setTemplate(tplId);
         UI.set(colorId);
         sel.tpl = UI.template().id;   // 加载器可能因配色回退修正状态
         sel.color = UI.current().id;
       } else {
+        // 另一端的配置：写入 localStorage，供该端浏览器读取
         try {
           localStorage.setItem('kfxt_ui_' + key + '_tpl', tplId);
           localStorage.setItem('kfxt_ui_' + key, colorId);
