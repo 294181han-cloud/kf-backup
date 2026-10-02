@@ -474,33 +474,80 @@ function save_upload(string $data, string $kind, string $filename = ''): array
     throw new \RuntimeException('文件格式不支持：' . ($mime ?: '未知'));
 }
 
-/* ================= IP 归属地（ip-api.com，带文件缓存） ================= */
+/* ================= IP 归属地（国内库优先 + ip-api 回退，带文件缓存） =================
+   统一输出格式：国家|地区|城市|运营商|国家码（缺失项用 0 占位） */
+
+/** 简单 HTTP GET（3 秒超时，失败返回空串） */
+function geo_http_get(string $url, int $timeout = 3): string
+{
+    if (!function_exists('curl_init')) return (string)@file_get_contents($url);
+    $ch = curl_init($url);
+    curl_setopt_array($ch, [
+        CURLOPT_RETURNTRANSFER => true,
+        CURLOPT_TIMEOUT => $timeout,
+        CURLOPT_CONNECTTIMEOUT => 2,
+        CURLOPT_SSL_VERIFYPEER => false,
+        CURLOPT_SSL_VERIFYHOST => 0,
+        CURLOPT_FOLLOWLOCATION => true,
+        CURLOPT_USERAGENT => 'Mozilla/5.0 (compatible; kfxt/2.36)',
+    ]);
+    $body = (string)curl_exec($ch);
+    curl_close($ch);
+    return $body;
+}
+
+/** 运营商名归一：把 "联通ADSL / 移通 / 电信3G" 等收敛成 电信/联通/移动/铁通/广电 */
+function geo_isp_norm(string $raw): string
+{
+    foreach (['电信' => '电信', '联通' => '联通', '网通' => '联通', '移通' => '移动', '移动' => '移动',
+              '铁通' => '铁通', '广电' => '广电', '教育网' => '教育网', '鹏博士' => '鹏博士'] as $k => $v) {
+        if (mb_strpos($raw, $k) !== false) return $v;
+    }
+    return '';
+}
+
+/** 国内库（太平洋电脑网 whois）：城市可到区县，带运营商；海外/失败返回空 */
+function geo_lookup_cn(string $ip): string
+{
+    $body = geo_http_get('https://whois.pconline.com.cn/ipJson.jsp?ip=' . urlencode($ip) . '&json=true', 3);
+    if ($body === '') return '';
+    if (function_exists('mb_convert_encoding')) $body = mb_convert_encoding($body, 'UTF-8', 'GBK,GB2312,UTF-8');
+    $d = json_decode($body, true);
+    if (!is_array($d) || ($d['err'] ?? '') !== '' || ($d['pro'] ?? '') === '') return '';
+    $pro  = trim((string)$d['pro']);
+    $city = trim((string)$d['city']);
+    $reg  = trim((string)$d['region']);            // 区县（如 普宁市）
+    $addr = trim((string)($d['addr'] ?? ''));
+    $isp  = geo_isp_norm($addr);
+    if ($city === '' && $reg !== '') $city = $reg;  // 只有区县时用区县
+    return implode('|', ['中国', $pro !== '' ? $pro : '0', $city !== '' ? $city : '0',
+        $isp !== '' ? $isp : '0', 'CN']);
+}
+
+/** 国外库回退（ip-api.com 免费接口） */
+function geo_lookup_world(string $ip): string
+{
+    $body = geo_http_get('http://ip-api.com/json/' . urlencode($ip)
+        . '?fields=status,country,regionName,city,isp,countryCode&lang=zh-CN', 3);
+    $d = $body ? json_decode($body, true) : null;
+    if (!$d || ($d['status'] ?? '') !== 'success') return '';
+    $parts = [$d['country'] ?? '0', $d['regionName'] ?? '0', $d['city'] ?: '0', $d['isp'] ?? '0', $d['countryCode'] ?? '0'];
+    return implode('|', $parts);
+}
 
 function lookup_geo(string $ip): string
 {
     if (!$ip || $ip === '127.0.0.1') return '';
-    $cacheFile = sys_get_temp_dir() . '/kfxt_geo_zh_' . md5($ip) . '.json';
+    $cacheFile = sys_get_temp_dir() . '/kfxt_geo_v2_' . md5($ip) . '.json';
     if (is_file($cacheFile) && (time() - filemtime($cacheFile)) < 86400) {
         $v = @file_get_contents($cacheFile);
         if ($v !== false && $v !== '') return $v;
     }
-    $ch = curl_init('http://ip-api.com/json/' . urlencode($ip) . '?fields=status,country,regionName,city,isp,countryCode&lang=zh-CN');
-    curl_setopt_array($ch, [
-        CURLOPT_RETURNTRANSFER => true,
-        CURLOPT_TIMEOUT => 3,
-        CURLOPT_CONNECTTIMEOUT => 2,
-    ]);
-    $body = curl_exec($ch);
-    curl_close($ch);
-    $d = $body ? json_decode($body, true) : null;
-    if ($d && ($d['status'] ?? '') === 'success') {
-        // 格式：国家|地区|城市|ISP|国家码（与示例 United States|New York|0|0|US 对齐，缺失项为 0）
-        $parts = [$d['country'] ?? '0', $d['regionName'] ?? '0', $d['city'] ?: '0', $d['isp'] ?? '0', $d['countryCode'] ?? '0'];
-        $out = implode('|', $parts);
-        @file_put_contents($cacheFile, $out);
-        return $out;
-    }
-    return '';
+    // 国内 IP 走国内库（城市/区县/运营商更准），海外或失败再走 ip-api
+    $out = geo_lookup_cn($ip);
+    if ($out === '') $out = geo_lookup_world($ip);
+    if ($out !== '') @file_put_contents($cacheFile, $out);
+    return $out;
 }
 
 /* ================= UA / 语言 ================= */
