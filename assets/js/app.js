@@ -411,6 +411,48 @@ const app = createApp({
         }
       } catch (e) { ElementPlus.ElMessage.error(e.message); }
     };
+    // 右键菜单（v2.26）：列表项右键弹出（删除腾额度 / 归档 / 结束）
+    const ctxMenu = reactive({ show: false, x: 0, y: 0, sid: 0, name: '' });
+    const openCtxMenu = (s, ev) => {
+      ev.preventDefault();
+      ctxMenu.x = ev.clientX; ctxMenu.y = ev.clientY;
+      ctxMenu.sid = s.id; ctxMenu.name = s.name;
+      ctxMenu.show = true;
+    };
+    const closeCtxMenu = () => { ctxMenu.show = false; };
+    const ctxMenuArchive = async () => {
+      const sid = ctxMenu.sid; closeCtxMenu();
+      try {
+        await API.post('/api/sessions/' + sid + '/archive', { on: 1 });
+        ElementPlus.ElMessage.success('已归档');
+        sessions.value = sessions.value.filter(s => s.id !== sid);
+        if (currentId.value === sid) { currentId.value = 0; msgs.value = []; }
+        await pollOnce();
+      } catch (e) { ElementPlus.ElMessage.error(e.message); }
+    };
+    const ctxMenuClose = async () => {
+      const sid = ctxMenu.sid; closeCtxMenu();
+      try {
+        await API.post('/api/sessions/' + sid + '/close');
+        ElementPlus.ElMessage.success('已结束');
+        sessions.value = sessions.value.filter(s => s.id !== sid);
+        if (currentId.value === sid) { currentId.value = 0; msgs.value = []; }
+        await pollOnce();
+      } catch (e) { ElementPlus.ElMessage.error(e.message); }
+    };
+    const ctxMenuDelete = async () => {
+      const sid = ctxMenu.sid; const name = ctxMenu.name; closeCtxMenu();
+      try {
+        await ElementPlus.ElMessageBox.confirm(
+          '彻底删除「' + name + '」及其全部聊天记录？删除后不可恢复，可腾出会话额度空间', '删除会话',
+          { type: 'warning', confirmButtonText: '删除', cancelButtonText: '取消' });
+        await API.post('/api/sessions/' + sid + '/delete');
+        ElementPlus.ElMessage.success('已删除');
+        sessions.value = sessions.value.filter(s => s.id !== sid);
+        if (currentId.value === sid) { currentId.value = 0; msgs.value = []; }
+        await pollOnce();
+      } catch (e) { if (e !== 'cancel' && e && e.message) ElementPlus.ElMessage.error(e.message); }
+    };
     const doTransfer = async () => {
       if (transferTo.value === null) { ElementPlus.ElMessage.warning('请选择目标'); return; }
       try {
@@ -1170,6 +1212,7 @@ const app = createApp({
       chatSearchOn, chatSearchKw, searchHit, visibleMsgs, canRecall, recallMsg, isRead,
       pol, savePolicy, uploadPolHead, clock, unreadTotal, sessCollapsed,
       sessScope, sessCounts, archiveSession,
+      ctxMenu, openCtxMenu, closeCtxMenu, ctxMenuArchive, ctxMenuClose, ctxMenuDelete,
       manageDlg, history, codeCfg, qrWrap, currentLink, renderMainQr,
       posterCfg, posterQrBox, posterBgInput, pickPosterBg, onPosterBg, downloadPoster2,
       POSTER_POS, qrFreeStyle, qrLayerStyle, textStyle,

@@ -216,6 +216,31 @@ function handle_session_archive(string $method, array $m): void
     json_out(['ok' => true, 'archived' => $on]);
 }
 
+/* ---------- 删除会话（右键菜单，彻底删除腾出会话额度；仅租户可删任意会话） ---------- */
+function handle_session_delete(string $method, array $m): void
+{
+    if ($method !== 'POST') { json_error('方法不允许', 405); return; }
+    $sid = (int)$m[1];
+    $ctx = require_workspace();
+    session_of($ctx, $sid);
+    if ($ctx['role'] !== 'tenant') json_error('仅租户可删除会话', 403);
+    $tid = (int)$ctx['tenant_id'];
+    $pdo = db();
+    $pdo->beginTransaction();
+    try {
+        $pdo->prepare("DELETE FROM messages WHERE tenant_id = ? AND session_id = ?")->execute([$tid, $sid]);
+        $pdo->prepare("DELETE FROM contacts WHERE tenant_id = ? AND session_id = ?")->execute([$tid, $sid]);
+        $pdo->prepare("DELETE FROM welcome_sent WHERE tenant_id = ? AND session_id = ?")->execute([$tid, $sid]);
+        $st = $pdo->prepare("DELETE FROM v_sessions WHERE tenant_id = ? AND id = ?");
+        $st->execute([$tid, $sid]);
+        $pdo->commit();
+    } catch (\Throwable $e) {
+        try { $pdo->rollBack(); } catch (\Throwable $e2) {}
+        json_error('删除失败：' . $e->getMessage(), 500);
+    }
+    json_out(['ok' => true]);
+}
+
 /* ---------- 标记已读 ---------- */
 function handle_session_read(string $method, array $m): void
 {
@@ -576,6 +601,8 @@ function handle_stats_dashboard(string $method): void
             'web_limit' => (int)$t['quota_web'], 'app_limit' => (int)$t['quota_app'],
             'web_used' => quota_used($tid, 'web'), 'app_used' => quota_used($tid, 'app'),
             'expires_at' => $t['expires_at'],
+            // 会话总额度（管理员设置；0=不限）
+            'sess_limit' => (int)($t['max_sessions'] ?? 0), 'sess_used' => $total_sessions,
         ];
     }
     json_out($out);

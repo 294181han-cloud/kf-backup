@@ -111,6 +111,21 @@ body { margin: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'P
 .geo-tag { display: inline-block; font-size: 10px; color: #86909c; background: #f2f3f5; border-radius: 4px; padding: 0 5px; margin-left: 5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; vertical-align: 1px; }
 /* 会话列表：标签弹性收缩可长至整行剩余空间（避免短名字仍被 ... 截断的浪费） */
 .sess-item .name .geo-tag { max-width: 220px; vertical-align: middle; }
+
+/* ===== 聊天头部紧凑按钮组 + 右键菜单（v2.26） ===== */
+.chat-head-btns { margin-left: auto; display: flex; gap: 4px; align-items: center; flex-shrink: 0; }
+.chat-head-btns .cbtn { padding: 5px 9px; font-size: 12px; margin: 0; }
+.ctx-menu {
+  position: fixed; z-index: 3000; min-width: 190px;
+  background: #fff; border-radius: 8px; padding: 4px;
+  box-shadow: 0 6px 24px rgba(0,0,0,.16), 0 0 0 1px #f0f1f3;
+  user-select: none;
+}
+.ctx-item { padding: 8px 12px; border-radius: 6px; font-size: 13px; cursor: pointer; color: #1f2329; }
+.ctx-item:hover { background: #f5f7fa; }
+.ctx-item.danger { color: #f53f3f; }
+.ctx-item.danger:hover { background: #fef1f1; }
+.ctx-sub { font-size: 11px; color: #a0a6ad; margin-top: 1px; }
 .chat-head .geo-tag { font-size: 11px; background: #f2f3f5; }
 
 .chat-col { flex: 1; display: flex; flex-direction: column; min-width: 0; background: #f7f7f7; }
