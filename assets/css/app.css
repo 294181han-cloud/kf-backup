@@ -498,31 +498,161 @@ body.dark .guide-step { border-color: #3a4048 !important; color: #c9cdd4; }
 /* ===== 设置页子导航（侧栏瘦身：内容/访客/外观/系统 收进这里）===== */
 .subnav {
   display: flex; align-items: center; gap: 6px; flex-wrap: wrap;
-  padding: 10px 22px; background: #fff; border-bottom: 1px solid var(--v-line, #ecf0f6);
+  padding: 12px 22px 12px;
+  background: linear-gradient(180deg, #ffffff, #fbfcff);
+  border-bottom: 1px solid var(--v-line, #ecf0f6);
+  box-shadow: 0 10px 20px -18px rgba(16, 24, 40, .35);
   flex-shrink: 0;
 }
 .subnav .sn-group {
-  font-size: 10px; letter-spacing: 1.2px; color: #a8b0c0;
-  padding: 0 10px 0 4px; margin-left: 4px; border-left: 1px solid var(--v-line, #ecf0f6);
+  display: inline-flex; align-items: center;
+  font-size: 11px; font-weight: 700; letter-spacing: 1.6px; color: #8b95a7;
+  padding: 0 12px 0 10px; margin-left: 6px;
+  border-left: 1px solid #e8ecf3; align-self: stretch;
 }
-.subnav .sn-group:first-child { border-left: 0; padding-left: 0; margin-left: 0; }
+.subnav .sn-group:first-child { border-left: 0; padding-left: 2px; margin-left: 0; }
 .subnav .sn-item {
-  display: inline-flex; align-items: center; gap: 5px;
-  border: 1px solid var(--v-line-2, #e3e8f0); background: #fff; color: #4b5563;
-  border-radius: 999px; padding: 6px 13px; font-size: 13px; cursor: pointer;
-  font-family: inherit; transition: all .15s;
+  display: inline-flex; align-items: center; gap: 6px;
+  border: 1px solid transparent; background: #f2f5fa; color: #46506a;
+  border-radius: 11px; padding: 8px 16px; font-size: 13.5px; font-weight: 500;
+  cursor: pointer; font-family: inherit; transition: all .16s ease;
 }
-.subnav .sn-item:hover { border-color: color-mix(in srgb, var(--theme, #1677ff) 45%, #fff); color: var(--theme, #1677ff); }
+.subnav .sn-item:hover {
+  background: #e9eef8; color: var(--theme, #1677ff);
+  border-color: color-mix(in srgb, var(--theme, #1677ff) 26%, #fff);
+}
 .subnav .sn-item.on {
-  background: color-mix(in srgb, var(--theme, #1677ff) 10%, #fff);
-  border-color: color-mix(in srgb, var(--theme, #1677ff) 45%, #fff);
-  color: var(--theme, #1677ff); font-weight: 650;
+  background: var(--theme-grad, linear-gradient(135deg, #1677ff, #4d9bff));
+  color: #fff; font-weight: 700; border-color: transparent;
+  box-shadow: 0 8px 18px -6px color-mix(in srgb, var(--theme, #1677ff) 60%, transparent);
+  transform: translateY(-1px);
 }
-.subnav .sn-ic { font-size: 13px; }
+.subnav .sn-item.on .sn-ic { filter: drop-shadow(0 1px 1px rgba(0, 0, 0, .18)); }
+.subnav .sn-ic { font-size: 14px; line-height: 1; }
 .subnav .sn-sp { flex: 1; }
-body.dark .subnav { background: #1e2229; border-bottom-color: #2b313a; }
-body.dark .subnav .sn-item { background: #232830; border-color: #333a44; color: #b6bfcd; }
-body.dark .subnav .sn-group { border-left-color: #2b313a; }
+body.dark .subnav { background: linear-gradient(180deg, #1e2229, #1b1f26); border-bottom-color: #2b313a; }
+body.dark .subnav .sn-item { background: #262b33; color: #b6bfcd; }
+body.dark .subnav .sn-item:hover { background: #2c323b; }
+body.dark .subnav .sn-group { border-left-color: #2b313a; color: #6f7683; }
+
+/* =====================================================================
+   v2.42 深色模式整体修复
+   思路：① 用 Element Plus 自己的 CSS 变量一次性把对话框/按钮/表格/下拉/开关等压暗，
+        ② 再逐个补齐我们自定义组件在深色下的配色，保证对比度够、不刺眼。
+   ===================================================================== */
+body.dark {
+  --el-bg-color: #1e2229;
+  --el-bg-color-page: #171a1f;
+  --el-bg-color-overlay: #23272e;
+  --el-text-color-primary: #e7eaf0;
+  --el-text-color-regular: #c6ccd8;
+  --el-text-color-secondary: #9aa4b5;
+  --el-text-color-placeholder: #6f7683;
+  --el-text-color-disabled: #5b626e;
+  --el-border-color: #333a44;
+  --el-border-color-light: #2e343d;
+  --el-border-color-lighter: #2a3038;
+  --el-border-color-extra-light: #262c34;
+  --el-border-color-dark: #3d454f;
+  --el-fill-color: #262c34;
+  --el-fill-color-light: #232830;
+  --el-fill-color-lighter: #20252c;
+  --el-fill-color-extra-light: #1d2126;
+  --el-fill-color-dark: #2b313a;
+  --el-fill-color-darker: #2f3640;
+  --el-fill-color-blank: #1e2229;
+  --el-mask-color: rgba(8, 10, 14, .72);
+  --el-mask-color-extra-light: rgba(8, 10, 14, .4);
+  --el-disabled-bg-color: #232830;
+  --el-disabled-text-color: #5f6875;
+  --el-disabled-border-color: #2e343d;
+  --el-box-shadow: 0 12px 32px 4px rgba(0, 0, 0, .4), 0 8px 20px rgba(0, 0, 0, .44);
+  --el-box-shadow-light: 0 0 12px rgba(0, 0, 0, .44);
+  --el-box-shadow-lighter: 0 0 12px rgba(0, 0, 0, .36);
+  --el-table-border-color: #2e343d;
+  --el-table-header-bg-color: #232830;
+  --el-table-tr-bg-color: #1e2229;
+  --el-table-row-hover-bg-color: #262c34;
+  --el-table-bg-color: #1e2229;
+  --el-popover-bg-color: #23272e;
+}
+/* 对话框 / 弹层：深色卡片 + 深色标题栏 */
+body.dark .el-dialog, body.dark .el-message-box { background: #20252c; border: 1px solid #2e343d; }
+body.dark .el-dialog__title, body.dark .el-message-box__title { color: #e7eaf0; }
+body.dark .el-dialog__body, body.dark .el-message-box__content { color: #c6ccd8; }
+body.dark .el-overlay { background-color: rgba(8, 10, 14, .68); }
+/* 下拉 / 弹层 / 气泡卡片 */
+body.dark .el-popper.is-light, body.dark .el-dropdown__popper, body.dark .el-select__popper {
+  background: #23272e !important; border-color: #333a44 !important;
+}
+body.dark .el-popper.is-light .el-popper__arrow::before { background: #23272e !important; border-color: #333a44 !important; }
+body.dark .el-dropdown-menu, body.dark .el-select-dropdown { background: #23272e; }
+body.dark .el-dropdown-menu__item, body.dark .el-select-dropdown__item { color: #c6ccd8; }
+body.dark .el-dropdown-menu__item:not(.is-disabled):hover,
+body.dark .el-select-dropdown__item.is-hovering { background: #2b313a; color: #fff; }
+/* 按钮：默认/朴素按钮别再是刺眼白底 */
+body.dark .el-button:not(.el-button--primary):not(.el-button--danger):not(.el-button--success):not(.el-button--warning) {
+  background: #262c34; border-color: #3a424d; color: #c6ccd8;
+}
+body.dark .el-button:not(.el-button--primary):not(.el-button--danger):not(.el-button--success):not(.el-button--warning):hover {
+  background: #2f3640; border-color: #4a545f; color: #fff;
+}
+body.dark .el-button.is-text, body.dark .el-button.is-link { background: transparent; }
+/* 表格 */
+body.dark .el-table { background: transparent; }
+body.dark .el-table tr, body.dark .el-table td.el-table__cell, body.dark .el-table th.el-table__cell { background: transparent; color: #c6ccd8; border-color: #2e343d; }
+body.dark .el-table th.el-table__cell { background: #232830 !important; color: #9aa4b5 !important; }
+body.dark .el-table--striped .el-table__body tr.el-table__row--striped td.el-table__cell { background: #20252c; }
+body.dark .el-table__empty-text { color: #6f7683; }
+/* 其他表单控件 */
+body.dark .el-radio-button__inner { background: #232830; border-color: #333a44; color: #c6ccd8; }
+body.dark .el-radio-button__original-radio:checked + .el-radio-button__inner { background: var(--theme, #1677ff); border-color: var(--theme, #1677ff); color: #fff; }
+body.dark .el-checkbox__label, body.dark .el-radio__label, body.dark .el-form-item__label { color: #c6ccd8; }
+body.dark .el-tag { border-color: #3a424d; }
+body.dark .el-alert--warning.is-light { background: #3a2f16; color: #f0c274; }
+/* —— 我们的组件 —— */
+body.dark .stat-card .sc-ic { background: color-mix(in srgb, var(--theme, #1677ff) 18%, #262b33); }
+body.dark .guide-card { background: #232830; border-color: #333a44; }
+body.dark .guide-card.done { background: #1d2c24; border-color: #2f4a3a; }
+body.dark .quick-btn { background: #2a3038; color: #b6bfcd; }
+body.dark .quick-btn:hover { background: var(--theme, #1677ff); color: #fff; }
+body.dark .quick-toggle-btn { background: #232830; border-color: #333a44; color: #b6bfcd; }
+body.dark .quick-toggle-btn.on { background: #2f3640; color: #fff; }
+body.dark .tpl-card { background: #232830; border-color: #333a44; color: #c6ccd8; }
+body.dark .tpl-card.active { background: color-mix(in srgb, var(--theme, #1677ff) 22%, #232830); border-color: var(--theme, #1677ff); color: #e7eaf0; }
+body.dark .code-qr { border-color: #3a424d; background: #232830; }
+body.dark .cp-pillrow .code-pill, body.dark .code-pill { background: color-mix(in srgb, var(--theme, #1677ff) 22%, #232830); color: #9fc7ff; border-color: color-mix(in srgb, var(--theme, #1677ff) 40%, #232830); }
+body.dark .v-ava { background: color-mix(in srgb, var(--theme, #1677ff) 18%, #262b33); }
+body.dark .vb-play { background: rgba(255, 255, 255, .16); color: #e7eaf0; box-shadow: none; }
+body.dark .msg-row.from-them .vb-play { background: rgba(255, 255, 255, .10); color: #c6ccd8; }
+body.dark .vb-asr-btn { background: rgba(255, 255, 255, .14); color: #b8f5cd; }
+body.dark .msg-row.from-them .vb-asr-btn { background: rgba(255, 255, 255, .10); color: #c6ccd8; }
+body.dark .vb-asr-text { background: rgba(255, 255, 255, .08); }
+body.dark .ask-dlg .ad-chip { background: #262b33; border-color: #333a44; color: #c6ccd8; }
+body.dark .ask-dlg .ad-chip.on { background: color-mix(in srgb, var(--theme, #1677ff) 26%, #232830); color: #9fc7ff; }
+body.dark .qd .qd-row { border-bottom-color: #2b313a; }
+body.dark .qa-row .el-input__wrapper { background: #232830; }
+body.dark .link-line { background: #20252c; }
+body.dark .panel-title::before { background: var(--theme, #1677ff); }
+body.dark .sess-item:hover { background: #262c34; }
+body.dark .sess-item.active { background: color-mix(in srgb, var(--theme, #1677ff) 26%, #232830); }
+body.dark .chat-head .ch-chip, body.dark .geo-tag, body.dark .ch-sub .ch-chip { background: #262c34; color: #b6bfcd; }
+body.dark .ch-chip.src { background: color-mix(in srgb, var(--theme, #1677ff) 30%, #232830); color: #9fc7ff; }
+body.dark .info-col h4 { color: #8b95a7; }
+body.dark .info-item { border-bottom-color: #2b313a; }
+body.dark .info-item .k { color: #8b95a7; }
+body.dark .chat-body { background: transparent; }
+body.dark .msg-row.sys .msg-bubble { background: rgba(255, 255, 255, .10); color: #a9b3bd; }
+body.dark .code-stage-hint, body.dark .cp-link, body.dark .muted { color: #8b95a7; }
+body.dark .topbar .clock { background: #262c34; color: #9aa4b5; }
+body.dark .unread-chip { background: linear-gradient(135deg, #ff7a7a, #f5455c); }
+body.dark .bar-row .bar { background: #2b313a; }
+body.dark .guide-progress { background: #2b313a; }
+body.dark .stat-card { background: #1e2229; border-color: #2b313a; }
+body.dark .panel { border-color: #2b313a; }
+body.dark .sess-col .search { border-bottom-color: #2b313a; }
+body.dark .sess-scope-tabs { border-bottom-color: #2b313a; }
+body.dark .info-col { border-left-color: #2b313a; }
 
 /* 聊天里的快捷消息设置弹窗 */
 .qd .qd-add { display: flex; gap: 8px; align-items: center; margin-bottom: 14px; }
