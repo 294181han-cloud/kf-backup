@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>客服工作台</title>
 <link rel="stylesheet" href="/assets/vendor/element-plus.css">
-<link rel="stylesheet" href="/assets/css/app.css?v=3.7.0">
+<link rel="stylesheet" href="/assets/css/app.css?v=3.8.0">
 <script src="/assets/ui/ui-registry.js?v=2.6.0"></script>
 <script src="/assets/ui/ui-loader.js?v=2.6.0" data-ui-cat="auto"></script>
 </head>
@@ -109,7 +109,8 @@
               </div>
               <div class="sess-body">
                 <div class="row1">
-                  <span class="name">{{ s.name }}<span class="geo-tag" v-if="visitorTag(s)" :title="visitorTagFull(s)">{{ visitorTag(s) }}</span></span>
+                  <span class="name">{{ s.name }}</span>
+                  <span class="geo-tag" v-if="visitorTag(s)" :class="visitorChnClass(s)" :title="visitorTagFull(s)">{{ visitorTag(s) }}</span>
                   <span class="time">{{ shortTime(s.lastTime) }}</span>
                 </div>
                 <div class="row2">
@@ -1299,7 +1300,7 @@
 <script src="/assets/qr-poster.js?v=2.1.03"></script>
 <script src="/assets/api.js?v=2.0.1"></script>
 <script src="/assets/js/app-components.js?v=2.1.0"></script>
-<script src="/assets/js/app.js?v=3.2.0"></script>
+<script src="/assets/js/app.js?v=3.3.0"></script>
 <script src="/assets/js/app-boot.js?v=2.1.1"></script>
 </body>
 </html>

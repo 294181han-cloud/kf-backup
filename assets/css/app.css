@@ -1239,3 +1239,21 @@ body.dark .nav-item.active {
 .ch-chip.src { background: #f2f4f8; color: #6b7688; font-weight: 500; }
 body.dark .ch-chip.chn { background: color-mix(in srgb, var(--theme, #1677ff) 30%, #232830); color: #9fc7ff; }
 body.dark .ch-chip.src { background: #262c34; color: #a9b3c2; }
+
+/* ---------- v3.8 会话列表标签：渠道优先（微信 · 广东揭阳）+ 渠道配色 ---------- */
+/* 标签从 .name 里挪出来当独立 flex 项：名字长了先省略，渠道标签尽量完整露出 */
+.sess-item .row1 .name { flex: 0 1 auto; min-width: 48px; }
+.sess-item .row1 .geo-tag { flex: 0 1 auto; margin-left: 0; max-width: 210px; }
+.sess-item .row1 .time { margin-left: auto; }
+.geo-tag.chn-wx   { background: rgba(7, 193, 96, .14);  color: #07974a; }
+.geo-tag.chn-qq   { background: rgba(18, 183, 245, .15); color: #0b86b5; }
+.geo-tag.chn-ali  { background: rgba(22, 119, 255, .13); color: #1467d8; }
+.geo-tag.chn-dy   { background: rgba(254, 44, 85, .12);  color: #d92048; }
+.geo-tag.chn-dt   { background: rgba(20, 118, 254, .13); color: #1467d8; }
+.geo-tag.chn-other { background: #f2f3f5; color: #98a1b0; }
+body.dark .geo-tag.chn-wx   { background: rgba(7, 193, 96, .22);   color: #6ee7a8; }
+body.dark .geo-tag.chn-qq   { background: rgba(18, 183, 245, .22); color: #7dd6f7; }
+body.dark .geo-tag.chn-ali  { background: rgba(22, 119, 255, .24); color: #9fc7ff; }
+body.dark .geo-tag.chn-dy   { background: rgba(254, 44, 85, .22);  color: #ff9db4; }
+body.dark .geo-tag.chn-dt   { background: rgba(20, 118, 254, .24); color: #9fc7ff; }
+body.dark .geo-tag.chn-other { background: #262c34; color: #98a3b4; }

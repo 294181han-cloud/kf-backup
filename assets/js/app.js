@@ -1729,18 +1729,25 @@ const app = createApp({
       }
       return parts.join(' ');
     };
-    // 访客标签（v2.29）：主显示 = 地区（广东广州 电信 / 香港…）；设备/渠道移入悬停全文
+    // 访客标签（v2.42）：渠道优先 —— 「微信 · 广东揭阳」；没有地区时退化成渠道/设备
     const visitorTag = (s) => {
       if (!s) return '';
-      if (s.region) return s.region;
-      return s.city || geoTag(s.geo) || [s.devTag, s.channel].filter(Boolean).join(' · ');
+      const chn = s.channel || '';
+      const geo = s.region || s.city || geoTag(s.geo) || '';
+      if (chn && geo) return chn + ' · ' + geo;
+      if (chn) return chn;
+      if (geo) return geo;
+      return s.devTag || '';
     };
+    // 渠道配色：微信绿 / QQ 蓝 / 支付宝蓝 / 抖音红，其余中性
+    const CHN_CLASS = { '微信': 'chn-wx', 'QQ': 'chn-qq', '支付宝': 'chn-ali', '抖音': 'chn-dy', '钉钉': 'chn-dt' };
+    const visitorChnClass = (s) => (s && CHN_CLASS[s.channel]) || 'chn-other';
     const visitorTagFull = (s) => {
       if (!s) return '';
       const bits = [];
+      if (s.channel) bits.push('渠道：' + s.channel);
       if (s.region || s.city) bits.push(s.region || s.city);
       if (s.devTag) bits.push(s.devTag);
-      if (s.channel) bits.push(s.channel);
       if (s.browser && !bits.includes(s.browser)) bits.push(s.browser);
       const g = geoTag(s.geo);
       if (g) bits.push(g);
@@ -1856,7 +1863,7 @@ const app = createApp({
       presetPng, pickPosterPresetImg,
       POSTER_POS, qrFreeStyle, qrLayerStyle, textStyle,
       cropDlg, cropSrc, cropZoomPct, cropStage, cropStyle, cropImgLoaded, cropDown, cropMove, cropUp, cropWheel, cropClose, openCrop, cropConfirm, avatarPreview,
-      geoTag, visitorTag, visitorTagFull, copyQrImage, downloadQrImage, codeRotateHint, rotateCode, loadHistory, disableLink, saveCodeCfg, meAvatarUrl,
+      geoTag, visitorTag, visitorTagFull, visitorChnClass, copyQrImage, downloadQrImage, codeRotateHint, rotateCode, loadHistory, disableLink, saveCodeCfg, meAvatarUrl,
       quickFields, welcomeFields, autoFields, blFields, preqFields,
       shortTime, fmtTime, sourceText, contactLabel, barW, quotaW,
       sessIcon,
