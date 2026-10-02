@@ -115,6 +115,7 @@ $r = ApiGet "/api/visitor/messages?session_id=$sidA"
 Step '访客历史（首问+欢迎语>=2）' (@($r.messages).Count -ge 2) ($r | ConvertTo-Json -Compress)
 # 黑名单：用访客真实出口 IP 测试拦截
 $r = ApiGet '/api/sessions' $tenantA
+$r = $r.sessions   # v2.25 响应包装 {sessions, counts}
 $realIp = $r[0].ip
 $r = ApiPost '/api/ip-blacklist' @{ip=$realIp; reason='自测拦截'} $tenantA
 $blId = $r.id
@@ -123,6 +124,7 @@ Step '黑名单真实IP拦截 init' ($r.error -match '受限') ($r | ConvertTo-J
 $r = ApiDel "/api/ip-blacklist/$blId" $tenantA
 Step '移除黑名单' ($r.ok) ($r | ConvertTo-Json -Compress)
 $r = ApiGet '/api/sessions' $tenantA
+$r = $r.sessions   # v2.25 响应包装 {sessions, counts}
 Step '拦截未产生多余会话' (@($r).Count -eq 1) ($r | ConvertTo-Json -Compress)
 
 Write-Host "`n========== 7. 访客发消息 → 自动回复 ==========" -ForegroundColor Cyan
@@ -134,6 +136,7 @@ Step '空消息被拒' ($r.error) ($r | ConvertTo-Json -Compress)
 
 Write-Host "`n========== 8. 租户A工作台 ==========" -ForegroundColor Cyan
 $r = ApiGet '/api/sessions' $tenantA
+$r = $r.sessions   # v2.25 响应包装 {sessions, counts}
 Step '会话列表（1条，含未读）' (@($r).Count -eq 1 -and $r[0].name -eq '小明' -and $r[0].unread -ge 1) ($r | ConvertTo-Json -Compress)
 $r = ApiPost "/api/sessions/$sidA/messages" @{text='您好，价格私聊详询哈'} $tenantA
 Step '客服回复' ($r.message.id) ($r | ConvertTo-Json -Compress)
@@ -157,6 +160,7 @@ $r = ApiPost '/api/auth/login' @{account=$kamiB; password='tenant234'}
 $tenantB = $r.token
 Step '租户B登录' ($tenantB) ($r | ConvertTo-Json -Compress)
 $r = ApiGet '/api/sessions' $tenantB
+$r = $r.sessions   # v2.25 响应包装 {sessions, counts}
 Step '租户B会话列表为空' (@($r).Count -eq 0) ($r | ConvertTo-Json -Compress)
 $r = ApiGet "/api/sessions/$sidA/messages" $tenantB
 Step '租户B读租户A会话被拒' ($r.error) ($r | ConvertTo-Json -Compress)
@@ -171,6 +175,7 @@ $r = ApiPost '/api/visitor/init' @{t=$kamiB; name='B的访客'}
 Step '租户B访客进入' ($r.session_id) ($r | ConvertTo-Json -Compress)
 $sidB = $r.session_id
 $r = ApiGet '/api/sessions' $tenantB
+$r = $r.sessions   # v2.25 响应包装 {sessions, counts}
 Step '租户B只见自己的会话' (@($r).Count -eq 1 -and $r[0].name -eq 'B的访客') ($r | ConvertTo-Json -Compress)
 
 Write-Host "`n========== 10. 子客服 ==========" -ForegroundColor Cyan
@@ -186,10 +191,12 @@ $r = ApiPost '/api/auth/login' @{account='TESTKAMI1/kefu01'; password='agent123'
 Step '子客服登录' ($r.token -and $r.user.role -eq 'agent') ($r | ConvertTo-Json -Compress)
 $agent1 = $r.token
 $r = ApiGet '/api/sessions' $agent1
+$r = $r.sessions   # v2.25 响应包装 {sessions, counts}
 Step '子客服可见待接入会话' (@($r).Count -ge 1) ($r | ConvertTo-Json -Compress)
 $r = ApiPost "/api/sessions/$sidA/messages" @{text='我是子客服小美~'} $agent1
 Step '子客服回复' ($r.message.id) ($r | ConvertTo-Json -Compress)
 $r = ApiGet '/api/sessions' $agent1
+$r = $r.sessions   # v2.25 响应包装 {sessions, counts}
 $mine = @($r) | Where-Object { $_.id -eq $sidA }
 Step '回复后自动接手' ($mine.agent_id -gt 0) ($r | ConvertTo-Json -Compress)
 $r = ApiPost '/api/tenant/settings' @{} $agent1
@@ -197,6 +204,7 @@ Step '子客服访问租户管理被拒' ($r.error -match '无权限') ($r | Con
 $r = ApiGet '/api/quick-msgs' $agent1
 Step '子客服可读共享话术' (@($r).Count -ge 1) ($r | ConvertTo-Json -Compress)
 $r = ApiGet '/api/sessions' $tenantB
+$r = $r.sessions   # v2.25 响应包装 {sessions, counts}
 Step '子客服看不到租户B会话（隔离）' ((@($r) | Where-Object { $_.name -eq '小明' }) -eq $null) ($r | ConvertTo-Json -Compress)
 # 转接
 $r = ApiPost "/api/sessions/$sidA/transfer" @{to_agent_id=0} $tenantA
@@ -314,6 +322,7 @@ ApiPost "/api/sessions/$cid1/close" @{} $tenantC | Out-Null
 $r = ApiPost '/api/visitor/init' @{t='TESTKAMI3'; visitor_token='vt_c1'}
 Step '关闭后同token复用（去重生效）' ($r.reused -eq $true -and $r.session_id -eq $cid1) ($r | ConvertTo-Json -Compress)
 $r = ApiGet '/api/sessions' $tenantC
+$r = $r.sessions   # v2.25 响应包装 {sessions, counts}
 Step '去重复用未新建会话' (@($r).Count -eq 1) ($r | ConvertTo-Json -Compress)
 
 # --- IP 频率限制（先清空会话使 60 秒窗口归零） ---
@@ -342,6 +351,7 @@ Step '访客资源聚合（含联系方式）' (@($r).Count -ge 2 -and (@($r) | 
 $r = ApiPost '/api/tenant/cleanup' @{days=-1; scope='sessions'} $tenantC
 Step '清理全部会话' ($r.ok -and $r.deleted -ge 2) ($r | ConvertTo-Json -Compress)
 $r = ApiGet '/api/sessions' $tenantC
+$r = $r.sessions   # v2.25 响应包装 {sessions, counts}
 Step '清理后无会话' (@($r).Count -eq 0) ($r | ConvertTo-Json -Compress)
 $r = ApiGet '/api/tenant/visitors' $tenantC
 Step '清理后访客资源为空' (@($r).Count -eq 0) ($r | ConvertTo-Json -Compress)
