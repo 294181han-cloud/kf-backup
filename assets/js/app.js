@@ -1205,17 +1205,22 @@ const app = createApp({
       }
       return parts.join(' ');
     };
-    // 访客标签（v2.24）：设备（华为 安卓14 / iOS 17 / Windows 10/11…）· 渠道（微信/浏览器…）· 城市
+    // 访客标签（v2.29）：主显示 = 地区（广东广州 电信 / 香港…）；设备/渠道移入悬停全文
     const visitorTag = (s) => {
       if (!s) return '';
-      return [s.devTag, s.channel, s.city].filter(Boolean).join(' · ') || geoTag(s.geo);
+      if (s.region) return s.region;
+      return s.city || geoTag(s.geo) || [s.devTag, s.channel].filter(Boolean).join(' · ');
     };
     const visitorTagFull = (s) => {
       if (!s) return '';
-      const bits = [s.devTag, s.channel, s.city].filter(Boolean);
+      const bits = [];
+      if (s.region || s.city) bits.push(s.region || s.city);
+      if (s.devTag) bits.push(s.devTag);
+      if (s.channel) bits.push(s.channel);
       if (s.browser && !bits.includes(s.browser)) bits.push(s.browser);
       const g = geoTag(s.geo);
-      if (g && g !== s.city) bits.push(g);
+      if (g) bits.push(g);
+      if (s.ip) bits.push(s.ip);
       return bits.join(' · ') || '';
     };
 

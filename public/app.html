@@ -232,7 +232,7 @@
           <div class="info-item" v-if="profile"><span class="k">渠道</span><span class="v">{{ profile.channel || '浏览器' }}</span></div>
           <div class="info-item" v-if="profile"><span class="k">浏览器</span><span class="v">{{ profile.browser || '未知' }}</span></div>
           <div class="info-item"><span class="k">I P</span><span class="v mono">{{ current.ip }}</span></div>
-          <div class="info-item" v-if="profile"><span class="k">地区</span><span class="v" style="font-size:12px;">{{ profile.city || geoTag(profile.geo) || '未知' }}</span></div>
+          <div class="info-item" v-if="profile"><span class="k">地区</span><span class="v" style="font-size:12px;">{{ profile.region || profile.city || geoTag(profile.geo) || '未知' }}</span></div>
           <div class="info-item"><span class="k">来源</span><span class="v">{{ sourceText(current.source) }}</span></div>
           <div class="info-item" v-if="profile"><span class="k">访问次数</span><span class="v">{{ profile.visit_count }}</span></div>
           <div class="info-item" v-if="profile"><span class="k">消息数</span><span class="v">{{ profile.message_count }}</span></div>
@@ -1109,7 +1109,7 @@
 <script src="/assets/qr-poster.js?v=2.0.1"></script>
 <script src="/assets/api.js?v=2.0.1"></script>
 <script src="/assets/js/app-components.js?v=2.1.0"></script>
-<script src="/assets/js/app.js?v=2.6.2"></script>
+<script src="/assets/js/app.js?v=2.7.0"></script>
 <script src="/assets/js/app-boot.js?v=2.1.1"></script>
 </body>
 </html>

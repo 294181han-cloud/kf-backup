@@ -480,6 +480,48 @@ function geo_city(?string $geo): string
     return '';
 }
 
+/** geo 串取地区标签（v2.29）：省市 + 运营商。如「广东 广州 电信」「香港」；海外不含运营商 */
+function geo_region(?string $geo): string
+{
+    if (!$geo) return '';
+    $p = array_map('trim', explode('|', $geo));
+    $prov = ($p[1] ?? '');
+    $city = ($p[2] ?? '');
+    $isp = ($p[3] ?? '');
+    $cc = strtoupper($p[4] ?? '');
+    $tight = function (string $v): string {
+        if ($v === '' || $v === '0') return '';
+        if (mb_strlen($v) > 2) {
+            if (mb_substr($v, -1) === '市') $v = mb_substr($v, 0, -1);
+            elseif (mb_substr($v, -3) === '地区') $v = mb_substr($v, 0, -3);
+            elseif (mb_substr($v, -1) === '省') $v = mb_substr($v, 0, -1);
+        }
+        return $v;
+    };
+    $prov = $tight($prov); $city = $tight($city);
+    // 运营商精简：ISP 字符串里通常含公司名（如 "中国电信"/"China Telecom"）
+    $ispShort = '';
+    if ($isp !== '' && $isp !== '0') {
+        if (str_contains($isp, '电信') || stripos($isp, 'Telecom') !== false) $ispShort = '电信';
+        elseif (str_contains($isp, '联通') || stripos($isp, 'Unicom') !== false) $ispShort = '联通';
+        elseif (str_contains($isp, '移动') || stripos($isp, 'Mobile') !== false) $ispShort = '移动';
+        elseif (str_contains($isp, '铁通')) $ispShort = '铁通';
+        elseif (str_contains($isp, '广电')) $ispShort = '广电';
+        elseif (stripos($isp, 'Cable') !== false) $ispShort = '广电';
+    }
+    $out = '';
+    if ($cc === 'CN') {
+        // 国内：省市去重（北京市|北京市 → 北京）
+        if ($prov !== '' && $city !== '' && $prov !== $city) $out = $prov . ' ' . $city;
+        else $out = $city !== '' ? $city : $prov;
+        if ($ispShort !== '') $out .= ' ' . $ispShort;
+    } else {
+        // 海外：城市/地区即可（国家在悬停全文里）
+        $out = $city !== '' ? $city : $prov;
+    }
+    return $out !== '' ? $out : geo_city($geo);
+}
+
 /* ================= 随机串生成 ================= */
 
 function gen_kami(): string

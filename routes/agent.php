@@ -79,11 +79,12 @@ function handle_sessions(string $method): void
         $r['unread'] = (int)$r['unread'];
         $r['agent_id'] = (int)$r['agent_id'];
         $r['message_count'] = (int)$r['message_count'];
-        // 访客标签：设备（品牌/系统版本）、渠道（微信/浏览器…）、地区（城市，中文）
+        // 访客标签（v2.29）：地区（省市+运营商，如 广东广州 电信）；设备/渠道仅悬停全文用
         $uaInfo = parse_ua($r['ua'] ?? null);
         $r['devTag'] = $uaInfo['dev_tag'];
         $r['channel'] = $uaInfo['channel'];
         $r['city'] = geo_city($r['geo'] ?? null);
+        $r['region'] = geo_region($r['geo'] ?? null);
         unset($r['ua']);
     }
     unset($r);
@@ -367,6 +368,7 @@ function handle_session_profile(string $method, array $m): void
         'dev_tag' => $ua['dev_tag'], 'channel' => $ua['channel'],
         'geo' => ($geoStr = lookup_geo($s['ip'])),
         'city' => geo_city($geoStr),
+        'region' => geo_region($geoStr),
         'ua' => $ua,
         'visit_count' => $visitCount, 'message_count' => $msgCount,
         'first_time' => dt_to_iso($ft ?: $s['created_at']),
@@ -657,10 +659,11 @@ function handle_agent_poll(string $method): void
         $r['unread'] = (int)$r['unread'];
         $r['agent_id'] = (int)$r['agent_id'];
         $r['message_count'] = (int)$r['message_count'];
-        $uaInfo = parse_ua($r['ua'] ?? null);          // 访客标签（设备/渠道/城市）
+        $uaInfo = parse_ua($r['ua'] ?? null);          // 访客标签（设备/渠道保留给悬停全文）
         $r['devTag'] = $uaInfo['dev_tag'];
         $r['channel'] = $uaInfo['channel'];
         $r['city'] = geo_city($r['geo'] ?? null);
+        $r['region'] = geo_region($r['geo'] ?? null);   // v2.29：列表主标签=地区（省市+运营商）
         unset($r['ua']);
         $sessions[] = $r;
     }
