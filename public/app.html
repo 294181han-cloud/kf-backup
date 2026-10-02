@@ -693,9 +693,9 @@
           <div class="panel-title">后台 UI</div>
           <div class="muted" style="margin:-6px 0 14px;font-size:12px;line-height:1.7;">
             模板决定界面结构，配色决定颜色；选择即时生效并保存在本浏览器。<br>
-            电脑端作用于电脑浏览器打开的后台，手机端作用于手机浏览器打开的后台。<br>
-            配置按浏览器保存：谁设置只对谁自己生效，不影响其他客服与管理员。<br>
-            访客端的外观不在此配置：请使用「访客端模板」（品牌色 / 平台皮肤）。
+            此处按当前设备自动显示对应端（{{ uiCurrentCat === 'mobile' ? '手机端' : '电脑端' }}）；
+            另一端的样式请在对应设备上打开本页调整。<br>
+            配置按浏览器保存：谁设置只对谁自己生效，不影响其他客服与管理员。访客端外观请用「访客端模板」。
           </div>
           <div v-for="cat in uiCatList" :key="cat.key" style="margin-bottom:22px;">
             <h4 style="margin:0 0 10px;font-size:14px;color:#1f2329;">{{ cat.label }}</h4>
@@ -1221,7 +1221,7 @@
 <script src="/assets/qr-poster.js?v=2.1.03"></script>
 <script src="/assets/api.js?v=2.0.1"></script>
 <script src="/assets/js/app-components.js?v=2.1.0"></script>
-<script src="/assets/js/app.js?v=2.7.23"></script>
+<script src="/assets/js/app.js?v=2.7.25"></script>
 <script src="/assets/js/app-boot.js?v=2.1.1"></script>
 </body>
 </html>

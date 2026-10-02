@@ -854,7 +854,9 @@ const app = createApp({
       if (!colors.find((x) => x.id === colorId)) colorId = colors.length ? colors[0].id : '';
       uiSel[key] = { tpl: t ? t.id : '', color: colorId };
     });
-    const uiCatList = Object.keys(uiReg.categories || {}).map((key) => ({
+    // 后台UI 配置页只显示当前设备对应的端（加载器已按宽度自动识别 pc/mobile）
+    const uiCurrentCat = (window.UI && window.UI.cat) || 'pc';
+    const uiCatList = Object.keys(uiReg.categories || {}).filter((key) => key === uiCurrentCat).map((key) => ({
       key,
       label: uiReg.categories[key].label,
       pages: (uiReg.categories[key].pages || []).join(' / '),
@@ -1506,7 +1508,7 @@ const app = createApp({
       uploadAvatar, isImg,
       sec, loginLogs, visitors, cleanupOpts, loadSecurityPage, saveSecurity, doCleanup, loadVisitors, openVisitorSessions,
       guide, guideDone, dark, toggleDark, renameVisitor, renderCodeQrs, tplList,
-      uiCatList, uiSel, uiTplList, uiColorList, uiPick, sideCollapsed, mSideOpen,
+      uiCatList, uiCurrentCat, uiSel, uiTplList, uiColorList, uiPick, sideCollapsed, mSideOpen,
       blockSession, blockIp, kwList, kwInput, kwSaving, addKw, removeKw, saveFilter, agentCmd, restartPoll,
       chatSearchOn, chatSearchKw, searchHit, visibleMsgs, canRecall, recallMsg, isRead,
       pol, savePolicy, uploadPolHead, clock, unreadTotal, sessCollapsed,
