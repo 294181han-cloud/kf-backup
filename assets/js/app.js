@@ -366,7 +366,10 @@ const app = createApp({
       quickCtx.show = false;
       if (!q) return;
       tab.value = 'quick';
-      nextTick(() => {
+      // 表格渲染 + 数据加载都需要时间，轮询重试（最多 2s）
+      let tries = 0;
+      const tryOpen = () => {
+        tries++;
         try {
           const rows = document.querySelectorAll('.crud-table .el-table__row');
           for (const row of rows) {
@@ -376,8 +379,10 @@ const app = createApp({
             }
           }
         } catch (e) {}
+        if (tries < 10) { setTimeout(tryOpen, 200); return; }
         ElementPlus.ElMessage.info('请在列表中编辑「' + q.title + '」');
-      });
+      };
+      setTimeout(tryOpen, 250);
     };
     const sendQuick = async (q) => {
       if (!currentId.value || sending.value) { ElementPlus.ElMessage.warning('请先选择会话'); return; }
