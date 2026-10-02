@@ -21,8 +21,7 @@ function resolve_visitor_context(): ?array
             $lh = strtolower((string)(parse_url((string)($scX['link'] ?? ''), PHP_URL_HOST) ?: ''));
             $trace['steps'][] = ['kami' => $scX['kami'], 'link' => $scX['link'], 'parsed' => $lh, 'match' => ($lh !== '' && $h === $lh)];
         }
-        echo json_encode($trace, JSON_UNESCAPED_UNICODE);
-        exit;
+        $GLOBALS['__dbg_trace'] = $trace;   // 不 exit：继续走正常流程，观察最终返回
     }
 
     $pdo = db();
@@ -66,6 +65,11 @@ function resolve_visitor_context(): ?array
                 return ['tenant' => $sc, 'agent_id' => (int)$sc['agent_id']];
             }
         }
+    }
+    if (isset($GLOBALS['__dbg_trace'])) {
+        header('Content-Type: application/json; charset=utf-8');
+        echo json_encode(['result' => 'null-return', 'trace' => $GLOBALS['__dbg_trace']], JSON_UNESCAPED_UNICODE);
+        exit;
     }
     return null;
 }
