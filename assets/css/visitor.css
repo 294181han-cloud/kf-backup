@@ -108,6 +108,8 @@ body[data-tpl="whatsapp"] .msg-row.agent .msg-bubble::after {
   clip-path: polygon(0 0, 100% 0, 100% 100%);
 }
 body[data-tpl="whatsapp"] .msg-time { color: #667781; }
+/* 1:1 聊天不显示访客自己的头像（贴近 WhatsApp 原生观感），客服消息保留头像 */
+body[data-tpl="whatsapp"] .msg-row.visitor .msg-ava { display: none; }
 /* 输入区：贴在墙纸上的白色药丸输入条 */
 body[data-tpl="whatsapp"] .v-footer-wrap {
   background: transparent; box-shadow: none; border-radius: 0;
