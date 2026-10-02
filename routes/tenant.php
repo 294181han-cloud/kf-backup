@@ -805,7 +805,8 @@ function urlsec_details(array $j): array
 
 function handle_tenant_url_check(string $method): void
 {
-    $ctx = require_workspace();
+    // 检测接口按次计费（平台账号共享），仅租户主账号可用，子客服不可见
+    $ctx = require_tenant();
     $cfg = wxcheck_cfg();
 
     if ($method === 'GET') {
