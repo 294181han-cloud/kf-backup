@@ -176,7 +176,6 @@ const app = createApp({
         brand.company_name = b.brand_company; brand.title = b.brand_title; brand.sub = b.brand_sub;
         brand.avatar = b.brand_avatar; brand.color = b.brand_color; brand.tpl = b.visitor_template || 'default';
         brand.tpl_nav_on = b.tpl_nav_on !== false; brand.tpl_nav_title = b.tpl_nav_title || '';
-        codeCfg.logoType = b.code_logo_type || 'wechat';
         codeCfg.nicknameOn = b.code_nickname_on !== false;
         codeCfg.supportOn = b.code_support_on !== false;
         brand.vip_badge = b.vip_badge || ''; brand.footer_text = b.footer_text || '';
@@ -827,27 +826,126 @@ const app = createApp({
     // ===== 获客码页（统一码） =====
     const manageDlg = ref(false);
     const history = ref({ links: [], codes: [] });
-    const codeCfg = reactive({ logoType: 'wechat', nicknameOn: true, supportOn: true });
-    const mainQrUrl = ref('');
+    const codeCfg = reactive({ nicknameOn: true, supportOn: true });
     const qrWrap = ref(null);
-    const codeLogoEmoji = Vue.computed(() => ({
-      wechat: '💚', alipay: '🔵', mix: ['💚','🔵','🎲'][Math.floor(Math.random()*3)],
-    }[codeCfg.logoType] || '💚'));
-    const codeLogoImg = Vue.computed(() => codeCfg.logoType === 'avatar' ? ((me.value && me.value.avatar) || '') : '');
     const currentLink = Vue.computed(() => {
       if (!links.value) return '';
       if (links.value.domain_link && links.value.domain_link.active) return links.value.domain_link.link;
       const cs = (links.value.codes || []).filter(x => x.link);
       return cs.length ? cs[0].link : '';
     });
+    // 二维码渲染（普通样式，无中央徽章）。watch 含 tab：获客码面板是 v-if 渲染，
+    // 启动时 tab 未切换 DOM 不存在，切换 tab 必须重渲染（否则首次进入空白）
     const renderMainQr = () => {
       nextTick(() => {
-        if (!qrWrap.value || !currentLink.value || !window.QRCode) return;
-        qrWrap.value.innerHTML = '';
-        try { new QRCode(qrWrap.value, { text: currentLink.value, width: 210, height: 210, correctLevel: QRCode.CorrectLevel.M }); } catch (e) {}
+        if (qrWrap.value && window.QRCode && currentLink.value) {
+          qrWrap.value.innerHTML = '';
+          try { new QRCode(qrWrap.value, { text: currentLink.value, width: 210, height: 210, correctLevel: QRCode.CorrectLevel.M }); } catch (e) {}
+        }
+        renderPosterQr();
       });
     };
-    Vue.watch([currentLink, () => codeCfg.logoType], renderMainQr);
+    Vue.watch([currentLink, tab], renderMainQr);
+
+    // ===== 推广海报：背景图 + 居中二维码 + 自定义上下文字 =====
+    const posterCfg = reactive({ bgUrl: '', topText: '', bottomText: '' });
+    try { Object.assign(posterCfg, JSON.parse(localStorage.getItem('kfxt_code_poster') || '{}')); } catch (e) {}
+    Vue.watch(posterCfg, () => { try { localStorage.setItem('kfxt_code_poster', JSON.stringify(posterCfg)); } catch (e) {} }, { deep: true });
+    const posterQrBox = ref(null);
+    const posterBgInput = ref(null);
+    const renderPosterQr = () => {
+      if (!posterQrBox.value) return;
+      posterQrBox.value.innerHTML = '';
+      if (window.QRCode && currentLink.value) {
+        try { new QRCode(posterQrBox.value, { text: currentLink.value, width: 190, height: 190, correctLevel: QRCode.CorrectLevel.M }); } catch (e) {}
+      }
+    };
+    const pickPosterBg = () => { if (posterBgInput.value) posterBgInput.value.click(); };
+    const onPosterBg = async (ev) => {
+      const file = ev.target.files[0];
+      ev.target.value = '';
+      if (!file) return;
+      if (file.size > 5 * 1024 * 1024) { ElementPlus.ElMessage.warning('背景图不能超过 5MB'); return; }
+      const data = await new Promise(res => { const fr = new FileReader(); fr.onload = () => res(fr.result); fr.readAsDataURL(file); });
+      try {
+        const up = await API.post('/api/upload', { data, kind: 'image', filename: file.name });
+        posterCfg.bgUrl = up.url;
+        ElementPlus.ElMessage.success('背景已更新');
+      } catch (e) { ElementPlus.ElMessage.error(e.message); }
+    };
+    const loadImgOnce = (src) => new Promise((res, rej) => { const im = new Image(); im.onload = () => res(im); im.onerror = rej; im.src = src; });
+    const fitText = (ctx, text, maxW, baseSize) => {
+      let size = baseSize;
+      ctx.font = `700 ${size}px sans-serif`;
+      while (size > 16 && ctx.measureText(text).width > maxW) { size -= 2; ctx.font = `700 ${size}px sans-serif`; }
+      return size;
+    };
+    const roundRect = (ctx, x, y, w, h, r) => {
+      ctx.beginPath();
+      ctx.moveTo(x + r, y);
+      ctx.arcTo(x + w, y, x + w, y + h, r);
+      ctx.arcTo(x + w, y + h, x, y + h, r);
+      ctx.arcTo(x, y + h, x, y, r);
+      ctx.arcTo(x, y, x + w, y, r);
+      ctx.closePath();
+    };
+    const downloadPoster2 = async () => {
+      if (!currentLink.value) { ElementPlus.ElMessage.warning('尚未生成客服码'); return; }
+      try {
+        const W = 750, cardW = 470, qrSize = 380, pad = 26;
+        let bgImg = null;
+        if (posterCfg.bgUrl) { try { bgImg = await loadImgOnce(posterCfg.bgUrl); } catch (e) { bgImg = null; } }
+        // 卡片总高：上文字 + QR + 下文字（各留 14 间距）
+        const meas = document.createElement('canvas').getContext('2d');
+        const topT = (posterCfg.topText || '').trim(), botT = (posterCfg.bottomText || '').trim();
+        const topSize = topT ? fitText(meas, topT, cardW - pad * 2, 36) : 0;
+        const botSize = botT ? fitText(meas, botT, cardW - pad * 2, 30) : 0;
+        const cardH = pad + (topT ? topSize + 14 : 0) + qrSize + (botT ? botSize + 14 : 0) + pad;
+        let H = bgImg ? Math.round(W * bgImg.height / bgImg.width) : 1000;
+        if (H < cardH + 100) H = cardH + 100;
+        const c = document.createElement('canvas');
+        c.width = W; c.height = H;
+        const ctx = c.getContext('2d');
+        ctx.fillStyle = '#ffffff'; ctx.fillRect(0, 0, W, H);
+        if (bgImg) { // cover 铺满
+          const s = Math.max(W / bgImg.width, H / bgImg.height);
+          const dw = bgImg.width * s, dh = bgImg.height * s;
+          ctx.drawImage(bgImg, (W - dw) / 2, (H - dh) / 2, dw, dh);
+        }
+        // 中央白卡 + QR + 文字
+        const cx = (W - cardW) / 2, cy = (H - cardH) / 2;
+        ctx.fillStyle = 'rgba(255,255,255,.96)';
+        roundRect(ctx, cx, cy, cardW, cardH, 28); ctx.fill();
+        let y = cy + pad;
+        if (topT) {
+          ctx.fillStyle = '#1a2233'; ctx.textAlign = 'center'; ctx.textBaseline = 'top';
+          ctx.font = `700 ${topSize}px sans-serif`;
+          ctx.fillText(topT, W / 2, y); y += topSize + 14;
+        }
+        const qrCv = posterQrBox.value && (posterQrBox.value.querySelector('canvas') || posterQrBox.value.querySelector('img'));
+        let drew = false;
+        // 导出用高清二维码（离屏按目标尺寸重绘，避免预览 190px 放大发糊）
+        try {
+          const holder = document.createElement('div');
+          new QRCode(holder, { text: currentLink.value, width: qrSize, height: qrSize, correctLevel: QRCode.CorrectLevel.M });
+          const hi = holder.querySelector('canvas');
+          if (hi) { ctx.drawImage(hi, (W - qrSize) / 2, y, qrSize, qrSize); drew = true; }
+        } catch (e) {}
+        if (!drew && qrCv && qrCv.tagName === 'CANVAS') { ctx.drawImage(qrCv, (W - qrSize) / 2, y, qrSize, qrSize); drew = true; }
+        else if (!drew && qrCv) { const im = await loadImgOnce(qrCv.src); ctx.drawImage(im, (W - qrSize) / 2, y, qrSize, qrSize); drew = true; }
+        if (!drew) { ElementPlus.ElMessage.warning('二维码尚未生成'); return; }
+        y += qrSize;
+        if (botT) {
+          y += 14;
+          ctx.fillStyle = '#5c6b85'; ctx.textAlign = 'center'; ctx.textBaseline = 'top';
+          ctx.font = `500 ${botSize}px sans-serif`;
+          ctx.fillText(botT, W / 2, y);
+        }
+        const a = document.createElement('a');
+        a.href = c.toDataURL('image/png'); a.download = '客服码海报-' + Date.now() + '.png';
+        document.body.appendChild(a); a.click(); a.remove();
+      } catch (e) { ElementPlus.ElMessage.error('海报生成失败：' + (e.message || e)); }
+    };
     const copyQrImage = async () => {
       try {
         const cv = qrWrap.value.querySelector('canvas') || qrWrap.value.querySelector('img');
@@ -884,7 +982,7 @@ const app = createApp({
       catch (e) { ElementPlus.ElMessage.error(e.message); }
     };
     const saveCodeCfg = async () => {
-      try { await API.put('/api/tenant/settings', { code_logo_type: codeCfg.logoType, code_nickname_on: codeCfg.nicknameOn, code_support_on: codeCfg.supportOn }); }
+      try { await API.put('/api/tenant/settings', { code_nickname_on: codeCfg.nicknameOn, code_support_on: codeCfg.supportOn }); }
       catch (e) { ElementPlus.ElMessage.error(e.message); }
     };
 
@@ -1001,7 +1099,8 @@ const app = createApp({
       blockSession, blockIp, kwList, kwInput, kwSaving, addKw, removeKw, saveFilter, agentCmd, restartPoll,
       chatSearchOn, chatSearchKw, searchHit, visibleMsgs, canRecall, recallMsg, isRead,
       pol, savePolicy, uploadPolHead, clock, unreadTotal, sessCollapsed,
-      manageDlg, history, codeCfg, mainQrUrl, qrWrap, codeLogoEmoji, codeLogoImg, currentLink, renderMainQr,
+      manageDlg, history, codeCfg, qrWrap, currentLink, renderMainQr,
+      posterCfg, posterQrBox, posterBgInput, pickPosterBg, onPosterBg, downloadPoster2,
       cropDlg, cropSrc, cropZoomPct, cropStage, cropStyle, cropImgLoaded, cropDown, cropMove, cropUp, cropWheel, cropClose, openCrop, cropConfirm, avatarPreview,
       geoTag,copyQrImage, downloadQrImage, codeRotateHint, rotateCode, loadHistory, disableLink, saveCodeCfg, meAvatarUrl,
       quickFields, welcomeFields, autoFields, blFields, preqFields,
