@@ -5,9 +5,9 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>客服工作台</title>
 <link rel="stylesheet" href="/assets/vendor/element-plus.css">
-<link rel="stylesheet" href="/assets/css/app.css?v=2.7.0">
-<script src="/assets/ui/ui-registry.js?v=2.5.1"></script>
-<script src="/assets/ui/ui-loader.js?v=2.5.1" data-ui-cat="auto"></script>
+<link rel="stylesheet" href="/assets/css/app.css?v=2.8.1">
+<script src="/assets/ui/ui-registry.js?v=2.6.0"></script>
+<script src="/assets/ui/ui-loader.js?v=2.6.0" data-ui-cat="auto"></script>
 </head>
 <body>
 <div id="app" v-cloak @click="closeCtxMenu(); quickCtx.show=false">
@@ -40,33 +40,32 @@
       </div>
       <div class="nav">
         <div class="nav-group" style="padding-top:6px;">工 作</div>
-        <div class="nav-item" :class="{active: tab==='stats'}" @click="tab='stats'; restartPoll()"><span class="nv-text">数据面板</span></div>
-        <div class="nav-item" :class="{active: tab==='work'}" @click="tab='work'; restartPoll()"><span class="nv-text">工作台</span></div>
-        <div class="nav-item" :class="{active: tab==='visitors'}" @click="tab='visitors'; loadVisitors()"><span class="nv-text">访客列表</span></div>
+        <div class="nav-item" :class="{active: tab==='stats'}" @click="tab='stats'; restartPoll()"><span class="nv-ic">📊</span><span class="nv-text">数据面板</span></div>
+        <div class="nav-item" :class="{active: tab==='work'}" @click="tab='work'; restartPoll()"><span class="nv-ic">💬</span><span class="nv-text">工作台</span><span class="nv-dot" v-if="unreadTotal>0"></span></div>
+        <div class="nav-item" :class="{active: tab==='visitors'}" @click="tab='visitors'; loadVisitors()"><span class="nv-ic">👥</span><span class="nv-text">访客列表</span></div>
         <template v-if="me && me.role==='tenant'">
-          <div class="nav-item" :class="{active: tab==='agents'}" @click="tab='agents'"><span class="nv-text">坐席管理</span></div>
-          <div class="nav-item" :class="{active: tab==='links'}" @click="tab='links'"><span class="nv-text">客服码</span></div>
-          <div class="nav-item" :class="{active: tab==='urlsec'}" @click="tab='urlsec'; loadUrlsec()"><span class="nv-text">域名检测</span></div>
+          <div class="nav-item" :class="{active: tab==='agents'}" @click="tab='agents'"><span class="nv-ic">🎧</span><span class="nv-text">坐席管理</span></div>
+          <div class="nav-item" :class="{active: tab==='links'}" @click="tab='links'"><span class="nv-ic">🔗</span><span class="nv-text">客服码</span></div>
         </template>
         <div class="nav-group">内 容</div>
-        <div class="nav-item" :class="{active: tab==='quick'}" @click="tab='quick'"><span class="nv-text">快捷消息</span></div>
-        <div class="nav-item" :class="{active: tab==='welcome'}" @click="tab='welcome'"><span class="nv-text">欢迎语</span></div>
-        <div class="nav-item" :class="{active: tab==='auto'}" @click="tab='auto'"><span class="nv-text">智能回复</span></div>
+        <div class="nav-item" :class="{active: tab==='quick'}" @click="tab='quick'"><span class="nv-ic">⚡</span><span class="nv-text">快捷消息</span></div>
+        <div class="nav-item" :class="{active: tab==='welcome'}" @click="tab='welcome'"><span class="nv-ic">👋</span><span class="nv-text">欢迎语</span></div>
+        <div class="nav-item" :class="{active: tab==='auto'}" @click="tab='auto'"><span class="nv-ic">🤖</span><span class="nv-text">智能回复</span></div>
         <template v-if="me && me.role==='tenant'">
-          <div class="nav-item" :class="{active: tab==='broadcast'}" @click="tab='broadcast'"><span class="nv-text">群发模板</span></div>
+          <div class="nav-item" :class="{active: tab==='broadcast'}" @click="tab='broadcast'"><span class="nv-ic">📢</span><span class="nv-text">群发模板</span></div>
         </template>
         <div class="nav-group">数 据</div>
-        <div class="nav-item" :class="{active: tab==='blacklist'}" @click="tab='blacklist'"><span class="nv-text">IP黑名单</span></div>
+        <div class="nav-item" :class="{active: tab==='blacklist'}" @click="tab='blacklist'"><span class="nv-ic">🚫</span><span class="nv-text">IP黑名单</span></div>
         <template v-if="me && me.role==='tenant'">
           <div class="nav-group">系 统</div>
-          <div class="nav-item" :class="{active: tab==='brand'}" @click="tab='brand'"><span class="nv-text">访客端模板</span></div>
-          <div class="nav-item" :class="{active: tab==='ui'}" @click="tab='ui'"><span class="nv-text">后台UI</span></div>
-          <div class="nav-item" :class="{active: tab==='preinq'}" @click="tab='preinq'"><span class="nv-text">询前表单</span></div>
-          <div class="nav-item" :class="{active: tab==='policy'}" @click="tab='policy'"><span class="nv-text">访客策略</span></div>
-          <div class="nav-item" :class="{active: tab==='security'}" @click="tab='security'; loadSecurityPage()"><span class="nv-text">安全与维护</span></div>
+          <div class="nav-item" :class="{active: tab==='brand'}" @click="tab='brand'"><span class="nv-ic">🎨</span><span class="nv-text">访客端模板</span></div>
+          <div class="nav-item" :class="{active: tab==='ui'}" @click="tab='ui'"><span class="nv-ic">🖌️</span><span class="nv-text">后台UI</span></div>
+          <div class="nav-item" :class="{active: tab==='preinq'}" @click="tab='preinq'"><span class="nv-ic">📝</span><span class="nv-text">询前表单</span></div>
+          <div class="nav-item" :class="{active: tab==='policy'}" @click="tab='policy'"><span class="nv-ic">🛡️</span><span class="nv-text">访客策略</span></div>
+          <div class="nav-item" :class="{active: tab==='security'}" @click="tab='security'; loadSecurityPage()"><span class="nv-ic">🔒</span><span class="nv-text">安全与维护</span></div>
         </template>
         <div class="nav-group">账 号</div>
-        <div class="nav-item" :class="{active: tab==='profile'}" @click="tab='profile'"><span class="nv-text">个人设置</span></div>
+        <div class="nav-item" :class="{active: tab==='profile'}" @click="tab='profile'"><span class="nv-ic">⚙️</span><span class="nv-text">个人设置</span></div>
       </div>
       <div class="side-tools" style="padding:10px 12px 4px;display:flex;align-items:center;justify-content:space-between;">
         <span style="cursor:pointer;font-size:16px;" title="收起/展开菜单" @click="sideCollapsed = !sideCollapsed">{{ sideCollapsed ? '➡' : '⬅' }}</span>
@@ -113,15 +112,20 @@
           <div class="sess-list" v-if="!sessCollapsed">
             <div v-if="!filteredSessions.length" style="padding:40px;text-align:center;color:#a0a6ad;font-size:13px;">暂无会话</div>
             <div class="sess-item" v-for="s in filteredSessions" :key="s.id" :class="{active: currentId===s.id}" @click="openSession(s.id)" @contextmenu="openCtxMenu(s, $event)">
-              <div class="row1">
-                <span class="name">{{ s.name }}<span class="geo-tag" v-if="visitorTag(s)" :title="visitorTagFull(s)">{{ visitorTag(s) }}</span></span>
-                <span class="time">{{ shortTime(s.lastTime) }}</span>
+              <div class="sess-ava" :class="{on: s.status==='online'}">
+                <span>{{ sessIcon(s) }}</span>
+                <i class="sess-ava-dot" :class="s.status"></i>
               </div>
-              <div class="row2">
-                <span v-if="s.agent_id>0" class="tag-agent">{{ s.agent_name || '客服' }}</span>
-                <span class="last">{{ s.lastMsg }}</span>
-                <span class="dot" :class="s.status"></span>
-                <span class="badge" v-if="s.unread>0">{{ s.unread>99?'99+':s.unread }}</span>
+              <div class="sess-body">
+                <div class="row1">
+                  <span class="name">{{ s.name }}<span class="geo-tag" v-if="visitorTag(s)" :title="visitorTagFull(s)">{{ visitorTag(s) }}</span></span>
+                  <span class="time">{{ shortTime(s.lastTime) }}</span>
+                </div>
+                <div class="row2">
+                  <span v-if="s.agent_id>0" class="tag-agent">{{ s.agent_name || '客服' }}</span>
+                  <span class="last">{{ s.lastMsg }}</span>
+                  <span class="badge" v-if="s.unread>0">{{ s.unread>99?'99+':s.unread }}</span>
+                </div>
               </div>
             </div>
           </div>
@@ -130,13 +134,30 @@
         <div class="chat-col">
           <template v-if="current">
             <div class="chat-head">
-              <span class="name">{{ current.name }}</span>
-              <span class="geo-tag" v-if="visitorTag(current)" :title="visitorTagFull(current)">{{ visitorTag(current) }}</span>
-              <span style="cursor:pointer;font-size:13px;" title="修改访客名称" @click="renameVisitor">✏️</span>
-              <span style="cursor:pointer;font-size:13px;" title="搜索聊天记录" @click="chatSearchOn = !chatSearchOn">🔍</span>
-              <el-tag size="small" :type="current.status==='online' ? 'success' : 'info'">{{ current.status==='online'?'在线':'离线' }}</el-tag>
+              <div class="ch-ava" :class="{on: current.status==='online'}">{{ sessIcon(current) }}</div>
+              <div class="ch-info">
+                <div class="ch-top">
+                  <span class="name" :title="current.name">{{ current.name }}</span>
+                  <span class="ch-edit" title="修改访客名称" @click="renameVisitor">✏️</span>
+                  <span class="ch-chip" v-if="profile && profile.dev_tag">{{ profile.dev_tag }}</span>
+                  <span class="ch-chip" v-if="profile && profile.channel && profile.channel !== '未知'">{{ profile.channel }}</span>
+                  <span class="ch-chip src">{{ sourceText(current.source) }}</span>
+                  <span class="ch-state" :class="current.status"><i></i>{{ current.status==='online' ? '在线' : '离线' }}</span>
+                </div>
+                <div class="ch-sub">
+                  <span title="访客 IP">🌐 {{ current.ip || '—' }}</span>
+                  <span v-if="profile">📍 {{ profile.region || profile.city || geoTag(profile.geo) || '未知' }}</span>
+                  <span v-if="profile">👣 访问 {{ profile.visit_count }} 次</span>
+                  <span v-if="profile">💬 消息 {{ profile.message_count }}</span>
+                  <span v-if="profile && profile.first_time" title="首次进入时间">🕒 首次 {{ shortTime(profile.first_time) }}</span>
+                  <span v-if="current.lastTime" title="最近活跃">⏱ 最近 {{ shortTime(current.lastTime) }}</span>
+                  <span v-if="current.agent_name" title="接待客服">🎧 {{ current.agent_name }}</span>
+                  <span class="ch-id" title="会话编号">#{{ current.id }}</span>
+                </div>
+              </div>
 
               <span class="chat-head-btns">
+                <el-button size="small" plain class="cbtn icon" title="搜索聊天记录" @click="chatSearchOn = !chatSearchOn">🔍</el-button>
                 <el-popconfirm title="拉黑该访客 IP？拉黑后其无法再进入或发消息" @confirm="blockSession">
                   <template #reference><el-button size="small" type="danger" plain class="cbtn">🚫 拉黑</el-button></template>
                 </el-popconfirm>
@@ -282,12 +303,11 @@
           </div>
         </div>
         <div class="stat-grid">
-          <div class="stat-card"><div class="v">{{ stats.today_sessions }}</div><div class="l">今日新会话</div></div>
-          <div class="stat-card"><div class="v" style="color:#00b42a;">{{ stats.today_active }}</div><div class="l">今日活跃访客</div></div>
-          <div class="stat-card"><div class="v">{{ stats.today_replied }}</div><div class="l">今日回复数</div></div>
-
-          <div class="stat-card"><div class="v">{{ stats.online_visitors }}</div><div class="l">当前在线</div></div>
-          <div class="stat-card"><div class="v">{{ stats.total_sessions }}</div><div class="l">总会话</div></div>
+          <div class="stat-card"><span class="sc-ic c1">📨</span><div class="sc-body"><div class="v">{{ stats.today_sessions }}</div><div class="l">今日新会话</div></div></div>
+          <div class="stat-card"><span class="sc-ic c2">👤</span><div class="sc-body"><div class="v c2t">{{ stats.today_active }}</div><div class="l">今日活跃访客</div></div></div>
+          <div class="stat-card"><span class="sc-ic c3">💬</span><div class="sc-body"><div class="v">{{ stats.today_replied }}</div><div class="l">今日回复数</div></div></div>
+          <div class="stat-card"><span class="sc-ic c4">🟢</span><div class="sc-body"><div class="v">{{ stats.online_visitors }}</div><div class="l">当前在线</div></div></div>
+          <div class="stat-card"><span class="sc-ic c5">🗂️</span><div class="sc-body"><div class="v">{{ stats.total_sessions }}</div><div class="l">总会话</div></div></div>
         </div>
         <div class="panel">
           <div class="panel-title">近 7 天会话趋势</div>
@@ -403,22 +423,45 @@
           <div class="code-bar">
             <span class="cb-lbl">客服码</span>
             <button type="button" class="code-pill" title="点击复制" @click="copy(codeValue)">{{ codeValue }}</button>
-            <span class="code-state" :class="'st-' + codeCheck.state">{{ codeCheck.text }}</span>
             <span class="cb-name">名称：<b>{{ me.nickname || '客服' }}</b></span>
+            <span class="cb-sp"></span>
             <el-popconfirm :title="codeRotateHint" @confirm="rotateCode">
               <template #reference><el-button type="primary" size="small">换码</el-button></template>
             </el-popconfirm>
             <el-button size="small" class="cb-danger" @click="manageDlg = true; loadHistory()">失效二维码</el-button>
           </div>
 
+          <!-- 拦截检测：微信 logo 就查微信能不能打开 / 有没有被拦截（红了） -->
+          <div class="check-bar" :class="'ck-' + codeCheck.state">
+            <div class="ck-ic">{{ codeCheck.state === 'ok' ? '🟢' : (codeCheck.state === 'red' ? '🔴' : '⚪') }}</div>
+            <div class="ck-main">
+              <div class="ck-t">
+                <span class="ck-name">{{ checkChannelLabel }}拦截检测</span>
+                <span class="ck-res" :class="'ckr-' + codeCheck.state">
+                  <span v-if="codeCheck.loading">检测中…</span>
+                  <span v-else>{{ codeCheck.state === 'ok' ? '正常（未红）' : (codeCheck.state === 'red' ? '已被拦截（红了）' : codeCheck.text) }}</span>
+                </span>
+              </div>
+              <div class="ck-s">
+                <template v-if="codeCheck.msg">{{ codeCheck.msg }}</template>
+                <template v-else>{{ checkChannelLabel === '微信' ? '检测这个客服码链接在微信里能不能正常打开、有没有被微信拦截（俗称「红了」）。中心 Logo 选微信即检测微信。' : '检测这个客服码链接在 QQ 里能不能正常打开、有没有被拦截。中心 Logo 选 QQ 即检测 QQ。' }}</template>
+              </div>
+              <div class="ck-meta">
+                <span class="mono">{{ currentLink || '尚未生成客服码' }}</span>
+                <span>检测通道：{{ checkChannelLabel }}</span>
+                <span>最近检测：{{ codeCheck.atText }}</span>
+              </div>
+            </div>
+            <el-button type="primary" size="small" :loading="codeCheck.loading" @click="checkCode(true)">
+              {{ codeCheck.loading ? '检测中' : '立即检测' }}
+            </el-button>
+          </div>
+
           <div class="code-panel">
             <div class="cp-hd">
               <span class="cp-hd-t">公共链接</span>
-              <span class="code-state" :class="'st-' + codeCheck.state">{{ codeCheck.tag }}</span>
-              <span class="cp-hd-hint" v-if="codeCheck.msg">{{ codeCheck.msg }}</span>
+              <span class="cp-hd-hint">中心 Logo 决定检测通道（微信 / QQ）</span>
               <span class="cp-hd-sp"></span>
-              <span class="cp-hd-at">最近检测：{{ codeCheck.atText }}</span>
-              <el-button size="small" :loading="codeCheck.loading" @click="checkCode(true)">立即检测</el-button>
               <el-button size="small" text @click="manageDlg = true; loadHistory()">管理码</el-button>
             </div>
 
@@ -602,87 +645,6 @@
               </div>
             </div>
           </div>
-        </div>
-      </div>
-
-      <!-- ============ 域名检测（平台图标墙） ============ -->
-      <div class="content" v-if="tab==='urlsec'">
-        <div class="panel">
-          <div class="panel-title" style="justify-content:flex-start;gap:10px;">
-            域名检测
-            <span class="code-state" :class="urlsec.on ? 'st-ok' : 'st-off'">{{ urlsec.on ? '接口已开通' : '接口未开通' }}</span>
-            <span class="muted" style="font-size:12px;">账号 {{ urlsec.user || '未配置' }}</span>
-          </div>
-          <div class="us-bar">
-            <span class="us-lbl">检测网址</span>
-            <el-input v-model="urlsec.url" placeholder="https://example.com 或 example.com" clearable @keyup.enter="urlsecRunFirst"></el-input>
-            <el-button v-if="currentLink" size="small" @click="useCurrentLink">用当前客服链接</el-button>
-          </div>
-          <div class="us-bar" style="margin-bottom:6px;">
-            <span class="us-lbl">找平台</span>
-            <el-input v-model="urlsec.kw" placeholder="输入平台名筛选，如：微信 / 抖音 / 备案" clearable style="max-width:260px;"></el-input>
-            <span class="muted" style="font-size:12px;">点任意平台图标，即用上面的网址检测该平台</span>
-          </div>
-        </div>
-
-        <div class="panel" v-if="urlsec.result">
-          <div class="panel-title" style="justify-content:flex-start;gap:10px;">
-            检测结果
-            <span class="code-state" :class="'st-' + (urlsec.result.state === 'ok' ? 'ok' : (urlsec.result.state === 'red' ? 'red' : (urlsec.result.state === 'off' ? 'off' : 'err')))">
-              {{ urlsec.result.state === 'ok' ? '正常' : (urlsec.result.state === 'red' ? '已拦截' : (urlsec.result.state === 'off' ? '未开通' : '异常')) }}
-            </span>
-            <span class="muted" style="font-size:12px;">{{ urlsec.result.icon }} {{ urlsec.result.name }} · {{ urlsec.result.at }}</span>
-          </div>
-          <div class="us-res">
-            <div class="us-res-main">
-              <div class="us-msg">{{ urlsec.result.msg }}</div>
-              <div class="us-url mono">{{ urlsec.result.url }}</div>
-            </div>
-            <div class="us-det" v-if="(urlsec.result.details||[]).length">
-              <div class="us-det-row" v-for="(d, di) in urlsec.result.details" :key="di">
-                <span class="k">{{ d.k }}</span><span class="v">{{ d.v }}</span>
-              </div>
-            </div>
-          </div>
-          <details class="us-raw" v-if="urlsec.rawText">
-            <summary>查看接口原始返回</summary>
-            <pre>{{ urlsec.rawText }}</pre>
-          </details>
-        </div>
-
-        <div class="panel" v-if="urlsec.history.length">
-          <div class="panel-title" style="justify-content:space-between;">
-            <span>最近检测（本次会话）</span>
-            <el-button size="small" @click="urlsec.history.splice(0)">清空</el-button>
-          </div>
-          <div class="us-hist">
-            <div class="us-hist-item" v-for="(h, hi) in urlsec.history" :key="hi">
-              <span class="us-hi-ic">{{ h.icon }}</span>
-              <span class="us-hi-name">{{ h.name }}</span>
-              <span class="code-state" :class="'st-' + (h.state === 'ok' ? 'ok' : (h.state === 'red' ? 'red' : (h.state === 'off' ? 'off' : 'err')))">{{ h.msg }}</span>
-              <span class="us-hi-time">{{ h.at }}</span>
-            </div>
-          </div>
-        </div>
-
-        <div class="panel" v-for="g in urlsecGroups" :key="g.g">
-          <div class="panel-title" style="justify-content:flex-start;gap:8px;">
-            {{ g.g }}<span class="muted" style="font-size:12px;">{{ g.items.length }} 个平台</span>
-          </div>
-          <div class="us-grid">
-            <button class="us-card" v-for="it in g.items" :key="it.c"
-                    :class="{busy: urlsec.cur === it.c, red: urlsec.result && urlsec.result.channel === it.c && urlsec.result.state === 'red'}"
-                    :disabled="urlsec.loading"
-                    :title="'点击检测：' + it.n"
-                    @click="runUrlCheck(it)">
-              <span class="us-ic">{{ it.i }}</span>
-              <span class="us-name">{{ it.n }}</span>
-              <span class="us-spin" v-if="urlsec.cur === it.c"></span>
-            </button>
-          </div>
-        </div>
-        <div class="panel" v-if="urlsec.loaded && !urlsecGroups.length">
-          <div class="muted">没有匹配的平台，换个关键词试试。</div>
         </div>
       </div>
 
@@ -1321,7 +1283,7 @@
 <script src="/assets/qr-poster.js?v=2.1.03"></script>
 <script src="/assets/api.js?v=2.0.1"></script>
 <script src="/assets/js/app-components.js?v=2.1.0"></script>
-<script src="/assets/js/app.js?v=2.8.1"></script>
+<script src="/assets/js/app.js?v=2.8.3"></script>
 <script src="/assets/js/app-boot.js?v=2.1.1"></script>
 </body>
 </html>

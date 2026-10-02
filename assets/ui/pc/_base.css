@@ -14,6 +14,10 @@
   --el-color-primary-light-8: color-mix(in srgb, var(--theme) 20%, white);
   --el-color-primary-light-9: color-mix(in srgb, var(--theme) 10%, white);
   --el-color-primary-dark-2: color-mix(in srgb, var(--theme) 80%, black);
+
+  /* 自己发出的消息气泡：产品约定＝微信绿，不跟随配色（各配色不得改） */
+  --bubble-mine: #95ec69;
+  --bubble-mine-ink: #10321c;
 }
 
 /* 侧栏右边框随主题色（原 JS 内联实现，现回归 CSS） */

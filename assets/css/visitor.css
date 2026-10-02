@@ -427,3 +427,25 @@ body[data-tpl="whatsapp"] .ask-card .ac-btn { background: #008069; box-shadow: 0
   .v-footer-wrap { border-radius: 20px 20px 0 0; }
   body[data-tpl="whatsapp"] .v-footer-wrap { border-radius: 0; }
 }
+
+/* ================= v2.33 访客端细节打磨 ================= */
+/* 默认模板也加气泡小尾巴（自己发的绿、客服的白），与微信观感一致 */
+body[data-tpl="default"] .msg-bubble { position: relative; }
+body[data-tpl="default"] .msg-row.agent .msg-bubble::after {
+  content: ''; position: absolute; left: -5px; top: 12px; width: 0; height: 0;
+  border: 6px solid transparent; border-right-color: var(--card); border-left: 0;
+}
+body[data-tpl="default"] .msg-row.visitor .msg-bubble::after {
+  content: ''; position: absolute; right: -5px; top: 12px; width: 0; height: 0;
+  border: 6px solid transparent; border-left-color: #8fe066; border-right: 0;
+}
+.v-tool-btn {
+  background: var(--card); border: 1px solid var(--line); border-radius: 10px;
+  padding: 6px 10px; font-weight: 500;
+}
+.v-tool-btn:active { background: var(--bg); }
+.v-tool-btn .ic { font-size: 17px; }
+body[data-tpl="whatsapp"] .v-tool-btn { background: rgba(255, 255, 255, .92); border-color: transparent; }
+body[data-tpl="whatsapp"] .v-input-row .v-btn { box-shadow: 0 3px 10px rgba(0, 128, 105, .3); }
+.v-header { padding-top: calc(14px + env(safe-area-inset-top)); }
+.welcome-card h3 { letter-spacing: .2px; }

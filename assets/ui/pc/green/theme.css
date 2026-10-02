@@ -28,4 +28,4 @@ html[data-ui="green"] .code-tab.active::after { background: var(--theme); }
 html[data-ui="green"] .qr-headline { color: var(--theme); }
 html[data-ui="green"] .crop-box { border-color: var(--theme); }
 html[data-ui="green"] .bar-row .bar > div { background: linear-gradient(90deg, var(--theme), color-mix(in srgb, var(--theme) 55%, white)); }
-html[data-ui="green"] body:not(.dark) .msg-row.mine .msg-bubble { background: color-mix(in srgb, var(--theme) 14%, white); }
+html[data-ui="green"] body:not(.dark) .msg-row.mine .msg-bubble { background: var(--bubble-mine); color: var(--bubble-mine-ink); }

@@ -182,7 +182,6 @@ function dispatch_api(string $method, string $uri): void
     if ($uri === '/api/sessions')        handle_sessions($method);
     if ($uri === '/api/agents')          handle_agents_list($method);
     if ($uri === '/api/upload')          handle_upload($method);
-    if ($uri === '/api/tenant/url-check') handle_tenant_url_check($method);
     if ($uri === '/api/stats/dashboard') handle_stats_dashboard($method);
     if ($uri === '/api/export/sessions') handle_export_sessions($method);
     if ($uri === '/api/broadcast/send')  handle_broadcast_send($method);

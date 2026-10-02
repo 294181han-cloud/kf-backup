@@ -140,7 +140,6 @@ const app = createApp({
       broadcast: '群发', blacklist: 'IP 黑名单', preinq: '询前表单', links: '获客链接', agents: '子客服管理',
       brand: '访客端模板', policy: '访客策略', visitors: '访客列表', security: '安全与维护', profile: '个人设置', ui: '后台 UI',
       quick: '快捷消息', auto: '智能回复', agents: '坐席管理', broadcast: '群发模板', links: '获客码',
-      urlsec: '域名检测',
     }[tab.value]));
     const current = computed(() => sessions.value.find(s => s.id === currentId.value) || null);
     const filteredSessions = computed(() => {
@@ -158,6 +157,18 @@ const app = createApp({
     const shortTime = (t) => { if (!t) return ''; const d = new Date(t); return `${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')} ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`; };
     const fmtTime = shortTime;
     const sourceText = (s) => ({ app: '客服码', web: '网页链接', direct: '直接访问' }[s] || s);
+    // 会话列表/会话头：按来访设备/平台给一个图标，比纯文字更好认
+    const sessIcon = (s) => {
+      const u = String((s && (s.ua || '')) || '') + ' ' + String((s && (s.source || '')) || '');
+      if (/MicroMessenger|微信/i.test(u)) return '💬';
+      if (/aweme|抖音|TikTok/i.test(u)) return '🎵';
+      if (/QQBrowser|QQ\//i.test(u)) return '🐧';
+      if (/Alipay|支付宝|DingTalk|钉钉/i.test(u)) return '💙';
+      if (/iPhone|iPad|iOS|Macintosh|macOS/i.test(u)) return '🍎';
+      if (/Android|安卓/i.test(u)) return '🤖';
+      if (/Windows/i.test(u)) return '🪟';
+      return '🙋';
+    };
     const contactLabel = (t) => ({ note: '备注', mobile: '手机', qq: 'QQ', wechat: '微信', email: '邮箱', other: '其他' }[t] || t);
     const barW = (v, list) => { const max = Math.max(1, ...list.map(x => x.count)); return Math.round(v / max * 100) + '%'; };
     const quotaW = (u, l) => Math.min(100, l > 0 ? Math.round(u / l * 100) : 100) + '%';
@@ -341,48 +352,6 @@ const app = createApp({
       finally { sending.value = false; }
     };
 
-    // ===== 域名检测（v2.32）：平台图标墙 =====
-    const urlsec = reactive({
-      loaded: false, on: false, user: '', platforms: [], url: '', kw: '',
-      loading: false, cur: '', result: null, rawText: '', history: [],
-    });
-    const loadUrlsec = async () => {
-      try {
-        const r = await API.get('/api/tenant/url-check');
-        urlsec.on = !!r.on;
-        urlsec.user = r.user || '';
-        urlsec.platforms = r.platforms || [];
-        if (!urlsec.url) urlsec.url = r.default_url || '';
-        urlsec.loaded = true;
-      } catch (e) { ElementPlus.ElMessage.error(e.message); }
-    };
-    const urlsecGroups = computed(() => {
-      const kw = urlsec.kw.trim().toLowerCase();
-      return urlsec.platforms
-        .map(g => ({ g: g.g, items: (g.items || []).filter(it => !kw || it.n.toLowerCase().includes(kw) || it.c.includes(kw)) }))
-        .filter(g => g.items.length);
-    });
-    const useCurrentLink = () => { if (currentLink.value) urlsec.url = currentLink.value; };
-    const runUrlCheck = async (it) => {
-      if (urlsec.loading) return;
-      const u = urlsec.url.trim();
-      if (!u) { ElementPlus.ElMessage.warning('请先填写要检测的网址'); return; }
-      urlsec.loading = true; urlsec.cur = it.c;
-      try {
-        const r = await API.post('/api/tenant/url-check', { channel: it.c, url: u });
-        const at = new Date().toLocaleTimeString('zh-CN', { hour12: false });
-        urlsec.result = Object.assign({}, r, { icon: it.i, name: it.n, at });
-        urlsec.rawText = JSON.stringify(r.raw || {}, null, 2);
-        urlsec.history.unshift({ icon: it.i, name: it.n, state: r.state, msg: r.msg, at });
-        urlsec.history = urlsec.history.slice(0, 30);
-      } catch (e) { ElementPlus.ElMessage.error(e.message); }
-      finally { urlsec.loading = false; urlsec.cur = ''; }
-    };
-    const urlsecRunFirst = () => {
-      const g = urlsecGroups.value[0];
-      if (g && g.items.length) runUrlCheck(g.items[0]);
-    };
-    // 结束会话统一确认（提示访客端聊天记录会清除）
     const confirmEndSession = async (name) => {
       await ElementPlus.ElMessageBox.confirm(
         '结束会话后，访客端聊天记录将清除，访客将无法继续在该会话中发送消息；会话会移入「已结束」列表。',
@@ -1096,11 +1065,14 @@ const app = createApp({
     const CODE_BRANDS = ['#16181d', '#2E6BE6', '#0E7A5F', '#6B3FE0', '#C2410C'];
     // 中心 Logo → 检测渠道：微信/QQ 有独立检测通道，其余走微信通道
     const CODE_CHANNEL = { wechat: 'wx', qq: 'qq', all: 'wx', alipay: 'wx', douyin: 'wx', avatar: 'wx', none: 'wx', custom: 'wx' };
+    // 当前中心 Logo 对应的拦截检测通道（微信 logo → 查微信是否拦截；QQ logo → 查 QQ）
+    const checkChannel = computed(() => CODE_CHANNEL[codeStyle.logo] || 'wx');
+    const checkChannelLabel = computed(() => (checkChannel.value === 'qq' ? 'QQ' : '微信'));
     const CODE_STYLE_DEF = { dot: 'rounded', eye: 'rounded', brand: '#2E6BE6', logo: 'none', logoSize: 'std',
                              topText: '扫码咨询', bottomText: '官方客服', colorDots: false, custom: '' };
     const codeStyle = reactive(Object.assign({}, CODE_STYLE_DEF));
     const codeImgCache = {};
-    const codeCheck = reactive({ state: 'idle', text: '未检测', tag: '未检测', atText: '—', msg: '', loading: false });
+    const codeCheck = reactive({ state: 'idle', text: '未检测', tag: '未检测', atText: '—', msg: '', channel: 'wx', loading: false });
     const codeValue = computed(() => {
       const dl = links.value && links.value.domain_link;
       if (dl && dl.subdomain) return dl.subdomain;
@@ -1206,6 +1178,7 @@ const app = createApp({
         codeCheck.tag = r.tag || codeCheck.text;
         codeCheck.atText = r.at || '—';
         codeCheck.msg = r.msg || '';
+        codeCheck.channel = r.channel || codeCheck.channel;
       } catch (e) {
         codeCheck.state = 'err'; codeCheck.text = '检测失败'; codeCheck.tag = '异常';
       } finally { codeCheck.loading = false; }
@@ -1604,6 +1577,7 @@ const app = createApp({
       SOUND_OPTS, sndCfg, playSound, saveSnd,
       manageDlg, history, codeCfg, qrWrap, currentLink, renderMainQr,
       codeCanvas, logoFile, previewDlg, previewSrc, codeValue, codeStyle, codeCheck,
+      checkChannel, checkChannelLabel,
       CODE_LOGOS, CODE_BRANDS, pickLogo, setCodeStyle, renderCodeCard, resetCodeStyle, onLogoFile,
       logoThumb, previewBig, checkCode,
       posterCfg, posterQrBox, posterBgInput, pickPosterBg, onPosterBg, downloadPoster2,
@@ -1613,6 +1587,7 @@ const app = createApp({
       geoTag, visitorTag, visitorTagFull, copyQrImage, downloadQrImage, codeRotateHint, rotateCode, loadHistory, disableLink, saveCodeCfg, meAvatarUrl,
       quickFields, welcomeFields, autoFields, blFields, preqFields,
       shortTime, fmtTime, sourceText, contactLabel, barW, quotaW,
+      sessIcon,
       openSession, send, onKey, useQuick, sendQuick, quickClick, onImage, startRec, stopRec, closeSession, doTransfer,
       pendingAtts, rmPendingAtt, quickCtx, openQuickCtx, editQuick,
       imgZoom, imgRot, imgWheel, downloadImage,
@@ -1623,7 +1598,6 @@ const app = createApp({
       saveBrand, savePreqOn, saveProfile, changePw, exportCsv, logout,
       loadQuick, loadWelcome, loadAuto, loadBlacklist, loadPreInq,
       refreshing, refreshChat, askUpload,
-      urlsec, urlsecGroups, loadUrlsec, runUrlCheck, urlsecRunFirst, useCurrentLink,
     };
   }
 });

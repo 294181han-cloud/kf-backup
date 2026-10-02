@@ -681,15 +681,10 @@ v2.14 撤回同步改动遗漏了 `$recalledIds` 的块外初始化——**未�
 - 同时改 `routes/tenant.php`、`routes/visitor.php`、`assets/js/app.js`、`assets/js/visitor.js` 的默认，
   并把仍是旧默认值的历史租户记录一次性迁移到新默认（自定义过的值不动）。
 
-### 域名检测（新页面，点哪个平台图标就检测哪个渠道）
-- `routes/tenant.php` 新增 `handle_tenant_url_check`（`GET` 取平台清单与默认地址 / `POST` 执行检测），
-  `index.php` 注册 `GET|POST /api/tenant/url-check`。
-- 平台清单 `urlsec_platforms()` 覆盖麒麟域名检测（api.uouin.com）开放文档全部 **84** 个接口，分 6 组；
-  调用 `{wxcheck_url}/{code}?username&key&url`，归一化 `code` → `ok / red / off / warn`，附详情行与原始 JSON。
-- 前端 `public/app.html#urlsec`：网址输入（默认取当前客服链接）+「用当前客服链接」+ 平台搜索 +
-  图标墙（点击即检测，带 spinner）+ 结果卡（状态/详情/原始返回）+ 本次会话检测历史。
-- 侧栏「工作 → 域名检测」入口；`urlsec_codes()` 白名单校验，非法渠道直接 400。
-- 平台配置 `kv_store`：`wxcheck_on` 已置 **1**，`wxcheck_user=294181h`、`wxcheck_key`（原已存在）。
+### 域名检测（作废，见 v2.33）
+- v2.32 曾试做「独立域名检测页（84 个平台图标墙）」，但需求方要的是**客服码里的拦截检测**（微信 logo → 查该链接在微信里能不能打开、有没有被拦"红"），
+  该独立页面已在 v2.33 整段移除（前端页面 / 导航 / `handle_tenant_url_check` / `/api/tenant/url-check` / `.us-*` 样式全部删除）。
+- 平台配置 `kv_store` 保留并启用：`wxcheck_on=1`、`wxcheck_user=294181h`、`wxcheck_key=S8uvqKPX0o36lAK`（客服码检测用）。
 
 ### 访客端：默认 WhatsApp + 现代观感
 - 默认模板 `default → whatsapp`（`routes/tenant.php`、`routes/visitor.php`、`assets/js/app.js` 三处默认值 +
@@ -711,3 +706,60 @@ v2.14 撤回同步改动遗漏了 `$recalledIds` 的块外初始化——**未�
 - `php -l` 四个 PHP 文件无语法错误；`GET/POST /api/tenant/url-check` 实测：qq.com→微信正常、www.google.com→被墙（1002 红）、非法渠道→400。
 - 数据面板 10-02 行：新会话 9 / 活跃访客 3 / 已回复会话 2 / 回复条数 9 / 回复率 66.7%（旧口径为 300%）。
 - 工作台实测：客服发出消息为绿气泡且气泡贴合文字；「请求访客上传图片」两端卡片正常；访客端收到卡片可点「上传图片」。
+
+## 28. v2.33 变更记录（全站视觉升级 + 微信绿气泡定为契约 + 客服码拦截检测做对 + 移除多余检测页，2026-10-03）
+
+### 一、移除 v2.32 多加的「域名检测」页（需求澄清：指的是客服码里的拦截检测）
+- 删除：`public/app.html` 的 `tab==='urlsec'` 整段页面与侧栏入口、`assets/js/app.js` 的
+  `urlsec/loadUrlsec/urlsecGroups/runUrlCheck/urlsecFirst/useCurrentLink` 与 `tabTitle.urlsec`、
+  `routes/tenant.php` 的 `urlsec_platforms/urlsec_codes/urlsec_fetch/urlsec_normalize/urlsec_details/handle_tenant_url_check`、
+  `index.php` 的 `/api/tenant/url-check` 路由、`assets/css/app.css` 的 `.us-*` 样式。
+
+### 二、客服码「拦截检测」做成主角（微信 logo → 查微信是否拦截 / 俗称"红了"）
+- 检测区从"角落小标签"改为客服码页顶部的独立卡片 `.check-bar`：大状态（🟢 正常（未红）/ 🔴 已被拦截（红了）/ ⚪ 未检测）、
+  说明文案、检测地址、检测通道、最近检测时间 + 「立即检测」按钮。
+- 检测通道由**中心 Logo 决定**：微信 logo → `wx`（微信网址安全）；QQ logo → `qq`；其它 logo 走微信通道。
+  `checkChannel/checkChannelLabel` 计算属性 + 服务端回包 `channel` 字段，界面显式标注「检测通道：微信 / QQ」。
+- `routes/tenant.php handle_tenant_code_check`：回包增加 `channel`；文案按通道区分
+  （`微信可正常打开` / `已被微信拦截` / `QQ可正常打开` / `已被QQ拦截`）；未开通时的提示改为「平台未开通拦截检测，请联系管理员」。
+- `handle_tenant_settings` GET 增加 `code_check_channel`；进入客服码页 / 换标 / 换码 / 手动点「立即检测」都会触发检测（同链接同渠道 TTL 300s 内走缓存，避免重复扣点）。
+
+### 三、"自己发出的消息＝微信绿"提升为 UI 体系契约（不再跟随配色）
+- 现象：配色层 `assets/ui/pc/*/theme.css` 原来把 `.msg-row.mine .msg-bubble` 写成 `color-mix(--theme 14%, white)`，
+  优先级高于 `app.css`，导致切配色后自己的气泡变浅蓝，怎么改 app.css 都不生效。
+- 修法：`assets/ui/pc/_base.css` 新增契约变量 `--bubble-mine: #95ec69` / `--bubble-mine-ink: #10321c`，
+  8 个 pc 配色 + `assets/ui/mobile/default/template.css` 统一改用它；`ui-registry.js` version 2.5.1 → **2.6.0**，
+  app.html/admin.html 的 `ui-registry.js`、`ui-loader.js` `?v=` 同步升到 2.6.0。
+- 工作台气泡同时补齐微信观感：气泡小尾巴（自己绿色在右、对方白色在左）、气泡 最大宽 62% / 最小 42px / 字号 14px / 行高 1.58。
+
+### 四、全站视觉升级（"所有界面都不好看"）
+- 新增设计变量（`--v-bg/--v-card/--v-line/--v-ink/--v-r/--v-shadow`）并统一：
+  侧栏宽度 188→198、白底 + 渐变头像卡；导航项**加图标**（📊💬👥🎧🔗⚡👋🤖📢🚫🎨🖌️📝🛡️🔒⚙️）+ 药丸高亮（跟随 `--theme`）；
+  顶栏 58px + 时钟胶囊；面板/统计卡统一 14px 圆角 + 双层柔和阴影；面板标题加 `--theme` 竖条。
+- 会话列表：每行加**平台头像**（微信💬/抖音🎵/QQ🐧/苹果🍎/安卓🤖/Windows🪟）+ 在线小圆点，行高/留白重排，
+  未读红点带光晕；`.sessIcon()` 按 UA 判定平台。
+- 会话头部（用户点名的位置）**信息量加大**：头像 + 昵称 + 编辑 + 设备/渠道/来源标签 + 在线状态，
+  第二行显示 IP、地区、访问次数、消息数、首次进入、最近活跃、接待客服、会话编号 `#id`；右侧操作按钮（🔍 搜索 / 拉黑 / 归档 / 转接 / 结束）。
+- 聊天区：底色 `#f2f3f7`、头像圆角方、气泡圆角+尾巴、输入区白卡 + 主题色发送按钮；Element Plus 统一按钮/输入/表格头圆角与配色。
+- 深色模式同步适配以上所有新样式。
+- 平台管理台（`admin.css` + `admin.html`）同样处理：深色渐变侧栏、统计卡加图标、面板/表格统一；`admin.css ?v=2.3.0`。
+- 访客端（`visitor.css ?v=2.4.0`）：默认模板也加气泡尾巴（自己绿/客服白）、工具按钮改药丸样式、头部安全区适配。
+
+### 版本
+- app.css ?v=2.8.1、app.js ?v=2.8.3、admin.css ?v=2.3.0、visitor.css ?v=2.4.0、ui-registry/ui-loader ?v=2.6.0
+
+### 验证
+- `php -l routes/tenant.php`、`php -l index.php` 无语法错误；`POST /api/tenant/code/check` 实测：
+  `{"state":"ok","text":"微信可正常打开","channel":"wx"}`、`{"state":"ok","text":"QQ可正常打开","channel":"qq"}`；
+  `/api/tenant/url-check` 已下线（400）。
+- 客服码页实测截图：拦截检测卡（🟢 正常（未红）/ 检测通道：微信 / 最近检测时间 / 立即检测）、中心 Logo 行、二维码卡片渲染正常。
+- 工作台实测：`.msg-row.mine .msg-bubble` 计算样式为 `#95ec69`（此前被配色层覆盖成 `color(srgb .873 .939 1)`）。
+
+### 已知问题（重要）
+- 麒麟（api.uouin.com）账号 `294181h` 的 **微信通道（`/app/wx`）目前对任何输入都返回 `1001 正常访问`**：
+  实测 qq.com / baidu.com / google.com / facebook.com / x.com / t.me **以及不存在的域名** 全部 1001。
+  即"红"检测当前拿不到有效结果（界面会一直显示🟢正常）。
+- 同账号其它通道**有反应但不准**：`/app/qiang`（被墙）把 qq.com / baidu.com / kf.ylcz.cc 都判成 `1002 域名已墙`；
+  `/app/wxejbs`（微信二级不死）对所有域名返回 `1002 非二级不死`。两者都不适合直接当作"红"信号。
+- 结论：客服码检测的链路（通道选择 / 缓存 / 文案 / 展示）已经做好，**但数据源需要换**：请在麒麟账号里确认"微信网址安全"通道已开通/有额度，
+  或换一家能真实报 1002 的检测接口（只需改 `kv_store` 的 `wxcheck_url` / `wxcheck_user` / `wxcheck_key`，不用改代码）。

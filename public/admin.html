@@ -5,9 +5,9 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>平台管理 - 客服系统</title>
 <link rel="stylesheet" href="/assets/vendor/element-plus.css">
-<link rel="stylesheet" href="/assets/css/admin.css?v=2.2.0">
-<script src="/assets/ui/ui-registry.js?v=2.5.1"></script>
-<script src="/assets/ui/ui-loader.js?v=2.5.1" data-ui-cat="pc"></script>
+<link rel="stylesheet" href="/assets/css/admin.css?v=2.3.0">
+<script src="/assets/ui/ui-registry.js?v=2.6.0"></script>
+<script src="/assets/ui/ui-loader.js?v=2.6.0" data-ui-cat="pc"></script>
 </head>
 <body>
 <div id="app" v-cloak>
@@ -41,13 +41,13 @@
         <!-- ===================== 概览 ===================== -->
         <template v-if="tab==='overview' && ov">
           <div class="stat-grid">
-            <div class="stat-card"><div class="v">{{ ov.tenants_total }}</div><div class="l">租户总数</div></div>
-            <div class="stat-card"><div class="v" style="color:#00b42a;">{{ ov.tenants_active }}</div><div class="l">有效租户</div></div>
-            <div class="stat-card"><div class="v" style="color:#f53f3f;">{{ ov.tenants_expired }}</div><div class="l">已到期</div></div>
-            <div class="stat-card"><div class="v">{{ ov.agents_total }}</div><div class="l">子客服数</div></div>
-            <div class="stat-card"><div class="v">{{ ov.sessions_total }}</div><div class="l">总会话数</div></div>
-            <div class="stat-card"><div class="v">{{ ov.sessions_today }}</div><div class="l">今日新会话</div></div>
-            <div class="stat-card"><div class="v">{{ ov.messages_today }}</div><div class="l">今日消息数</div></div>
+            <div class="stat-card"><span class="sc-ic a1">🏢</span><div class="sc-body"><div class="v">{{ ov.tenants_total }}</div><div class="l">租户总数</div></div></div>
+            <div class="stat-card"><span class="sc-ic a2">✅</span><div class="sc-body"><div class="v ok">{{ ov.tenants_active }}</div><div class="l">有效租户</div></div></div>
+            <div class="stat-card"><span class="sc-ic a3">⏳</span><div class="sc-body"><div class="v bad">{{ ov.tenants_expired }}</div><div class="l">已到期</div></div></div>
+            <div class="stat-card"><span class="sc-ic a4">🎧</span><div class="sc-body"><div class="v">{{ ov.agents_total }}</div><div class="l">子客服数</div></div></div>
+            <div class="stat-card"><span class="sc-ic a5">🗂️</span><div class="sc-body"><div class="v">{{ ov.sessions_total }}</div><div class="l">总会话数</div></div></div>
+            <div class="stat-card"><span class="sc-ic a2">📨</span><div class="sc-body"><div class="v">{{ ov.sessions_today }}</div><div class="l">今日新会话</div></div></div>
+            <div class="stat-card"><span class="sc-ic a4">💬</span><div class="sc-body"><div class="v">{{ ov.messages_today }}</div><div class="l">今日消息数</div></div></div>
           </div>
           <div class="panel">
             <div class="panel-title">近 7 天新会话</div>

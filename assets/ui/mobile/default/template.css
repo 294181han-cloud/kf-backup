@@ -96,7 +96,7 @@ html[data-ui-cat="mobile"][data-ui-template="default"] body:not(.dark) .chat-inp
 html[data-ui-cat="mobile"][data-ui-template="default"] body:not(.dark) .msg-bubble { background: var(--card); color: var(--ink); }
 html[data-ui-cat="mobile"][data-ui-template="default"] body:not(.dark) .msg-ava { background: var(--card); }
 html[data-ui-cat="mobile"][data-ui-template="default"] body:not(.dark) .msg-row.mine .msg-bubble {
-  background: color-mix(in srgb, var(--theme) 14%, white); color: var(--ink);
+  background: var(--bubble-mine); color: var(--bubble-mine-ink);
 }
 html[data-ui-cat="mobile"][data-ui-template="default"] body:not(.dark) .chat-search { background: var(--card); }
 html[data-ui-cat="mobile"][data-ui-template="default"] body:not(.dark) .quick-toggle-btn { background: var(--card); color: var(--ink); }
