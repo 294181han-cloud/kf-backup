@@ -39,8 +39,6 @@ body {
 .el-input__prefix .ic, .el-input__suffix .ic { display: inline-flex; align-items: center; color: #98a2b3; }
 .el-input__prefix .ic svg, .el-input__suffix .ic svg { width: 18px; height: 18px; display: block; }
 .login-btn { width: 100%; height: 50px; font-size: 17px; font-weight: 600; border-radius: 12px; margin-top: 6px; }
-.login-tip { margin-top: 20px; font-size: 12.5px; color: #8f959e; line-height: 1.9; text-align: center; }
-.login-tip .tag { display: inline-block; padding: 1px 8px; background: #f2f3f5; border-radius: 4px; color: #4e5969; margin: 0 2px; }
 .footer { position: fixed; bottom: 16px; left: 0; right: 0; text-align: center; color: rgba(74, 105, 150, .55); font-size: 12px; }
 @media (max-width: 480px) {
   .login-card { padding: 36px 26px 28px; border-radius: 20px; }
@@ -80,10 +78,6 @@ body {
       </el-input>
     </div>
     <el-button class="login-btn" type="primary" size="large" :loading="loading" @click="doLogin">登 录</el-button>
-    <div class="login-tip">
-      租户：直接输入 <span class="tag">卡密</span> 登录<br>
-      子客服：<span class="tag">卡密/客服用户名</span> &nbsp;管理员：<span class="tag">admin</span>
-    </div>
   </div>
 </div>
 <div class="footer">Powered by 客服系统</div>
@@ -109,6 +103,8 @@ createApp({
         ElementPlus.ElMessage.error(e.message);
       } finally { loading.value = false; }
     };
+    // 已登录直接进工作台（token 失效时工作台会清除并回到本页，不会死循环）
+    try { if (localStorage.getItem('kfxt_token')) { location.replace('/app.html'); return; } } catch (e) {}
     return { account, password, loading, doLogin };
   }
 }).use(ElementPlus).mount('#app');

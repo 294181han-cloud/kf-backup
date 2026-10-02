@@ -854,13 +854,15 @@ const app = createApp({
       if (!colors.find((x) => x.id === colorId)) colorId = colors.length ? colors[0].id : '';
       uiSel[key] = { tpl: t ? t.id : '', color: colorId };
     });
-    // 后台UI 配置页只显示当前设备对应的端（加载器已按宽度自动识别 pc/mobile）
+    // 后台UI 配置页：两端都保留可配，按当前设备自动选中对应端，可手动切换
     const uiCurrentCat = (window.UI && window.UI.cat) || 'pc';
-    const uiCatList = Object.keys(uiReg.categories || {}).filter((key) => key === uiCurrentCat).map((key) => ({
+    const uiActiveCat = ref(uiCurrentCat);
+    const uiCatList = Object.keys(uiReg.categories || {}).map((key) => ({
       key,
       label: uiReg.categories[key].label,
       pages: (uiReg.categories[key].pages || []).join(' / '),
     }));
+    const uiActiveList = Vue.computed(() => [uiActiveCat.value].filter((k) => uiReg.categories[k]));
     const uiTplList = (key) => (uiReg.categories[key] ? uiReg.categories[key].templates || [] : []);
     const uiColorList = (key) => {
       const t = (uiReg.categories[key] ? uiReg.categories[key].templates || [] : []).find((x) => x.id === uiSel[key].tpl);
@@ -1508,7 +1510,7 @@ const app = createApp({
       uploadAvatar, isImg,
       sec, loginLogs, visitors, cleanupOpts, loadSecurityPage, saveSecurity, doCleanup, loadVisitors, openVisitorSessions,
       guide, guideDone, dark, toggleDark, renameVisitor, renderCodeQrs, tplList,
-      uiCatList, uiCurrentCat, uiSel, uiTplList, uiColorList, uiPick, sideCollapsed, mSideOpen,
+      uiCatList, uiCurrentCat, uiActiveCat, uiActiveList, uiSel, uiTplList, uiColorList, uiPick, sideCollapsed, mSideOpen,
       blockSession, blockIp, kwList, kwInput, kwSaving, addKw, removeKw, saveFilter, agentCmd, restartPoll,
       chatSearchOn, chatSearchKw, searchHit, visibleMsgs, canRecall, recallMsg, isRead,
       pol, savePolicy, uploadPolHead, clock, unreadTotal, sessCollapsed,

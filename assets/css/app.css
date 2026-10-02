@@ -172,6 +172,10 @@ body.dark .tool-btn:hover { color: var(--theme, #69b1ff); }
 .quick-toggle-btn .q-ic { width: 14px; height: 14px; flex-shrink: 0; }
 .q-img-ic { display: inline-flex; vertical-align: -2px; margin-right: 4px; color: inherit; }
 .q-img-ic svg { width: 13px; height: 13px; display: block; }
+/* 后台UI 分段选择（电脑端/手机端） */
+.ui-seg { display: inline-flex; background: #f2f3f5; border-radius: 12px; padding: 4px; }
+.ui-seg-btn { width: 130px; height: 40px; border: none; border-radius: 9px; background: transparent; color: #333; font-size: 14px; cursor: pointer; transition: all .15s; }
+.ui-seg-btn.on { background: var(--theme, #1677ff); color: #fff; font-weight: 600; }
 .quick-toggle-row { padding: 0 2px 6px; }
 .quick-toggle-btn {
   border: 1px solid #eeeaea; background: #fff; color: #333; border-radius: 8px;
