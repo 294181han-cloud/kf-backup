@@ -3,7 +3,7 @@
 // 结构：分类（pc / mobile）→ 款式列表。每个款式一个目录一个 theme.css。
 // 新增款式步骤见 UI-DEV.md（根目录）。改完任何 theme.css 后把 version +1（缓存破坏）。
 window.UI_STYLES = {
-  version: '2.2.0',
+  version: '2.3.0',
 
   categories: {
     // ===== PC 端（工作台 app.html / 管理台 admin.html）=====
@@ -17,6 +17,10 @@ window.UI_STYLES = {
         { id: 'purple',  name: '优雅紫', chip: '#722ed1', css: '/assets/ui/pc/purple/theme.css' },
         { id: 'sky',     name: '天空蓝', chip: '#13c2c2', css: '/assets/ui/pc/sky/theme.css' },
         { id: 'green',   name: '清新绿', chip: '#52c41a', css: '/assets/ui/pc/green/theme.css' },
+        { id: 'rose',     name: '玫瑰红', chip: '#eb2f96', css: '/assets/ui/pc/rose/theme.css' },
+        { id: 'sunset',   name: '暖阳橙', chip: '#fa8c16', css: '/assets/ui/pc/sunset/theme.css' },
+        { id: 'indigo',   name: '靛蓝',   chip: '#4c6ef5', css: '/assets/ui/pc/indigo/theme.css' },
+        { id: 'graphite', name: '石墨灰', chip: '#475569', css: '/assets/ui/pc/graphite/theme.css' },
       ],
     },
 
@@ -29,6 +33,10 @@ window.UI_STYLES = {
       styles: [
         { id: 'default', name: '默认亮色', chip: '#1677ff', css: '/assets/ui/mobile/default/theme.css' },
         { id: 'dark',    name: '暗色',     chip: '#1c2333', css: '/assets/ui/mobile/dark/theme.css' },
+        { id: 'mint',    name: '薄荷',     chip: '#10b981', css: '/assets/ui/mobile/mint/theme.css' },
+        { id: 'sakura',  name: '樱花粉',   chip: '#ec4899', css: '/assets/ui/mobile/sakura/theme.css' },
+        { id: 'sunset',  name: '暖阳橙',   chip: '#f97316', css: '/assets/ui/mobile/sunset/theme.css' },
+        { id: 'taro',    name: '香芋紫',   chip: '#8b5cf6', css: '/assets/ui/mobile/taro/theme.css' },
       ],
     },
   },

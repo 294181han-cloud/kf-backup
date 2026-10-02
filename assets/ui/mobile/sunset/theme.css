@@ -1,0 +1,35 @@
+/* mobile/sunset - 暖阳橙（暖调活力亮色）
+   预览：visitor.html?t=<卡密>&ui=sunset */
+
+/* 1) 调色板：覆盖契约全部变量 */
+:root {
+  --theme: #f97316;
+  --theme-grad: linear-gradient(135deg, #f97316 0%, #fb923c 100%);
+  --bg: #f8f3ec;
+  --card: #ffffff;
+  --ink: #2d241a;
+  --ink-2: #756552;
+  --ink-3: #b1a28e;
+  --line: #ece2d4;
+  --radius: 14px;
+}
+
+/* 2) 结构覆盖：visitor.css 中未走变量的硬编码表面（只改本款式作用域，不动基础样式） */
+html[data-ui="sunset"] .v-input { background: #faf6f0; }
+html[data-ui="sunset"] .v-input:focus { background: #fff; }
+html[data-ui="sunset"] .form-input { background: #faf6f0; }
+html[data-ui="sunset"] .form-input:focus { background: #fff; }
+html[data-ui="sunset"] .rec-cancel { background: #f1e9dd; }
+html[data-ui="sunset"] .slide-track { background: #f1e9dd; }
+html[data-ui="sunset"] .verify-code-img { background: linear-gradient(90deg, #f7f1e8, #f0e6d6); color: #6b573d; }
+
+/* 3) 强调面跟随主题色（color-mix 引用 --theme，租户品牌色覆盖后依旧协调） */
+html[data-ui="sunset"] .welcome-card .w-ava,
+html[data-ui="sunset"] .form-ava { background: linear-gradient(135deg, color-mix(in srgb, var(--theme) 12%, transparent), color-mix(in srgb, var(--theme) 22%, transparent)); }
+html[data-ui="sunset"] .spinner { border-color: color-mix(in srgb, var(--theme) 18%, transparent); border-top-color: var(--theme); }
+html[data-ui="sunset"] .msg-row.visitor .msg-bubble { box-shadow: 0 4px 12px color-mix(in srgb, var(--theme) 25%, transparent); }
+html[data-ui="sunset"] .v-btn { box-shadow: 0 4px 12px color-mix(in srgb, var(--theme) 30%, transparent); }
+html[data-ui="sunset"] .form-btn { box-shadow: 0 6px 16px color-mix(in srgb, var(--theme) 30%, transparent); }
+html[data-ui="sunset"] .welcome-card,
+html[data-ui="sunset"] .block-card,
+html[data-ui="sunset"] .verify-card { box-shadow: 0 10px 40px color-mix(in srgb, var(--theme) 10%, transparent); }

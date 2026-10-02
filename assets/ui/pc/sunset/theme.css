@@ -1,0 +1,31 @@
+/* pc/sunset - 暖阳橙
+   预览：app.html?ui=sunset / admin.html?ui=sunset */
+
+/* 1) 契约变量 */
+:root {
+  --theme: #fa8c16;
+  --theme-grad: linear-gradient(135deg, #fa8c16, #ffc069);
+}
+
+/* 2) 作用域覆盖：app.css / admin.css 中硬编码的蓝色点缀跟随本款式主题
+   （只改本款式作用域；body.dark 独立深色开关不受影响，碰撞面用 :not(.dark) 让位） */
+html[data-ui="sunset"] .theme-dot.on { border-color: var(--theme); box-shadow: 0 0 5px color-mix(in srgb, var(--theme) 50%, transparent); }
+html[data-ui="sunset"] .hero-avatar { background: var(--theme-grad); box-shadow: 0 2px 8px color-mix(in srgb, var(--theme) 25%, transparent); }
+html[data-ui="sunset"] .hero-badge { background: var(--theme); }
+/* app.html 亮色侧栏活动项 */
+html[data-ui="sunset"] .nav-item.active { color: var(--theme); background: color-mix(in srgb, var(--theme) 8%, #f5f5f5); box-shadow: inset 3px 0 0 var(--theme); }
+/* admin.html 深色侧栏活动项（仅管理台侧栏含 .foot；不支持 :has() 的老浏览器自动跳过本条） */
+html[data-ui="sunset"] .side:has(.foot) .nav-item.active { color: #fff; background: color-mix(in srgb, var(--theme) 18%, transparent); border-left-color: var(--theme); box-shadow: none; }
+html[data-ui="sunset"] .side .me:hover { color: var(--theme); }
+html[data-ui="sunset"] .sess-collapse-btn:hover { color: var(--theme); border-color: var(--theme); }
+html[data-ui="sunset"] .sess-item.active .name { color: var(--theme); }
+html[data-ui="sunset"] .send-btn { background: var(--theme-grad); }
+html[data-ui="sunset"] .recall-a { color: var(--theme); }
+html[data-ui="sunset"] .tpl-card.active { border-color: var(--theme); background: color-mix(in srgb, var(--theme) 8%, #fff); }
+html[data-ui="sunset"] .tpl-check { color: var(--theme); }
+html[data-ui="sunset"] .code-tab.active { color: var(--theme); }
+html[data-ui="sunset"] .code-tab.active::after { background: var(--theme); }
+html[data-ui="sunset"] .qr-headline { color: var(--theme); }
+html[data-ui="sunset"] .crop-box { border-color: var(--theme); }
+html[data-ui="sunset"] .bar-row .bar > div { background: linear-gradient(90deg, var(--theme), color-mix(in srgb, var(--theme) 55%, white)); }
+html[data-ui="sunset"] body:not(.dark) .msg-row.mine .msg-bubble { background: color-mix(in srgb, var(--theme) 14%, white); }

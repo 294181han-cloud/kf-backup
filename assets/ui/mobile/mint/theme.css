@@ -1,0 +1,35 @@
+/* mobile/mint - 薄荷（清新绿调亮色）
+   预览：visitor.html?t=<卡密>&ui=mint */
+
+/* 1) 调色板：覆盖契约全部变量 */
+:root {
+  --theme: #10b981;
+  --theme-grad: linear-gradient(135deg, #10b981 0%, #34d399 100%);
+  --bg: #edf4ef;
+  --card: #ffffff;
+  --ink: #182b22;
+  --ink-2: #5a6f63;
+  --ink-3: #94a89c;
+  --line: #dce8e0;
+  --radius: 16px;
+}
+
+/* 2) 结构覆盖：visitor.css 中未走变量的硬编码表面（只改本款式作用域，不动基础样式） */
+html[data-ui="mint"] .v-input { background: #f3f9f5; }
+html[data-ui="mint"] .v-input:focus { background: #fff; }
+html[data-ui="mint"] .form-input { background: #f3f9f5; }
+html[data-ui="mint"] .form-input:focus { background: #fff; }
+html[data-ui="mint"] .rec-cancel { background: #e7f0ea; }
+html[data-ui="mint"] .slide-track { background: #e7f0ea; }
+html[data-ui="mint"] .verify-code-img { background: linear-gradient(90deg, #f0f6f2, #e3efe8); color: #3d5a4b; }
+
+/* 3) 强调面跟随主题色（color-mix 引用 --theme，租户品牌色覆盖后依旧协调） */
+html[data-ui="mint"] .welcome-card .w-ava,
+html[data-ui="mint"] .form-ava { background: linear-gradient(135deg, color-mix(in srgb, var(--theme) 12%, transparent), color-mix(in srgb, var(--theme) 22%, transparent)); }
+html[data-ui="mint"] .spinner { border-color: color-mix(in srgb, var(--theme) 18%, transparent); border-top-color: var(--theme); }
+html[data-ui="mint"] .msg-row.visitor .msg-bubble { box-shadow: 0 4px 12px color-mix(in srgb, var(--theme) 25%, transparent); }
+html[data-ui="mint"] .v-btn { box-shadow: 0 4px 12px color-mix(in srgb, var(--theme) 30%, transparent); }
+html[data-ui="mint"] .form-btn { box-shadow: 0 6px 16px color-mix(in srgb, var(--theme) 30%, transparent); }
+html[data-ui="mint"] .welcome-card,
+html[data-ui="mint"] .block-card,
+html[data-ui="mint"] .verify-card { box-shadow: 0 10px 40px color-mix(in srgb, var(--theme) 10%, transparent); }

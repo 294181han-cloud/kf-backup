@@ -1,0 +1,35 @@
+/* mobile/sakura - 樱花粉（柔和粉调亮色）
+   预览：visitor.html?t=<卡密>&ui=sakura */
+
+/* 1) 调色板：覆盖契约全部变量 */
+:root {
+  --theme: #ec4899;
+  --theme-grad: linear-gradient(135deg, #ec4899 0%, #f472b6 100%);
+  --bg: #f9f1f4;
+  --card: #ffffff;
+  --ink: #2c1f27;
+  --ink-2: #7a626e;
+  --ink-3: #b39da8;
+  --line: #f0e3e9;
+  --radius: 18px;
+}
+
+/* 2) 结构覆盖：visitor.css 中未走变量的硬编码表面（只改本款式作用域，不动基础样式） */
+html[data-ui="sakura"] .v-input { background: #faf3f6; }
+html[data-ui="sakura"] .v-input:focus { background: #fff; }
+html[data-ui="sakura"] .form-input { background: #faf3f6; }
+html[data-ui="sakura"] .form-input:focus { background: #fff; }
+html[data-ui="sakura"] .rec-cancel { background: #f3e7ec; }
+html[data-ui="sakura"] .slide-track { background: #f3e7ec; }
+html[data-ui="sakura"] .verify-code-img { background: linear-gradient(90deg, #f8eff3, #f1e3ea); color: #6b4457; }
+
+/* 3) 强调面跟随主题色（color-mix 引用 --theme，租户品牌色覆盖后依旧协调） */
+html[data-ui="sakura"] .welcome-card .w-ava,
+html[data-ui="sakura"] .form-ava { background: linear-gradient(135deg, color-mix(in srgb, var(--theme) 12%, transparent), color-mix(in srgb, var(--theme) 22%, transparent)); }
+html[data-ui="sakura"] .spinner { border-color: color-mix(in srgb, var(--theme) 18%, transparent); border-top-color: var(--theme); }
+html[data-ui="sakura"] .msg-row.visitor .msg-bubble { box-shadow: 0 4px 12px color-mix(in srgb, var(--theme) 25%, transparent); }
+html[data-ui="sakura"] .v-btn { box-shadow: 0 4px 12px color-mix(in srgb, var(--theme) 30%, transparent); }
+html[data-ui="sakura"] .form-btn { box-shadow: 0 6px 16px color-mix(in srgb, var(--theme) 30%, transparent); }
+html[data-ui="sakura"] .welcome-card,
+html[data-ui="sakura"] .block-card,
+html[data-ui="sakura"] .verify-card { box-shadow: 0 10px 40px color-mix(in srgb, var(--theme) 10%, transparent); }
