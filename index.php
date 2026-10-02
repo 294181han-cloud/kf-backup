@@ -62,6 +62,17 @@ function ensure_upgrade(): void
         try { $pdo->exec("ALTER TABLE v_sessions ADD COLUMN closed_at DATETIME NULL"); } catch (\Throwable $e) { /* 列已存在 */ }
         try { $pdo->exec("ALTER TABLE v_sessions ADD COLUMN archived_at DATETIME NULL"); } catch (\Throwable $e) { /* 列已存在 */ }
         try { $pdo->exec("ALTER TABLE v_sessions ADD INDEX idx_status_time (tenant_id, status, last_time)"); } catch (\Throwable $e) { /* 已存在 */ }
+        // v2.41 语音转文字缓存（同一条语音只转一次，不重复扣费）
+        $pdo->exec("CREATE TABLE IF NOT EXISTS msg_transcripts (
+            id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+            tenant_id INT UNSIGNED NOT NULL,
+            message_id INT UNSIGNED NOT NULL,
+            url VARCHAR(500) NOT NULL DEFAULT '',
+            text TEXT NOT NULL,
+            created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            UNIQUE KEY uniq_msg_url (message_id, url),
+            KEY idx_tenant (tenant_id)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
     } catch (\Throwable $e) { /* 忽略 */ }
 }
 try { ensure_installed(); } catch (\Throwable $e) { /* 初始化失败由后续请求重试 */ }
@@ -182,6 +193,7 @@ function dispatch_api(string $method, string $uri): void
     if ($uri === '/api/sessions')        handle_sessions($method);
     if ($uri === '/api/agents')          handle_agents_list($method);
     if ($uri === '/api/upload')          handle_upload($method);
+    if ($uri === '/api/msg/transcribe')  handle_msg_transcribe($method);
     if ($uri === '/api/stats/dashboard') handle_stats_dashboard($method);
     if ($uri === '/api/export/sessions') handle_export_sessions($method);
     if ($uri === '/api/broadcast/send')  handle_broadcast_send($method);

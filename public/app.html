@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>客服工作台</title>
 <link rel="stylesheet" href="/assets/vendor/element-plus.css">
-<link rel="stylesheet" href="/assets/css/app.css?v=3.0.0">
+<link rel="stylesheet" href="/assets/css/app.css?v=3.0.1">
 <script src="/assets/ui/ui-registry.js?v=2.6.0"></script>
 <script src="/assets/ui/ui-loader.js?v=2.6.0" data-ui-cat="auto"></script>
 </head>
@@ -193,6 +193,12 @@
                           </span>
                           <span class="vb-wave"><i v-for="(h, wi) in waveBars(a.url)" :key="wi" :style="{height: h + 'px'}"></i></span>
                           <span class="vb-sec">{{ audioDur[a.url] ? audioDur[a.url] + '″' : '' }}</span>
+                        </div>
+                        <div class="vb-asr" v-if="a.type==='audio'">
+                          <button type="button" class="vb-asr-btn" :disabled="asrBusy===m.id" @click.stop="transcribe(m, a)">
+                            {{ asrBusy===m.id ? '转写中…' : (asrText[m.id] ? '收起文字' : '转文字') }}
+                          </button>
+                          <div class="vb-asr-text" v-if="asrText[m.id]">{{ asrText[m.id] }}</div>
                         </div>
                       </template>
                     </div>
@@ -1267,7 +1273,7 @@
 <script src="/assets/qr-poster.js?v=2.1.03"></script>
 <script src="/assets/api.js?v=2.0.1"></script>
 <script src="/assets/js/app-components.js?v=2.1.0"></script>
-<script src="/assets/js/app.js?v=3.0.0"></script>
+<script src="/assets/js/app.js?v=3.0.1"></script>
 <script src="/assets/js/app-boot.js?v=2.1.1"></script>
 </body>
 </html>

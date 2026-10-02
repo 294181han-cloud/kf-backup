@@ -632,6 +632,95 @@ function handle_stats_dashboard(string $method): void
 }
 
 /* ---------- 导出 CSV ---------- */
+/* ---------- 语音转文字（v2.41）：AIHubMix / OpenAI 兼容 STT，结果按消息缓存 ---------- */
+
+function asr_cfg(): array
+{
+    return [
+        'on'    => kv_get('asr_on', '1') === '1',
+        'key'   => kv_get('asr_key', ''),
+        'base'  => rtrim(kv_get('asr_base', 'https://aihubmix.com/v1'), '/'),
+        'model' => kv_get('asr_model', 'whisper-large-v3'),
+        'lang'  => kv_get('asr_lang', 'zh'),
+    ];
+}
+
+function handle_msg_transcribe(string $method): void
+{
+    if ($method !== 'POST') { json_error('方法不允许', 405); return; }
+    $ctx = require_workspace();
+    $mid = (int)input('message_id', 0);
+    if ($mid <= 0) json_error('参数缺失');
+    $pdo = db();
+    $st = $pdo->prepare('SELECT id, session_id, tenant_id, msg_type, attachments FROM messages WHERE id = ? AND tenant_id = ?');
+    $st->execute([$mid, $ctx['tenant_id']]);
+    $msg = $st->fetch();
+    if (!$msg) json_error('消息不存在', 404);
+    session_of($ctx, (int)$msg['session_id']);   // 越权检查
+    $atts = parse_attachments($msg['attachments']);
+    $url = '';
+    foreach ($atts as $a) { if (($a['type'] ?? '') === 'audio' && !empty($a['url'])) { $url = (string)$a['url']; break; } }
+    if ($url === '') json_error('这条消息里没有语音');
+
+    // 命中缓存直接返回（同一条语音只转一次）
+    $c = $pdo->prepare('SELECT text FROM msg_transcripts WHERE message_id = ? AND url = ? LIMIT 1');
+    $c->execute([$mid, $url]);
+    $hit = $c->fetchColumn();
+    if ($hit !== false && $hit !== null) { json_out(['text' => (string)$hit, 'cached' => true]); return; }
+
+    $cfg = asr_cfg();
+    if (!$cfg['on'] || $cfg['key'] === '') json_error('语音转文字未开通，请联系平台管理员', 503);
+
+    // 只允许读站内的语音文件（防目录穿越）
+    $file = '';
+    if (str_starts_with($url, '/uploads/')) {
+        $p = realpath(__DIR__ . '/../uploads/' . basename($url));
+        $base = realpath(__DIR__ . '/../uploads');
+        if ($p && $base && str_starts_with($p, $base)) $file = $p;
+    } elseif (str_starts_with($url, '/assets/')) {
+        $p = realpath(__DIR__ . '/..' . $url);
+        $base = realpath(__DIR__ . '/../assets');
+        if ($p && $base && str_starts_with($p, $base)) $file = $p;
+    }
+    if ($file === '' || !is_file($file)) json_error('语音文件不存在或不是本站文件');
+    if (filesize($file) > 25 * 1024 * 1024) json_error('语音太大（>25MB），无法转写');
+
+    $api = $cfg['base'] . '/audio/transcriptions';
+    $post = [
+        'file' => new CURLFile($file),
+        'model' => $cfg['model'],
+        'response_format' => 'json',
+        'temperature' => '0.2',
+    ];
+    if ($cfg['lang'] !== '') $post['language'] = $cfg['lang'];
+    $ch = curl_init($api);
+    curl_setopt_array($ch, [
+        CURLOPT_RETURNTRANSFER => true,
+        CURLOPT_POST => true,
+        CURLOPT_POSTFIELDS => $post,
+        CURLOPT_HTTPHEADER => ['Authorization: Bearer ' . $cfg['key']],
+        CURLOPT_TIMEOUT => 90,
+        CURLOPT_CONNECTTIMEOUT => 8,
+        CURLOPT_SSL_VERIFYPEER => false,
+        CURLOPT_SSL_VERIFYHOST => 0,
+    ]);
+    $body = (string)curl_exec($ch);
+    $code = (int)curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    $err = curl_error($ch);
+    curl_close($ch);
+    $j = json_decode($body, true);
+    $text = '';
+    if (is_array($j)) $text = trim((string)($j['text'] ?? ''));
+    if ($code < 200 || $code >= 300 || $text === '') {
+        $why = is_array($j) ? (string)($j['error']['message'] ?? $j['message'] ?? '') : ($err ?: '转写失败');
+        json_error('转写失败：' . mb_substr($why !== '' ? $why : ('HTTP ' . $code), 0, 200), 502);
+    }
+    $text = mb_substr($text, 0, 2000);
+    $pdo->prepare('INSERT INTO msg_transcripts (tenant_id, message_id, url, text) VALUES (?,?,?,?)
+        ON DUPLICATE KEY UPDATE text = VALUES(text)')->execute([$ctx['tenant_id'], $mid, $url, $text]);
+    json_out(['text' => $text, 'cached' => false]);
+}
+
 function handle_export_sessions(string $method): void
 {
     if ($method !== 'GET') { json_error('方法不允许', 405); return; }

@@ -661,6 +661,18 @@ const app = createApp({
         curAudio.play().then(() => { audioPlaying.value = url; }).catch(() => { audioPlaying.value = ''; });
       } catch (e) {}
     };
+    // 语音转文字（AIHubMix / OpenAI 兼容 STT；结果按消息缓存在服务端）
+    const asrText = reactive({});
+    const asrBusy = ref(0);
+    const transcribe = async (m, a) => {
+      if (asrText[m.id]) { delete asrText[m.id]; return; }   // 再点一次＝收起
+      asrBusy.value = m.id;
+      try {
+        const r = await API.post('/api/msg/transcribe', { message_id: m.id });
+        asrText[m.id] = r.text || '（没听清）';
+      } catch (e) { ElementPlus.ElMessage.error(e.message); }
+      finally { asrBusy.value = 0; }
+    };
 
     // ===== 可见消息（撤回的显示为系统胶囊） =====
     const visibleMsgs = Vue.computed(() => msgs.value);
@@ -1843,6 +1855,7 @@ const app = createApp({
       sessIcon,
       setTab, setGroups, openSetting, switchSetting,
       audioPlaying, audioDur, waveBars, toggleAudio,
+      asrText, asrBusy, transcribe,
       openSession, send, onKey, useQuick, sendQuick, quickClick, onImage, startRec, stopRec, closeSession, doTransfer,
       pendingAtts, rmPendingAtt, quickCtx, openQuickCtx, editQuick,
       imgZoom, imgRot, imgWheel, downloadImage,
