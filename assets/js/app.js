@@ -272,6 +272,8 @@ const app = createApp({
     // 三级会话分区（v2.25）：online=在线 / archived=已归档 / closed=已结束
     const sessScope = ref('online');
     const sessCounts = reactive({ online: 0, archived: 0, closed: 0, online_unread: 0, archived_unread: 0 });
+    // 切换分区会改变未读合计，别把它当成"来了新消息"而响铃
+    Vue.watch(sessScope, () => { lastUnreadTotal = -1; });
     const pollOnce = async () => {
       try {
         const r = await API.get('/api/poll?role=agent&session=' + currentId.value + '&sinceMsg=' + maxMsgId.value + '&scope=' + sessScope.value);
@@ -283,11 +285,19 @@ const app = createApp({
           const rset = new Set(r.recalledIds);
           msgs.value.forEach(m => { if (rset.has(m.id)) { m.recalled = true; m.recalledByVisitor = m.from === 'visitor'; } });
         }
-        if ((r.messages || []).some(m => m.from === 'visitor') || (unreadTotal > lastUnreadTotal && lastUnreadTotal >= 0)) beep();
+        // 提示音只在"来了还没读的新消息"时响：
+        // ① 未读总数增加（别的会话来了新消息）；② 页面切到后台时当前会话来了新消息。
+        // 当前正在看的会话消息会立刻标记已读，不再重复响。
+        const inMsgs = (r.messages || []).filter(m => m.from === 'visitor');
+        const unreadIncreased = unreadTotal > lastUnreadTotal && lastUnreadTotal >= 0;
+        if (unreadIncreased || (inMsgs.length > 0 && document.hidden)) beep();
         lastUnreadTotal = unreadTotal;
         if (r.messages && r.messages.length) {
           const fresh = r.messages.filter(m => !msgs.value.some(x => x.id === m.id)); // 去重防重复显示
           msgs.value.push(...fresh);
+          // 关键：推进"已拉取到的最大 id"，否则同一条消息每次轮询都被当成新消息（会一直响）
+          const lastId = r.messages[r.messages.length - 1].id;
+          if (lastId > maxMsgId.value) maxMsgId.value = lastId;
           scrollBottom();
           if (r.messages.some(m => m.from === 'visitor')) markRead(currentId.value);
         }

@@ -291,11 +291,15 @@ function handle_visitor_init(string $method): void
     if ($headType === 'custom') {
         $visitorAvatar = ts_get($tid, 'user_head', '');
     }
-    // 默认 / 随机：分配动物 emoji，并尽量避开"当天其他访客已用过的"
+    // 默认 / 随机：分配 emoji 头像（动物优先，不够用车/船，再不够用其它），并尽量避开"当天其他访客已用过的"
     if (trim($visitorAvatar) === '') $visitorAvatar = pick_visitor_avatar($pdo, $tid);
+    // 访客名：① 随机昵称 → 随机词 + 序号；② 默认（自动） → 跟头像对应（🐼→熊猫、🐘→大象、🌳→大树）
     if (ts_get($tid, 'user_name_type', 'default') === 'random') {
         $pool2 = ['小太阳','软糖','布丁','星星','月月','豆豆','团子','奶盖','咕咕','泡泡','奶茶','西柚','柚子','软软','阿玛','小鹿','桃桃','雪碧','布偶','汽水'];
         $name = $pool2[random_int(0, count($pool2) - 1)] . random_int(10, 99);
+    } elseif ($isAuto) {
+        $nick = visitor_avatar_name($visitorAvatar);
+        if ($nick !== '') $name = $nick;
     }
 
     $firstMsg = $question !== '' ? $question : '等待接入...';
@@ -344,7 +348,7 @@ function visitor_session_out(array $s): array
  */
 function pick_visitor_avatar(PDO $pdo, int $tenantId): string
 {
-    $pool = visitor_avatar_pool();
+    $tiers = visitor_avatar_tiers();
     $used = [];
     try {
         $st = $pdo->prepare('SELECT visitor_avatar, COUNT(*) AS c FROM v_sessions
@@ -353,12 +357,21 @@ function pick_visitor_avatar(PDO $pdo, int $tenantId): string
         foreach ($st->fetchAll() as $r) $used[(string)$r['visitor_avatar']] = (int)$r['c'];
     } catch (\Throwable $e) { /* 统计失败不影响分配 */ }
 
-    $free = [];
-    foreach ($pool as $e) { if (!isset($used[$e])) $free[] = $e; }
-    if ($free) return $free[random_int(0, count($free) - 1)];
+    // 按层优先：先用没被用过的动物，动物用完了再拿车船，最后才用其它 emoji
+    foreach ($tiers as $tier) {
+        $free = [];
+        foreach (array_keys($tier) as $e) { if (!isset($used[$e])) $free[] = $e; }
+        if ($free) return $free[random_int(0, count($free) - 1)];
+    }
 
-    $best = $pool[0]; $min = PHP_INT_MAX;
-    foreach ($pool as $e) { $c = $used[$e] ?? 0; if ($c < $min) { $min = $c; $best = $e; } }
+    // 三层都用完了：挑当天用得最少的（尽量不用同一个）
+    $best = ''; $min = PHP_INT_MAX;
+    foreach ($tiers as $tier) {
+        foreach (array_keys($tier) as $e) {
+            $c = $used[$e] ?? 0;
+            if ($c < $min) { $min = $c; $best = $e; }
+        }
+    }
     return $best;
 }
 

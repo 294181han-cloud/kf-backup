@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>客服工作台</title>
 <link rel="stylesheet" href="/assets/vendor/element-plus.css">
-<link rel="stylesheet" href="/assets/css/app.css?v=2.9.0">
+<link rel="stylesheet" href="/assets/css/app.css?v=2.9.1">
 <script src="/assets/ui/ui-registry.js?v=2.6.0"></script>
 <script src="/assets/ui/ui-loader.js?v=2.6.0" data-ui-cat="auto"></script>
 </head>
@@ -785,10 +785,13 @@
           <div class="pol-row">
             <span>访客名称</span>
             <el-radio-group v-model="pol.user_name_type" size="small">
-              <el-radio-button value="default">日期+编号</el-radio-button>
+              <el-radio-button value="default">跟随头像（如 熊猫）</el-radio-button>
               <el-radio-button value="random">随机昵称</el-radio-button>
             </el-radio-group>
           </div>
+          <p class="muted" style="margin:0 0 10px;font-size:11.5px;line-height:1.7;">
+            跟随头像：访客名直接用头像对应的中文（🐼→熊猫、🐘→大象、🌳→大树、🪙→比特币），一眼能对上；访客自己填了昵称则用他填的。
+          </p>
           <el-button type="primary" size="small" style="margin-top:10px;" @click="savePolicy">保存</el-button>
         </div>
 

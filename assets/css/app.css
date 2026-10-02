@@ -707,7 +707,9 @@ body { background: var(--v-bg); color: var(--v-ink); -webkit-font-smoothing: ant
 .sess-ava-dot.online { background: #18c964; }
 .sess-body { flex: 1; min-width: 0; }
 .sess-item .row1 { gap: 8px; margin-bottom: 5px; }
-.sess-item .name { font-size: 14px; font-weight: 650; color: var(--v-ink); }
+.sess-item .name { font-size: 14px; font-weight: 650; color: var(--v-ink); flex: 0 1 auto; min-width: 0; max-width: 74%; }
+/* 设备标签是次要信息：先截断它，保证访客名字完整显示 */
+.sess-item .name .geo-tag { max-width: 96px; flex-shrink: 1; min-width: 0; }
 .sess-item .time { font-size: 11px; color: var(--v-ink-3); }
 .sess-item .row2 { gap: 7px; }
 .sess-item .last { font-size: 12.5px; color: var(--v-ink-3); }
