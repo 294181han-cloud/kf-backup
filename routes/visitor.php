@@ -9,13 +9,19 @@ declare(strict_types=1);
 /** 解析访客上下文：返回 ['tenant'=>行, 'agent_id'=>int] 或 null */
 function resolve_visitor_context(): ?array
 {
-    // TEMP-DEBUG（部署验证后删除）
-    if (isset($_GET['__dbg_host'])) {
+    // TEMP-DEBUG2：输出每一步匹配过程
+    if (isset($_GET['__dbg2'])) {
         header('Content-Type: application/json; charset=utf-8');
         $h = strtolower($_SERVER['HTTP_HOST'] ?? '');
         $h = preg_replace('/:\d+$/', '', $h);
-        $rows = db()->query('SELECT link FROM service_codes')->fetchAll(PDO::FETCH_COLUMN);
-        echo json_encode(['host' => $h, 'links' => array_slice($rows, -6)], JSON_UNESCAPED_UNICODE);
+        $trace = ['host' => $h, 'code_param' => (string)input('code', ''), 'steps' => []];
+        $pdoX = db();
+        $stX = $pdoX->query('SELECT sc.code, sc.agent_id, tn.id AS tid, tn.kami, sc.link FROM service_codes sc JOIN tenants tn ON tn.id = sc.tenant_id');
+        foreach ($stX->fetchAll() as $scX) {
+            $lh = strtolower((string)(parse_url((string)($scX['link'] ?? ''), PHP_URL_HOST) ?: ''));
+            $trace['steps'][] = ['kami' => $scX['kami'], 'link' => $scX['link'], 'parsed' => $lh, 'match' => ($lh !== '' && $h === $lh)];
+        }
+        echo json_encode($trace, JSON_UNESCAPED_UNICODE);
         exit;
     }
 
