@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>客服工作台</title>
 <link rel="stylesheet" href="/assets/vendor/element-plus.css">
-<link rel="stylesheet" href="/assets/css/app.css?v=2.4.1">
+<link rel="stylesheet" href="/assets/css/app.css?v=2.4.2">
 <script src="/assets/ui/ui-registry.js?v=2.5.1"></script>
 <script src="/assets/ui/ui-loader.js?v=2.5.1" data-ui-cat="auto"></script>
 </head>
@@ -179,14 +179,15 @@
             <div class="chat-input">
               <div class="quick-toggle-row">
                 <button class="quick-toggle-btn" :class="{on: showQuick}" @click="showQuick=!showQuick">
-                  ⚡ 快捷消息 <span style="font-size:11px;">{{ showQuick ? '▾' : '▸' }}</span>
+                  <svg class="q-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2 4.5 13.5h6L9 22l10.5-12H13L13 2z"/></svg>
+                  快捷消息 <span style="font-size:11px;">{{ showQuick ? '▾' : '▸' }}</span>
                 </button>
               </div>
               <div class="quick-bar" :class="{open: showQuick}">
                 <div class="quick-scroll">
                   <template v-if="quickMsgs.length">
                     <button class="quick-btn" v-for="(q, qi) in quickMsgs" :key="q.id" :title="q.content" :style="{transitionDelay: (qi * 30) + 'ms'}" @click="sendQuick(q)">
-                      <span v-if="(q.attachments||[]).length" style="margin-right:3px;">🖼️</span>{{ q.title }}
+                      <span v-if="(q.attachments||[]).length" class="q-img-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="3"/><circle cx="9" cy="10" r="1.6"/><path d="M21 16.5 16.5 12l-6 6"/></svg></span>{{ q.title }}
                     </button>
                   </template>
                   <span v-if="!quickMsgs.length" class="muted" style="font-size:12px;padding:0 6px;">还没有快捷消息，去「快捷消息」添加</span>
@@ -194,8 +195,8 @@
               </div>
               <div class="chat-tools" style="margin-bottom:6px;">
 
-                <button class="tool-btn" title="发送图片" @click="$refs.imgInput.click()">🖼️</button>
-                <button class="tool-btn" title="语音" @click="startRec">🎤</button>
+                <button class="tool-btn" title="发送图片" @click="$refs.imgInput.click()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="3"/><circle cx="9" cy="10" r="1.6"/><path d="M21 16.5 16.5 12l-6 6"/></svg></button>
+                <button class="tool-btn" title="语音" @click="startRec"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0"/><path d="M12 18v3"/></svg></button>
                 <input ref="imgInput" type="file" accept="image/png,image/jpeg,image/gif,image/webp" style="display:none" @change="onImage"/>
               </div>
               <div class="recording-bar" v-if="recording">

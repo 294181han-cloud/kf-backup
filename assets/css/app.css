@@ -154,8 +154,17 @@ body { margin: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'P
 .chat-input { background: #fff; border-top: 1px solid #e5e6eb; padding: 10px 14px; }
 .chat-input textarea { width: 100%; border: none; outline: none; resize: none; font-size: 14px; font-family: inherit; height: 64px; background: transparent; }
 .chat-tools { display: flex; align-items: center; gap: 14px; }
-.tool-btn { background: none; border: none; font-size: 20px; cursor: pointer; padding: 0; transition: transform .15s; }
+.tool-btn { background: none; border: none; font-size: 20px; cursor: pointer; padding: 0; transition: transform .15s; display: inline-flex; align-items: center; color: #5c6b85; }
+.tool-btn svg { width: 21px; height: 21px; display: block; }
+.tool-btn:hover { color: var(--theme, #1677ff); }
 .tool-btn:active { transform: scale(.9); }
+body.dark .tool-btn { color: #8b919c; }
+body.dark .tool-btn:hover { color: var(--theme, #69b1ff); }
+/* 快捷消息条线性图标 */
+.quick-toggle-btn { display: inline-flex; align-items: center; gap: 5px; }
+.quick-toggle-btn .q-ic { width: 14px; height: 14px; flex-shrink: 0; }
+.q-img-ic { display: inline-flex; vertical-align: -2px; margin-right: 4px; color: inherit; }
+.q-img-ic svg { width: 13px; height: 13px; display: block; }
 .quick-toggle-row { padding: 0 2px 6px; }
 .quick-toggle-btn {
   border: 1px solid #eeeaea; background: #fff; color: #333; border-radius: 8px;
