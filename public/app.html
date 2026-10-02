@@ -630,50 +630,6 @@
           <el-button type="primary" size="small" @click="savePolicy">保存会话管理</el-button>
         </div>
 
-        <!-- ============ 声音设置（v2.27，租户级） ============ -->
-        <div class="panel" style="max-width:640px;margin:0 auto;">
-          <div class="panel-title">声音设置（客服端 / 访客端分开，接收 / 发送分开）</div>
-          <div class="snd-group">
-            <div class="snd-group-title">🎧 客服端（工作台）</div>
-            <div class="snd-row">
-              <span class="snd-label">接收消息提示音</span>
-              <el-switch v-model="sndCfg.agent_recv_on"></el-switch>
-              <el-select v-model="sndCfg.agent_recv_which" size="small" style="width:110px;" :disabled="!sndCfg.agent_recv_on">
-                <el-option v-for="o in SOUND_OPTS" :key="o.v" :label="o.l" :value="o.v"></el-option>
-              </el-select>
-              <el-button size="small" text type="primary" @click="playSound(sndCfg.agent_recv_which)">▶ 试听</el-button>
-            </div>
-            <div class="snd-row">
-              <span class="snd-label">发送消息提示音</span>
-              <el-switch v-model="sndCfg.agent_send_on"></el-switch>
-              <el-select v-model="sndCfg.agent_send_which" size="small" style="width:110px;" :disabled="!sndCfg.agent_send_on">
-                <el-option v-for="o in SOUND_OPTS" :key="'s'+o.v" :label="o.l" :value="o.v"></el-option>
-              </el-select>
-              <el-button size="small" text type="primary" @click="playSound(sndCfg.agent_send_which)">▶ 试听</el-button>
-            </div>
-          </div>
-          <div class="snd-group">
-            <div class="snd-group-title">👤 访客端（聊天页）</div>
-            <div class="snd-row">
-              <span class="snd-label">接收消息提示音</span>
-              <el-switch v-model="sndCfg.visitor_recv_on"></el-switch>
-              <el-select v-model="sndCfg.visitor_recv_which" size="small" style="width:110px;" :disabled="!sndCfg.visitor_recv_on">
-                <el-option v-for="o in SOUND_OPTS" :key="'vr'+o.v" :label="o.l" :value="o.v"></el-option>
-              </el-select>
-              <el-button size="small" text type="primary" @click="playSound(sndCfg.visitor_recv_which)">▶ 试听</el-button>
-            </div>
-            <div class="snd-row">
-              <span class="snd-label">发送消息提示音</span>
-              <el-switch v-model="sndCfg.visitor_send_on"></el-switch>
-              <el-select v-model="sndCfg.visitor_send_which" size="small" style="width:110px;" :disabled="!sndCfg.visitor_send_on">
-                <el-option v-for="o in SOUND_OPTS" :key="'vs'+o.v" :label="o.l" :value="o.v"></el-option>
-              </el-select>
-              <el-button size="small" text type="primary" @click="playSound(sndCfg.visitor_send_which)">▶ 试听</el-button>
-            </div>
-          </div>
-          <p class="muted" style="margin:0 0 10px;font-size:12px;">访客端浏览器要求用户先与页面交互过才允许播放声音（各平台自动策略，无法绕过）。</p>
-          <el-button type="primary" size="small" @click="saveSnd">保存声音设置</el-button>
-        </div>
 
         <div class="panel" style="max-width:640px;margin:0 auto;">
           <div class="panel-title">访客过滤</div>
@@ -884,6 +840,50 @@
           </el-form>
           <el-button type="primary" @click="saveProfile">保存</el-button>
         </div>
+        <!-- ============ 声音设置（v2.27，租户级；仅租户可改，子客服只读试听） ============ -->
+        <div class="panel" style="max-width:560px;margin:0 auto;" v-if="me && me.role==='tenant'">
+          <div class="panel-title">声音设置（客服端 / 访客端分开，接收 / 发送分开）</div>
+          <div class="snd-group">
+            <div class="snd-group-title">🎧 客服端（工作台）</div>
+            <div class="snd-row">
+              <span class="snd-label">接收消息提示音</span>
+              <el-switch v-model="sndCfg.agent_recv_on"></el-switch>
+              <el-select v-model="sndCfg.agent_recv_which" size="small" style="width:110px;" :disabled="!sndCfg.agent_recv_on">
+                <el-option v-for="o in SOUND_OPTS" :key="o.v" :label="o.l" :value="o.v"></el-option>
+              </el-select>
+              <el-button size="small" text type="primary" @click="playSound(sndCfg.agent_recv_which)">▶ 试听</el-button>
+            </div>
+            <div class="snd-row">
+              <span class="snd-label">发送消息提示音</span>
+              <el-switch v-model="sndCfg.agent_send_on"></el-switch>
+              <el-select v-model="sndCfg.agent_send_which" size="small" style="width:110px;" :disabled="!sndCfg.agent_send_on">
+                <el-option v-for="o in SOUND_OPTS" :key="'s'+o.v" :label="o.l" :value="o.v"></el-option>
+              </el-select>
+              <el-button size="small" text type="primary" @click="playSound(sndCfg.agent_send_which)">▶ 试听</el-button>
+            </div>
+          </div>
+          <div class="snd-group">
+            <div class="snd-group-title">👤 访客端（聊天页）</div>
+            <div class="snd-row">
+              <span class="snd-label">接收消息提示音</span>
+              <el-switch v-model="sndCfg.visitor_recv_on"></el-switch>
+              <el-select v-model="sndCfg.visitor_recv_which" size="small" style="width:110px;" :disabled="!sndCfg.visitor_recv_on">
+                <el-option v-for="o in SOUND_OPTS" :key="'vr'+o.v" :label="o.l" :value="o.v"></el-option>
+              </el-select>
+              <el-button size="small" text type="primary" @click="playSound(sndCfg.visitor_recv_which)">▶ 试听</el-button>
+            </div>
+            <div class="snd-row">
+              <span class="snd-label">发送消息提示音</span>
+              <el-switch v-model="sndCfg.visitor_send_on"></el-switch>
+              <el-select v-model="sndCfg.visitor_send_which" size="small" style="width:110px;" :disabled="!sndCfg.visitor_send_on">
+                <el-option v-for="o in SOUND_OPTS" :key="'vs'+o.v" :label="o.l" :value="o.v"></el-option>
+              </el-select>
+              <el-button size="small" text type="primary" @click="playSound(sndCfg.visitor_send_which)">▶ 试听</el-button>
+            </div>
+          </div>
+          <p class="muted" style="margin:0 0 10px;font-size:12px;">访客端浏览器要求用户先与页面交互过才允许播放声音（各平台自动策略，无法绕过）。</p>
+          <el-button type="primary" size="small" @click="saveSnd">保存声音设置</el-button>
+        </div>
         <div class="panel" style="max-width:560px;margin:0 auto;">
           <div class="panel-title">修改密码</div>
           <el-form label-width="80px">
@@ -1074,7 +1074,7 @@
 <script src="/assets/qr-poster.js?v=2.0.1"></script>
 <script src="/assets/api.js?v=2.0.1"></script>
 <script src="/assets/js/app-components.js?v=2.1.0"></script>
-<script src="/assets/js/app.js?v=2.5.0"></script>
+<script src="/assets/js/app.js?v=2.5.1"></script>
 <script src="/assets/js/app-boot.js?v=2.1.1"></script>
 </body>
 </html>
