@@ -5,9 +5,9 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>客服工作台</title>
 <link rel="stylesheet" href="/assets/vendor/element-plus.css">
-<link rel="stylesheet" href="/assets/css/app.css?v=2.1.0">
-<script src="/assets/ui/ui-registry.js?v=2.3.0"></script>
-<script src="/assets/ui/ui-loader.js?v=2.2.0" data-ui-cat="pc"></script>
+<link rel="stylesheet" href="/assets/css/app.css?v=2.2.0">
+<script src="/assets/ui/ui-registry.js?v=2.4.0"></script>
+<script src="/assets/ui/ui-loader.js?v=2.4.0" data-ui-cat="pc"></script>
 </head>
 <body>
 <div id="app" v-cloak>
@@ -47,6 +47,7 @@
         <template v-if="me && me.role==='tenant'">
           <div class="nav-group">系 统</div>
           <div class="nav-item" :class="{active: tab==='brand'}" @click="tab='brand'"><span class="nv-text">访客端模板</span></div>
+          <div class="nav-item" :class="{active: tab==='ui'}" @click="tab='ui'"><span class="nv-text">后台UI</span></div>
           <div class="nav-item" :class="{active: tab==='preinq'}" @click="tab='preinq'"><span class="nv-text">询前表单</span></div>
           <div class="nav-item" :class="{active: tab==='policy'}" @click="tab='policy'"><span class="nv-text">访客策略</span></div>
           <div class="nav-item" :class="{active: tab==='security'}" @click="tab='security'; loadSecurityPage()"><span class="nv-text">安全与维护</span></div>
@@ -56,14 +57,10 @@
       </div>
       <div class="side-tools" style="padding:10px 12px 4px;display:flex;align-items:center;justify-content:space-between;">
         <span style="cursor:pointer;font-size:16px;" title="收起/展开菜单" @click="sideCollapsed = !sideCollapsed">{{ sideCollapsed ? '➡' : '⬅' }}</span>
-        <span style="display:flex;gap:6px;">
-          <span v-for="t in themeDots" :key="t.v" class="theme-dot" :class="{on: themeKey===t.v}" :style="{background:t.c}" :title="t.label" @click="setTheme(t.v)"></span>
-        </span>
       </div>
-      <div class="me" style="border-top:1px solid #eeeaea;">
+      <div class="me">
         <span style="cursor:pointer;display:inline-block;margin-bottom:6px;" @click="toggleDark">{{ dark ? '☀️ 浅色模式' : '🌙 深色模式' }}</span><br>
         <span @click="logout" style="cursor:pointer;">
-        <b>{{ me ? (me.nickname || me.kami || '') : '' }}</b><br>
         <b>{{ me ? (me.nickname || me.kami || '') : '' }}</b><br>
         <template v-if="me && me.role==='tenant'">{{ me.kami }} · {{ expireText }}</template>
         <template v-else-if="me">子客服 {{ me.username }}</template>
@@ -487,6 +484,34 @@
             </el-form-item>
           </el-form>
           <el-button type="primary" @click="saveBrand">保存外观</el-button>
+        </div>
+      </div>
+
+      <!-- ============ 后台UI（模板+配色） ============ -->
+      <div class="content" v-if="tab==='ui' && me.role==='tenant'">
+        <div class="panel" style="max-width:680px;margin:0 auto;">
+          <div class="panel-title">后台 UI</div>
+          <div class="muted" style="margin:-6px 0 14px;font-size:12px;line-height:1.7;">
+            模板决定界面结构，配色决定颜色；选择即时生效并保存在本浏览器。<br>
+            手机端为访客页样式预览：访客实际颜色以租户品牌色 / 平台皮肤优先（产品设定）。
+          </div>
+          <div v-for="cat in uiCatList" :key="cat.key" style="margin-bottom:22px;">
+            <h4 style="margin:0 0 10px;font-size:14px;color:#1f2329;">{{ cat.label }} <span class="muted" style="font-size:11.5px;font-weight:normal;">{{ cat.pages }}</span></h4>
+            <div style="font-size:13px;color:#4e5969;margin:0 0 6px;">模板</div>
+            <div class="tpl-grid" style="max-width:460px;">
+              <div v-for="t in uiTplList(cat.key)" :key="t.id" class="tpl-card" :class="{active: uiSel[cat.key].tpl===t.id}" @click="uiPick(cat.key, t.id, uiSel[cat.key].color)">
+                <span class="tpl-name">{{ t.name }}</span>
+                <span v-if="uiSel[cat.key].tpl===t.id" class="tpl-check">✓</span>
+              </div>
+            </div>
+            <div style="font-size:13px;color:#4e5969;margin:12px 0 6px;">配色</div>
+            <div style="display:flex;gap:10px;flex-wrap:wrap;">
+              <div v-for="c in uiColorList(cat.key)" :key="c.id" class="ui-color-card" :class="{on: uiSel[cat.key].color===c.id}" @click="uiPick(cat.key, uiSel[cat.key].tpl, c.id)">
+                <span class="ui-color-chip" :style="{background:c.chip}"></span>
+                <span>{{ c.name }}</span>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -917,7 +942,7 @@
 <script src="/assets/qr-poster.js?v=2.0.1"></script>
 <script src="/assets/api.js?v=2.0.1"></script>
 <script src="/assets/js/app-components.js?v=2.1.0"></script>
-<script src="/assets/js/app.js?v=2.1.1"></script>
+<script src="/assets/js/app.js?v=2.2.0"></script>
 <script src="/assets/js/app-boot.js?v=2.1.0"></script>
 </body>
 </html>

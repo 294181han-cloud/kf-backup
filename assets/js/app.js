@@ -127,7 +127,7 @@ const app = createApp({
     const tabTitle = computed(() => ({
       work: '会话接待', stats: '数据面板', quick: '快捷回复', welcome: '欢迎语', auto: '自动回复',
       broadcast: '群发', blacklist: 'IP 黑名单', preinq: '询前表单', links: '获客链接', agents: '子客服管理',
-      brand: '访客端模板', policy: '访客策略', visitors: '访客列表', security: '安全与维护', profile: '个人设置',
+      brand: '访客端模板', policy: '访客策略', visitors: '访客列表', security: '安全与维护', profile: '个人设置', ui: '后台 UI',
       quick: '快捷消息', auto: '智能回复', agents: '坐席管理', broadcast: '群发模板', links: '获客码',
     }[tab.value]));
     const current = computed(() => sessions.value.find(s => s.id === currentId.value) || null);
@@ -674,10 +674,51 @@ const app = createApp({
       { k: 'xiaohongshu', label: '小红书', g1: '#FF2442' },
       { k: 'yangqianguan', label: '钱罐子', g1: '#FF8800' },
     ];
-    // ===== 主题换肤（多 UI 款式系统：款式注册表 assets/ui/ui-registry.js，规范见 UI-DEV.md） =====
-    const themeKey = ref((window.UI && UI.current().id) || 'default');
-    const themeDots = (window.UI ? UI.list('pc') : []).map(s => ({ v: s.id, label: s.name, c: s.chip }));
-    const setTheme = (v) => { if (window.UI) UI.set(v); themeKey.value = v; };
+    // ===== 后台UI（模板+配色选择；注册表 assets/ui/ui-registry.js，加载器 ui-loader.js） =====
+    // pc 分类由本页加载器实例管理（即时生效）；mobile 分类写 localStorage 供访客页本机预览。
+    const uiReg = window.UI_STYLES || { categories: {} };
+    const uiSel = {};
+    Object.keys(uiReg.categories || {}).forEach((key) => {
+      const cat = uiReg.categories[key];
+      const tpls = cat.templates || [];
+      let tplId = cat.defaultTemplate, colorId = null;
+      try {
+        tplId = localStorage.getItem('kfxt_ui_' + key + '_tpl') || tplId;
+        colorId = localStorage.getItem('kfxt_ui_' + key) || (key === 'pc' && window.UI ? UI.current().id : null);
+      } catch (e) {}
+      if (key === 'pc' && window.UI) { tplId = UI.template().id; colorId = UI.current().id; }
+      const t = tpls.find((x) => x.id === tplId) || tpls[0];
+      const colors = (t && t.colors) || [];
+      if (!colors.find((x) => x.id === colorId)) colorId = colors.length ? colors[0].id : '';
+      uiSel[key] = { tpl: t ? t.id : '', color: colorId };
+    });
+    const uiCatList = Object.keys(uiReg.categories || {}).map((key) => ({
+      key,
+      label: uiReg.categories[key].label,
+      pages: (uiReg.categories[key].pages || []).join(' / '),
+    }));
+    const uiTplList = (key) => (uiReg.categories[key] ? uiReg.categories[key].templates || [] : []);
+    const uiColorList = (key) => {
+      const t = (uiReg.categories[key] ? uiReg.categories[key].templates || [] : []).find((x) => x.id === uiSel[key].tpl);
+      return t ? t.colors || [] : [];
+    };
+    const uiPick = (key, tplId, colorId) => {
+      const sel = uiSel[key];
+      const tplChanged = tplId !== sel.tpl;
+      sel.tpl = tplId;
+      sel.color = colorId;
+      if (key === 'pc' && window.UI) {
+        if (tplChanged) UI.setTemplate(tplId);
+        UI.set(colorId);
+        sel.tpl = UI.template().id;   // 加载器可能因配色回退修正状态
+        sel.color = UI.current().id;
+      } else {
+        try {
+          localStorage.setItem('kfxt_ui_' + key + '_tpl', tplId);
+          localStorage.setItem('kfxt_ui_' + key, colorId);
+        } catch (e) {}
+      }
+    };
 
     // ===== 头像裁剪（1:1） =====
     const cropDlg = ref(false);
@@ -948,7 +989,7 @@ const app = createApp({
       uploadAvatar, isImg,
       sec, loginLogs, visitors, cleanupOpts, loadSecurityPage, saveSecurity, doCleanup, loadVisitors, openVisitorSessions,
       guide, guideDone, dark, toggleDark, renameVisitor, renderCodeQrs, tplList,
-      themeKey, themeDots, setTheme, sideCollapsed,
+      uiCatList, uiSel, uiTplList, uiColorList, uiPick, sideCollapsed,
       blockSession, blockIp, kwList, kwInput, kwSaving, addKw, removeKw, saveFilter, agentCmd, restartPoll,
       chatSearchOn, chatSearchKw, searchHit, visibleMsgs, canRecall, recallMsg, isRead,
       pol, savePolicy, uploadPolHead, clock, unreadTotal, sessCollapsed,

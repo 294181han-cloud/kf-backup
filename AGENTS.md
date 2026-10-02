@@ -38,11 +38,11 @@
 │   ├── qr-poster.js     # 共享二维码海报绘制
 │   ├── css/             # 页面基础样式：app.css / admin.css / visitor.css
 │   ├── js/              # 页面逻辑：app.js / app-components.js / app-boot.js / admin.js / visitor.js
-│   ├── ui/              # 多 UI 款式系统（pc/mobile 两类，见 UI-DEV.md）
-│   │   ├── ui-registry.js  # 款式注册表（新增款式在此登记）
-│   │   ├── ui-loader.js    # 款式加载器（禁止修改）
-│   │   ├── pc/          # 工作台/管理台款式：_base.css + default/purple/sky/green
-│   │   └── mobile/      # 访客端款式：default/dark
+│   ├── ui/              # 多 UI 系统：分类(pc/mobile)→模板→配色（见 UI-DEV.md）
+│   │   ├── ui-registry.js  # 注册表：分类→模板→配色三级（新增在此登记）
+│   │   ├── ui-loader.js    # 加载器（base+模板+配色注入，?ui=/​?uit= 预览）
+│   │   ├── pc/          # 工作台/管理台配色：_base.css + default/purple/sky/green/rose/sunset/indigo/graphite
+│   │   └── mobile/      # 访客端配色：default/dark/mint/sakura/sunset/taro
 │   └── vendor/          # 第三方库（vue/element-plus/echarts/qrcode），不修改
 ├── selftest.ps1         # 112 项全流程回归（直接跑线上！幂等可重跑）
 ├── DEPLOY.md            # 部署运维 + v1~v5 全部变更记录（新变更追加在文末）
@@ -57,9 +57,9 @@
 - **加载顺序（app.html）**：vue → element-plus → qrcode → qr-poster → api.js → app-components.js → app.js → app-boot.js。
   app.js 顶层 `const` 依赖 app-components.js 先执行（经典 script 共享全局词法环境，顺序不可乱）。
 - **缓存版本**：改了任何 css/js 内容，必须把该文件引用的 `?v=` 号 +1（当前 2.1.0），否则用户拿到 7 天旧缓存。
-- **多 UI 款式系统（v2.2.0）**：款式分 pc / mobile 两类，每款一个 `assets/ui/<分类>/<id>/theme.css`，
-  经 `ui-registry.js` 登记、`ui-loader.js` 注入（`?ui=<id>` 可预览）。**UI 外观类任务一律按 [UI-DEV.md](UI-DEV.md) 执行**——
-  该文档是交给轻量模型（如 GLM Flash）做 UI 的任务边界与自验清单，款式开发只动款式目录 + 注册表。
+- **多 UI 系统（v2.19 起：分类→模板→配色）**：工作台「系统 → 后台UI」页选择，`?ui=<配色id>` 可预览。
+  **纯配色/模板外观任务一律按 [UI-DEV.md](UI-DEV.md) 执行**——该文档是交给轻量模型（如 GLM Flash）做 UI 的
+  任务边界与自验清单，配色开发只动配色目录 + 注册表；涉及加载器/页面/JS 的改动需明确指派并走完整验证。
 - vendor 库永远不改；缺什么加文件到 vendor/ 并在页面引用。
 
 ## 4. 后端约定

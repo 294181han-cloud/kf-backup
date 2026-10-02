@@ -52,7 +52,7 @@ body { margin: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'P
   padding: 10px 16px 3px; font-size: 10px; letter-spacing: 1.5px;
   color: #999; text-transform: uppercase;
 }
-.side .me { padding: 12px 16px; font-size: 12px; color: #666; line-height: 1.8; cursor: pointer; }
+.side .me { padding: 12px 16px; font-size: 12px; color: #666; line-height: 1.8; cursor: pointer; border-top: 1px solid #eeeaea; }
 .side .me:hover { color: #1890ff; }
 .side .me b { color: #333; font-size: 13px; }
 
@@ -205,10 +205,29 @@ body { margin: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'P
 .tpl-dot { width: 13px; height: 13px; border-radius: 50%; flex-shrink: 0; }
 .tpl-name { flex: 1; }
 .tpl-check { color: #1677ff; font-weight: 700; }
+/* ===== 后台UI 配色卡片 ===== */
+.ui-color-card { display: flex; align-items: center; gap: 8px; border: 1.5px solid #e5e6eb; border-radius: 9px; padding: 8px 12px; cursor: pointer; font-size: 13px; color: #1f2329; background: #fff; }
+.ui-color-card.on { border-color: var(--theme, #1677ff); background: color-mix(in srgb, var(--theme, #1677ff) 8%, #fff); }
+.ui-color-card.on .ui-color-chip { box-shadow: 0 0 0 2px #fff, 0 0 0 3.5px var(--theme, #1677ff); }
+.ui-color-chip { width: 14px; height: 14px; border-radius: 50%; flex-shrink: 0; box-shadow: inset 0 0 0 1px rgba(0,0,0,.08); }
+body.dark .ui-color-card { background: #23272e; border-color: #3a4048; color: #e5e6eb; }
+body.dark .ui-color-card.on { border-color: var(--theme, #1677ff); background: color-mix(in srgb, var(--theme, #1677ff) 18%, #23272e); }
 .rec-dot { width: 9px; height: 9px; border-radius: 50%; background: #f53f3f; animation: blink 1s infinite; }
 @keyframes blink { 50% { opacity: .2; } }
 /* ===== dark theme ===== */
 body.dark { background: #171a1f; }
+body.dark .layout .side { background: #23272e; border-right: 1px solid #2a2f36; }
+body.dark .side .logo { color: #e5e6eb; }
+body.dark .side .nav-group { color: #6f7683; }
+body.dark .side .nav-item { color: #c9cdd4; }
+body.dark .side .nav-item:hover { background: #2a2f36; }
+body.dark .side .nav-item.active { background: #2a2f36; color: var(--theme, #1890ff); box-shadow: inset 3px 0 0 var(--theme, #1890ff); }
+body.dark .side .side-hero { background: #1d2126; border-bottom-color: #31363e; }
+body.dark .side .hero-kami { color: #6f7683; }
+body.dark .side .hero-expire { color: #6f7683; }
+body.dark .side .side-tools { border-top-color: #2a2f36; }
+body.dark .side .me { color: #c9cdd4; border-top-color: #2a2f36; }
+body.dark .side .me b { color: #e5e6eb; }
 body.dark .main .topbar { background: #23272e; box-shadow: 0 1px 4px rgba(0,0,0,.4); }
 body.dark .topbar .title { color: #e5e6eb; }
 body.dark .content { background: #171a1f; }
