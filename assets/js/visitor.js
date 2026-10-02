@@ -243,6 +243,7 @@ createApp({
       try {
         const r = await fetch('/api/poll?session=' + sessionId.value + '&sinceMsg=' + maxMsgId.value).then(x => x.json());
         pushMessages(r.messages || []);
+        if (r.agent_avatar) agentAvatar.value = r.agent_avatar;
         // 撤回同步：把最近撤回的消息标记为已撤回（自己撤回的会被过滤隐藏，客服撤回的显示胶囊）
         if (Array.isArray(r.recalledIds) && r.recalledIds.length) {
           const set = new Set(r.recalledIds);
@@ -424,6 +425,8 @@ createApp({
     // ===== 访客自己头像 =====
     const myAvatar = ref('');
     const myName = ref('');
+    // ===== 接待客服头像（poll 返回；子客服/主账号/品牌 三级由后端解析）=====
+    const agentAvatar = ref('');
     const ui = Vue.computed(() => ({
       navOn: document.body.dataset.navOff !== '1',
       navTitle: navTitle.value,
@@ -433,7 +436,7 @@ createApp({
     onUnmounted(stopPoll);
 
     return {
-      page, blockedTitle, blockedDesc, brand, messages, draft, sending,
+      page, blockedTitle, blockedDesc, brand, messages, draft, sending, agentAvatar,
       bodyRef, inputRef, imgInput, viewing, viewImage,
       showForm, formItems, formValues, formSubmitting, submitForm,
       recording, recSecs, startRec, stopRec,

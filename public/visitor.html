@@ -69,7 +69,7 @@
         <template v-else>
           <div class="msg-ava" v-if="m.from === 'visitor'">{{ myAvatar || '🙋' }}</div>
           <div class="msg-ava" v-else>
-            <img v-if="isImg(brand.avatar)" :src="brand.avatar"><template v-else>{{ brand.avatar }}</template>
+            <img v-if="isImg(agentAvatar || brand.avatar)" :src="agentAvatar || brand.avatar"><template v-else>{{ agentAvatar || brand.avatar }}</template>
           </div>
           <div class="msg-box">
             <div class="msg-bubble">
@@ -187,6 +187,6 @@
 </div>
 
 <script src="/assets/vendor/vue.global.js?v=2.0.1"></script>
-<script src="/assets/js/visitor.js?v=2.2.0"></script>
+<script src="/assets/js/visitor.js?v=2.2.2"></script>
 </body>
 </html>

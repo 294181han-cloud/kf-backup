@@ -416,9 +416,23 @@ function handle_visitor_poll(string $method): void
     $rc = $pdo->prepare('SELECT id FROM messages WHERE session_id = ? AND recalled_at IS NOT NULL AND recalled_at >= DATE_SUB(NOW(), INTERVAL 10 MINUTE)');
     $rc->execute([$sid]);
     $recalledIds = array_map('intval', $rc->fetchAll(PDO::FETCH_COLUMN));
+    // 接待客服头像：子客服用 agents.avatar，主账号接待（agent_id=0）用 me_avatar，兜底品牌头像
+    $agentAvatar = '';
+    $ss = $pdo->prepare('SELECT tenant_id, agent_id FROM v_sessions WHERE id = ?');
+    $ss->execute([$sid]);
+    if ($sess = $ss->fetch()) {
+        $tid2 = (int)$sess['tenant_id'];
+        if (!empty($sess['agent_id'])) {
+            $a = $pdo->prepare('SELECT avatar FROM agents WHERE id = ? AND tenant_id = ?');
+            $a->execute([(int)$sess['agent_id'], $tid2]);
+            $agentAvatar = trim((string)($a->fetchColumn() ?: ''));
+        }
+        if ($agentAvatar === '') $agentAvatar = trim((string)ts_get($tid2, 'me_avatar', ''));
+        if ($agentAvatar === '') $agentAvatar = (string)ts_get($tid2, 'brand_avatar', '💬');
+    }
     $st = $pdo->prepare('SELECT id, session_id, from_type AS `from`, sender_name, text, msg_type, attachments, recalled_at, created_at FROM messages WHERE session_id = ? AND id > ? ORDER BY id ASC');
     $st->execute([$sid, $sinceMsg]);
-    json_out(['messages' => array_map('to_msg', $st->fetchAll()), 'recalledIds' => $recalledIds, 'now' => time()]);
+    json_out(['messages' => array_map('to_msg', $st->fetchAll()), 'recalledIds' => $recalledIds, 'agent_avatar' => $agentAvatar, 'now' => time()]);
 }
 /* ---------- POST /api/visitor/send ---------- */
 function handle_visitor_send(string $method): void
