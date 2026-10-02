@@ -186,6 +186,20 @@ const app = createApp({
     };
 
     const loadQuick = async () => { try { quickMsgs.value = await API.get('/api/quick-msgs'); } catch (e) {} };
+    // 快捷消息：控制台里一行输入直接添加（不用开弹窗）
+    const qa = reactive({ title: '', content: '', saving: false });
+    const quickAdd = async () => {
+      const title = (qa.title || '').trim();
+      if (!title) { ElementPlus.ElMessage.warning('请填写按钮文字'); return; }
+      qa.saving = true;
+      try {
+        await API.post('/api/quick-msgs', { title, content: (qa.content || '').trim(), group_name: '通用', sort: 0, attachments: [] });
+        qa.title = ''; qa.content = '';
+        await loadQuick();
+        ElementPlus.ElMessage.success('已添加，聊天窗口里一点就发');
+      } catch (e) { ElementPlus.ElMessage.error(e.message); }
+      finally { qa.saving = false; }
+    };
     const loadWelcome = async () => { try { welcomeMsgs.value = await API.get('/api/welcome-messages'); } catch (e) {} };
     const loadAuto = async () => { try { autoReplies.value = await API.get('/api/auto-reply'); } catch (e) {} };
     const loadBlacklist = async () => { try { blacklist.value = await API.get('/api/ip-blacklist'); } catch (e) {} };
@@ -338,6 +352,50 @@ const app = createApp({
       finally { refreshing.value = false; }
     };
     // 请求访客上传图片：发一条 ask_image 卡片，访客端点卡片上的按钮即可选图
+    const ASK_DEFAULT = '方便的话，请上传一下相关图片，帮您更快定位问题～';
+    const ASK_PRESETS = [
+      '方便的话，请上传一下相关图片，帮您更快定位问题～',
+      '麻烦发张截图给我看看～',
+      '请把出错页面截图发我，我帮您看下',
+      '请上传您的付款/转账截图，方便核对',
+      '请拍一下产品照片，方便我这边确认',
+      '请把相关信息截图发我，我帮您核对一下',
+      '方便发一下图片吗？我看看具体情况',
+      '请把您看到的提示拍照发我',
+      '请上传收货地址截图',
+      '请上传证件照（隐私信息请打码）',
+    ];
+    const askDlg = ref(false);
+    const askForm = reactive({ text: '', saveDefault: false });
+    const openAskDialog = () => {
+      if (!currentId.value) { ElementPlus.ElMessage.warning('请先选择会话'); return; }
+      askForm.text = (pol.ask_image_text || '').trim() || ASK_DEFAULT;
+      askForm.saveDefault = false;
+      askDlg.value = true;
+    };
+    const sendAskDialog = async () => {
+      const text = (askForm.text || '').trim();
+      if (!text) { ElementPlus.ElMessage.warning('请填写要发送的话术'); return; }
+      if (!currentId.value || sending.value) return;
+      sending.value = true;
+      try {
+        if (askForm.saveDefault) {
+          const store = text === ASK_DEFAULT ? '' : text;
+          await API.put('/api/tenant/settings', { ask_image_text: store });
+          pol.ask_image_text = store;
+        }
+        const r = await API.post('/api/sessions/' + currentId.value + '/messages', { text, msg_type: 'ask_image' });
+        msgs.value.push(r.message);
+        maxMsgId.value = r.message.id;
+        scrollBottom();
+        sendBeep();
+        const s = sessions.value.find(x => x.id === currentId.value);
+        if (s) s.lastMsg = r.message.text || '[请求上传图片]';
+        askDlg.value = false;
+        if (askForm.saveDefault) ElementPlus.ElMessage.success('已发送，并设为默认话术');
+      } catch (e) { ElementPlus.ElMessage.error(e.message); }
+      finally { sending.value = false; }
+    };
     const askUpload = async () => {
       if (!currentId.value || sending.value) return;
       sending.value = true;
@@ -1108,6 +1166,12 @@ const app = createApp({
     // 当前中心 Logo 对应的拦截检测通道（微信 logo → 查微信是否拦截；QQ logo → 查 QQ）
     const checkChannel = computed(() => CODE_CHANNEL[codeStyle.logo] || 'wx');
     const checkChannelLabel = computed(() => (checkChannel.value === 'qq' ? 'QQ' : '微信'));
+    // 当前中心 Logo 的名字 + 是否走"默认微信通道"（支付宝/抖音等没有独立拦截检测接口）
+    const checkLogoName = computed(() => ({
+      wechat: '微信', qq: 'QQ', alipay: '支付宝', douyin: '抖音', all: '聚合', avatar: '头像',
+      none: '无', upload: '上传图', custom: '自定义图',
+    }[codeStyle.logo] || '无'));
+    const checkUseDefaultChannel = computed(() => codeStyle.logo !== 'wechat' && codeStyle.logo !== 'qq');
     const CODE_STYLE_DEF = { dot: 'rounded', eye: 'rounded', brand: '#2E6BE6', logo: 'none', logoSize: 'std',
                              topText: '扫码咨询', bottomText: '官方客服', colorDots: false, custom: '' };
     const codeStyle = reactive(Object.assign({}, CODE_STYLE_DEF));
@@ -1618,7 +1682,7 @@ const app = createApp({
       voiceHold, startHoldVoice, moveHoldVoice, endHoldVoice,
       manageDlg, history, codeCfg, qrWrap, currentLink, renderMainQr,
       codeCanvas, logoFile, previewDlg, previewSrc, codeValue, codeStyle, codeCheck,
-      checkChannel, checkChannelLabel,
+      checkChannel, checkChannelLabel, checkLogoName, checkUseDefaultChannel,
       CODE_LOGOS, CODE_BRANDS, pickLogo, setCodeStyle, renderCodeCard, resetCodeStyle, onLogoFile,
       logoThumb, previewBig, checkCode,
       posterCfg, posterQrBox, posterBgInput, pickPosterBg, onPosterBg, downloadPoster2,
@@ -1639,6 +1703,8 @@ const app = createApp({
       saveBrand, savePreqOn, saveProfile, changePw, exportCsv, logout,
       loadQuick, loadWelcome, loadAuto, loadBlacklist, loadPreInq,
       refreshing, refreshChat, askUpload,
+      askDlg, askForm, ASK_PRESETS, ASK_DEFAULT, openAskDialog, sendAskDialog,
+      qa, quickAdd,
     };
   }
 });

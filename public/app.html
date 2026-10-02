@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>客服工作台</title>
 <link rel="stylesheet" href="/assets/vendor/element-plus.css">
-<link rel="stylesheet" href="/assets/css/app.css?v=2.8.4">
+<link rel="stylesheet" href="/assets/css/app.css?v=2.9.0">
 <script src="/assets/ui/ui-registry.js?v=2.6.0"></script>
 <script src="/assets/ui/ui-loader.js?v=2.6.0" data-ui-cat="auto"></script>
 </head>
@@ -220,18 +220,18 @@
               <div class="quick-bar" :class="{open: showQuick}">
                 <div class="quick-scroll">
                   <template v-if="quickMsgs.length">
-                    <button class="quick-btn" v-for="(q, qi) in quickMsgs" :key="q.id" :title="q.content + '\n单击：填入输入框（可编辑）\nCtrl+单击：直接发送'" :style="{transitionDelay: (qi * 30) + 'ms'}" @click="quickClick(q, $event)" @contextmenu="openQuickCtx(q, $event)">
+                    <button class="quick-btn" v-for="(q, qi) in quickMsgs" :key="q.id" :title="q.content + '\n单击：直接发送\nCtrl+单击：填入输入框（可编辑）'" :style="{transitionDelay: (qi * 30) + 'ms'}" @click="quickClick(q, $event)" @contextmenu="openQuickCtx(q, $event)">
                       <span v-if="(q.attachments||[]).length" class="q-img-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="3"/><circle cx="9" cy="10" r="1.6"/><path d="M21 16.5 16.5 12l-6 6"/></svg></span>{{ q.title }}
                     </button>
                   </template>
-                  <span v-if="!quickMsgs.length" class="muted" style="font-size:12px;padding:0 6px;">还没有快捷消息，去「快捷消息」添加</span>
+                  <span v-if="!quickMsgs.length" class="muted" style="font-size:12px;padding:0 6px;">还没有快捷消息，去「快捷消息」页直接添加</span>
                 </div>
               </div>
               <div class="chat-tools" style="margin-bottom:6px;">
 
                 <button class="tool-btn" title="发送图片" @click="$refs.imgInput.click()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="3"/><circle cx="9" cy="10" r="1.6"/><path d="M21 16.5 16.5 12l-6 6"/></svg></button>
                 <button class="tool-btn" title="按住说话：松开发送，上滑取消" @pointerdown.prevent="startHoldVoice" @pointermove.prevent="moveHoldVoice" @pointerup.prevent="endHoldVoice" @pointercancel.prevent="endHoldVoice" @contextmenu.prevent><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0"/><path d="M12 18v3"/></svg></button>
-                <button class="tool-btn" :title="'请求访客上传图片，附言：' + (pol.ask_image_text || '（默认话术）')" @click="askUpload"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15V6a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h9"/><path d="M3 16l4.5-4.5 4 4"/><circle cx="15.5" cy="8.5" r="1.4"/><path d="M18 20v-6M15.5 16.5 18 14l2.5 2.5"/></svg></button>
+                <button class="tool-btn" title="请求访客上传图片（可改话术 / 选候选）" @click="openAskDialog"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15V6a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h9"/><path d="M3 16l4.5-4.5 4 4"/><circle cx="15.5" cy="8.5" r="1.4"/><path d="M18 20v-6M15.5 16.5 18 14l2.5 2.5"/></svg></button>
                 <button class="tool-btn" :class="{spinning: refreshing}" title="刷新聊天记录" @click="refreshChat"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M20 11a8 8 0 1 0-2.3 5.7"/><path d="M20 5v6h-6"/></svg></button>
                 <input ref="imgInput" type="file" accept="image/png,image/jpeg,image/gif,image/webp" style="display:none" @change="onImage"/>
               </div>
@@ -359,8 +359,19 @@
 
       <!-- ============ 快捷回复 ============ -->
       <div class="content" v-if="tab==='quick'">
+        <div class="panel" style="max-width:1100px;margin:0 auto 14px;">
+          <div class="panel-title">快捷消息（聊天窗口里一点就发）</div>
+          <div class="qa-row">
+            <el-input v-model="qa.title" placeholder="按钮文字，如：请发送手机号" maxlength="20" style="width:230px;"></el-input>
+            <el-input v-model="qa.content" placeholder="发送内容，如：方便发一下您的手机号吗？" maxlength="200" style="flex:1;min-width:220px;" @keyup.enter="quickAdd"></el-input>
+            <el-button type="primary" :loading="qa.saving" :disabled="!qa.title.trim()" @click="quickAdd">添加</el-button>
+          </div>
+          <p class="muted" style="font-size:11.5px;margin:8px 0 0;">
+            聊天框底部「⚡快捷消息」里：<b>单击=直接发送</b>，Ctrl+单击=填到输入框再改；带图片的话术请在下方表格里编辑。
+          </p>
+        </div>
         <crud-table
-          :rows="quickMsgs" :fields="quickFields" title="快捷回复" add-text="新增快捷回复"
+          :rows="quickMsgs" :fields="quickFields" title="全部快捷消息" add-text="高级新增（可带图）"
           @reload="loadQuick" api="/api/quick-msgs"
           :cols="[{k:'title',l:'标题'},{k:'attachments',l:'图片',imgs:true},{k:'content',l:'内容'},{k:'group_name',l:'分组'}]"></crud-table>
       </div>
@@ -449,7 +460,7 @@
               </div>
               <div class="ck-meta">
                 <span class="mono">{{ currentLink || '尚未生成客服码' }}</span>
-                <span>检测通道：{{ checkChannelLabel }}</span>
+                <span>检测通道：{{ checkChannelLabel }}<em v-if="checkUseDefaultChannel">（当前 Logo 是「{{ checkLogoName }}」，没有独立检测接口，统一按微信通道检测）</em></span>
                 <span>最近检测：{{ codeCheck.atText }}</span>
               </div>
             </div>
@@ -461,76 +472,79 @@
           <div class="code-panel">
             <div class="cp-hd">
               <span class="cp-hd-t">公共链接</span>
-              <span class="cp-hd-hint">中心 Logo 决定检测通道（微信 / QQ）</span>
+              <span class="cp-hd-hint">微信 Logo → 查微信拦截；QQ Logo → 查 QQ；其它 Logo 统一按微信通道检测</span>
               <span class="cp-hd-sp"></span>
               <el-button size="small" text @click="manageDlg = true; loadHistory()">管理码</el-button>
             </div>
 
-            <div class="cp-row">
-              <span class="cp-lbl">码点</span>
-              <div class="cp-seg">
-                <button type="button" :class="{on: codeStyle.dot==='rounded'}" @click="setCodeStyle('dot','rounded')">圆角</button>
-                <button type="button" :class="{on: codeStyle.dot==='dot'}" @click="setCodeStyle('dot','dot')">圆点</button>
-                <button type="button" :class="{on: codeStyle.dot==='square'}" @click="setCodeStyle('dot','square')">方形</button>
+            <div class="cp-body">
+              <div class="cp-left">
+              <div class="code-stage">
+                <canvas ref="codeCanvas"></canvas>
               </div>
-              <span class="cp-lbl">码眼</span>
-              <div class="cp-seg">
-                <button type="button" :class="{on: codeStyle.eye==='rounded'}" @click="setCodeStyle('eye','rounded')">圆角</button>
-                <button type="button" :class="{on: codeStyle.eye==='square'}" @click="setCodeStyle('eye','square')">方形</button>
+              <div class="code-stage-hint">扫不出来就用「标准」Logo 大小 +「圆角」码点；上传的深色图片 logo 建议配圆角码点。</div>
+  
+              <div class="cp-btns">
+                <el-button size="small" @click="previewBig">预览大图</el-button>
+                <el-button size="small" type="primary" @click="downloadQrImage">下载二维码</el-button>
+                <el-button size="small" @click="copyQrImage">复制二维码</el-button>
+                <el-button size="small" @click="copy(currentLink)">复制链接</el-button>
               </div>
-              <span class="cp-lbl">主色</span>
-              <div class="cp-sw">
-                <span v-for="c in CODE_BRANDS" :key="c" class="cp-sw-i" :class="{on: codeStyle.brand===c}" :style="{background: c}" @click="setCodeStyle('brand', c)"></span>
+  
+              <div class="cp-pillrow">
+                <button type="button" class="code-pill" @click="copy(codeValue)">{{ codeValue }}</button>
               </div>
-              <span class="cp-lbl">Logo 大小</span>
-              <div class="cp-seg">
-                <button type="button" :class="{on: codeStyle.logoSize==='std'}" @click="setCodeStyle('logoSize','std')">标准</button>
-                <button type="button" :class="{on: codeStyle.logoSize==='big'}" @click="setCodeStyle('logoSize','big')" title="更醒目；部分长链接下扫码识别率会下降">加大</button>
+              <div class="cp-linkrow">
+                <span class="cp-link">{{ currentLink || '尚未生成' }}</span>
+                <el-button size="small" text @click="copy(currentLink)">复制</el-button>
               </div>
-            </div>
-
-            <div class="cp-row">
-              <span class="cp-lbl">上方文字</span>
-              <el-input v-model="codeStyle.topText" maxlength="12" placeholder="扫码咨询" style="width:132px" @change="renderCodeCard"></el-input>
-              <span class="cp-lbl">下方文字</span>
-              <el-input v-model="codeStyle.bottomText" maxlength="12" placeholder="官方客服" style="width:132px" @change="renderCodeCard"></el-input>
-              <el-button size="small" @click="resetCodeStyle">恢复默认</el-button>
-            </div>
-
-            <div class="cp-row">
-              <span class="cp-lbl">中心 Logo</span>
-              <div class="cp-logos">
-                <button type="button" v-for="l in CODE_LOGOS" :key="l[0]" class="cp-logo"
-                        :class="{on: codeStyle.logo===l[0] || (l[0]==='upload' && codeStyle.logo==='custom')}"
-                        :title="l[1]" @click="pickLogo(l[0])">
-                  <img :src="logoThumb(l[0])" alt="">
-                </button>
               </div>
-              <input type="file" accept="image/*" style="display:none" ref="logoFile" @change="onLogoFile">
-              <label class="cp-chk"><input type="checkbox" v-model="codeStyle.colorDots" @change="renderCodeCard"> 码点跟随主色</label>
-            </div>
-
-            <div class="code-stage">
-              <canvas ref="codeCanvas"></canvas>
-            </div>
-            <div class="code-stage-hint">扫不出来就用「标准」Logo 大小 +「圆角」码点；上传的深色图片 logo 建议配圆角码点。</div>
-
-            <div class="cp-btns">
-              <el-button size="small" @click="previewBig">预览大图</el-button>
-              <el-button size="small" type="primary" @click="downloadQrImage">下载二维码</el-button>
-              <el-button size="small" @click="copyQrImage">复制二维码</el-button>
-              <el-button size="small" @click="copy(currentLink)">复制链接</el-button>
-            </div>
-
-            <div class="cp-pillrow">
-              <button type="button" class="code-pill" @click="copy(codeValue)">{{ codeValue }}</button>
-            </div>
-            <div class="cp-linkrow">
-              <span class="cp-link">{{ currentLink || '尚未生成' }}</span>
-              <el-button size="small" text @click="copy(currentLink)">复制</el-button>
-            </div>
-            <div class="cp-foot">
-              <span>链接</span><span class="on">预览</span>
+              <div class="cp-right">
+              <div class="cp-row">
+                <span class="cp-lbl">码点</span>
+                <div class="cp-seg">
+                  <button type="button" :class="{on: codeStyle.dot==='rounded'}" @click="setCodeStyle('dot','rounded')">圆角</button>
+                  <button type="button" :class="{on: codeStyle.dot==='dot'}" @click="setCodeStyle('dot','dot')">圆点</button>
+                  <button type="button" :class="{on: codeStyle.dot==='square'}" @click="setCodeStyle('dot','square')">方形</button>
+                </div>
+                <span class="cp-lbl">码眼</span>
+                <div class="cp-seg">
+                  <button type="button" :class="{on: codeStyle.eye==='rounded'}" @click="setCodeStyle('eye','rounded')">圆角</button>
+                  <button type="button" :class="{on: codeStyle.eye==='square'}" @click="setCodeStyle('eye','square')">方形</button>
+                </div>
+                <span class="cp-lbl">主色</span>
+                <div class="cp-sw">
+                  <span v-for="c in CODE_BRANDS" :key="c" class="cp-sw-i" :class="{on: codeStyle.brand===c}" :style="{background: c}" @click="setCodeStyle('brand', c)"></span>
+                </div>
+                <span class="cp-lbl">Logo 大小</span>
+                <div class="cp-seg">
+                  <button type="button" :class="{on: codeStyle.logoSize==='std'}" @click="setCodeStyle('logoSize','std')">标准</button>
+                  <button type="button" :class="{on: codeStyle.logoSize==='big'}" @click="setCodeStyle('logoSize','big')" title="更醒目；部分长链接下扫码识别率会下降">加大</button>
+                </div>
+              </div>
+  
+              <div class="cp-row">
+                <span class="cp-lbl">上方文字</span>
+                <el-input v-model="codeStyle.topText" maxlength="12" placeholder="扫码咨询" style="width:132px" @change="renderCodeCard"></el-input>
+                <span class="cp-lbl">下方文字</span>
+                <el-input v-model="codeStyle.bottomText" maxlength="12" placeholder="官方客服" style="width:132px" @change="renderCodeCard"></el-input>
+                <el-button size="small" @click="resetCodeStyle">恢复默认</el-button>
+              </div>
+  
+              <div class="cp-row">
+                <span class="cp-lbl">中心 Logo</span>
+                <div class="cp-logos">
+                  <button type="button" v-for="l in CODE_LOGOS" :key="l[0]" class="cp-logo"
+                          :class="{on: codeStyle.logo===l[0] || (l[0]==='upload' && codeStyle.logo==='custom')}"
+                          :title="l[1]" @click="pickLogo(l[0])">
+                    <img :src="logoThumb(l[0])" alt="">
+                  </button>
+                </div>
+                <input type="file" accept="image/*" style="display:none" ref="logoFile" @change="onLogoFile">
+                <label class="cp-chk"><input type="checkbox" v-model="codeStyle.colorDots" @change="renderCodeCard"> 码点跟随主色</label>
+              </div>
+  
+              </div>
             </div>
           </div>
 
@@ -538,114 +552,6 @@
             <img :src="previewSrc" style="width:100%;display:block;border-radius:12px;" alt="">
           </el-dialog>
 
-          <!-- ============ 推广海报：风格预设 / 背景图 + 二维码位置大小 + 文字独立定制 ============ -->
-          <div class="poster-sec">
-            <div class="cip-title">推广海报<span style="font-weight:400;font-size:12px;color:#999;margin-left:8px;">风格预设 / 自上传背景自由排版，所见即所得</span></div>
-            <div class="poster-flex">
-              <div class="poster-stage" v-if="posterCfg.style === 'custom'">
-                <img class="poster-bg" v-if="posterCfg.bgUrl" :src="posterCfg.bgUrl" alt="">
-                <div class="poster-qr-layer" v-if="posterCfg.cardOn" :style="qrLayerStyle"></div>
-                <div class="poster-qr-free" :style="qrFreeStyle">
-                  <div class="poster-qr-box" ref="posterQrBox"></div>
-                </div>
-                <div class="poster-free-text" v-if="posterCfg.topText" :style="textStyle('top')">{{ posterCfg.topText }}</div>
-                <div class="poster-free-text" v-if="posterCfg.bottomText" :style="textStyle('bot')">{{ posterCfg.bottomText }}</div>
-              </div>
-              <div class="poster-stage" v-else>
-                <img v-if="presetPng" :src="presetPng" style="width:100%;display:block;border-radius:12px;" alt="海报预览">
-                <div v-else style="padding:60px 0;text-align:center;color:#a0a6ad;font-size:13px;">海报生成中…</div>
-              </div>
-              <div class="poster-ctrl">
-                <div class="cs-row"><span class="cs-label">海报风格：</span>
-                  <el-radio-group v-model="posterCfg.style" size="small">
-                    <el-radio-button value="custom">自定义</el-radio-button>
-                    <el-radio-button value="wechat">微信经典</el-radio-button>
-                    <el-radio-button value="ticket">票券卡片</el-radio-button>
-                  </el-radio-group>
-                </div>
-                <template v-if="posterCfg.style === 'custom'">
-                <div class="cs-row"><span class="cs-label">二维码位置：</span>
-                  <div class="pos-grid">
-                    <button v-for="p in POSTER_POS" :key="p.v" type="button" class="pos-cell" :class="{on: posterCfg.qrPos===p.v}" :title="p.l" @click="posterCfg.qrPos=p.v">{{ p.l }}</button>
-                  </div>
-                </div>
-                <div class="cs-row"><span class="cs-label">二维码大小：</span>
-                  <el-slider v-model="posterCfg.qrScale" :min="10" :max="100" style="width:200px;margin-right:10px;"></el-slider>
-                  <el-checkbox v-model="posterCfg.cardOn" size="small">底衬白卡</el-checkbox>
-                </div>
-                <div class="cs-row"><span class="cs-label">上方文字：</span>
-                  <el-input v-model="posterCfg.topText" placeholder="如：扫码添加客服" maxlength="30" style="width:170px;"></el-input>
-                  <div class="pos-grid small">
-                    <button v-for="p in POSTER_POS" :key="'t'+p.v" type="button" class="pos-cell" :class="{on: posterCfg.topPos===p.v}" :title="'上文字：'+p.l" @click="posterCfg.topPos=p.v">{{ p.l }}</button>
-                  </div>
-                </div>
-                <div class="cs-row"><span class="cs-label">上字样式：</span>
-                  <el-input-number v-model="posterCfg.topSize" :min="16" :max="60" size="small" style="width:90px;"></el-input-number>
-                  <el-color-picker v-model="posterCfg.topColor" size="small"></el-color-picker>
-                  <el-checkbox v-model="posterCfg.topBold" size="small">加粗</el-checkbox>
-                </div>
-                <div class="cs-row"><span class="cs-label">下方文字：</span>
-                  <el-input v-model="posterCfg.bottomText" placeholder="如：24 小时在线" maxlength="30" style="width:170px;"></el-input>
-                  <div class="pos-grid small">
-                    <button v-for="p in POSTER_POS" :key="'b'+p.v" type="button" class="pos-cell" :class="{on: posterCfg.botPos===p.v}" :title="'下文字：'+p.l" @click="posterCfg.botPos=p.v">{{ p.l }}</button>
-                  </div>
-                </div>
-                <div class="cs-row"><span class="cs-label">下字样式：</span>
-                  <el-input-number v-model="posterCfg.botSize" :min="16" :max="60" size="small" style="width:90px;"></el-input-number>
-                  <el-color-picker v-model="posterCfg.botColor" size="small"></el-color-picker>
-                  <el-checkbox v-model="posterCfg.botBold" size="small">加粗</el-checkbox>
-                </div>
-                <div class="cs-row"><span class="cs-label">背景图：</span>
-                  <el-button size="small" @click="pickPosterBg">上传背景图</el-button>
-                  <el-button size="small" v-if="posterCfg.bgUrl" @click="posterCfg.bgUrl = ''">清除背景</el-button>
-                  <input ref="posterBgInput" type="file" accept="image/png,image/jpeg,image/gif,image/webp" style="display:none" @change="onPosterBg">
-                </div>
-                </template>
-                <template v-else-if="posterCfg.style === 'wechat'">
-                <div class="cs-row"><span class="cs-label">大标题：</span>
-                  <el-input v-model="posterCfg.wTitle" maxlength="20" style="width:220px;"></el-input>
-                </div>
-                <div class="cs-row"><span class="cs-label">底部文案：</span>
-                  <el-input v-model="posterCfg.wFooter" maxlength="20" style="width:220px;"></el-input>
-                </div>
-                <div class="cs-row"><span class="cs-label">码下角标：</span>
-                  <el-input v-model="posterCfg.badge" maxlength="10" placeholder="如：Cc3，留空不显示" style="width:220px;"></el-input>
-                </div>
-                <div class="cs-row"><span class="cs-label">中心徽章：</span>
-                  <el-button size="small" @click="pickPosterPresetImg('logoUrl')">上传 Logo</el-button>
-                  <el-button size="small" v-if="posterCfg.logoUrl" @click="posterCfg.logoUrl=''">清除</el-button>
-                  <span class="muted" style="font-size:11px;">不上传则使用内置对话气泡</span>
-                </div>
-                </template>
-                <template v-else>
-                <div class="cs-row"><span class="cs-label">客服名称：</span>
-                  <el-input v-model="posterCfg.tName" maxlength="16" style="width:220px;"></el-input>
-                </div>
-                <div class="cs-row"><span class="cs-label">右上标签：</span>
-                  <el-input v-model="posterCfg.tag" maxlength="6" style="width:220px;"></el-input>
-                </div>
-                <div class="cs-row"><span class="cs-label">主文案：</span>
-                  <el-input v-model="posterCfg.caption" maxlength="14" style="width:220px;"></el-input>
-                </div>
-                <div class="cs-row"><span class="cs-label">副行：</span>
-                  <el-input v-model="posterCfg.subLine" maxlength="24" style="width:220px;"></el-input>
-                </div>
-                <div class="cs-row"><span class="cs-label">底部提示：</span>
-                  <el-input v-model="posterCfg.note" maxlength="30" style="width:220px;"></el-input>
-                </div>
-                <div class="cs-row"><span class="cs-label">头像：</span>
-                  <el-button size="small" @click="pickPosterPresetImg('avatarUrl')">上传头像</el-button>
-                  <el-button size="small" v-if="posterCfg.avatarUrl" @click="posterCfg.avatarUrl=''">清除</el-button>
-                  <span class="muted" style="font-size:11px;">不上传则使用默认人像</span>
-                </div>
-                </template>
-                <div class="cip-btns" style="text-align:left;">
-                  <el-button size="small" type="primary" @click="downloadPoster2">下载海报</el-button>
-                </div>
-                <div class="cip-note" style="color:#999;">自定义：未上传背景时为白底海报；预览即最终效果，配置自动保存在本浏览器</div>
-              </div>
-            </div>
-          </div>
         </div>
       </div>
 
@@ -1106,6 +1012,27 @@
   </div>
 
   <!-- ============ 弹窗们 ============ -->
+<el-dialog v-model="askDlg" title="请求访客上传图片" width="520px" align-center>
+  <div class="ask-dlg">
+    <div class="ad-lbl">发给访客的话术（可改）</div>
+    <el-input type="textarea" :rows="2" v-model="askForm.text" maxlength="200" show-word-limit
+      placeholder="访客端会显示这句话 + 一个「上传图片」按钮"></el-input>
+    <div class="ad-lbl" style="margin-top:12px;">候选话术（点一下替换）</div>
+    <div class="ad-chips">
+      <button type="button" v-for="t in ASK_PRESETS" :key="t" class="ad-chip"
+        :class="{on: askForm.text.trim()===t}" @click="askForm.text=t">{{ t }}</button>
+    </div>
+    <label class="ad-save">
+      <input type="checkbox" v-model="askForm.saveDefault"> 同时设为默认话术（下次自动带出）
+    </label>
+    <div class="ad-tip">访客端收到的是卡片：🖼 客服请求您上传图片 + 上面这段话 + 「上传图片」按钮。</div>
+  </div>
+  <template #footer>
+    <el-button size="small" @click="askDlg=false">取消</el-button>
+    <el-button size="small" type="primary" :loading="sending" @click="sendAskDialog">发送</el-button>
+  </template>
+</el-dialog>
+
   <el-dialog v-model="transferDlg" title="转接会话" width="380px">
     <el-select v-model="transferTo" placeholder="选择转接目标" style="width:100%;">
       <el-option label="退回公共池（所有人可见）" :value="0"></el-option>
@@ -1303,7 +1230,7 @@
 <script src="/assets/qr-poster.js?v=2.1.03"></script>
 <script src="/assets/api.js?v=2.0.1"></script>
 <script src="/assets/js/app-components.js?v=2.1.0"></script>
-<script src="/assets/js/app.js?v=2.8.5"></script>
+<script src="/assets/js/app.js?v=2.9.0"></script>
 <script src="/assets/js/app-boot.js?v=2.1.1"></script>
 </body>
 </html>
