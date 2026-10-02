@@ -253,6 +253,8 @@ function handle_tenant_settings(string $method): void
             'dedup_on'       => ts_get($tid, 'dedup_on', '0') === '1',
             'ip_limit_on'    => ts_get($tid, 'ip_limit_on', '0') === '1',
             'ip_limit_count' => (int)ts_get($tid, 'ip_limit_count', '5'),
+            // 聊天头像：是否显示客服设置的个人头像（关闭/未设置时用品牌头像）
+            'agent_avatar_on' => ts_get($tid, 'agent_avatar_on', '1') === '1',
             // 声音设置（v2.27，租户级；客服端/访客端分开，发送/接收分开）
             'agent_snd_recv_on'   => ts_get($tid, 'agent_snd_recv_on', '1') === '1',
             'agent_snd_recv_which' => ts_get($tid, 'agent_snd_recv_which', 'dindon'),
@@ -288,7 +290,7 @@ function handle_tenant_settings(string $method): void
                 ts_set($tid, $k, $v);
             }
         }
-        foreach (['pre_inquiry_on', 'notice_on', 'auto_blacklist', 'dedup_on', 'ip_limit_on', 'filtration_wx', 'filtration_pc', 'filtration_area', 'publicity_on', 'inform_on', 'tpl_nav_on', 'agent_snd_recv_on', 'agent_snd_send_on', 'visitor_snd_recv_on', 'visitor_snd_send_on'] as $k) {
+        foreach (['pre_inquiry_on', 'notice_on', 'auto_blacklist', 'dedup_on', 'ip_limit_on', 'filtration_wx', 'filtration_pc', 'filtration_area', 'publicity_on', 'inform_on', 'tpl_nav_on', 'agent_snd_recv_on', 'agent_snd_send_on', 'visitor_snd_recv_on', 'visitor_snd_send_on', 'agent_avatar_on'] as $k) {
             if (array_key_exists($k, $data)) ts_set($tid, $k, $data[$k] ? '1' : '0');
         }
         if (array_key_exists('ip_limit_count', $data)) {

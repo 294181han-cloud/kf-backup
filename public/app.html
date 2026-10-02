@@ -533,6 +533,10 @@
             <el-form-item label="主题色">
               <el-color-picker v-model="brand.color"></el-color-picker>&nbsp;&nbsp;<span class="mono">{{ brand.color }}</span>
             </el-form-item>
+            <el-form-item label="个性头像">
+              <el-switch v-model="brand.agent_avatar_on" active-text="聊天中显示客服设置的个人头像"></el-switch>
+              <div class="muted" style="font-size:11px;line-height:1.6;margin-top:2px;">关闭，或客服未设置图片头像时，聊天头像使用默认品牌头像</div>
+            </el-form-item>
             <el-form-item label="平台导航条">
               <el-switch v-model="brand.tpl_nav_on" active-text="显示仿 App 导航条"></el-switch>
             </el-form-item>

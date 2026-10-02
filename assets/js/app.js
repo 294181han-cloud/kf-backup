@@ -38,7 +38,7 @@ const app = createApp({
     // 租户
     const links = ref(null);
     const agents = ref([]);
-    const brand = reactive({ company_name: '', title: '', sub: '', avatar: '💬', color: '#1677ff', tpl: 'default', tpl_nav_on: true, tpl_nav_title: '', vip_badge: '', footer_text: '' });
+    const brand = reactive({ company_name: '', title: '', sub: '', avatar: '💬', color: '#1677ff', tpl: 'default', tpl_nav_on: true, tpl_nav_title: '', vip_badge: '', footer_text: '', agent_avatar_on: true });
     const bcText = ref('');
     const bcSending = ref(false);
 
@@ -176,6 +176,7 @@ const app = createApp({
         brand.company_name = b.brand_company; brand.title = b.brand_title; brand.sub = b.brand_sub;
         brand.avatar = b.brand_avatar; brand.color = b.brand_color; brand.tpl = b.visitor_template || 'default';
         brand.tpl_nav_on = b.tpl_nav_on !== false; brand.tpl_nav_title = b.tpl_nav_title || '';
+        brand.agent_avatar_on = b.agent_avatar_on !== false;
         codeCfg.nicknameOn = b.code_nickname_on !== false;
         codeCfg.supportOn = b.code_support_on !== false;
         brand.vip_badge = b.vip_badge || ''; brand.footer_text = b.footer_text || '';
@@ -646,6 +647,7 @@ const app = createApp({
           brand_company: brand.company_name, brand_title: brand.title, brand_sub: brand.sub,
           brand_avatar: brand.avatar, brand_color: brand.color, visitor_template: brand.tpl,
           tpl_nav_on: brand.tpl_nav_on, tpl_nav_title: brand.tpl_nav_title,
+          agent_avatar_on: brand.agent_avatar_on,
           vip_badge: brand.vip_badge, footer_text: brand.footer_text,
         });
         ElementPlus.ElMessage.success('已保存');
