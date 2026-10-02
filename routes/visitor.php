@@ -43,7 +43,9 @@ function resolve_visitor_context(): ?array
         $st = $pdo->prepare('SELECT sc.code, sc.agent_id, tn.* FROM service_codes sc JOIN tenants tn ON tn.id = sc.tenant_id');
         $st->execute();
         foreach ($st->fetchAll() as $sc) {
-            $linkHost = strtolower(parse_url($sc['link'], PHP_URL_HOST) ?: '');
+            $linkRaw = $sc['link'] ?? '';
+            if (!is_string($linkRaw) || $linkRaw === '') continue;
+            $linkHost = strtolower((string)(parse_url($linkRaw, PHP_URL_HOST) ?: ''));
             if ($linkHost !== '' && $host === $linkHost) {
                 return ['tenant' => $sc, 'agent_id' => (int)$sc['agent_id']];
             }
