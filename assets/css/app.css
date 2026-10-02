@@ -1229,3 +1229,13 @@ body.dark .nav-item.active {
 .grid-auto .link-line, .grid2 .link-line { padding: 7px 0; }
 .grid-auto .kw-tags { margin-bottom: 10px; }
 @media (max-width: 1180px) { .grid2 { grid-template-columns: 1fr; } }
+
+/* ---------- v3.7 会话头「渠道」标签：微信/QQ/支付宝… 比「内置浏览器」更好认 ---------- */
+.ch-chip.chn {
+  background: color-mix(in srgb, var(--theme, #1677ff) 14%, #fff);
+  color: var(--theme, #1677ff); font-weight: 700;
+}
+/* 「进入方式」降级为中性色，避免和「渠道」两个彩色标签打架 */
+.ch-chip.src { background: #f2f4f8; color: #6b7688; font-weight: 500; }
+body.dark .ch-chip.chn { background: color-mix(in srgb, var(--theme, #1677ff) 30%, #232830); color: #9fc7ff; }
+body.dark .ch-chip.src { background: #262c34; color: #a9b3c2; }
