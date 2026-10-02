@@ -496,11 +496,12 @@
           <div class="panel-title">后台 UI</div>
           <div class="muted" style="margin:-6px 0 14px;font-size:12px;line-height:1.7;">
             模板决定界面结构，配色决定颜色；选择即时生效并保存在本浏览器。<br>
-            电脑端作用于电脑浏览器，手机端作用于手机浏览器打开的 app.html。<br>
-            访客页（visitor.html）的外观不在此配置：请使用「访客端模板」（品牌色 / 平台皮肤）。
+            电脑端作用于电脑浏览器打开的后台，手机端作用于手机浏览器打开的后台。<br>
+            配置按浏览器保存：谁设置只对谁自己生效，不影响其他客服与管理员。<br>
+            访客端的外观不在此配置：请使用「访客端模板」（品牌色 / 平台皮肤）。
           </div>
           <div v-for="cat in uiCatList" :key="cat.key" style="margin-bottom:22px;">
-            <h4 style="margin:0 0 10px;font-size:14px;color:#1f2329;">{{ cat.label }} <span class="muted" style="font-size:11.5px;font-weight:normal;">{{ cat.pages }}</span></h4>
+            <h4 style="margin:0 0 10px;font-size:14px;color:#1f2329;">{{ cat.label }}</h4>
             <div style="font-size:13px;color:#4e5969;margin:0 0 6px;">模板</div>
             <div class="tpl-grid" style="max-width:460px;">
               <div v-for="t in uiTplList(cat.key)" :key="t.id" class="tpl-card" :class="{active: uiSel[cat.key].tpl===t.id}" @click="uiPick(cat.key, t.id, uiSel[cat.key].color)">
@@ -946,7 +947,7 @@
 <script src="/assets/qr-poster.js?v=2.0.1"></script>
 <script src="/assets/api.js?v=2.0.1"></script>
 <script src="/assets/js/app-components.js?v=2.1.0"></script>
-<script src="/assets/js/app.js?v=2.3.1"></script>
+<script src="/assets/js/app.js?v=2.3.2"></script>
 <script src="/assets/js/app-boot.js?v=2.1.0"></script>
 </body>
 </html>
