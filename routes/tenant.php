@@ -265,6 +265,20 @@ function handle_tenant_settings(string $method): void
             'visitor_snd_recv_which' => ts_get($tid, 'visitor_snd_recv_which', 'dindon'),
             'visitor_snd_send_on'   => ts_get($tid, 'visitor_snd_send_on', '0') === '1',
             'visitor_snd_send_which' => ts_get($tid, 'visitor_snd_send_which', 'water'),
+            // 客服码卡片样式 + 上次检测结果（v2.30）
+            'code_dot'         => ts_get($tid, 'code_dot', 'rounded'),
+            'code_eye'         => ts_get($tid, 'code_eye', 'rounded'),
+            'code_brand'       => ts_get($tid, 'code_brand', '#2E6BE6'),
+            'code_logo'        => ts_get($tid, 'code_logo', 'none'),
+            'code_logo_size'   => ts_get($tid, 'code_logo_size', 'std'),
+            'code_top_text'    => ts_get($tid, 'code_top_text', '扫码咨询'),
+            'code_bottom_text' => ts_get($tid, 'code_bottom_text', '官方客服'),
+            'code_color_dots'  => ts_get($tid, 'code_color_dots', '0') === '1',
+            'code_custom_logo' => ts_get($tid, 'code_custom_logo', ''),
+            'code_check_state' => ts_get($tid, 'code_check_state', 'idle'),
+            'code_check_text'  => ts_get($tid, 'code_check_text', '未检测'),
+            'code_check_tag'   => ts_get($tid, 'code_check_tag', '未检测'),
+            'code_check_at'    => ts_get($tid, 'code_check_at', ''),
         ]);
     }
 
@@ -321,6 +335,12 @@ function handle_tenant_settings(string $method): void
         foreach (['code_nickname_on', 'code_support_on'] as $bk) {
             if (array_key_exists($bk, $data)) ts_set($tid, $bk, $data[$bk] ? '1' : '0');
         }
+        // 客服码卡片样式（v2.30）：码点/码眼/主色/上下文案/中心 Logo 与大小
+        foreach (['code_dot', 'code_eye', 'code_brand', 'code_logo', 'code_logo_size', 'code_top_text', 'code_bottom_text'] as $k) {
+            if (array_key_exists($k, $data)) ts_set($tid, $k, mb_substr(trim((string)$data[$k]), 0, 64));
+        }
+        if (array_key_exists('code_custom_logo', $data)) ts_set($tid, 'code_custom_logo', mb_substr(trim((string)$data['code_custom_logo']), 0, 500));
+        if (array_key_exists('code_color_dots', $data)) ts_set($tid, 'code_color_dots', $data['code_color_dots'] ? '1' : '0');
         // 会话管理（v2.25）：写租户级字段（非 ts 键值）
         $tidInt = (int)$tid;
         foreach (['closed_keep_days', 'max_sessions'] as $col) {
@@ -498,4 +518,103 @@ function handle_tenant_links(string $method): void
         'direct_link' => $direct,
         'codes' => $codes,
     ]);
+}
+
+/* ---------- 客服码状态检测（第三方「域名拦截检测」接口，按次计费） ---------- */
+
+/** 检测接口配置：kv_store 可覆盖（wxcheck_user / wxcheck_key / wxcheck_url / wxcheck_ttl） */
+function wxcheck_cfg(): array
+{
+    return [
+        'user' => kv_get('wxcheck_user', ''),
+        'key'  => kv_get('wxcheck_key', ''),
+        'url'  => rtrim(kv_get('wxcheck_url', 'https://api.uouin.com/app'), '/'),
+        'ttl'  => max(60, (int)kv_get('wxcheck_ttl', '300')),
+    ];
+}
+
+/** 当前生效的客服码链接：优先域名池子域，其次服务码 */
+function tenant_current_link(int $tid): string
+{
+    $pdo = db();
+    $st = $pdo->prepare('SELECT link FROM domain_links WHERE tenant_id = ? AND active = 1 ORDER BY id DESC LIMIT 1');
+    $st->execute([$tid]);
+    $link = (string)($st->fetchColumn() ?: '');
+    if ($link === '') {
+        $st = $pdo->prepare('SELECT link FROM service_codes WHERE tenant_id = ? ORDER BY id DESC LIMIT 1');
+        $st->execute([$tid]);
+        $link = (string)($st->fetchColumn() ?: '');
+    }
+    return $link;
+}
+
+/**
+ * 检测当前客服码在微信/QQ 是否被拦截（俗称「红」）。
+ * 结果落 tenant_settings（code_check_*），同链接同渠道 ttl 秒内直接复用，避免按次扣费。
+ */
+function handle_tenant_code_check(string $method): void
+{
+    if ($method !== 'POST') { json_error('方法不允许', 405); return; }
+    $ctx = require_tenant();
+    $tid = (int)$ctx['id'];
+    $data = body();
+    $force = !empty($data['force']);
+    $channel = (string)($data['channel'] ?? 'wx');
+    if (!in_array($channel, ['wx', 'qq'], true)) $channel = 'wx';
+
+    $link = tenant_current_link($tid);
+    if ($link === '') {
+        json_out(['state' => 'none', 'text' => '尚未生成客服码', 'tag' => '未生成', 'at' => '', 'msg' => '']);
+        return;
+    }
+
+    $cfg = wxcheck_cfg();
+    $lastLink = ts_get($tid, 'code_check_link', '');
+    $lastCh   = ts_get($tid, 'code_check_channel', '');
+    $lastTs   = (int)ts_get($tid, 'code_check_at_ts', '0');
+    if (!$force && $lastLink === $link && $lastCh === $channel && (time() - $lastTs) < $cfg['ttl']) {
+        json_out(['state' => ts_get($tid, 'code_check_state', 'idle'), 'text' => ts_get($tid, 'code_check_text', '未检测'),
+                  'tag'   => ts_get($tid, 'code_check_tag', '未检测'),   'at'   => ts_get($tid, 'code_check_at', ''),
+                  'msg'   => ts_get($tid, 'code_check_msg', ''), 'cached' => true]);
+        return;
+    }
+
+    $state = 'err'; $text = '检测失败'; $tag = '异常'; $msg = '';
+    if ($cfg['user'] === '' || $cfg['key'] === '') {
+        $state = 'off'; $text = '检测未开通'; $tag = '未开通'; $msg = '未配置检测接口账号';
+    } else {
+        $api = $cfg['url'] . '/' . $channel . '?username=' . urlencode($cfg['user'])
+             . '&key=' . urlencode($cfg['key']) . '&url=' . urlencode($link);
+        $resp = '';
+        if (function_exists('curl_init')) {
+            $ch = curl_init($api);
+            curl_setopt_array($ch, [CURLOPT_RETURNTRANSFER => true, CURLOPT_TIMEOUT => 12, CURLOPT_CONNECTTIMEOUT => 8,
+                CURLOPT_SSL_VERIFYPEER => false, CURLOPT_SSL_VERIFYHOST => 0, CURLOPT_USERAGENT => 'kfxt/2.30']);
+            $resp = (string)curl_exec($ch);
+            curl_close($ch);
+        } else {
+            $resp = (string)@file_get_contents($api);
+        }
+        $j = json_decode($resp, true);
+        if (!is_array($j) || !isset($j['code'])) {
+            $state = 'err'; $text = '检测失败'; $tag = '异常'; $msg = '检测接口无响应';
+        } else {
+            $c = (int)$j['code'];
+            $m = trim((string)($j['msg'] ?? ''));
+            if ($c === 1001)     { $state = 'ok';  $text = '正常接待';   $tag = '正常';   $msg = $m; }
+            elseif ($c === 1002) { $state = 'red'; $text = '已被拦截';   $tag = '已拦截'; $msg = ($m !== '' ? $m : '域名异常或封禁'); }
+            elseif ($c === -206) { $state = 'off'; $text = '检测未开通'; $tag = '未开通'; $msg = $m; }
+            else                 { $state = 'err'; $text = '检测异常';   $tag = '异常';   $msg = ($c . ' ' . $m); }
+        }
+    }
+    $at = now_dt();
+    ts_set($tid, 'code_check_state', $state);
+    ts_set($tid, 'code_check_text', $text);
+    ts_set($tid, 'code_check_tag', $tag);
+    ts_set($tid, 'code_check_msg', mb_substr($msg, 0, 300));
+    ts_set($tid, 'code_check_at', $at);
+    ts_set($tid, 'code_check_at_ts', (string)time());
+    ts_set($tid, 'code_check_link', $link);
+    ts_set($tid, 'code_check_channel', $channel);
+    json_out(['state' => $state, 'text' => $text, 'tag' => $tag, 'at' => $at, 'msg' => $msg]);
 }

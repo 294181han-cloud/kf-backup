@@ -190,6 +190,20 @@ const app = createApp({
         brand.agent_avatar_on = b.agent_avatar_on !== false;
         codeCfg.nicknameOn = b.code_nickname_on !== false;
         codeCfg.supportOn = b.code_support_on !== false;
+        // v2.30 客服码卡片样式 + 上次检测结果
+        codeStyle.dot = b.code_dot || 'rounded';
+        codeStyle.eye = b.code_eye || 'rounded';
+        codeStyle.brand = b.code_brand || '#2E6BE6';
+        codeStyle.logo = b.code_logo || 'none';
+        codeStyle.logoSize = b.code_logo_size || 'std';
+        codeStyle.topText = b.code_top_text || '扫码咨询';
+        codeStyle.bottomText = b.code_bottom_text || '官方客服';
+        codeStyle.colorDots = b.code_color_dots === true;
+        codeStyle.custom = b.code_custom_logo || '';
+        codeCheck.state = b.code_check_state || 'idle';
+        codeCheck.text = b.code_check_text || '未检测';
+        codeCheck.tag = b.code_check_tag || '未检测';
+        codeCheck.atText = b.code_check_at || '—';
         brand.vip_badge = b.vip_badge || ''; brand.footer_text = b.footer_text || '';
         preqOn.value = !!b.pre_inquiry_on;
         kwList.value = (b.filter_keywords || '').split(',').map(s => s.trim()).filter(Boolean);
@@ -983,18 +997,148 @@ const app = createApp({
       const cs = (links.value.codes || []).filter(x => x.link);
       return cs.length ? cs[0].link : '';
     });
-    // 二维码渲染（普通样式，无中央徽章）。watch 含 tab：获客码面板是 v-if 渲染，
-    // 启动时 tab 未切换 DOM 不存在，切换 tab 必须重渲染（否则首次进入空白）
+    // ===== 客服码卡片（v2.30）：样式状态 / canvas 卡片 / 微信拦截状态检测 =====
+    const codeCanvas = ref(null);
+    const logoFile = ref(null);
+    const previewDlg = ref(false);
+    const previewSrc = ref('');
+    const CODE_LOGOS = [['none', '无'], ['avatar', '头像'], ['all', '聚合'], ['wechat', '微信'],
+                        ['alipay', '支付宝'], ['qq', 'QQ'], ['douyin', '抖音'], ['upload', '上传']];
+    const CODE_BRANDS = ['#16181d', '#2E6BE6', '#0E7A5F', '#6B3FE0', '#C2410C'];
+    // 中心 Logo → 检测渠道：微信/QQ 有独立检测通道，其余走微信通道
+    const CODE_CHANNEL = { wechat: 'wx', qq: 'qq', all: 'wx', alipay: 'wx', douyin: 'wx', avatar: 'wx', none: 'wx', custom: 'wx' };
+    const CODE_STYLE_DEF = { dot: 'rounded', eye: 'rounded', brand: '#2E6BE6', logo: 'none', logoSize: 'std',
+                             topText: '扫码咨询', bottomText: '官方客服', colorDots: false, custom: '' };
+    const codeStyle = reactive(Object.assign({}, CODE_STYLE_DEF));
+    const codeImgCache = {};
+    const codeCheck = reactive({ state: 'idle', text: '未检测', tag: '未检测', atText: '—', msg: '', loading: false });
+    const codeValue = computed(() => {
+      const dl = links.value && links.value.domain_link;
+      if (dl && dl.subdomain) return dl.subdomain;
+      const cs = ((links.value && links.value.codes) || []).filter(x => x.code);
+      return cs.length ? cs[0].code : '—';
+    });
+    const codeIcons = () => (window.KFQCard && window.KFQCard.ICONS) || {};
+    const codeLogoSrc = () => {
+      if (codeStyle.logo === 'none') return null;
+      if (codeStyle.logo === 'custom') return codeStyle.custom || null;
+      if (codeStyle.logo === 'upload') return codeStyle.custom || codeIcons().upload || null;
+      return codeIcons()[codeStyle.logo] || null;
+    };
+    const logoThumb = (k) => {
+      if (k === 'upload') return codeStyle.custom || codeIcons().upload || '';
+      return codeIcons()[k] || '';
+    };
+    const codeCardOpts = (scale) => {
+      const big = codeStyle.logoSize === 'big';
+      return {
+        link: currentLink.value || 'https://example.com/',
+        topText: codeStyle.topText || ' ', bottomText: codeStyle.bottomText || ' ',
+        brand: codeStyle.brand, dot: codeStyle.dot, eye: codeStyle.eye, colorDots: !!codeStyle.colorDots,
+        knock: big ? 'square' : 'circle', logoRatio: big ? 0.24 : undefined,
+        logo: codeLogoSrc(), logoShape: codeStyle.logo === 'avatar' ? 'circle' : 'round', scale: scale || 2,
+      };
+    };
+    // 码卡片渲染（函数名沿用 renderMainQr：loadLinks / watch 里都在调它）
     const renderMainQr = () => {
       nextTick(() => {
-        if (qrWrap.value && window.QRCode && currentLink.value) {
-          qrWrap.value.innerHTML = '';
-          try { new QRCode(qrWrap.value, { text: currentLink.value, width: 210, height: 210, correctLevel: QRCode.CorrectLevel.M }); } catch (e) {}
-        }
-        renderPosterQr();
+        if (!codeCanvas.value || !window.KFQCard) return;
+        const draw = (img) => {
+          const o = codeCardOpts(2);
+          if (img) o._logoImg = img;
+          try { window.KFQCard.drawCodeCard(codeCanvas.value, o); } catch (e) {}
+        };
+        const src = codeLogoSrc();
+        if (!src) return draw(null);
+        let im = codeImgCache[src];
+        if (im && im.complete) return draw(im);
+        im = codeImgCache[src] = new Image();
+        im.onload = () => draw(im);
+        im.onerror = () => draw(null);
+        im.src = src;
       });
+      renderPosterQr();
     };
+    const renderCodeCard = () => { renderMainQr(); saveCodeStyle(); };
     Vue.watch([currentLink, tab], renderMainQr);
+
+    const codeExportCanvas = (scale) => {
+      const c = document.createElement('canvas');
+      const src = codeLogoSrc();
+      const im = src ? codeImgCache[src] : null;
+      const o = codeCardOpts(scale);
+      if (im && im.complete) o._logoImg = im;
+      window.KFQCard.drawCodeCard(c, o);
+      return c;
+    };
+    const setCodeStyle = (k, v) => { codeStyle[k] = v; renderCodeCard(); };
+    const pickLogo = (k) => {
+      if (k === 'upload') { if (logoFile.value) logoFile.value.click(); return; }
+      codeStyle.logo = k; renderCodeCard();
+      if (CODE_CHANNEL[k]) checkCode(false);
+    };
+    const onLogoFile = (e) => {
+      const f = (e.target.files || [])[0];
+      if (!f) return;
+      if (f.size > 1024 * 1024) { ElementPlus.ElMessage.warning('图片不要超过 1MB'); e.target.value = ''; return; }
+      const rd = new FileReader();
+      rd.onload = async () => {
+        try {
+          const up = await API.post('/api/upload', { data: rd.result, kind: 'image', filename: 'code-logo.png' });
+          codeStyle.custom = up.url; codeStyle.logo = 'custom'; renderCodeCard(); checkCode(false);
+          ElementPlus.ElMessage.success('Logo 已上传');
+        } catch (err) { ElementPlus.ElMessage.error('上传失败，请重试'); }
+      };
+      rd.readAsDataURL(f);
+      e.target.value = '';
+    };
+    const resetCodeStyle = () => { Object.assign(codeStyle, CODE_STYLE_DEF); renderCodeCard(); };
+    const saveCodeStyle = async () => {
+      try {
+        await API.put('/api/tenant/settings', {
+          code_dot: codeStyle.dot, code_eye: codeStyle.eye, code_brand: codeStyle.brand,
+          code_logo: codeStyle.logo === 'custom' ? 'upload' : codeStyle.logo, code_logo_size: codeStyle.logoSize,
+          code_top_text: codeStyle.topText, code_bottom_text: codeStyle.bottomText,
+          code_color_dots: codeStyle.colorDots ? '1' : '0',
+          code_custom_logo: codeStyle.logo === 'custom' || codeStyle.logo === 'upload' ? codeStyle.custom : '',
+        });
+      } catch (e) {}
+    };
+    // 微信/QQ 拦截状态检测（俗称「红」）：换标、换码、进页面各查一次，服务端 5 分钟缓存
+    const checkCode = async (force) => {
+      if (codeCheck.loading) return;
+      if (!currentLink.value) { codeCheck.state = 'none'; codeCheck.text = '尚未生成'; codeCheck.tag = '未生成'; return; }
+      codeCheck.loading = true;
+      try {
+        const r = await API.post('/api/tenant/code/check', { force: force ? 1 : 0, channel: CODE_CHANNEL[codeStyle.logo] || 'wx' });
+        codeCheck.state = r.state || 'err';
+        codeCheck.text = r.text || '检测失败';
+        codeCheck.tag = r.tag || codeCheck.text;
+        codeCheck.atText = r.at || '—';
+        codeCheck.msg = r.msg || '';
+      } catch (e) {
+        codeCheck.state = 'err'; codeCheck.text = '检测失败'; codeCheck.tag = '异常';
+      } finally { codeCheck.loading = false; }
+    };
+    const previewBig = () => {
+      try { previewSrc.value = codeExportCanvas(2).toDataURL('image/png'); previewDlg.value = true; }
+      catch (e) { ElementPlus.ElMessage.error('预览失败'); }
+    };
+    const downloadQrImage = () => {
+      if (!window.KFQCard) return;
+      const c = codeExportCanvas(4);
+      const a = document.createElement('a');
+      a.href = c.toDataURL('image/png'); a.download = '客服码-' + codeValue.value + '.png';
+      document.body.appendChild(a); a.click(); a.remove();
+    };
+    const copyQrImage = async () => {
+      try {
+        const c = codeExportCanvas(2);
+        const blob = await new Promise(r => c.toBlob(r, 'image/png'));
+        await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })]);
+        ElementPlus.ElMessage.success('二维码已复制到剪贴板');
+      } catch (e) { ElementPlus.ElMessage.warning('复制失败，请用下载按钮'); }
+    };
 
     // ===== 推广海报：背景图 + 二维码位置大小 + 上下文字独立定制 =====
     // pos 用九宫值：top-left / top / top-right / left / center / right / bottom-left / bottom / bottom-right
@@ -1212,24 +1356,6 @@ const app = createApp({
         document.body.appendChild(a); a.click(); a.remove();
       } catch (e) { ElementPlus.ElMessage.error('海报生成失败：' + (e.message || e)); }
     };
-    const copyQrImage = async () => {
-      try {
-        const cv = qrWrap.value.querySelector('canvas') || qrWrap.value.querySelector('img');
-        if (!cv) return;
-        const url = cv.toDataURL ? cv.toDataURL() : cv.src;
-        const blob = await (await fetch(url)).blob();
-        await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })]);
-        ElementPlus.ElMessage.success('二维码已复制到剪贴板');
-      } catch (e) { ElementPlus.ElMessage.warning('复制失败，请使用下载功能'); }
-    };
-    const downloadQrImage = () => {
-      const cv = qrWrap.value.querySelector('canvas') || qrWrap.value.querySelector('img');
-      if (!cv) return;
-      const url = cv.toDataURL ? cv.toDataURL() : cv.src;
-      const a = document.createElement('a');
-      a.href = url; a.download = 'qrcode-' + Date.now() + '.png';
-      document.body.appendChild(a); a.click(); a.remove();
-    };
     const codeRotateHint = Vue.computed(() =>
       (links.value && links.value.domain_link) ? '更换后旧链接立即失效，确定？' : '生成一个新的客服码？');
     const rotateCode = async () => {
@@ -1387,6 +1513,9 @@ const app = createApp({
       ctxMenu, openCtxMenu, closeCtxMenu, ctxMenuArchive, ctxMenuClose, ctxMenuDelete,
       SOUND_OPTS, sndCfg, playSound, saveSnd,
       manageDlg, history, codeCfg, qrWrap, currentLink, renderMainQr,
+      codeCanvas, logoFile, previewDlg, previewSrc, codeValue, codeStyle, codeCheck,
+      CODE_LOGOS, CODE_BRANDS, pickLogo, setCodeStyle, renderCodeCard, resetCodeStyle, onLogoFile,
+      logoThumb, previewBig, checkCode,
       posterCfg, posterQrBox, posterBgInput, pickPosterBg, onPosterBg, downloadPoster2,
       presetPng, pickPosterPresetImg,
       POSTER_POS, qrFreeStyle, qrLayerStyle, textStyle,

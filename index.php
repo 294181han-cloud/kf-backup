@@ -218,6 +218,7 @@ function dispatch_api(string $method, string $uri): void
     if ($uri === '/api/tenant/login-logs')       handle_tenant_login_logs($method);
     if ($uri === '/api/tenant/cleanup')          handle_tenant_cleanup($method);
     if ($uri === '/api/tenant/visitors')         handle_tenant_visitors($method);
+    if ($uri === '/api/tenant/code/check')       handle_tenant_code_check($method);
 
     // ---- 平台管理 ----
     if ($uri === '/api/admin/overview')          handle_admin_overview($method);

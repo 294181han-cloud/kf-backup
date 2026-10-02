@@ -389,3 +389,166 @@
     else finishHeader(null);
   }
 })(window);
+
+/* ===== 客服码卡片渲染（v2.30）：扫码咨询 + 码 + 官方底部通栏 ===== */
+/* card_core.js — 客服码卡片渲染核心（本地预览用；与将来线上 canvas 同源逻辑）
+ * 参数依据 skill qr-code-asset-design：码点留缝/圆角、码眼圆角、中央 logo 直径按模块密度自适应
+ */
+(function (g) {
+  var CARD_W = 680, CARD_H = 960;
+
+  function svg(s) { return 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(s); }
+
+  var ICONS = {
+    none: svg('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><rect x="1" y="1" width="62" height="62" rx="14" fill="#fff" stroke="#e3e6ea" stroke-width="2"/><circle cx="32" cy="32" r="14" fill="none" stroke="#b9bfc7" stroke-width="4"/><path d="M22 42 42 22" stroke="#b9bfc7" stroke-width="4" stroke-linecap="round"/></svg>'),
+    avatar: svg('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><defs><linearGradient id="a" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#5B8DEF"/><stop offset="1" stop-color="#8A63F0"/></linearGradient></defs><rect width="64" height="64" rx="32" fill="url(#a)"/><circle cx="32" cy="25" r="9.5" fill="#fff"/><path d="M13 54c3.2-10 10.5-14 19-14s15.8 4 19 14z" fill="#fff"/></svg>'),
+    all: svg('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">' +
+      '<rect x="1" y="1" width="62" height="62" rx="13" fill="#fff" stroke="#e9ecef" stroke-width="2"/>' +
+      // 微信
+      '<g transform="translate(5,5) scale(0.26)"><rect width="64" height="64" rx="14" fill="#07C160"/>' +
+      '<ellipse cx="26" cy="27" rx="14.5" ry="12" fill="#fff"/><path d="M17 37l-6 7 9.5-3z" fill="#fff"/>' +
+      '<circle cx="21" cy="25" r="2.3" fill="#07C160"/><circle cx="31" cy="25" r="2.3" fill="#07C160"/>' +
+      '<ellipse cx="44" cy="41" rx="11" ry="9" fill="#fff"/><path d="M52 48l5.5 5.5-9-2.2z" fill="#fff"/>' +
+      '<circle cx="41" cy="40" r="1.9" fill="#07C160"/><circle cx="48" cy="40" r="1.9" fill="#07C160"/></g>' +
+      // QQ
+      '<g transform="translate(34,5) scale(0.26)"><rect width="64" height="64" rx="14" fill="#12B7F5"/>' +
+      '<path d="M32 10c-8.3 0-14.4 6.5-14.4 15.7 0 4.8-1.7 7.1-3.6 11-1.7 3.4-2.1 7.1.6 8.2 2.4 1 4.7-2.6 4.7-2.6 1 2.8 2.4 4.9 4.3 6.3-1.7.9-4.9 2.5-4.2 5.4.8 2.8 4.9 4.4 12.6 4.4s11.8-1.6 12.6-4.4c.7-2.9-2.5-4.5-4.2-5.4 1.9-1.4 3.3-3.5 4.3-6.3 0 0 2.3 3.6 4.7 2.6 2.7-1.1 2.3-4.8.6-8.2-1.9-3.9-3.6-6.2-3.6-11C46.4 16.5 40.3 10 32 10z" fill="#fff"/>' +
+      '<circle cx="26" cy="25" r="3" fill="#12B7F5"/><circle cx="38" cy="25" r="3" fill="#12B7F5"/></g>' +
+      // 支付宝
+      '<g transform="translate(5,34) scale(0.26)"><rect width="64" height="64" rx="14" fill="#1677FF"/>' +
+      '<text x="32" y="45" font-family="Microsoft YaHei,Arial,sans-serif" font-size="36" font-weight="bold" fill="#fff" text-anchor="middle">支</text></g>' +
+      // 抖音
+      '<g transform="translate(34,34) scale(0.26)"><rect width="64" height="64" rx="14" fill="#010101"/>' +
+      '<path d="M41 12h-6.4v25.6a5.4 5.4 0 1 1-5.4-5.4c.6 0 1.2.1 1.8.3v-6.6a12.6 12.6 0 0 0-1.8-.2 12 12 0 1 0 12 12V24.4c2.4 1.6 5.3 2.5 8.2 2.5v-6c-4.7 0-8.4-2.9-8.4-6.9z" fill="#fff"/></g>' +
+      '</svg>'),
+    wechat: svg('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><rect width="64" height="64" rx="14" fill="#07C160"/><ellipse cx="26" cy="27" rx="14.5" ry="12" fill="#fff"/><path d="M17 37l-6 7 9.5-3z" fill="#fff"/><circle cx="21" cy="25" r="2.3" fill="#07C160"/><circle cx="31" cy="25" r="2.3" fill="#07C160"/><ellipse cx="44" cy="41" rx="11" ry="9" fill="#fff"/><path d="M52 48l5.5 5.5-9-2.2z" fill="#fff"/><circle cx="41" cy="40" r="1.9" fill="#07C160"/><circle cx="48" cy="40" r="1.9" fill="#07C160"/></svg>'),
+    alipay: svg('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><rect width="64" height="64" rx="14" fill="#1677FF"/><text x="32" y="45" font-family="Microsoft YaHei,Arial,sans-serif" font-size="36" font-weight="bold" fill="#fff" text-anchor="middle">\u652f</text></svg>'),
+    qq: svg('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><rect width="64" height="64" rx="14" fill="#12B7F5"/><path d="M32 10c-8.3 0-14.4 6.5-14.4 15.7 0 4.8-1.7 7.1-3.6 11-1.7 3.4-2.1 7.1.6 8.2 2.4 1 4.7-2.6 4.7-2.6 1 2.8 2.4 4.9 4.3 6.3-1.7.9-4.9 2.5-4.2 5.4.8 2.8 4.9 4.4 12.6 4.4s11.8-1.6 12.6-4.4c.7-2.9-2.5-4.5-4.2-5.4 1.9-1.4 3.3-3.5 4.3-6.3 0 0 2.3 3.6 4.7 2.6 2.7-1.1 2.3-4.8.6-8.2-1.9-3.9-3.6-6.2-3.6-11C46.4 16.5 40.3 10 32 10z" fill="#fff"/><circle cx="26" cy="25" r="3" fill="#12B7F5"/><circle cx="38" cy="25" r="3" fill="#12B7F5"/></svg>'),
+    douyin: svg('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><rect width="64" height="64" rx="14" fill="#010101"/><path d="M41 12h-6.4v25.6a5.4 5.4 0 1 1-5.4-5.4c.6 0 1.2.1 1.8.3v-6.6a12.6 12.6 0 0 0-1.8-.2 12 12 0 1 0 12 12V24.4c2.4 1.6 5.3 2.5 8.2 2.5v-6c-4.7 0-8.4-2.9-8.4-6.9z" fill="#25F4EE" transform="translate(-2.5,2.5)"/><path d="M41 12h-6.4v25.6a5.4 5.4 0 1 1-5.4-5.4c.6 0 1.2.1 1.8.3v-6.6a12.6 12.6 0 0 0-1.8-.2 12 12 0 1 0 12 12V24.4c2.4 1.6 5.3 2.5 8.2 2.5v-6c-4.7 0-8.4-2.9-8.4-6.9z" fill="#FE2C55" transform="translate(2.5,-2)"/><path d="M41 12h-6.4v25.6a5.4 5.4 0 1 1-5.4-5.4c.6 0 1.2.1 1.8.3v-6.6a12.6 12.6 0 0 0-1.8-.2 12 12 0 1 0 12 12V24.4c2.4 1.6 5.3 2.5 8.2 2.5v-6c-4.7 0-8.4-2.9-8.4-6.9z" fill="#fff"/></svg>'),
+    upload: svg('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><rect x="2" y="2" width="60" height="60" rx="13" fill="#fbfcfd" stroke="#cfd6de" stroke-width="2" stroke-dasharray="7 5"/><path d="M32 42V22m0 0-8 8m8-8 8 8" stroke="#8b95a1" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/></svg>')
+  };
+
+  function qrModel(text) {
+    var host = document.createElement('div');
+    var q = new QRCode(host, { text: text, width: 256, height: 256 });
+    var m = q._oQRCode;
+    var n = m.getModuleCount();
+    return { n: n, dark: function (r, c) { return m.isDark(r, c); } };
+  }
+
+  function rr(ctx, x, y, w, h, r) {
+    r = Math.min(r, w / 2, h / 2);
+    ctx.beginPath();
+    if (ctx.roundRect) { ctx.roundRect(x, y, w, h, r); return; }
+    ctx.moveTo(x + r, y); ctx.lineTo(x + w - r, y); ctx.quadraticCurveTo(x + w, y, x + w, y + r);
+    ctx.lineTo(x + w, y + h - r); ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+    ctx.lineTo(x + r, y + h); ctx.quadraticCurveTo(x, y + h, x, y + h - r);
+    ctx.lineTo(x, y + r); ctx.quadraticCurveTo(x, y, x + r, y);
+    ctx.closePath();
+  }
+
+  function inEye(n, r, c) {
+    return (r < 7 && c < 7) || (r < 7 && c >= n - 7) || (r >= n - 7 && c < 7);
+  }
+
+  function drawModule(ctx, x, y, box, color, style) {
+    ctx.fillStyle = color;
+    if (style === 'square') { ctx.fillRect(x, y, box, box); return; }
+    if (style === 'dot') {
+      ctx.beginPath(); ctx.arc(x + box / 2, y + box / 2, box * 0.46, 0, Math.PI * 2); ctx.fill(); return;
+    }
+    var inset = box * 0.04, s = box - inset * 2;
+    rr(ctx, x + inset, y + inset, s, s, box * 0.20); ctx.fill();
+  }
+
+  function drawEye(ctx, x, y, box, fg, style, R) {
+    if (!R) R = style === 'circle' ? [3.5, 2.5, 1.5] : (style === 'rounded' ? [0.6, 0.4, 0.5] : [0, 0, 0]);
+    ctx.fillStyle = fg; rr(ctx, x, y, box * 7, box * 7, R[0] * box); ctx.fill();
+    ctx.fillStyle = '#fff'; rr(ctx, x + box, y + box, box * 5, box * 5, R[1] * box); ctx.fill();
+    ctx.fillStyle = fg; rr(ctx, x + box * 2, y + box * 2, box * 3, box * 3, R[2] * box); ctx.fill();
+  }
+
+  /* opts: link, topText, bottomText, brand, dot, eye, logo(dataURL|null), colorDots(bool), scale, bg */
+  function drawCodeCard(canvas, opt) {
+    var o = Object.assign({
+      link: 'https://demo.moupz.cn/', topText: '\u626b\u7801\u54a8\u8be2', bottomText: '\u5b98\u65b9\u5ba2\u670d',
+      brand: '#2E6BE6', dot: 'rounded', eye: 'rounded', logo: null, colorDots: false, scale: 2, font: ''
+    }, opt || {});
+
+    var W = CARD_W, H = CARD_H, S = o.scale, f = o.font || 'bold %dpx "Microsoft YaHei","PingFang SC",Arial,sans-serif';
+    canvas.width = W * S; canvas.height = H * S;
+    var ctx = canvas.getContext('2d');
+    ctx.setTransform(S, 0, 0, S, 0, 0);
+    ctx.clearRect(0, 0, W, H);
+
+    // 卡面（不画投影：投影会被画布边缘裁掉，留下四个黑角；需要投影由页面 CSS 负责）
+    rr(ctx, 0, 0, W, H, 28); ctx.fillStyle = '#fff'; ctx.fill();
+
+    var report = {};
+
+    // 顶部文案
+    ctx.fillStyle = '#17181c';
+    ctx.font = f.replace('%d', '44');
+    ctx.textAlign = 'center'; ctx.textBaseline = 'alphabetic';
+    report.topTextWidth = Math.round(ctx.measureText(o.topText).width);
+    report.topTextMax = W - 2 * 56;
+    ctx.fillText(o.topText, W / 2, 120);
+
+    // 二维码（比例照参考图：码宽 = 卡宽 69%，码区 472×472）
+    var m = qrModel(o.link), qa = 472, qx = (W - qa) / 2, qy = 262;
+    var box = Math.floor(qa / m.n);
+    if (box % 2) box -= 1;                 // 偶数模块（不缩放，直接按 box 画）
+    if (box < 2) box = 2;
+    var size = box * m.n;
+    var ox = Math.round(qx + (qa - size) / 2), oy = Math.round(qy + (qa - size) / 2);
+    var fg = o.colorDots ? o.brand : '#16181d';
+    var dot = o.dot;
+    if (dot === 'dot' && box < 10) dot = 'rounded';   // 长链接（模块多）时圆点会变临界：自动回退圆角，保可扫
+    report.n = m.n; report.box = box; report.qrSize = size; report.dot = dot;
+    for (var r = 0; r < m.n; r++)
+      for (var c = 0; c < m.n; c++)
+        if (!inEye(m.n, r, c) && m.dark(r, c)) drawModule(ctx, ox + c * box, oy + r * box, box, fg, dot);
+    drawEye(ctx, ox, oy, box, fg, o.eye, o.eyeR);
+    drawEye(ctx, ox + (m.n - 7) * box, oy, box, fg, o.eye, o.eyeR);
+    drawEye(ctx, ox, oy + (m.n - 7) * box, box, fg, o.eye, o.eyeR);
+
+    // 中央 logo：白底衬（默认圆角方形，比圆形同宽更"大"）+ 图标内缩，图标不越出白衬（越出会盖住码点、解码器直接拒码）
+    if (o.logo) {
+      var L = o.logoRatio || (box >= 10 ? 0.18 : 0.14);
+      var side = size * L, ccx = W / 2, ccy = oy + size / 2;
+      ctx.fillStyle = '#fff';
+      if (o.knock === 'square') { rr(ctx, ccx - side / 2, ccy - side / 2, side, side, side * 0.26); ctx.fill(); }
+      else { ctx.beginPath(); ctx.arc(ccx, ccy, side / 2, 0, Math.PI * 2); ctx.fill(); }
+      var p = side * (o.iconRatio || 0.86), pr = p / 2;
+      ctx.save(); ctx.beginPath();
+      var round = (o.knock === 'square' && o.logoShape !== 'circle');
+      if (round) rr(ctx, ccx - pr, ccy - pr, p, p, p * 0.26);
+      else ctx.arc(ccx, ccy, pr, 0, Math.PI * 2);
+      ctx.clip();
+      if (o._logoImg && o._logoImg.complete) ctx.drawImage(o._logoImg, ccx - pr, ccy - pr, p, p);
+      ctx.restore();
+      report.logoDia = Math.round(side);
+      report.logoPct = Math.round((o.knock === 'square' ? L * (o.iconRatio || 0.86) : L * (o.iconRatio || 0.86) * 0.707) * 100);
+    }
+
+    // 底部通栏
+    var barH = 131, by = H - barH;
+    ctx.save();
+    rr(ctx, 0, 0, W, H, 28); ctx.clip();
+    ctx.fillStyle = o.brand; ctx.fillRect(0, by, W, barH);
+    ctx.restore();
+    ctx.fillStyle = '#fff';
+    ctx.font = f.replace('%d', '40');
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    report.bottomTextWidth = Math.round(ctx.measureText(o.bottomText).width);
+    report.bottomTextMax = W - 2 * 56;
+    ctx.fillText(o.bottomText, W / 2, by + barH / 2 + 2);
+
+    report.overflow = (report.topTextWidth > report.topTextMax) || (report.bottomTextWidth > report.bottomTextMax);
+    report.scale = S;
+    canvas._report = report;
+    return report;
+  }
+
+  g.KFQCard = { drawCodeCard: drawCodeCard, ICONS: ICONS, CARD_W: CARD_W, CARD_H: CARD_H };
+})(window);

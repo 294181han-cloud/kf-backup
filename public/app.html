@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>客服工作台</title>
 <link rel="stylesheet" href="/assets/vendor/element-plus.css">
-<link rel="stylesheet" href="/assets/css/app.css?v=2.6.0">
+<link rel="stylesheet" href="/assets/css/app.css?v=2.6.01">
 <script src="/assets/ui/ui-registry.js?v=2.5.1"></script>
 <script src="/assets/ui/ui-loader.js?v=2.5.1" data-ui-cat="auto"></script>
 </head>
@@ -381,43 +381,104 @@
       <!-- ============ 获客码（统一码） ============ -->
       <div class="content" v-if="tab==='links' && me.role==='tenant'">
         <div class="code-page-card">
-          <div class="code-tabs">
-            <div class="code-tab active">正式码</div>
+          <div class="code-head">
+            <div class="code-head-t">客服码管理</div>
+            <div class="code-head-sub">统一管理客服码链接与二维码样式：中心 Logo、上下文案、码点码眼可自由设置；换标会检测该渠道的拦截状态。</div>
           </div>
-          <div class="code-body">
-            <div class="code-img-panel">
-              <div class="cip-title">码图像</div>
-              <div class="qr-stage">
-                <div class="qr-headline" v-if="codeCfg.nicknameOn">{{ me.nickname || '客服' }}</div>
-                <div class="qr-wrap" ref="qrWrap"></div>
-                <div class="qr-footnote" v-if="codeCfg.supportOn">支持微信、支付宝、淘宝、浏览器等通道扫码进入</div>
-              </div>
-              <div class="cip-btns">
-                <el-button size="small" @click="copyQrImage">复制二维码</el-button>
-                <el-button size="small" @click="downloadQrImage">下载二维码</el-button>
-              </div>
-              <div class="cip-note">注意：请不要截整个手机扫码，避免码死的太快!</div>
+
+          <div class="code-bar">
+            <span class="cb-lbl">客服码</span>
+            <button type="button" class="code-pill" title="点击复制" @click="copy(codeValue)">{{ codeValue }}</button>
+            <span class="code-state" :class="'st-' + codeCheck.state">{{ codeCheck.text }}</span>
+            <span class="cb-name">名称：<b>{{ me.nickname || '客服' }}</b></span>
+            <el-popconfirm :title="codeRotateHint" @confirm="rotateCode">
+              <template #reference><el-button type="primary" size="small">换码</el-button></template>
+            </el-popconfirm>
+            <el-button size="small" class="cb-danger" @click="manageDlg = true; loadHistory()">失效二维码</el-button>
+          </div>
+
+          <div class="code-panel">
+            <div class="cp-hd">
+              <span class="cp-hd-t">公共链接</span>
+              <span class="code-state" :class="'st-' + codeCheck.state">{{ codeCheck.tag }}</span>
+              <span class="cp-hd-hint" v-if="codeCheck.msg">{{ codeCheck.msg }}</span>
+              <span class="cp-hd-sp"></span>
+              <span class="cp-hd-at">最近检测：{{ codeCheck.atText }}</span>
+              <el-button size="small" :loading="codeCheck.loading" @click="checkCode(true)">立即检测</el-button>
+              <el-button size="small" text @click="manageDlg = true; loadHistory()">管理码</el-button>
             </div>
-            <div class="code-set-panel">
-              <div class="cip-title">码设置</div>
-              <div class="cs-row"><span class="cs-label">码显示：</span>
-                <span style="margin-right:14px;">昵称显示：<el-switch v-model="codeCfg.nicknameOn" @change="saveCodeCfg"></el-switch></span>
-                <span>支持显示：<el-switch v-model="codeCfg.supportOn" @change="saveCodeCfg"></el-switch></span>
+
+            <div class="cp-row">
+              <span class="cp-lbl">码点</span>
+              <div class="cp-seg">
+                <button type="button" :class="{on: codeStyle.dot==='rounded'}" @click="setCodeStyle('dot','rounded')">圆角</button>
+                <button type="button" :class="{on: codeStyle.dot==='dot'}" @click="setCodeStyle('dot','dot')">圆点</button>
+                <button type="button" :class="{on: codeStyle.dot==='square'}" @click="setCodeStyle('dot','square')">方形</button>
               </div>
-              <div class="cs-row"><span class="cs-label">码链接：</span>
-                <el-button size="small" type="primary" plain @click="copy(currentLink)">复制链接</el-button>
-                <span class="mono" style="font-size:12px;color:#666;word-break:break-all;">{{ currentLink || '尚未生成' }}</span>
+              <span class="cp-lbl">码眼</span>
+              <div class="cp-seg">
+                <button type="button" :class="{on: codeStyle.eye==='rounded'}" @click="setCodeStyle('eye','rounded')">圆角</button>
+                <button type="button" :class="{on: codeStyle.eye==='square'}" @click="setCodeStyle('eye','square')">方形</button>
               </div>
-              <div class="cs-row"><span class="cs-label">码状态：</span><span style="color:#13c56b;">正常，新老客户均可访问</span></div>
-              <div class="cs-row"><span class="cs-label">码到期：</span><span>{{ expireText }}</span></div>
-              <div class="cs-btns">
-                <el-popconfirm :title="codeRotateHint" @confirm="rotateCode">
-                  <template #reference><el-button type="primary">更换码</el-button></template>
-                </el-popconfirm>
-                <el-button type="success" @click="manageDlg = true; loadHistory()">管理码</el-button>
+              <span class="cp-lbl">主色</span>
+              <div class="cp-sw">
+                <span v-for="c in CODE_BRANDS" :key="c" class="cp-sw-i" :class="{on: codeStyle.brand===c}" :style="{background: c}" @click="setCodeStyle('brand', c)"></span>
               </div>
+              <span class="cp-lbl">Logo 大小</span>
+              <div class="cp-seg">
+                <button type="button" :class="{on: codeStyle.logoSize==='std'}" @click="setCodeStyle('logoSize','std')">标准</button>
+                <button type="button" :class="{on: codeStyle.logoSize==='big'}" @click="setCodeStyle('logoSize','big')" title="更醒目；部分长链接下扫码识别率会下降">加大</button>
+              </div>
+            </div>
+
+            <div class="cp-row">
+              <span class="cp-lbl">上方文字</span>
+              <el-input v-model="codeStyle.topText" maxlength="12" placeholder="扫码咨询" style="width:132px" @change="renderCodeCard"></el-input>
+              <span class="cp-lbl">下方文字</span>
+              <el-input v-model="codeStyle.bottomText" maxlength="12" placeholder="官方客服" style="width:132px" @change="renderCodeCard"></el-input>
+              <el-button size="small" @click="resetCodeStyle">恢复默认</el-button>
+            </div>
+
+            <div class="cp-row">
+              <span class="cp-lbl">中心 Logo</span>
+              <div class="cp-logos">
+                <button type="button" v-for="l in CODE_LOGOS" :key="l[0]" class="cp-logo"
+                        :class="{on: codeStyle.logo===l[0] || (l[0]==='upload' && codeStyle.logo==='custom')}"
+                        :title="l[1]" @click="pickLogo(l[0])">
+                  <img :src="logoThumb(l[0])" alt="">
+                </button>
+              </div>
+              <input type="file" accept="image/*" style="display:none" ref="logoFile" @change="onLogoFile">
+              <label class="cp-chk"><input type="checkbox" v-model="codeStyle.colorDots" @change="renderCodeCard"> 码点跟随主色</label>
+            </div>
+
+            <div class="code-stage">
+              <canvas ref="codeCanvas"></canvas>
+            </div>
+            <div class="code-stage-hint">扫不出来就用「标准」Logo 大小 +「圆角」码点；上传的深色图片 logo 建议配圆角码点。</div>
+
+            <div class="cp-btns">
+              <el-button size="small" @click="previewBig">预览大图</el-button>
+              <el-button size="small" type="primary" @click="downloadQrImage">下载二维码</el-button>
+              <el-button size="small" @click="copyQrImage">复制二维码</el-button>
+              <el-button size="small" @click="copy(currentLink)">复制链接</el-button>
+            </div>
+
+            <div class="cp-pillrow">
+              <button type="button" class="code-pill" @click="copy(codeValue)">{{ codeValue }}</button>
+            </div>
+            <div class="cp-linkrow">
+              <span class="cp-link">{{ currentLink || '尚未生成' }}</span>
+              <el-button size="small" text @click="copy(currentLink)">复制</el-button>
+            </div>
+            <div class="cp-foot">
+              <span>链接</span><span class="on">预览</span>
             </div>
           </div>
+
+          <el-dialog v-model="previewDlg" title="预览大图（长按或右键保存）" width="420px" align-center>
+            <img :src="previewSrc" style="width:100%;display:block;border-radius:12px;" alt="">
+          </el-dialog>
 
           <!-- ============ 推广海报：风格预设 / 背景图 + 二维码位置大小 + 文字独立定制 ============ -->
           <div class="poster-sec">
@@ -1157,10 +1218,10 @@
 <script src="/assets/vendor/vue.global.js?v=2.0.1"></script>
 <script src="/assets/vendor/element-plus.js?v=2.0.1"></script>
 <script src="/assets/vendor/qrcode.min.js?v=2.0.1"></script>
-<script src="/assets/qr-poster.js?v=2.1.0"></script>
+<script src="/assets/qr-poster.js?v=2.1.01"></script>
 <script src="/assets/api.js?v=2.0.1"></script>
 <script src="/assets/js/app-components.js?v=2.1.0"></script>
-<script src="/assets/js/app.js?v=2.7.2"></script>
+<script src="/assets/js/app.js?v=2.7.21"></script>
 <script src="/assets/js/app-boot.js?v=2.1.1"></script>
 </body>
 </html>
