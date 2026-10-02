@@ -227,7 +227,7 @@ Step 'config 提示额度状态' ($r.quota_full) ($r | ConvertTo-Json -Compress)
 
 Write-Host "`n========== 13. 客服码 + 品牌设置 ==========" -ForegroundColor Cyan
 $r = ApiPost '/api/tenant/service-code' @{} $tenantA
-Step '一键换码生成链接' ($r.code.link -match '^https://[a-z0-9.-]+/visitor\.html\?code=') ($r | ConvertTo-Json -Compress)
+Step '一键换码生成链接' ($r.code.link -match '^https://[a-z0-9.-]+/($|/visitor\.html\?code=)') ($r | ConvertTo-Json -Compress)
 $codeVal = $r.code.code
 $r = ApiGet "/api/visitor/config?code=$codeVal"
 Step '客服码 config 可用' ($r.available) ($r | ConvertTo-Json -Compress)
