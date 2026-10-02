@@ -430,6 +430,7 @@ function handle_tenant_visitors(string $method): void
         SUBSTRING_INDEX(GROUP_CONCAT(s.visitor_name ORDER BY s.last_time DESC SEPARATOR '|||'), '|||', 1) AS name,
         SUBSTRING_INDEX(GROUP_CONCAT(NULLIF(s.ip,'') ORDER BY s.last_time DESC SEPARATOR '|||'), '|||', 1) AS ip,
         SUBSTRING_INDEX(GROUP_CONCAT(s.from_url ORDER BY s.last_time DESC SEPARATOR '|||'), '|||', 1) AS from_url,
+        SUBSTRING_INDEX(GROUP_CONCAT(NULLIF(s.visitor_avatar,'') ORDER BY s.last_time DESC SEPARATOR '|||'), '|||', 1) AS avatar,
         COUNT(*) AS session_count,
         MAX(s.last_time) AS last_active,
         MIN(s.created_at) AS first_seen,

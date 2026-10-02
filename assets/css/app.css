@@ -668,12 +668,20 @@ body { background: var(--v-bg); color: var(--v-ink); -webkit-font-smoothing: ant
 .tag-agent { background: color-mix(in srgb, var(--theme, #1677ff) 12%, #fff); color: var(--theme, #1677ff); border-radius: 6px; padding: 1px 6px; }
 .badge { background: linear-gradient(135deg, #ff7a7a, #f5455c); min-width: 18px; height: 18px; border-radius: 9px;
   box-shadow: 0 3px 8px rgba(245, 69, 92, .3); }
+/* 访客资源表头像（动物 emoji 或首字） */
+.v-ava {
+  width: 34px; height: 34px; border-radius: 50%; flex-shrink: 0;
+  display: inline-flex; align-items: center; justify-content: center;
+  font-size: 17px; font-weight: 600; color: var(--theme, #1677ff);
+  background: color-mix(in srgb, var(--theme, #1677ff) 10%, #fff);
+}
 
 /* ---------- 会话头部（信息更丰富） ---------- */
 .chat-col { background: #f2f3f7; }
 .chat-head {
   display: flex; align-items: center; gap: 13px;
   padding: 12px 18px; background: #fff; border-bottom: 1px solid var(--v-line);
+  flex-wrap: wrap;
 }
 .ch-ava {
   position: relative; width: 44px; height: 44px; border-radius: 14px; flex-shrink: 0;
@@ -704,6 +712,17 @@ body { background: var(--v-bg); color: var(--v-ink); -webkit-font-smoothing: ant
   margin-top: 6px; font-size: 12px; color: var(--v-ink-3);
 }
 .ch-sub .ch-id { font-family: Consolas, monospace; color: #b3bccb; }
+
+/* 头部信息保持两行：第一行不换行（超出省略），第二行不换行横向可滚，避免窄屏堆成高墙 */
+.chat-head .ch-top { flex-wrap: nowrap; overflow: hidden; }
+.chat-head .ch-top .name { flex: 0 1 auto; min-width: 90px; }
+.chat-head .ch-info { flex: 1 1 240px; }
+.chat-head .chat-head-btns { flex: 0 0 auto; }
+.chat-head .ch-top .ch-edit, .chat-head .ch-top .ch-chip, .chat-head .ch-top .ch-state { flex-shrink: 0; }
+.chat-head .ch-sub .ch-chip { font-size: 11px; padding: 2px 7px; }
+.chat-head .ch-sub { flex-wrap: nowrap; overflow-x: auto; overflow-y: hidden; padding-bottom: 2px; scrollbar-width: none; -ms-overflow-style: none; }
+.chat-head .ch-sub::-webkit-scrollbar { height: 0; display: none; }
+.chat-head .ch-sub > span { flex-shrink: 0; }
 
 /* ---------- 聊天消息（微信观感） ---------- */
 .chat-body { padding: 18px 20px; }

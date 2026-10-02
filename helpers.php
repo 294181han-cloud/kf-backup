@@ -263,6 +263,27 @@ function is_ip_blocked(int $tenantId, string $ip): bool
 
 /* ================= 附件 / 消息 ================= */
 
+/* ================= 访客头像（动物 emoji） ================= */
+
+/** 头像池：全部单码位动物 emoji，避免不同设备渲染差异 */
+function visitor_avatar_pool(): array
+{
+    return ['🐶','🐱','🐭','🐹','🐰','🦊','🐻','🐼','🐨','🐯','🦁','🐮','🐷','🐸','🐵','🐔',
+        '🐧','🐦','🐤','🦆','🦅','🦉','🦇','🐺','🐗','🐴','🦄','🐝','🐛','🦋','🐌','🐞',
+        '🐢','🐍','🦎','🐙','🦑','🦐','🦀','🐡','🐠','🐟','🐬','🐳','🐋','🦈','🐊','🐅',
+        '🐆','🦓','🦍','🐘','🦏','🦛','🐪','🐫','🦒','🦘','🐃','🐄','🐎','🐖','🐏','🐑',
+        '🦙','🐐','🦌','🐕','🐈','🐓','🦃','🦚','🦜','🦢','🦩','🐇','🦝','🦦','🐁','🐀','🦔'];
+}
+
+/** 会话头像：优先用已分配的，其次按会话 id 稳定派生一个（老会话也有头像，且客服端/访客端一致） */
+function visitor_avatar_resolve(int $sessionId, string $stored = ''): string
+{
+    $stored = trim($stored);
+    if ($stored !== '') return $stored;
+    $pool = visitor_avatar_pool();
+    return $pool[abs($sessionId) % count($pool)];
+}
+
 function parse_attachments($v): array
 {
     if (!$v) return [];

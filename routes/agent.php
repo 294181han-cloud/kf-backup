@@ -62,7 +62,7 @@ function handle_sessions(string $method): void
     $onlineSql = "CASE WHEN s.status IN ('closed','archived') THEN s.status
         WHEN s.last_online_at IS NOT NULL AND s.last_online_at > DATE_SUB(NOW(), INTERVAL " . (int)$cfg['session_online_secs'] . " SECOND) THEN 'online'
         ELSE 'offline' END";
-    $sql = "SELECT s.id, s.agent_id, a.nickname AS agent_name, s.visitor_name AS name,
+    $sql = "SELECT s.id, s.agent_id, a.nickname AS agent_name, s.visitor_name AS name, s.visitor_avatar,
         (SELECT value FROM contacts WHERE session_id = s.id AND type = 'note' LIMIT 1) AS note,
         s.ip, s.from_url AS `from`, s.last_msg AS lastMsg, s.last_time AS lastTime, s.unread, s.source, s.geo, s.ua,
         s.archived_at, s.closed_at,
@@ -79,6 +79,8 @@ function handle_sessions(string $method): void
         $r['unread'] = (int)$r['unread'];
         $r['agent_id'] = (int)$r['agent_id'];
         $r['message_count'] = (int)$r['message_count'];
+        // 访客头像：优先已分配，其次按会话 id 稳定派生（老会话也有头像）
+        $r['visitor_avatar'] = visitor_avatar_resolve((int)$r['id'], (string)($r['visitor_avatar'] ?? ''));
         // 访客标签（v2.29）：地区（省市+运营商，如 广东广州 电信）；设备/渠道仅悬停全文用
         $uaInfo = parse_ua($r['ua'] ?? null);
         $r['devTag'] = $uaInfo['dev_tag'];
@@ -662,7 +664,7 @@ function handle_agent_poll(string $method): void
     $onlineSql = "CASE WHEN s.status IN ('closed','archived') THEN s.status
         WHEN s.last_online_at IS NOT NULL AND s.last_online_at > DATE_SUB(NOW(), INTERVAL " . (int)$cfg['session_online_secs'] . " SECOND) THEN 'online'
         ELSE 'offline' END";
-    $st = $pdo->prepare("SELECT s.id, s.agent_id, a.nickname AS agent_name, s.visitor_name AS name,
+    $st = $pdo->prepare("SELECT s.id, s.agent_id, a.nickname AS agent_name, s.visitor_name AS name, s.visitor_avatar,
         (SELECT value FROM contacts WHERE session_id = s.id AND type = 'note' LIMIT 1) AS note,
         s.ip, s.from_url AS `from`, s.last_msg AS lastMsg, s.last_time AS lastTime, s.unread, s.source, s.geo, s.ua,
         s.archived_at, s.closed_at,
@@ -678,6 +680,7 @@ function handle_agent_poll(string $method): void
         $r['unread'] = (int)$r['unread'];
         $r['agent_id'] = (int)$r['agent_id'];
         $r['message_count'] = (int)$r['message_count'];
+        $r['visitor_avatar'] = visitor_avatar_resolve((int)$r['id'], (string)($r['visitor_avatar'] ?? ''));
         $uaInfo = parse_ua($r['ua'] ?? null);          // 访客标签（设备/渠道保留给悬停全文）
         $r['devTag'] = $uaInfo['dev_tag'];
         $r['channel'] = $uaInfo['channel'];

@@ -218,6 +218,7 @@ function handle_visitor_init(string $method): void
                 'session_id' => $sid,
                 'visitor_token' => $visitorToken,
                 'reused' => true,
+                'visitor_avatar' => visitor_avatar_resolve($sid, (string)($old['visitor_avatar'] ?? '')),
                 'session' => visitor_session_out($old),
             ]);
         }
@@ -287,12 +288,11 @@ function handle_visitor_init(string $method): void
     // 访客头像/昵称策略
     $headType = ts_get($tid, 'user_head_type', 'default');
     $visitorAvatar = '';
-    if ($headType === 'random') {
-        $pool = ['🐱','🐶','🦊','🐼','🐨','🐯','🦁','🐸','🐵','🐰','🐷','🐔','🦄','🐝','🐬','🐳','🦋','🌻','🌟','🍀'];
-        $visitorAvatar = $pool[random_int(0, count($pool) - 1)];
-    } elseif ($headType === 'custom') {
+    if ($headType === 'custom') {
         $visitorAvatar = ts_get($tid, 'user_head', '');
     }
+    // 默认 / 随机：分配动物 emoji，并尽量避开"当天其他访客已用过的"
+    if (trim($visitorAvatar) === '') $visitorAvatar = pick_visitor_avatar($pdo, $tid);
     if (ts_get($tid, 'user_name_type', 'default') === 'random') {
         $pool2 = ['小太阳','软糖','布丁','星星','月月','豆豆','团子','奶盖','咕咕','泡泡','奶茶','西柚','柚子','软软','阿玛','小鹿','桃桃','雪碧','布偶','汽水'];
         $name = $pool2[random_int(0, count($pool2) - 1)] . random_int(10, 99);
@@ -332,7 +332,34 @@ function visitor_session_out(array $s): array
         'id' => (int)$s['id'], 'name' => $s['visitor_name'], 'ip' => $s['ip'],
         'from' => $s['from_url'], 'lastMsg' => $s['last_msg'], 'lastTime' => dt_to_iso($s['last_time']),
         'status' => $s['status'],
+        'avatar' => visitor_avatar_resolve((int)$s['id'], (string)($s['visitor_avatar'] ?? '')),
     ];
+}
+
+/* ---------- 访客头像：动物 emoji 池（visitor_avatar_pool 在 helpers.php）+ 同天尽量不重复分配 ---------- */
+
+/**
+ * 给新访客分配头像：优先挑「今天还没被其他访客用过」的动物 emoji；
+ * 池子用完了就挑当天用得最少的那个（保证仍然尽量分散）。
+ */
+function pick_visitor_avatar(PDO $pdo, int $tenantId): string
+{
+    $pool = visitor_avatar_pool();
+    $used = [];
+    try {
+        $st = $pdo->prepare('SELECT visitor_avatar, COUNT(*) AS c FROM v_sessions
+            WHERE tenant_id = ? AND visitor_avatar <> ? AND created_at >= CURDATE() GROUP BY visitor_avatar');
+        $st->execute([$tenantId, '']);
+        foreach ($st->fetchAll() as $r) $used[(string)$r['visitor_avatar']] = (int)$r['c'];
+    } catch (\Throwable $e) { /* 统计失败不影响分配 */ }
+
+    $free = [];
+    foreach ($pool as $e) { if (!isset($used[$e])) $free[] = $e; }
+    if ($free) return $free[random_int(0, count($free) - 1)];
+
+    $best = $pool[0]; $min = PHP_INT_MAX;
+    foreach ($pool as $e) { $c = $used[$e] ?? 0; if ($c < $min) { $min = $c; $best = $e; } }
+    return $best;
 }
 
 /* ---------- POST /api/visitor/welcome ---------- */

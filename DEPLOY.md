@@ -788,8 +788,21 @@ v2.14 撤回同步改动遗漏了 `$recalledIds` 的块外初始化——**未�
   「方便的话，请上传一下相关图片，帮您更快定位问题～」。
 - 访客端卡片仍为：🖼 图标 + 「客服请求您上传图片」+ 这句话 + 绿色「上传图片」按钮。
 
+### 四、访客头像：动物 emoji + 同天尽量不重复
+- `helpers.php` 新增头像池 `visitor_avatar_pool()`（80 个单码位动物 emoji）与 `visitor_avatar_resolve($sid, $stored)`
+  （已分配则用已分配的，否则按会话 id 稳定派生——**客服端与访客端算出来同一个头像**，老会话也有头像）。
+- `routes/visitor.php` 新建会话时用 `pick_visitor_avatar()` 分配：先查当天该租户已用过的头像，
+  从**没用过的**里随机挑；池子用完则挑当天用得最少的。`user_head_type`：`custom` 仍用租户上传的头像；
+  `default`（自动分配，不重复）/ `random`（随机动物）走新逻辑。
+- 「访客策略 → 访客头像」选项文案改为「自动分配（不重复）／随机动物／自定义」并补说明。
+- 展示位置：工作台**会话列表头像 / 会话头部头像 / 访客消息头像**（原来是平台图标/🙋）、
+  「访客资源」表头像（`handle_tenant_visitors` 增加 `avatar` 聚合字段，`/api/sessions`、`/api/agent/poll` 返回 `visitor_avatar`）。
+- 另外：会话头部改为「姓名 + 在线状态」一行、其余信息（设备/渠道/来源/IP/地区/访问/消息/首次/最近/客服/#编号）一行可横向滚动，
+  操作按钮在窄屏自动换行，避免挤压变形。
+- 实测：连续 8 个新访客分配 → `🦚 🐪 🐑 🐼 🐺 🦜 🐝 🐔`（8/8 不重复）；接口实测 3 个新访客 `🐇 🐻 🐢`。
+
 ### 版本
-- visitor.css ?v=2.5.0、visitor.js ?v=2.7.0、app.css ?v=2.8.2、app.js ?v=2.8.5
+- visitor.css ?v=2.5.0、visitor.js ?v=2.7.0、app.css ?v=2.8.4、app.js ?v=2.8.5
 
 ### 验证
 - `php -l routes/{tenant,agent,visitor}.php` 无语法错误。
