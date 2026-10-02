@@ -1,0 +1,5 @@
+/* pc/default - 经典蓝（默认款式） */
+:root {
+  --theme: #1890ff;
+  --theme-grad: linear-gradient(135deg, #1890ff, #4d9bff);
+}

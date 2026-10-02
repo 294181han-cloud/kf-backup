@@ -1,0 +1,20 @@
+/* pc/_base.css - 所有 PC 款式共用的主题接线（由加载器注入，先于各款式 theme.css）
+   只做"变量 → 组件"的映射，不定义任何具体颜色；颜色由各款式 theme.css 提供。
+   勿在款式文件里重复这里的规则。 */
+:root {
+  /* 契约变量兜底默认值（theme.css 缺失/未加载时页面仍可用） */
+  --theme: #1890ff;
+  --theme-grad: linear-gradient(135deg, #1890ff, #4d9bff);
+
+  /* Element Plus 主色跟随款式主题色（按钮/链接/菜单/开关等全部生效） */
+  --el-color-primary: var(--theme);
+  --el-color-primary-light-3: color-mix(in srgb, var(--theme) 70%, white);
+  --el-color-primary-light-5: color-mix(in srgb, var(--theme) 50%, white);
+  --el-color-primary-light-7: color-mix(in srgb, var(--theme) 30%, white);
+  --el-color-primary-light-8: color-mix(in srgb, var(--theme) 20%, white);
+  --el-color-primary-light-9: color-mix(in srgb, var(--theme) 10%, white);
+  --el-color-primary-dark-2: color-mix(in srgb, var(--theme) 80%, black);
+}
+
+/* 侧栏右边框随主题色（原 JS 内联实现，现回归 CSS） */
+html[data-ui-cat="pc"] .side { border-right-color: color-mix(in srgb, var(--theme) 20%, transparent); }

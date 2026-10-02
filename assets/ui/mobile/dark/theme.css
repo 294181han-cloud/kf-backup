@@ -1,0 +1,28 @@
+/* mobile/dark - 暗色（手机端参考示例：调色板 + 对硬编码表面的结构覆盖）
+   预览：visitor.html?t=<卡密>&ui=dark */
+
+/* 1) 调色板：覆盖契约全部变量 */
+:root {
+  --theme: #4d9bff;
+  --theme-grad: linear-gradient(135deg, #4d9bff 0%, #2f7bf6 100%);
+  --bg: #10151f;
+  --card: #1a2233;
+  --ink: #e6ebf5;
+  --ink-2: #9fb0cc;
+  --ink-3: #64748f;
+  --line: #2a3550;
+  --radius: 14px;
+}
+
+/* 2) 结构覆盖：visitor.css 中未走变量的硬编码表面，按 html[data-ui="dark"] 作用域修正
+   （新增款式照此模式：只改自己 data-ui 作用域内的规则，绝不动 visitor.css 本体） */
+html[data-ui="dark"] .v-input { background: #0d1320; color: var(--ink); }
+html[data-ui="dark"] .v-input:focus { background: #131b2c; }
+html[data-ui="dark"] .form-input { background: #0d1320; color: var(--ink); }
+html[data-ui="dark"] .form-input:focus { background: #131b2c; }
+html[data-ui="dark"] .rec-cancel { background: #232d42; }
+html[data-ui="dark"] .verify-input { background: #0d1320; color: var(--ink); }
+html[data-ui="dark"] .slide-track { background: #232d42; }
+html[data-ui="dark"] .verify-code-img { background: linear-gradient(90deg, #232d42, #1c2740); color: #c6d4ee; }
+html[data-ui="dark"] .msg-row.agent .msg-bubble { box-shadow: 0 2px 8px rgba(0,0,0,.35), inset 0 0 0 1px var(--line); }
+html[data-ui="dark"] .block-card, html[data-ui="dark"] .verify-card { box-shadow: 0 10px 40px rgba(0,0,0,.4); }

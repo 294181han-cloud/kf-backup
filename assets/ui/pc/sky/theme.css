@@ -1,0 +1,5 @@
+/* pc/sky - 天空蓝 */
+:root {
+  --theme: #13c2c2;
+  --theme-grad: linear-gradient(135deg, #13c2c2, #36cfc9);
+}

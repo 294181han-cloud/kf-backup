@@ -674,28 +674,10 @@ const app = createApp({
       { k: 'xiaohongshu', label: '小红书', g1: '#FF2442' },
       { k: 'yangqianguan', label: '钱罐子', g1: '#FF8800' },
     ];
-    // ===== 主题换肤（对标对方 4 套主题） =====
-    const themeKey = ref(localStorage.getItem('kfxt_theme') || 'default');
-    const themeDots = [
-      { v: 'default', label: '经典蓝', c: '#1677ff' },
-      { v: 'purple', label: '优雅紫', c: '#8b7cf6' },
-      { v: 'sky', label: '天空蓝', c: '#2196f3' },
-      { v: 'green', label: '清新绿', c: '#00b96b' },
-    ];
-    const applyTheme = () => {
-      const map = {
-        default: { theme: '#1890ff', grad: 'linear-gradient(135deg,#1890ff,#4d9bff)', side: '#f4f6f9' },
-        purple:  { theme: '#722ed1', grad: 'linear-gradient(135deg,#722ed1,#9254de)', side: '#f6f2fb' },
-        sky:     { theme: '#13c2c2', grad: 'linear-gradient(135deg,#13c2c2,#36cfc9)', side: '#effbfb' },
-        green:   { theme: '#52c41a', grad: 'linear-gradient(135deg,#52c41a,#73d13d)', side: '#f2fbef' },
-      };
-      const t = map[themeKey.value] || map.default;
-      document.documentElement.style.setProperty('--theme', t.theme);
-      document.documentElement.style.setProperty('--theme-grad', t.grad);
-      document.querySelectorAll('.side').forEach(el => { el.style.borderRightColor = t.theme + '33'; });
-    };
-    const setTheme = (v) => { themeKey.value = v; try { localStorage.setItem('kfxt_theme', v); } catch (e) {} applyTheme(); };
-    applyTheme();
+    // ===== 主题换肤（多 UI 款式系统：款式注册表 assets/ui/ui-registry.js，规范见 UI-DEV.md） =====
+    const themeKey = ref((window.UI && UI.current().id) || 'default');
+    const themeDots = (window.UI ? UI.list('pc') : []).map(s => ({ v: s.id, label: s.name, c: s.chip }));
+    const setTheme = (v) => { if (window.UI) UI.set(v); themeKey.value = v; };
 
     // ===== 头像裁剪（1:1） =====
     const cropDlg = ref(false);

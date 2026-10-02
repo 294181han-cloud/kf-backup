@@ -1,0 +1,5 @@
+/* pc/green - 清新绿 */
+:root {
+  --theme: #52c41a;
+  --theme-grad: linear-gradient(135deg, #52c41a, #73d13d);
+}

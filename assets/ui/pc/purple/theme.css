@@ -1,0 +1,5 @@
+/* pc/purple - 优雅紫 */
+:root {
+  --theme: #722ed1;
+  --theme-grad: linear-gradient(135deg, #722ed1, #9254de);
+}

@@ -36,15 +36,20 @@
 ├── assets/
 │   ├── api.js           # 共享 API 客户端（fetch 封装、401 跳登录、JSON 容错）
 │   ├── qr-poster.js     # 共享二维码海报绘制
-│   ├── css/             # 页面样式：app.css / admin.css / visitor.css
+│   ├── css/             # 页面基础样式：app.css / admin.css / visitor.css
 │   ├── js/              # 页面逻辑：app.js / app-components.js / app-boot.js / admin.js / visitor.js
+│   ├── ui/              # 多 UI 款式系统（pc/mobile 两类，见 UI-DEV.md）
+│   │   ├── ui-registry.js  # 款式注册表（新增款式在此登记）
+│   │   ├── ui-loader.js    # 款式加载器（禁止修改）
+│   │   ├── pc/          # 工作台/管理台款式：_base.css + default/purple/sky/green
+│   │   └── mobile/      # 访客端款式：default/dark
 │   └── vendor/          # 第三方库（vue/element-plus/echarts/qrcode），不修改
 ├── selftest.ps1         # 112 项全流程回归（直接跑线上！幂等可重跑）
 ├── DEPLOY.md            # 部署运维 + v1~v5 全部变更记录（新变更追加在文末）
 └── uploads/ data/       # 运行数据（有意入库；服务器上 git pull 不覆盖）
 ```
 
-## 3. 前端模块约定（v2.1.0 重构后）
+## 3. 前端模块约定（v2.1.0 重构后；v2.2.0 起含多 UI 款式系统）
 
 - **模板**（`public/*.html`）：只写 Vue 模板标记与结构，不放 `<style>`/`<script>` 内联块。
 - **逻辑**（`assets/js/<page>.js`）：每页一个主文件；跨页共享组件放 `app-components.js`。
@@ -52,6 +57,9 @@
 - **加载顺序（app.html）**：vue → element-plus → qrcode → qr-poster → api.js → app-components.js → app.js → app-boot.js。
   app.js 顶层 `const` 依赖 app-components.js 先执行（经典 script 共享全局词法环境，顺序不可乱）。
 - **缓存版本**：改了任何 css/js 内容，必须把该文件引用的 `?v=` 号 +1（当前 2.1.0），否则用户拿到 7 天旧缓存。
+- **多 UI 款式系统（v2.2.0）**：款式分 pc / mobile 两类，每款一个 `assets/ui/<分类>/<id>/theme.css`，
+  经 `ui-registry.js` 登记、`ui-loader.js` 注入（`?ui=<id>` 可预览）。**UI 外观类任务一律按 [UI-DEV.md](UI-DEV.md) 执行**——
+  该文档是交给轻量模型（如 GLM Flash）做 UI 的任务边界与自验清单，款式开发只动款式目录 + 注册表。
 - vendor 库永远不改；缺什么加文件到 vendor/ 并在页面引用。
 
 ## 4. 后端约定

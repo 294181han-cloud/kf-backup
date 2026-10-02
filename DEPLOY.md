@@ -243,3 +243,25 @@ v2.14 撤回同步改动遗漏了 `$recalledIds` 的块外初始化——**未�
 - 提取内容与 git HEAD 原区间逐行比对（8/8 完全一致），新 HTML 与设计结构逐行比对（3/3 一致）
 - 本地静态服务器 + 浏览器加载四页冒烟，控制台错误与重构前基线一致（仅 API 404 属预期）
 - 推送后 selftest.ps1 112 项回归 + 线上页面过检
+
+## 20. v2.17 变更记录（多 UI 款式系统，2026-10-02）
+
+### 新架构：assets/ui/（为多套 UI / 多人（含轻量模型）并行开发 UI 而设）
+- **两类款式**：pc（app/admin 页）与 mobile（visitor 页），每款一个目录一个 theme.css
+- **ui-registry.js**：款式注册表（id/名称/色卡/css 路径/分类默认值/资源版本号）——新增款式只动这里
+- **ui-loader.js**：页面 head 同步注入 base+款式 css；`?ui=<id>` URL 预览并记住；localStorage 持久；
+  未知 id 静默回退默认；`window.UI` API（current/list/set）
+- **pc/_base.css**：契约变量→组件接线（Element Plus 主色全系列映射 --theme，含 color-mix 派生浅色）
+- **顺手修复**：原工作台 4 色主题切换基本无效（--theme 变量无消费方，仅侧栏边框变色）；
+  现经 _base.css 接入 Element Plus 主色体系，主题真正全页生效；色点颜色同步修正为实际主题色
+- **mobile/dark**：暗色示例款（调色板 + html[data-ui] 作用域覆盖硬编码表面），作为新款式开发参考模板
+- **旧数据迁移**：localStorage kfxt_theme → kfxt_ui_pc（加载器自动回退读取，老用户无感）
+
+### UI 开发移交基建
+- **UI-DEV.md**：面向轻量模型（GLM 5.3 Flash）的 UI 任务执行规范——变量契约、标准步骤、红线清单、
+  交付自验清单；UI 任务只允许动「款式目录 + 注册表」，其余全禁
+- AGENTS.md 目录地图与前端约定同步更新
+
+### 验证
+- 默认款式零视觉差异（本地 + 线上对照）；?ui= 切换四款 PC + 两款移动端均生效；
+  selftest 112 项回归全过
