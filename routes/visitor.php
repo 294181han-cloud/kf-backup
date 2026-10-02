@@ -57,14 +57,20 @@ function resolve_visitor_context(): ?array
         // 客服码根路径子域（v2.28 链接格式）：service_codes.link 的 Host 精确匹配
         $st = $pdo->prepare('SELECT sc.code, sc.agent_id, tn.* FROM service_codes sc JOIN tenants tn ON tn.id = sc.tenant_id');
         $st->execute();
+        $dbgLoop = [];
         foreach ($st->fetchAll() as $sc) {
             $linkRaw = $sc['link'] ?? '';
+            $dbgLoop[] = ['raw' => var_export($linkRaw, true), 'is_str' => is_string($linkRaw), 'empty' => ($linkRaw === '')];
             if (!is_string($linkRaw) || $linkRaw === '') continue;
             $linkHost = strtolower((string)(parse_url($linkRaw, PHP_URL_HOST) ?: ''));
+            $dbgLoop[count($dbgLoop)-1]['host_parsed'] = $linkHost;
+            $dbgLoop[count($dbgLoop)-1]['eq'] = ($linkHost !== '' && $host === $linkHost);
             if ($linkHost !== '' && $host === $linkHost) {
+                if (isset($GLOBALS['__dbg_trace'])) { $GLOBALS['__dbg_trace']['returned'] = 'service-code-hit'; }
                 return ['tenant' => $sc, 'agent_id' => (int)$sc['agent_id']];
             }
         }
+        if (isset($GLOBALS['__dbg_trace'])) { $GLOBALS['__dbg_trace']['loop'] = $dbgLoop; }
     }
     if (isset($GLOBALS['__dbg_trace'])) {
         header('Content-Type: application/json; charset=utf-8');
