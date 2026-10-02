@@ -5,17 +5,22 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>客服工作台</title>
 <link rel="stylesheet" href="/assets/vendor/element-plus.css">
-<link rel="stylesheet" href="/assets/css/app.css?v=2.5.0">
+<link rel="stylesheet" href="/assets/css/app.css?v=2.6.0">
 <script src="/assets/ui/ui-registry.js?v=2.5.1"></script>
 <script src="/assets/ui/ui-loader.js?v=2.5.1" data-ui-cat="auto"></script>
 </head>
 <body>
-<div id="app" v-cloak @click="closeCtxMenu">
+<div id="app" v-cloak @click="closeCtxMenu(); quickCtx.show=false">
   <!-- 右键菜单（会话列表项触发） -->
   <div class="ctx-menu" v-if="ctxMenu.show" :style="{left: ctxMenu.x + 'px', top: ctxMenu.y + 'px'}" @click.stop>
     <div class="ctx-item danger" @click="ctxMenuDelete">🗑️ 删除会话<div class="ctx-sub">彻底删除，腾出会话额度</div></div>
     <div class="ctx-item" v-if="sessScope==='online'" @click="ctxMenuArchive">📦 归档会话</div>
     <div class="ctx-item" v-if="sessScope!=='closed'" @click="ctxMenuClose">✅ 结束会话</div>
+  </div>
+
+  <!-- 快捷消息右键菜单 -->
+  <div class="ctx-menu" v-if="quickCtx.show" :style="{left: quickCtx.x + 'px', top: quickCtx.y + 'px'}" @click.stop>
+    <div class="ctx-item" @click="editQuick">✏️ 编辑「{{ quickCtx.item ? quickCtx.item.title : '' }}」</div>
   </div>
   <!-- 未鉴权前不渲染任何界面骨架 -->
   <div v-if="!booted" style="height:100vh;display:flex;align-items:center;justify-content:center;color:#86909c;font-size:14px;">
@@ -186,7 +191,7 @@
               <div class="quick-bar" :class="{open: showQuick}">
                 <div class="quick-scroll">
                   <template v-if="quickMsgs.length">
-                    <button class="quick-btn" v-for="(q, qi) in quickMsgs" :key="q.id" :title="q.content + '\n单击：填入输入框（可编辑）\nCtrl+单击：直接发送'" :style="{transitionDelay: (qi * 30) + 'ms'}" @click="quickClick(q, $event)">
+                    <button class="quick-btn" v-for="(q, qi) in quickMsgs" :key="q.id" :title="q.content + '\n单击：填入输入框（可编辑）\nCtrl+单击：直接发送'" :style="{transitionDelay: (qi * 30) + 'ms'}" @click="quickClick(q, $event)" @contextmenu="openQuickCtx(q, $event)">
                       <span v-if="(q.attachments||[]).length" class="q-img-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="3"/><circle cx="9" cy="10" r="1.6"/><path d="M21 16.5 16.5 12l-6 6"/></svg></span>{{ q.title }}
                     </button>
                   </template>
@@ -204,8 +209,14 @@
                 <el-button size="small" type="primary" @click="stopRec(true)">发送</el-button>
                 <el-button size="small" @click="stopRec(false)">取消</el-button>
               </div>
-              <textarea v-else v-model="draft" placeholder="输入消息，Enter 发送，Shift+Enter 换行" @keydown="onKey"></textarea>
-              <button class="send-btn" :disabled="!draft.trim()||sending" @click="send" style="margin-top:6px;">发 送</button>
+              <div class="pending-atts" v-if="!recording && pendingAtts.length">
+                <div class="pa-item" v-for="(a, ai) in pendingAtts" :key="ai">
+                  <img :src="a.url">
+                  <span class="pa-rm" @click="rmPendingAtt(ai)" title="移除">✕</span>
+                </div>
+              </div>
+              <textarea v-if="!recording" v-model="draft" placeholder="输入消息，Enter 发送，Shift+Enter 换行" @keydown="onKey"></textarea>
+              <button class="send-btn" :disabled="(!draft.trim() && !pendingAtts.length)||sending" @click="send" style="margin-top:6px;">发 送</button>
             </div>
           </template>
           <div v-else class="chat-empty">
@@ -1058,9 +1069,29 @@
     </template>
   </el-dialog>
 
-  <div class="img-viewer" v-if="viewing" @click="viewing=''"><img :src="viewing"></div>
+  <div class="img-viewer" v-if="viewing" @click.self="viewing=''">
+    <img :src="viewing" :style="{ transform: 'scale(' + imgZoom + ') rotate(' + imgRot + 'deg)' }" @wheel.prevent="imgWheel" @click.stop>
+    <div class="iv-tools" @click.stop>
+      <span class="iv-btn" title="缩小" @click="imgZoom = Math.max(0.2, imgZoom - 0.2)">－</span>
+      <span class="iv-btn" title="放大" @click="imgZoom = Math.min(6, imgZoom + 0.2)">＋</span>
+      <span class="iv-btn" title="还原" @click="imgZoom = 1; imgRot = 0">⤢</span>
+      <span class="iv-btn" title="旋转" @click="imgRot += 90">⟳</span>
+      <span class="iv-btn" title="下载" @click="downloadImage(viewing)">⤓</span>
+      <span class="iv-btn" title="关闭" @click="viewing=''">✕</span>
+    </div>
+  </div>
 
-  <div class="img-viewer" v-if="viewing" @click="viewing=''"><img :src="viewing"></div>
+  <div class="img-viewer" v-if="viewing" @click.self="viewing=''">
+    <img :src="viewing" :style="{ transform: 'scale(' + imgZoom + ') rotate(' + imgRot + 'deg)' }" @wheel.prevent="imgWheel" @click.stop>
+    <div class="iv-tools" @click.stop>
+      <span class="iv-btn" title="缩小" @click="imgZoom = Math.max(0.2, imgZoom - 0.2)">－</span>
+      <span class="iv-btn" title="放大" @click="imgZoom = Math.min(6, imgZoom + 0.2)">＋</span>
+      <span class="iv-btn" title="还原" @click="imgZoom = 1; imgRot = 0">⤢</span>
+      <span class="iv-btn" title="旋转" @click="imgRot += 90">⟳</span>
+      <span class="iv-btn" title="下载" @click="downloadImage(viewing)">⤓</span>
+      <span class="iv-btn" title="关闭" @click="viewing=''">✕</span>
+    </div>
+  </div>
 
   <!-- 联系方式编辑 -->
   <el-dialog v-model="contactDlg" :title="'编辑 ' + contactLabel(editingContact.type)" width="360px">
@@ -1078,7 +1109,7 @@
 <script src="/assets/qr-poster.js?v=2.0.1"></script>
 <script src="/assets/api.js?v=2.0.1"></script>
 <script src="/assets/js/app-components.js?v=2.1.0"></script>
-<script src="/assets/js/app.js?v=2.5.2"></script>
+<script src="/assets/js/app.js?v=2.6.0"></script>
 <script src="/assets/js/app-boot.js?v=2.1.1"></script>
 </body>
 </html>

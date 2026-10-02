@@ -17,6 +17,17 @@ const app = createApp({
     const sending = ref(false);
     const chatBody = ref(null);
     const viewing = ref('');
+    // 图片查看器（v2.28）：滚轮缩放 / 旋转 / 下载
+    const imgZoom = ref(1);
+    const imgRot = ref(0);
+    const imgWheel = (e) => { imgZoom.value = Math.max(0.2, Math.min(6, imgZoom.value + (e.deltaY < 0 ? 0.15 : -0.15))); };
+    const downloadImage = (url) => {
+      if (!url) return;
+      const a = document.createElement('a');
+      a.href = url; a.download = 'image-' + Date.now() + '.png';
+      a.target = '_blank';
+      document.body.appendChild(a); a.click(); a.remove();
+    };
     const profile = ref(null);
     const contactList = ref([]);
     const noteDraft = ref('');
@@ -311,30 +322,62 @@ const app = createApp({
 
     const send = async () => {
       const text = draft.value.trim();
-      if (!text || !currentId.value || sending.value) return;
+      const atts = pendingAtts.value.slice();
+      if ((!text && !atts.length) || !currentId.value || sending.value) return;
       sending.value = true;
       try {
-        const r = await API.post('/api/sessions/' + currentId.value + '/messages', { text });
+        const r = await API.post('/api/sessions/' + currentId.value + '/messages', { text, attachments: atts.length ? atts : undefined });
         msgs.value.push(r.message);
         maxMsgId.value = r.message.id;
         draft.value = '';
+        pendingAtts.value = [];
         showQuick.value = false;
         scrollBottom();
         sendBeep();
         const s = sessions.value.find(x => x.id === currentId.value);
-        if (s) { s.lastMsg = text.slice(0, 60); s.agent_id = s.agent_id || (me.value.role === 'agent' ? me.value.id : s.agent_id); }
+        if (s) { s.lastMsg = (text || (atts.length ? '[图片]' : '')).slice(0, 60); s.agent_id = s.agent_id || (me.value.role === 'agent' ? me.value.id : s.agent_id); }
       } catch (e) { ElementPlus.ElMessage.error(e.message); }
       finally { sending.value = false; }
     };
     const onKey = (e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(); } };
 
-    // 快捷回复：点击直接发送全部内容
-    // 快捷消息（v2.27 改版）：单击 = 文字填入输入框（可编辑后发送）；Ctrl+单击 = 直接发送
+    // 快捷消息（v2.28 改版）：单击 = 直接发送；Ctrl+单击 = 填入输入框（文字+图片均可编辑）
+    const pendingAtts = ref([]);   // 待发附件（编辑模式带入的图片，发送时随消息发出）
     const quickClick = (q, ev) => {
-      if (ev && (ev.ctrlKey || ev.metaKey)) { sendQuick(q); return; }
-      draft.value = q.content || '';
-      const input = document.querySelector('.chat-input textarea, .chat-input input');
-      if (input) { input.focus(); }
+      if (ev && (ev.ctrlKey || ev.metaKey)) {
+        draft.value = q.content || '';
+        pendingAtts.value = (q.attachments || []).filter(a => a && a.url).slice();   // 修复：带图话术图片不再丢失
+        const input = document.querySelector('.chat-input textarea, .chat-input input');
+        if (input) { input.focus(); }
+        return;
+      }
+      sendQuick(q);
+    };
+    const rmPendingAtt = (i) => { pendingAtts.value.splice(i, 1); };
+    // 快捷按钮右键：编辑该条（跳转快捷消息页并打开编辑框）
+    const quickCtx = reactive({ show: false, x: 0, y: 0, item: null });
+    const openQuickCtx = (q, ev) => {
+      ev.preventDefault();
+      quickCtx.x = ev.clientX; quickCtx.y = ev.clientY;
+      quickCtx.item = q; quickCtx.show = true;
+    };
+    const editQuick = () => {
+      const q = quickCtx.item;
+      quickCtx.show = false;
+      if (!q) return;
+      tab.value = 'quick';
+      nextTick(() => {
+        try {
+          const rows = document.querySelectorAll('.crud-table .el-table__row');
+          for (const row of rows) {
+            if ((row.textContent || '').includes(q.title)) {
+              const btn = Array.from(row.querySelectorAll('button')).find(b => b.textContent.trim() === '编辑');
+              if (btn) { btn.click(); return; }
+            }
+          }
+        } catch (e) {}
+        ElementPlus.ElMessage.info('请在列表中编辑「' + q.title + '」');
+      });
     };
     const sendQuick = async (q) => {
       if (!currentId.value || sending.value) { ElementPlus.ElMessage.warning('请先选择会话'); return; }
@@ -1276,6 +1319,8 @@ const app = createApp({
       quickFields, welcomeFields, autoFields, blFields, preqFields,
       shortTime, fmtTime, sourceText, contactLabel, barW, quotaW,
       openSession, send, onKey, useQuick, sendQuick, quickClick, onImage, startRec, stopRec, closeSession, doTransfer,
+      pendingAtts, rmPendingAtt, quickCtx, openQuickCtx, editQuick,
+      imgZoom, imgRot, imgWheel, downloadImage,
       editContact, saveContact, contactDlg, editingContact, saveNote, sendBroadcast,
       copy, createLink, renewLink, newCode, delCode, showQr,
       agentDlg, agentMode, agentForm, openAgentEdit, saveAgent, resetAgentPw, toggleAgent, delAgent,

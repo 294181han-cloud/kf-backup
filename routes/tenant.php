@@ -127,8 +127,9 @@ function handle_tenant_service_code(string $method): void
         $code = gen_code_token();
         $scheme = 'https';
         if ($pick['wildcard']) {
+            // 泛解析域名：随机子域即入口标识，根路径直达（无 /visitor.html?code= 后缀）
             $sub = substr(preg_replace('/[^a-z0-9]/', 'x', strtolower(base64_encode(random_bytes(6)))), 0, 8);
-            $url = "$scheme://$sub.{$pick['domain']}/visitor.html?code=$code";
+            $url = "$scheme://$sub.{$pick['domain']}/";
         } else {
             $url = "$scheme://{$pick['domain']}/visitor.html?code=$code";
         }

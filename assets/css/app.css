@@ -154,7 +154,7 @@ body { margin: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'P
 .msg-row.mine .msg-bubble { background: #daf3fd; color: #333; border-radius: 9px; border-top-right-radius: 2px; }
 .msg-row.sys { justify-content: center; }
 .msg-row.sys .msg-bubble { background: transparent; box-shadow: none; color: #a0a6ad; font-size: 12px; padding: 2px; }
-.msg-bubble img { max-width: 100%; border-radius: 6px; display: block; margin-top: 4px; cursor: pointer; }
+.msg-bubble img { max-width: 220px; max-height: 220px; border-radius: 6px; display: block; margin-top: 4px; cursor: zoom-in; }
 .msg-bubble audio { width: 200px; margin-top: 4px; }
 .msg-time { font-size: 10.5px; color: #c0c6cf; margin-top: 3px; }
 .msg-row.mine .msg-time { text-align: right; }
@@ -205,8 +205,17 @@ body.dark .tool-btn:hover { color: var(--theme, #69b1ff); }
 .mono { font-family: Consolas, monospace; }
 .muted { color: #86909c; font-size: 13px; }
 .link-line { display: flex; align-items: center; gap: 8px; padding: 8px 10px; background: #f7f8fa; border-radius: 8px; margin-bottom: 8px; font-size: 13px; word-break: break-all; }
-.img-viewer { position: fixed; inset: 0; background: rgba(0,0,0,.9); z-index: 200; display: flex; align-items: center; justify-content: center; }
-.img-viewer img { max-width: 94vw; max-height: 90vh; }
+.img-viewer { position: fixed; inset: 0; background: rgba(0,0,0,.92); z-index: 200; display: flex; align-items: center; justify-content: center; }
+.img-viewer img { max-width: 94vw; max-height: 88vh; transition: transform .12s ease; cursor: grab; }
+.img-viewer img:active { cursor: grabbing; }
+.iv-tools { position: fixed; bottom: 26px; left: 50%; transform: translateX(-50%); display: flex; gap: 6px; background: rgba(30,32,38,.78); border-radius: 10px; padding: 5px 8px; backdrop-filter: blur(4px); }
+.iv-btn { width: 34px; height: 34px; border-radius: 7px; background: rgba(255,255,255,.1); color: #fff; font-size: 16px; display: inline-flex; align-items: center; justify-content: center; cursor: pointer; user-select: none; }
+.iv-btn:hover { background: rgba(255,255,255,.24); }
+/* 待发附件区（快捷消息编辑模式） */
+.pending-atts { display: flex; gap: 8px; padding: 6px 2px 8px; flex-wrap: wrap; }
+.pa-item { position: relative; }
+.pa-item img { width: 56px; height: 56px; object-fit: cover; border-radius: 8px; border: 1px solid #e5e6eb; display: block; }
+.pa-rm { position: absolute; top: -7px; right: -7px; width: 18px; height: 18px; border-radius: 50%; background: #f53f3f; color: #fff; text-align: center; line-height: 18px; font-size: 11px; cursor: pointer; }
 /* 快捷条：布局内占位（不遮挡），位于工具栏上方，向右展开 */
 .quick-bar {
   max-height: 0; opacity: 0; overflow: hidden; margin-bottom: 0;

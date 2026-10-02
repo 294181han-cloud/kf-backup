@@ -119,6 +119,30 @@ function serve_html(string $file): void
 }
 
 if ($uri === '/' || $uri === '/index.php' || $uri === '/index.html') {
+    // 访客入口根路径直达（v2.28）：Host 命中客服码子域或专属链接子域时直接出访客页（无需 ?code= 后缀）
+    $rootHost = strtolower(preg_replace('/:\d+$/', '', $_SERVER['HTTP_HOST'] ?? ''));
+    $isVisitorHost = false;
+    if ($rootHost !== '') {
+        try {
+            $pdo0 = db();
+            // 专属链接子域
+            $st0 = $pdo0->prepare('SELECT dl.subdomain, dl.tenant_id FROM domain_links dl WHERE dl.active = 1');
+            $st0->execute();
+            foreach ($st0->fetchAll() as $dl0) {
+                $sub0 = strtolower($dl0['subdomain']);
+                if ($rootHost === $sub0 || str_starts_with($rootHost, $sub0 . '.')) { $isVisitorHost = true; break; }
+            }
+            // 客服码子域（service_codes.link 的 Host 部分）
+            if (!$isVisitorHost) {
+                $st1 = $pdo0->query('SELECT link FROM service_codes');
+                foreach ($st1->fetchAll() as $sc0) {
+                    $h0 = strtolower(parse_url($sc0['link'], PHP_URL_HOST) ?: '');
+                    if ($h0 !== '' && $rootHost === $h0) { $isVisitorHost = true; break; }
+                }
+            }
+        } catch (\Throwable $e) { /* 查询失败按默认跳转 */ }
+    }
+    if ($isVisitorHost) { serve_html('visitor.html'); exit; }
     header('Location: /login.html');
     exit;
 }
