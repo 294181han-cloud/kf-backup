@@ -862,7 +862,7 @@ const app = createApp({
       label: uiReg.categories[key].label,
       pages: (uiReg.categories[key].pages || []).join(' / '),
     }));
-    const uiActiveList = Vue.computed(() => [uiActiveCat.value].filter((k) => uiReg.categories[k]));
+    const uiActiveList = Vue.computed(() => uiCatList.filter((c) => c.key === uiActiveCat.value));
     const uiTplList = (key) => (uiReg.categories[key] ? uiReg.categories[key].templates || [] : []);
     const uiColorList = (key) => {
       const t = (uiReg.categories[key] ? uiReg.categories[key].templates || [] : []).find((x) => x.id === uiSel[key].tpl);
