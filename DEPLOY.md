@@ -652,3 +652,62 @@ v2.14 撤回同步改动遗漏了 `$recalledIds` 的块外初始化——**未�
 ### 验证
 - 登录页：桌面截图与样图比对一致；密码明密切换存在；无终端/工作台选择残留
 - 后台UI 配置页：电脑视口仅「电脑端」组，手机视口（390px）仅「手机端」组，手机端抽屉正常
+
+## 27. v2.32 变更记录（全站铺满改版 + 域名检测 + 微信绿气泡 + 访客端默认 WhatsApp，2026-10-03）
+
+### 布局：全站「铺满」
+- `assets/css/app.css`：`.content` 去掉 `max-width: 1100px`、`.content.workbench` 去掉 `max-width: 1400px`，改为满宽；
+  ≥1800px 视口追加 24/32px 内边距；会话列 300→320px、访客信息列 260→300px（都带 min-width）。
+- `assets/css/admin.css`：平台管理台 `.content` 去掉 `max-width: 1240px`，同样满宽 + 大屏内边距。
+- 实测（1920 视口）：side 188 + sess 320 + chat 1106 + info 300 = 1914，无横向溢出/裁切。
+
+### 数据面板：近 7 天接待明细口径修正（原先回复率可 >100%）
+- `routes/agent.php` `handle_stats_dashboard`：趋势/明细全部带上 agent 可见范围 `$vis`。
+- 新会话＝当天 `created_at` 创建的会话；活跃访客＝当天有访客消息的去重会话；
+  已回复会话＝当天被客服回复过的去重会话；回复率＝已回复会话 ÷ 活跃访客（上限 100%）；新增「客服回复条数」。
+- `public/app.html` 明细表增列「已回复会话 / 客服回复条数」并补口径说明。
+
+### 工作台：消息气泡与微信一致
+- 我方（客服）发出的气泡统一微信绿 `#95ec69`（深色模式 `#3f8f5c`），不再用浅蓝。
+- 气泡宽度改为 `fit-content`（`.msg-box/.msg-bubble`）：短消息就是短气泡，不再与文字长短不一。
+
+### 工作台：聊天工具条新增两个按钮
+- 「请求访客上传图片」：`POST /api/sessions/{id}/messages` 支持 `msg_type=ask_image`，
+  访客端渲染成卡片（虚线描边 + 「上传图片」按钮，点击直接调起选图并发送），客服端渲染成"已请求访客上传图片"卡片。
+- 「刷新聊天记录」：重新拉取当前会话消息，图标旋转反馈。
+
+### 声音提示默认值（按用户样图：客服端/访客端 × 接收/发送 全开）
+- 客服端：接收 on + Dindon、发送 on + 水滴；访客端：接收 on + Dindon、发送 on + 水滴。
+- 同时改 `routes/tenant.php`、`routes/visitor.php`、`assets/js/app.js`、`assets/js/visitor.js` 的默认，
+  并把仍是旧默认值的历史租户记录一次性迁移到新默认（自定义过的值不动）。
+
+### 域名检测（新页面，点哪个平台图标就检测哪个渠道）
+- `routes/tenant.php` 新增 `handle_tenant_url_check`（`GET` 取平台清单与默认地址 / `POST` 执行检测），
+  `index.php` 注册 `GET|POST /api/tenant/url-check`。
+- 平台清单 `urlsec_platforms()` 覆盖麒麟域名检测（api.uouin.com）开放文档全部 **84** 个接口，分 6 组；
+  调用 `{wxcheck_url}/{code}?username&key&url`，归一化 `code` → `ok / red / off / warn`，附详情行与原始 JSON。
+- 前端 `public/app.html#urlsec`：网址输入（默认取当前客服链接）+「用当前客服链接」+ 平台搜索 +
+  图标墙（点击即检测，带 spinner）+ 结果卡（状态/详情/原始返回）+ 本次会话检测历史。
+- 侧栏「工作 → 域名检测」入口；`urlsec_codes()` 白名单校验，非法渠道直接 400。
+- 平台配置 `kv_store`：`wxcheck_on` 已置 **1**，`wxcheck_user=294181h`、`wxcheck_key`（原已存在）。
+
+### 访客端：默认 WhatsApp + 现代观感
+- 默认模板 `default → whatsapp`（`routes/tenant.php`、`routes/visitor.php`、`assets/js/app.js` 三处默认值 +
+  历史租户 `visitor_template=default` 迁移为 whatsapp）。
+- 访客自己发出的气泡统一绿色（WhatsApp `#d9fdd3`；默认模板也改为绿渐变），气泡宽度贴文字。
+- 宽屏（≥820px）访客页居中成 620px「App 窗口」卡片（圆角 + 投影），WhatsApp 墙纸保留。
+- WhatsApp 细节打磨：头部投影、气泡内边距/字号、药丸输入条、按钮主色。
+- 新增「客服请求上传图片」卡片与「会话已结束」卡片（含「重新咨询」按钮）。
+
+### 会话结束提示
+- 列表右键「结束会话」与聊天头部「✔ 结束」统一二次确认：
+  「结束会话后，访客端聊天记录将清除，访客将无法继续在此会话发送消息。」
+- 访客端 `/api/poll` 返回 `session_status`；客服结束会话后访客页清空本地聊天记录、停轮询并显示已结束卡片。
+
+### 版本
+- app.css ?v=2.7.0、app.js ?v=2.8.0、visitor.css ?v=2.3.0、visitor.js ?v=2.6.0、admin.css ?v=2.2.0
+
+### 验证
+- `php -l` 四个 PHP 文件无语法错误；`GET/POST /api/tenant/url-check` 实测：qq.com→微信正常、www.google.com→被墙（1002 红）、非法渠道→400。
+- 数据面板 10-02 行：新会话 9 / 活跃访客 3 / 已回复会话 2 / 回复条数 9 / 回复率 66.7%（旧口径为 300%）。
+- 工作台实测：客服发出消息为绿气泡且气泡贴合文字；「请求访客上传图片」两端卡片正常；访客端收到卡片可点「上传图片」。

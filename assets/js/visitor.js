@@ -18,6 +18,7 @@ createApp({
     const inputRef = ref(null);
     const imgInput = ref(null);
     const viewing = ref('');
+    const ended = ref(false);   // 会话已被客服结束
 
     // 询前表单
     const showForm = ref(false);
@@ -65,8 +66,8 @@ createApp({
       return pad(d.getHours()) + ':' + pad(d.getMinutes());
     };
 
-    // 声音设置（v2.27，租户级）：访客端接收/发送分开
-    const snd = reactive({ recv_on: false, recv_which: 'dindon', send_on: false, send_which: 'water' });
+    // 声音设置（v2.27，租户级）：访客端接收/发送分开（默认开启，与后台默认一致）
+    const snd = reactive({ recv_on: true, recv_which: 'dindon', send_on: true, send_which: 'water' });
     const audioCache = {};
     const playSnd = (which) => {
       const key = ['water', 'pling', 'weixin', 'dindon', 'click'].includes(which) ? which : 'dindon';
@@ -142,7 +143,7 @@ createApp({
           return;
         }
         applyBrand(cfg.brand);
-        const tplKey = cfg.brand.template || 'default';
+        const tplKey = cfg.brand.template || 'whatsapp';
         window.__tpl = applyTemplate(tplKey);
         navTitle.value = TEMPLATES[tplKey] ? TEMPLATES[tplKey].nav : '在线客服';
         robotType.value = cfg.brand.robot || 'no';
@@ -258,12 +259,27 @@ createApp({
     };
 
     // ---- 轮询 ----
+    // 客服结束会话：按结束提示清除访客端聊天记录（本地记录 + 会话令牌）
+    const handleEnded = () => {
+      if (ended.value) return;
+      ended.value = true;
+      try { stopPoll(); } catch (e) {}
+      messages.value = [];
+      maxMsgId.value = 0;
+      draft.value = '';
+      showForm.value = false;
+      try { localStorage.removeItem('kfxt_vt_' + (qs.get('code') || qs.get('t') || location.hostname)); } catch (e) {}
+    };
+    // 重新咨询：清掉本地会话令牌后重载页面，开启一段全新会话
+    const restartChat = () => { try { location.reload(); } catch (e) {} };
     const pollOnce = async () => {
       if (!sessionId.value) return;
       try {
         const r = await fetch('/api/poll?session=' + sessionId.value + '&sinceMsg=' + maxMsgId.value).then(x => x.json());
         pushMessages(r.messages || []);
         if (r.agent_avatar) agentAvatar.value = r.agent_avatar;
+        // 会话被客服结束：按提示清除聊天记录并停轮询
+        if (r.session_status === 'closed') handleEnded();
         // 撤回同步：把最近撤回的消息标记为已撤回（自己撤回的会被过滤隐藏，客服撤回的显示胶囊）
         if (Array.isArray(r.recalledIds) && r.recalledIds.length) {
           const set = new Set(r.recalledIds);
@@ -292,7 +308,8 @@ createApp({
         if (r.auto_reply) { pushMessages([r.auto_reply]); }
       } catch (e) {
         draft.value = text;
-        alert(e.message);
+        if (String(e.message).includes('会话已结束')) handleEnded();
+        else alert(e.message);
       } finally { sending.value = false; }
     };
 
@@ -314,7 +331,10 @@ createApp({
           body: JSON.stringify({ session_id: sessionId.value, text: '', attachments: [up] })
         }).then(x => x.json());
         if (r.message) pushMessages([r.message]);
-      } catch (e) { alert(e.message); }
+      } catch (e) {
+        if (String(e.message).includes('会话已结束')) handleEnded();
+        else alert(e.message);
+      }
     };
 
     // ---- 录音 ----
@@ -464,6 +484,7 @@ createApp({
       ui, robotType, verifyTitle, verifyBg, verifyPassed, verifyValue, verifyErr, codeText, codeInput,
       genCode, codeVerify, verifyGo, slideStart, slideMove, slideEnd, doEnter,
       pubShow, pubTitle, pubContent, linkMode, linkSegs, copyLink, myAvatar,
+      ended, handleEnded, restartChat,
     };
   }
 }).mount('#app');

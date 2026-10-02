@@ -210,7 +210,7 @@ function handle_tenant_settings(string $method): void
             'brand_color'    => ts_get($tid, 'brand_color', '#1677ff'),
             'brand_position' => ts_get($tid, 'brand_position', 'right-bottom'),
             'pre_inquiry_on' => ts_get($tid, 'pre_inquiry_on', '0') === '1',
-            'visitor_template' => ts_get($tid, 'visitor_template', 'default'),
+            'visitor_template' => ts_get($tid, 'visitor_template', 'whatsapp'),
             // 验证策略
             'robot'          => ts_get($tid, 'robot', 'no'),
             'robot_frequency' => ts_get($tid, 'robot_frequency', 'first'),
@@ -259,11 +259,11 @@ function handle_tenant_settings(string $method): void
             // 声音设置（v2.27，租户级；客服端/访客端分开，发送/接收分开）
             'agent_snd_recv_on'   => ts_get($tid, 'agent_snd_recv_on', '1') === '1',
             'agent_snd_recv_which' => ts_get($tid, 'agent_snd_recv_which', 'dindon'),
-            'agent_snd_send_on'   => ts_get($tid, 'agent_snd_send_on', '0') === '1',
-            'agent_snd_send_which' => ts_get($tid, 'agent_snd_send_which', 'click'),
-            'visitor_snd_recv_on'   => ts_get($tid, 'visitor_snd_recv_on', '0') === '1',
+            'agent_snd_send_on'   => ts_get($tid, 'agent_snd_send_on', '1') === '1',
+            'agent_snd_send_which' => ts_get($tid, 'agent_snd_send_which', 'water'),
+            'visitor_snd_recv_on'   => ts_get($tid, 'visitor_snd_recv_on', '1') === '1',
             'visitor_snd_recv_which' => ts_get($tid, 'visitor_snd_recv_which', 'dindon'),
-            'visitor_snd_send_on'   => ts_get($tid, 'visitor_snd_send_on', '0') === '1',
+            'visitor_snd_send_on'   => ts_get($tid, 'visitor_snd_send_on', '1') === '1',
             'visitor_snd_send_which' => ts_get($tid, 'visitor_snd_send_which', 'water'),
             // 客服码卡片样式 + 上次检测结果（v2.30）
             'code_dot'         => ts_get($tid, 'code_dot', 'rounded'),
@@ -631,4 +631,227 @@ function handle_tenant_code_check(string $method): void
     ts_set($tid, 'code_check_link', $link);
     ts_set($tid, 'code_check_channel', $channel);
     json_out(['state' => $state, 'text' => $text, 'tag' => $tag, 'at' => $at, 'msg' => $msg]);
+}
+
+/* ---------- 域名检测（v2.32）：平台图标墙，点哪个图标就检测哪个渠道 ---------- */
+
+/**
+ * 平台清单（与 api.uouin.com 开放文档一一对应；c = 接口子路径）。
+ * 分组仅用于前台呈现，接口本身只认 c。
+ */
+function urlsec_platforms(): array
+{
+    return [
+        ['g' => '微信 / QQ / 社交', 'items' => [
+            ['c' => 'wx',      'n' => '微信网址安全',   'i' => '💬'],
+            ['c' => 'qq',      'n' => 'QQ网址安全',     'i' => '🐧'],
+            ['c' => 'guanjia', 'n' => 'QQ管家网址安全', 'i' => '🛡️'],
+            ['c' => 'lbjc',    'n' => 'QQ绿标域名',     'i' => '🟢'],
+            ['c' => 'wxejbs',  'n' => '微信二级不死',   'i' => '♾️'],
+            ['c' => 'ejbs',    'n' => 'QQ二级不死',     'i' => '🔁'],
+            ['c' => 'wxmpjc',  'n' => '微信公众号状态', 'i' => '🔖'],
+            ['c' => 'wxappjc', 'n' => '微信小程序下架', 'i' => '📲'],
+            ['c' => 'mpjc',    'n' => '公众号文章状态', 'i' => '📰'],
+            ['c' => 'weibo',   'n' => '微博网址安全',   'i' => '💭'],
+            ['c' => 'wbjc',    'n' => '微博白名单',     'i' => '✅'],
+            ['c' => 'wbmpjc',  'n' => '微博文章状态',   'i' => '📝'],
+            ['c' => 'zhjc',    'n' => '知乎网址安全',   'i' => '❓'],
+        ]],
+        ['g' => '浏览器 / 安全厂商', 'items' => [
+            ['c' => '360',       'n' => '360网址安全',    'i' => '🧭'],
+            ['c' => 'mi',        'n' => '小米网址安全',   'i' => '📱'],
+            ['c' => 'baidu',     'n' => '百度网址安全',   'i' => '🐾'],
+            ['c' => 'king',      'n' => '金山网址安全',   'i' => '🔒'],
+            ['c' => 'qqbrowser', 'n' => 'QQ浏览器',       'i' => '🧩'],
+            ['c' => 'uc',        'n' => 'UC浏览器',       'i' => '🌐'],
+            ['c' => 'huaban',    'n' => '花瓣浏览器',     'i' => '🎨'],
+            ['c' => 'safari',    'n' => '苹果 Safari',    'i' => '🍎'],
+            ['c' => 'firefox',   'n' => '火狐 Firefox',   'i' => '🦊'],
+            ['c' => 'wkjc',      'n' => '悟空浏览器',     'i' => '🐒'],
+            ['c' => 'quark',     'n' => '夸克浏览器',     'i' => '⚡'],
+            ['c' => 'nubia',     'n' => '努比亚浏览器',   'i' => '📱'],
+            ['c' => 'liebao',    'n' => '猎豹浏览器',     'i' => '🐆'],
+            ['c' => 'google',    'n' => '谷歌 Google',    'i' => '🔍'],
+            ['c' => 'msjc',      'n' => '微软 Edge',      'i' => '🌊'],
+            ['c' => 'oppo',      'n' => 'OPPO 浏览器',    'i' => '🟩'],
+            ['c' => 'vivo',      'n' => 'VIVO 浏览器',    'i' => '🔵'],
+            ['c' => 'sogou',     'n' => '搜狗浏览器',     'i' => '🐶'],
+            ['c' => '2345',      'n' => '2345 浏览器',    'i' => '🔢'],
+            ['c' => 'slbrowser', 'n' => '联想浏览器',     'i' => '💻'],
+            ['c' => 'lianxin',   'n' => '连信网址安全',   'i' => '💌'],
+            ['c' => 'xljc',      'n' => '迅雷浏览器',     'i' => '🚀'],
+            ['c' => 'samsung',   'n' => '三星浏览器',     'i' => '📱'],
+            ['c' => 'huawei',    'n' => '华为网址安全',   'i' => '🌸'],
+            ['c' => 'honor',     'n' => '荣耀浏览器',     'i' => '⭐'],
+            ['c' => 'adguard',   'n' => 'Adguard',        'i' => '🛑'],
+            ['c' => 'norton',    'n' => '诺顿 Norton',    'i' => '🟡'],
+            ['c' => 'kaspersky', 'n' => '卡巴斯基',       'i' => '🔴'],
+        ]],
+        ['g' => '短视频 / 内容平台', 'items' => [
+            ['c' => 'dyjc',       'n' => '抖音网址安全', 'i' => '🎵'],
+            ['c' => 'dsjc',       'n' => '多闪网址安全', 'i' => '💫'],
+            ['c' => 'toutiaoso',  'n' => '头条网址安全', 'i' => '📰'],
+            ['c' => 'xgjc',       'n' => '西瓜网址安全', 'i' => '🍉'],
+            ['c' => 'ksjc',       'n' => '快手白名单',   'i' => '🎬'],
+            ['c' => 'fsjc',       'n' => '飞书网址安全', 'i' => '🕊️'],
+            ['c' => 'jsjc',       'n' => '简书网址安全', 'i' => '📘'],
+        ]],
+        ['g' => '备案 / 资质认证', 'items' => [
+            ['c' => 'beianok',   'n' => '备案查询(实时)', 'i' => '🏛️'],
+            ['c' => 'beian',     'n' => '备案查询(缓存)', 'i' => '🗄️'],
+            ['c' => 'wanganok',  'n' => '网安备案(实时)', 'i' => '🛡️'],
+            ['c' => 'beianjrs',  'n' => '备案接入商',     'i' => '🔌'],
+            ['c' => 'net',       'n' => '中网可信认证',   'i' => '🏅'],
+            ['c' => 'blackok',   'n' => '工信部黑名单',   'i' => '⛔'],
+            ['c' => 'union',     'n' => '知道创宇认证',   'i' => '🔎'],
+            ['c' => 'jwyj',      'n' => '净网云剑检测',   'i' => '⚔️'],
+        ]],
+        ['g' => '域名 / 网络探测', 'items' => [
+            ['c' => 'qiang',     'n' => '域名被墙',       'i' => '🧱'],
+            ['c' => 'ydjc',      'n' => '移动域名被墙',   'i' => '📶'],
+            ['c' => 'dns',       'n' => 'DNS 污染',       'i' => '🕸️'],
+            ['c' => 'yddnsjc',   'n' => '移动 DNS 污染',  'i' => '📡'],
+            ['c' => 'ipcheck',   'n' => 'IP 被墙',        'i' => '🌍'],
+            ['c' => 'portjc',    'n' => '端口检测',       'i' => '🔌'],
+            ['c' => 'hold',      'n' => '域名锁定 Hold',  'i' => '🔐'],
+            ['c' => 'expire',    'n' => '域名到期',       'i' => '⏰'],
+            ['c' => 'zt',        'n' => 'HTTP 状态',      'i' => '🚦'],
+            ['c' => 'dnsjx',     'n' => 'DNS 解析',       'i' => '🧬'],
+            ['c' => 'ymzc',      'n' => '域名注册查询',   'i' => '📇'],
+            ['c' => 'whois',     'n' => '域名 Whois',     'i' => '📋'],
+            ['c' => 'ipwhois',   'n' => 'IP Whois',       'i' => '🗂️'],
+            ['c' => 'ping',      'n' => 'Ping (IPv4)',    'i' => '🏓'],
+            ['c' => 'portping',  'n' => '端口 Ping',      'i' => '🔧'],
+            ['c' => 'ping6',     'n' => 'Ping (IPv6)',    'i' => '🌐'],
+            ['c' => 'traceroute','n' => '路由追踪',       'i' => '🛰️'],
+            ['c' => 'sslexpire', 'n' => 'SSL 证书',       'i' => '🔐'],
+            ['c' => 'rank',      'n' => '域名权重',       'i' => '📈'],
+            ['c' => 'apppc',     'n' => '世界排名',       'i' => '🏆'],
+        ]],
+        ['g' => '网盘 / 文档分享', 'items' => [
+            ['c' => 'panbaidu', 'n' => '百度网盘',   'i' => '📦'],
+            ['c' => 'weiyun',   'n' => '微云网盘',   'i' => '☁️'],
+            ['c' => 'tianyi',   'n' => '天翼云网盘', 'i' => '🌤️'],
+            ['c' => 'ctfile',   'n' => '诚通网盘',   'i' => '💾'],
+            ['c' => 'youdao',   'n' => '有道云文档', 'i' => '📗'],
+            ['c' => 'yuque',    'n' => '语雀文档',   'i' => '🐦'],
+            ['c' => 'shimo',    'n' => '石墨文档',   'i' => '🪨'],
+            ['c' => 'qqdocs',   'n' => '腾讯文档',   'i' => '📄'],
+        ]],
+    ];
+}
+
+/** 合法渠道 id 白名单（扁平） */
+function urlsec_codes(): array
+{
+    static $codes = null;
+    if ($codes === null) {
+        $codes = [];
+        foreach (urlsec_platforms() as $g) {
+            foreach ($g['items'] as $it) $codes[$it['c']] = $it['n'];
+        }
+    }
+    return $codes;
+}
+
+/** 带重试的 GET（返回原始响应文本） */
+function urlsec_fetch(string $api): string
+{
+    if (function_exists('curl_init')) {
+        $ch = curl_init($api);
+        curl_setopt_array($ch, [CURLOPT_RETURNTRANSFER => true, CURLOPT_TIMEOUT => 20, CURLOPT_CONNECTTIMEOUT => 8,
+            CURLOPT_SSL_VERIFYPEER => false, CURLOPT_SSL_VERIFYHOST => 0, CURLOPT_FOLLOWLOCATION => true,
+            CURLOPT_USERAGENT => 'kfxt/2.32']);
+        $resp = (string)curl_exec($ch);
+        curl_close($ch);
+        return $resp;
+    }
+    return (string)@file_get_contents($api);
+}
+
+/** 归一化检测结果：state=ok|red|warn|off */
+function urlsec_normalize(array $j): array
+{
+    $c = (int)($j['code'] ?? 0);
+    $m = trim((string)($j['msg'] ?? ''));
+    if ($c === 1001 || $c === 1003 || $c === 200) {
+        $state = 'ok';
+    } elseif ($c === 1002) {
+        $state = 'red';
+    } elseif ($c === -206) {
+        $state = 'off';
+    } else {
+        $state = 'warn';
+    }
+    return ['state' => $state, 'code' => $c, 'msg' => ($m !== '' ? $m : ($state === 'ok' ? '正常' : '检测异常'))];
+}
+
+/** 详情行（把返回里的扁平字段整理成可读键值对） */
+function urlsec_details(array $j): array
+{
+    $labels = ['url' => '检测地址', 'statu' => '状态', 'httpcode' => 'HTTP 状态码', 'day' => '剩余天数',
+        'expdate' => '到期时间', 'count' => '剩余点数', 'apinode' => '接口节点',
+        'reason' => '拦截原因', 'describe' => '拦截描述'];
+    $rows = [];
+    foreach ($labels as $k => $label) {
+        if (!array_key_exists($k, $j)) continue;
+        $v = $j[$k];
+        if (is_array($v)) continue;
+        if (is_bool($v)) $v = $v ? 'true' : 'false';
+        $rows[] = ['k' => $label, 'v' => mb_substr((string)$v, 0, 300)];
+    }
+    return $rows;
+}
+
+function handle_tenant_url_check(string $method): void
+{
+    $ctx = require_workspace();
+    $cfg = wxcheck_cfg();
+
+    if ($method === 'GET') {
+        $direct = '';
+        $scheme = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
+        $host = $_SERVER['HTTP_HOST'] ?? '';
+        $kami = $ctx['kami'] ?? ($ctx['row']['tenant_kami'] ?? '');
+        if ($host && $kami !== '') $direct = "$scheme://$host/visitor.html?t=$kami";
+        json_out([
+            'on'        => $cfg['on'],
+            'user'      => $cfg['user'],
+            'platforms' => urlsec_platforms(),
+            'default_url' => tenant_current_link((int)$ctx['tenant_id']) ?: $direct,
+        ]);
+        return;
+    }
+
+    if ($method !== 'POST') { json_error('方法不允许', 405); return; }
+    $data = body();
+    $channel = strtolower(trim((string)($data['channel'] ?? '')));
+    $channel = preg_replace('/[^a-z0-9_\-]/', '', $channel);
+    $url = trim((string)($data['url'] ?? ''));
+    if ($channel === '' || !isset(urlsec_codes()[$channel])) json_error('请选择要检测的平台');
+    if ($url === '') json_error('请填写要检测的网址');
+    if (!preg_match('#^https?://#i', $url)) $url = 'https://' . $url;
+    $host = parse_url($url, PHP_URL_HOST);
+    if (!$host || !str_contains($host, '.')) json_error('网址格式不正确，请检查域名');
+    if (!$cfg['on'] || $cfg['user'] === '' || $cfg['key'] === '') {
+        json_out(['state' => 'off', 'code' => -206, 'msg' => '检测接口未开通，请联系平台管理员',
+            'channel' => $channel, 'name' => urlsec_codes()[$channel], 'url' => $url, 'details' => [], 'raw' => []]);
+    }
+
+    $api = $cfg['url'] . '/' . $channel . '?username=' . urlencode($cfg['user'])
+         . '&key=' . urlencode($cfg['key']) . '&url=' . urlencode($url);
+    $resp = urlsec_fetch($api);
+    $j = json_decode($resp, true);
+    if (!is_array($j) || !isset($j['code'])) {
+        json_out(['state' => 'warn', 'code' => 0, 'msg' => '检测接口无响应，请稍后重试',
+            'channel' => $channel, 'name' => urlsec_codes()[$channel], 'url' => $url, 'details' => [], 'raw' => []]);
+    }
+    $r = urlsec_normalize($j);
+    $raw = $j;
+    unset($raw['username'], $raw['key']);
+    json_out([
+        'state'   => $r['state'], 'code' => $r['code'], 'msg' => $r['msg'],
+        'channel' => $channel, 'name' => urlsec_codes()[$channel], 'url' => $url,
+        'details' => urlsec_details($j), 'raw' => $raw, 'at' => now_dt(),
+    ]);
 }

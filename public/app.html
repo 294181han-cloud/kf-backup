@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>客服工作台</title>
 <link rel="stylesheet" href="/assets/vendor/element-plus.css">
-<link rel="stylesheet" href="/assets/css/app.css?v=2.6.4">
+<link rel="stylesheet" href="/assets/css/app.css?v=2.7.0">
 <script src="/assets/ui/ui-registry.js?v=2.5.1"></script>
 <script src="/assets/ui/ui-loader.js?v=2.5.1" data-ui-cat="auto"></script>
 </head>
@@ -46,6 +46,7 @@
         <template v-if="me && me.role==='tenant'">
           <div class="nav-item" :class="{active: tab==='agents'}" @click="tab='agents'"><span class="nv-text">坐席管理</span></div>
           <div class="nav-item" :class="{active: tab==='links'}" @click="tab='links'"><span class="nv-text">客服码</span></div>
+          <div class="nav-item" :class="{active: tab==='urlsec'}" @click="tab='urlsec'; loadUrlsec()"><span class="nv-text">域名检测</span></div>
         </template>
         <div class="nav-group">内 容</div>
         <div class="nav-item" :class="{active: tab==='quick'}" @click="tab='quick'"><span class="nv-text">快捷消息</span></div>
@@ -142,7 +143,7 @@
                 <el-button size="small" v-if="sessScope==='archived'" type="warning" plain class="cbtn" @click="archiveSession(false)">↩ 取消归档</el-button>
                 <el-button size="small" v-else-if="sessScope==='online'" plain class="cbtn" @click="archiveSession(true)">📦 归档</el-button>
                 <el-button size="small" v-if="sessScope!=='closed'" plain class="cbtn" @click="transferDlg=true">⇄ 转接</el-button>
-                <el-popconfirm v-if="sessScope!=='closed'" title="结束该会话？结束后移入「已结束」，按保留天数自动清理" @confirm="closeSession">
+                <el-popconfirm v-if="sessScope!=='closed'" title="结束会话后，访客端聊天记录将清除，访客将无法继续在此会话发送消息。确认结束？" confirm-button-text="结束会话" cancel-button-text="取消" @confirm="closeSession">
                   <template #reference><el-button size="small" type="danger" plain class="cbtn">✔ 结束</el-button></template>
                 </el-popconfirm>
               </span>
@@ -164,7 +165,14 @@
                   <div class="msg-ava" v-if="m.from!=='system'">{{ m.from==='agent' ? '🎧' : '🙋' }}</div>
                   <div class="msg-box">
                     <div class="msg-sender" v-if="m.from!=='system' && m.sender_name">{{ m.sender_name }}</div>
-                    <div class="msg-bubble" :class="{'search-hit': chatSearchOn && chatSearchKw && m.text && m.text.includes(chatSearchKw)}">
+                    <div class="msg-bubble ask-img-bubble" v-if="m.msg_type==='ask_image'">
+                      <div class="ai-ic">🖼️</div>
+                      <div class="ai-body">
+                        <div class="ai-t">已请求访客上传图片</div>
+                        <div class="ai-s">{{ m.text }}</div>
+                      </div>
+                    </div>
+                    <div class="msg-bubble" v-else :class="{'search-hit': chatSearchOn && chatSearchKw && m.text && m.text.includes(chatSearchKw)}">
                       <span v-if="m.text">{{ m.text }}</span>
                       <template v-for="(a,i) in (m.attachments||[])" :key="i">
                         <img v-if="a.type==='image'" :src="a.url" @click="viewing=a.url">
@@ -202,6 +210,8 @@
 
                 <button class="tool-btn" title="发送图片" @click="$refs.imgInput.click()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="3"/><circle cx="9" cy="10" r="1.6"/><path d="M21 16.5 16.5 12l-6 6"/></svg></button>
                 <button class="tool-btn" title="语音" @click="startRec"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0"/><path d="M12 18v3"/></svg></button>
+                <button class="tool-btn" title="请求访客上传图片" @click="askUpload"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15V6a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h9"/><path d="M3 16l4.5-4.5 4 4"/><circle cx="15.5" cy="8.5" r="1.4"/><path d="M18 20v-6M15.5 16.5 18 14l2.5 2.5"/></svg></button>
+                <button class="tool-btn" :class="{spinning: refreshing}" title="刷新聊天记录" @click="refreshChat"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M20 11a8 8 0 1 0-2.3 5.7"/><path d="M20 5v6h-6"/></svg></button>
                 <input ref="imgInput" type="file" accept="image/png,image/jpeg,image/gif,image/webp" style="display:none" @change="onImage"/>
               </div>
               <div class="recording-bar" v-if="recording">
@@ -309,11 +319,15 @@
             <el-table-column prop="date" label="日期" width="110"></el-table-column>
             <el-table-column prop="received" label="新会话"></el-table-column>
             <el-table-column prop="active" label="活跃访客"></el-table-column>
-            <el-table-column prop="replied" label="客服回复"></el-table-column>
+            <el-table-column prop="replied" label="已回复会话"></el-table-column>
+            <el-table-column prop="replied_msgs" label="客服回复条数"></el-table-column>
             <el-table-column label="回复率" width="110">
               <template #default="{row}">{{ row.active > 0 ? row.reply_rate + '%' : '—' }}</template>
             </el-table-column>
           </el-table>
+          <div class="muted" style="font-size:11.5px;margin-top:8px;line-height:1.7;">
+            口径：新会话＝当天创建的会话；活跃访客＝当天发过消息的访客（去重）；已回复会话＝当天被客服回复过的会话（去重）；回复率＝已回复会话 ÷ 活跃访客。
+          </div>
         </div>
         <div class="panel">
           <div class="panel-title" style="justify-content:flex-start;gap:12px;">会话数据
@@ -591,6 +605,87 @@
         </div>
       </div>
 
+      <!-- ============ 域名检测（平台图标墙） ============ -->
+      <div class="content" v-if="tab==='urlsec'">
+        <div class="panel">
+          <div class="panel-title" style="justify-content:flex-start;gap:10px;">
+            域名检测
+            <span class="code-state" :class="urlsec.on ? 'st-ok' : 'st-off'">{{ urlsec.on ? '接口已开通' : '接口未开通' }}</span>
+            <span class="muted" style="font-size:12px;">账号 {{ urlsec.user || '未配置' }}</span>
+          </div>
+          <div class="us-bar">
+            <span class="us-lbl">检测网址</span>
+            <el-input v-model="urlsec.url" placeholder="https://example.com 或 example.com" clearable @keyup.enter="urlsecRunFirst"></el-input>
+            <el-button v-if="currentLink" size="small" @click="useCurrentLink">用当前客服链接</el-button>
+          </div>
+          <div class="us-bar" style="margin-bottom:6px;">
+            <span class="us-lbl">找平台</span>
+            <el-input v-model="urlsec.kw" placeholder="输入平台名筛选，如：微信 / 抖音 / 备案" clearable style="max-width:260px;"></el-input>
+            <span class="muted" style="font-size:12px;">点任意平台图标，即用上面的网址检测该平台</span>
+          </div>
+        </div>
+
+        <div class="panel" v-if="urlsec.result">
+          <div class="panel-title" style="justify-content:flex-start;gap:10px;">
+            检测结果
+            <span class="code-state" :class="'st-' + (urlsec.result.state === 'ok' ? 'ok' : (urlsec.result.state === 'red' ? 'red' : (urlsec.result.state === 'off' ? 'off' : 'err')))">
+              {{ urlsec.result.state === 'ok' ? '正常' : (urlsec.result.state === 'red' ? '已拦截' : (urlsec.result.state === 'off' ? '未开通' : '异常')) }}
+            </span>
+            <span class="muted" style="font-size:12px;">{{ urlsec.result.icon }} {{ urlsec.result.name }} · {{ urlsec.result.at }}</span>
+          </div>
+          <div class="us-res">
+            <div class="us-res-main">
+              <div class="us-msg">{{ urlsec.result.msg }}</div>
+              <div class="us-url mono">{{ urlsec.result.url }}</div>
+            </div>
+            <div class="us-det" v-if="(urlsec.result.details||[]).length">
+              <div class="us-det-row" v-for="(d, di) in urlsec.result.details" :key="di">
+                <span class="k">{{ d.k }}</span><span class="v">{{ d.v }}</span>
+              </div>
+            </div>
+          </div>
+          <details class="us-raw" v-if="urlsec.rawText">
+            <summary>查看接口原始返回</summary>
+            <pre>{{ urlsec.rawText }}</pre>
+          </details>
+        </div>
+
+        <div class="panel" v-if="urlsec.history.length">
+          <div class="panel-title" style="justify-content:space-between;">
+            <span>最近检测（本次会话）</span>
+            <el-button size="small" @click="urlsec.history.splice(0)">清空</el-button>
+          </div>
+          <div class="us-hist">
+            <div class="us-hist-item" v-for="(h, hi) in urlsec.history" :key="hi">
+              <span class="us-hi-ic">{{ h.icon }}</span>
+              <span class="us-hi-name">{{ h.name }}</span>
+              <span class="code-state" :class="'st-' + (h.state === 'ok' ? 'ok' : (h.state === 'red' ? 'red' : (h.state === 'off' ? 'off' : 'err')))">{{ h.msg }}</span>
+              <span class="us-hi-time">{{ h.at }}</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="panel" v-for="g in urlsecGroups" :key="g.g">
+          <div class="panel-title" style="justify-content:flex-start;gap:8px;">
+            {{ g.g }}<span class="muted" style="font-size:12px;">{{ g.items.length }} 个平台</span>
+          </div>
+          <div class="us-grid">
+            <button class="us-card" v-for="it in g.items" :key="it.c"
+                    :class="{busy: urlsec.cur === it.c, red: urlsec.result && urlsec.result.channel === it.c && urlsec.result.state === 'red'}"
+                    :disabled="urlsec.loading"
+                    :title="'点击检测：' + it.n"
+                    @click="runUrlCheck(it)">
+              <span class="us-ic">{{ it.i }}</span>
+              <span class="us-name">{{ it.n }}</span>
+              <span class="us-spin" v-if="urlsec.cur === it.c"></span>
+            </button>
+          </div>
+        </div>
+        <div class="panel" v-if="urlsec.loaded && !urlsecGroups.length">
+          <div class="muted">没有匹配的平台，换个关键词试试。</div>
+        </div>
+      </div>
+
 <!-- ============ 子客服管理 ============ -->
       <div class="content" v-if="tab==='agents' && me.role==='tenant'">
         <div class="panel">
@@ -680,7 +775,7 @@
                   <span v-if="brand.tpl===t.k" class="tpl-check">✓</span>
                 </div>
               </div>
-              <div class="muted" style="font-size:11.5px;margin-top:6px;">WhatsApp 为完整仿真实界面（涂鸦墙纸/带尾巴气泡/药丸输入条）；默认客服为基础样式。品牌色会覆盖模板点缀色</div>
+              <div class="muted" style="font-size:11.5px;margin-top:6px;">默认使用 WhatsApp（涂鸦墙纸 / 带尾巴气泡 / 药丸输入条，自己发出的气泡为绿色）；「默认客服」为基础样式。品牌色会覆盖模板点缀色</div>
             </el-form-item>
           </el-form>
           <el-button type="primary" @click="saveBrand">保存外观</el-button>
@@ -1226,7 +1321,7 @@
 <script src="/assets/qr-poster.js?v=2.1.03"></script>
 <script src="/assets/api.js?v=2.0.1"></script>
 <script src="/assets/js/app-components.js?v=2.1.0"></script>
-<script src="/assets/js/app.js?v=2.7.27"></script>
+<script src="/assets/js/app.js?v=2.8.0"></script>
 <script src="/assets/js/app-boot.js?v=2.1.1"></script>
 </body>
 </html>

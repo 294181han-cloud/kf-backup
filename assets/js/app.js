@@ -49,7 +49,7 @@ const app = createApp({
     // 租户
     const links = ref(null);
     const agents = ref([]);
-    const brand = reactive({ company_name: '', title: '', sub: '', avatar: '💬', color: '#1677ff', tpl: 'default', tpl_nav_on: true, tpl_nav_title: '', vip_badge: '', footer_text: '', agent_avatar_on: true });
+    const brand = reactive({ company_name: '', title: '', sub: '', avatar: '💬', color: '#1677ff', tpl: 'whatsapp', tpl_nav_on: true, tpl_nav_title: '', vip_badge: '', footer_text: '', agent_avatar_on: true });
     const bcText = ref('');
     const bcSending = ref(false);
 
@@ -140,6 +140,7 @@ const app = createApp({
       broadcast: '群发', blacklist: 'IP 黑名单', preinq: '询前表单', links: '获客链接', agents: '子客服管理',
       brand: '访客端模板', policy: '访客策略', visitors: '访客列表', security: '安全与维护', profile: '个人设置', ui: '后台 UI',
       quick: '快捷消息', auto: '智能回复', agents: '坐席管理', broadcast: '群发模板', links: '获客码',
+      urlsec: '域名检测',
     }[tab.value]));
     const current = computed(() => sessions.value.find(s => s.id === currentId.value) || null);
     const filteredSessions = computed(() => {
@@ -185,7 +186,7 @@ const app = createApp({
       try {
         const b = await API.get('/api/tenant/settings');
         brand.company_name = b.brand_company; brand.title = b.brand_title; brand.sub = b.brand_sub;
-        brand.avatar = b.brand_avatar; brand.color = b.brand_color; brand.tpl = b.visitor_template || 'default';
+        brand.avatar = b.brand_avatar; brand.color = b.brand_color; brand.tpl = b.visitor_template || 'whatsapp';
         brand.tpl_nav_on = b.tpl_nav_on !== false; brand.tpl_nav_title = b.tpl_nav_title || '';
         brand.agent_avatar_on = b.agent_avatar_on !== false;
         codeCfg.nicknameOn = b.code_nickname_on !== false;
@@ -285,9 +286,9 @@ const app = createApp({
     ];
     const sndCfg = reactive({
       agent_recv_on: true, agent_recv_which: 'dindon',
-      agent_send_on: false, agent_send_which: 'click',
-      visitor_recv_on: false, visitor_recv_which: 'dindon',
-      visitor_send_on: false, visitor_send_which: 'water',
+      agent_send_on: true, agent_send_which: 'water',
+      visitor_recv_on: true, visitor_recv_which: 'dindon',
+      visitor_send_on: true, visitor_send_which: 'water',
     });
     const audioCache = {};
     const playSound = (which) => {
@@ -308,6 +309,85 @@ const app = createApp({
       if (me.value && me.value.role === 'agent' && !me.value.sound_enabled) return;
       if (!sndCfg.agent_send_on) return;
       playSound(sndCfg.agent_send_which);
+    };
+
+    // ===== 聊天工具条：刷新聊天记录 / 请求访客上传图片（v2.32）=====
+    const refreshing = ref(false);
+    const refreshChat = async () => {
+      if (!currentId.value || refreshing.value) return;
+      refreshing.value = true;
+      try {
+        const r = await API.get('/api/sessions/' + currentId.value + '/messages');
+        msgs.value = r.messages || [];
+        maxMsgId.value = msgs.value.length ? msgs.value[msgs.value.length - 1].id : 0;
+        scrollBottom();
+        ElementPlus.ElMessage.success('已刷新聊天记录');
+      } catch (e) { ElementPlus.ElMessage.error(e.message); }
+      finally { refreshing.value = false; }
+    };
+    // 请求访客上传图片：发一条 ask_image 卡片，访客端点卡片上的按钮即可选图
+    const askUpload = async () => {
+      if (!currentId.value || sending.value) return;
+      sending.value = true;
+      try {
+        const r = await API.post('/api/sessions/' + currentId.value + '/messages', { text: '', msg_type: 'ask_image' });
+        msgs.value.push(r.message);
+        maxMsgId.value = r.message.id;
+        scrollBottom();
+        sendBeep();
+        const s = sessions.value.find(x => x.id === currentId.value);
+        if (s) s.lastMsg = r.message.text || '[请求上传图片]';
+      } catch (e) { ElementPlus.ElMessage.error(e.message); }
+      finally { sending.value = false; }
+    };
+
+    // ===== 域名检测（v2.32）：平台图标墙 =====
+    const urlsec = reactive({
+      loaded: false, on: false, user: '', platforms: [], url: '', kw: '',
+      loading: false, cur: '', result: null, rawText: '', history: [],
+    });
+    const loadUrlsec = async () => {
+      try {
+        const r = await API.get('/api/tenant/url-check');
+        urlsec.on = !!r.on;
+        urlsec.user = r.user || '';
+        urlsec.platforms = r.platforms || [];
+        if (!urlsec.url) urlsec.url = r.default_url || '';
+        urlsec.loaded = true;
+      } catch (e) { ElementPlus.ElMessage.error(e.message); }
+    };
+    const urlsecGroups = computed(() => {
+      const kw = urlsec.kw.trim().toLowerCase();
+      return urlsec.platforms
+        .map(g => ({ g: g.g, items: (g.items || []).filter(it => !kw || it.n.toLowerCase().includes(kw) || it.c.includes(kw)) }))
+        .filter(g => g.items.length);
+    });
+    const useCurrentLink = () => { if (currentLink.value) urlsec.url = currentLink.value; };
+    const runUrlCheck = async (it) => {
+      if (urlsec.loading) return;
+      const u = urlsec.url.trim();
+      if (!u) { ElementPlus.ElMessage.warning('请先填写要检测的网址'); return; }
+      urlsec.loading = true; urlsec.cur = it.c;
+      try {
+        const r = await API.post('/api/tenant/url-check', { channel: it.c, url: u });
+        const at = new Date().toLocaleTimeString('zh-CN', { hour12: false });
+        urlsec.result = Object.assign({}, r, { icon: it.i, name: it.n, at });
+        urlsec.rawText = JSON.stringify(r.raw || {}, null, 2);
+        urlsec.history.unshift({ icon: it.i, name: it.n, state: r.state, msg: r.msg, at });
+        urlsec.history = urlsec.history.slice(0, 30);
+      } catch (e) { ElementPlus.ElMessage.error(e.message); }
+      finally { urlsec.loading = false; urlsec.cur = ''; }
+    };
+    const urlsecRunFirst = () => {
+      const g = urlsecGroups.value[0];
+      if (g && g.items.length) runUrlCheck(g.items[0]);
+    };
+    // 结束会话统一确认（提示访客端聊天记录会清除）
+    const confirmEndSession = async (name) => {
+      await ElementPlus.ElMessageBox.confirm(
+        '结束会话后，访客端聊天记录将清除，访客将无法继续在该会话中发送消息；会话会移入「已结束」列表。',
+        name ? ('结束会话 · ' + name) : '结束会话',
+        { type: 'warning', confirmButtonText: '结束会话', cancelButtonText: '取消' });
     };
 
     const scrollBottom = () => nextTick(() => { if (chatBody.value) chatBody.value.scrollTop = chatBody.value.scrollHeight; });
@@ -492,9 +572,13 @@ const app = createApp({
 
     // 会话操作
     const closeSession = async () => {
+      const sid = currentId.value;
+      if (!sid) return;
+      try { await confirmEndSession((current.value && current.value.name) || ''); } catch (e) { return; }
       try {
-        await API.post('/api/sessions/' + currentId.value + '/close');
-        sessions.value = sessions.value.filter(s => s.id !== currentId.value);
+        await API.post('/api/sessions/' + sid + '/close');
+        ElementPlus.ElMessage.success('会话已结束');
+        sessions.value = sessions.value.filter(s => s.id !== sid);
         currentId.value = 0; msgs.value = [];
         await pollOnce();
       } catch (e) { ElementPlus.ElMessage.error(e.message); }
@@ -535,6 +619,7 @@ const app = createApp({
     };
     const ctxMenuClose = async () => {
       const sid = ctxMenu.sid; closeCtxMenu();
+      try { await confirmEndSession(ctxMenu.name || ''); } catch (e) { return; }
       try {
         await API.post('/api/sessions/' + sid + '/close');
         ElementPlus.ElMessage.success('已结束');
@@ -833,8 +918,8 @@ const app = createApp({
 
     // 访客端模板列表（与 visitor.js TEMPLATES 对齐；只保留有真实界面结构的模板）
     const tplList = [
+      { k: 'whatsapp', label: 'WhatsApp（默认）', g1: '#008069' },
       { k: 'default', label: '默认客服', g1: '#1677ff' },
-      { k: 'whatsapp', label: 'WhatsApp', g1: '#008069' },
     ];
     // ===== 后台UI（模板+配色选择；注册表 assets/ui/ui-registry.js，加载器 ui-loader.js） =====
     // pc 分类由本页加载器实例管理（即时生效）；mobile 分类写 localStorage 供访客页本机预览。
@@ -1537,6 +1622,8 @@ const app = createApp({
       createdAgentVisible, createdAgent,
       saveBrand, savePreqOn, saveProfile, changePw, exportCsv, logout,
       loadQuick, loadWelcome, loadAuto, loadBlacklist, loadPreInq,
+      refreshing, refreshChat, askUpload,
+      urlsec, urlsecGroups, loadUrlsec, runUrlCheck, urlsecRunFirst, useCurrentLink,
     };
   }
 });

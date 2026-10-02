@@ -142,12 +142,18 @@ function handle_session_messages(string $method, array $m): void
         $text = mb_substr(trim((string)input('text', '')), 0, 2000);
         $attachArr = input('attachments', []);
         $attachArr = is_array($attachArr) ? $attachArr : [];
+        // v2.32：允许指定消息类型（如「请求访客上传图片」卡片）
+        $reqType = strtolower(trim((string)input('msg_type', '')));
+        $allowTypes = ['text', 'image', 'audio', 'mixed', 'ask_image'];
+        $reqType = in_array($reqType, $allowTypes, true) ? $reqType : '';
+        $isAsk = ($reqType === 'ask_image');
+        if ($isAsk && $text === '') $text = '方便的话，请上传一下相关图片，帮您更快定位问题～';
         if ($text === '' && !$attachArr) json_error('消息不能为空');
 
         // 记录前先取会话（拿 agent_id 判断接手）
         $sess = session_of($ctx, $sid);
         $now = now_dt();
-        $msgType = resolve_msg_type($text, $attachArr);
+        $msgType = $isAsk ? 'ask_image' : ($reqType !== '' && $reqType !== 'text' ? $reqType : resolve_msg_type($text, $attachArr));
         $attachJson = $attachArr ? json_encode($attachArr, JSON_UNESCAPED_UNICODE) : '';
         $senderName = $ctx['name'] ?: '客服';
 
@@ -554,8 +560,8 @@ function handle_stats_dashboard(string $method): void
     $total_sessions = fetch_count($pdo, "SELECT COUNT(*) FROM v_sessions s WHERE s.tenant_id = ?$vis", [$tid]);
     $waiting        = fetch_count($pdo, "SELECT COUNT(*) FROM v_sessions s WHERE s.tenant_id = ? AND s.status != 'closed' AND s.agent_id = 0$vis", [$tid]);
 
-    // 近 7 天趋势
-    $st = $pdo->prepare("SELECT date(last_time) AS day, COUNT(*) c FROM v_sessions WHERE tenant_id = ? AND date(last_time) >= ? GROUP BY day");
+    // 近 7 天趋势（当日有活跃的会话数）
+    $st = $pdo->prepare("SELECT date(s.last_time) AS day, COUNT(*) c FROM v_sessions s WHERE s.tenant_id = ? AND date(s.last_time) >= ?$vis GROUP BY day");
     $st->execute([$tid, $weekAgo]);
     $map = [];
     foreach ($st->fetchAll() as $r) $map[$r['day']] = (int)$r['c'];
@@ -569,25 +575,34 @@ function handle_stats_dashboard(string $method): void
     $srcApp = fetch_count($pdo, "SELECT COUNT(*) FROM v_sessions s WHERE s.tenant_id = ? AND s.quota_key = 'app' AND date(s.last_time) >= ?$vis", [$tid, $weekAgo]);
     $srcWeb = fetch_count($pdo, "SELECT COUNT(*) FROM v_sessions s WHERE s.tenant_id = ? AND s.quota_key = 'web' AND date(s.last_time) >= ?$vis", [$tid, $weekAgo]);
 
-    // 每日接待
-    $st = $pdo->prepare("SELECT date(last_time) day, COUNT(*) c FROM v_sessions WHERE tenant_id = ? AND date(last_time) >= ? GROUP BY day");
+    // 每日接待明细（口径统一，均可对账）：
+    //   新会话   = 当天创建的会话数（created_at）
+    //   活跃访客 = 当天发过言的去重会话数（访客消息）
+    //   客服回复 = 当天被客服回复过的去重会话数（回复率 = 客服回复 / 活跃访客，≤100%）
+    //   回复条数 = 当天客服发出的消息条数
+    $st = $pdo->prepare("SELECT date(s.created_at) day, COUNT(*) c FROM v_sessions s WHERE s.tenant_id = ? AND date(s.created_at) >= ?$vis GROUP BY day");
     $st->execute([$tid, $weekAgo]);
     $recMap = [];
     foreach ($st->fetchAll() as $r) $recMap[$r['day']] = (int)$r['c'];
-    $st = $pdo->prepare("SELECT date(m.created_at) day, COUNT(DISTINCT m.session_id) c FROM messages m JOIN v_sessions s ON s.id = m.session_id WHERE s.tenant_id = ? AND date(m.created_at) >= ? AND m.from_type = 'visitor' GROUP BY day");
+    $st = $pdo->prepare("SELECT date(m.created_at) day, COUNT(DISTINCT m.session_id) c FROM messages m JOIN v_sessions s ON s.id = m.session_id WHERE s.tenant_id = ? AND date(m.created_at) >= ? AND m.from_type = 'visitor'$vis GROUP BY day");
     $st->execute([$tid, $weekAgo]);
     $actMap = [];
     foreach ($st->fetchAll() as $r) $actMap[$r['day']] = (int)$r['c'];
-    $st = $pdo->prepare("SELECT date(m.created_at) day, COUNT(*) c FROM messages m JOIN v_sessions s ON s.id = m.session_id WHERE s.tenant_id = ? AND date(m.created_at) >= ? AND m.from_type = 'agent' GROUP BY day");
+    $st = $pdo->prepare("SELECT date(m.created_at) day, COUNT(DISTINCT m.session_id) c FROM messages m JOIN v_sessions s ON s.id = m.session_id WHERE s.tenant_id = ? AND date(m.created_at) >= ? AND m.from_type = 'agent'$vis GROUP BY day");
     $st->execute([$tid, $weekAgo]);
     $repMap = [];
     foreach ($st->fetchAll() as $r) $repMap[$r['day']] = (int)$r['c'];
+    $st = $pdo->prepare("SELECT date(m.created_at) day, COUNT(*) c FROM messages m JOIN v_sessions s ON s.id = m.session_id WHERE s.tenant_id = ? AND date(m.created_at) >= ? AND m.from_type = 'agent'$vis GROUP BY day");
+    $st->execute([$tid, $weekAgo]);
+    $repMsgMap = [];
+    foreach ($st->fetchAll() as $r) $repMsgMap[$r['day']] = (int)$r['c'];
     $daily = [];
     for ($i = 6; $i >= 0; $i--) {
         $d = date('Y-m-d', strtotime("-$i days"));
         $received = $recMap[$d] ?? 0; $active = $actMap[$d] ?? 0; $replied = $repMap[$d] ?? 0;
         $daily[] = ['date' => $d, 'received' => $received, 'active' => $active, 'replied' => $replied,
-            'reply_rate' => $active > 0 ? round($replied / $active * 100, 1) : 0];
+            'replied_msgs' => $repMsgMap[$d] ?? 0,
+            'reply_rate' => $active > 0 ? min(100, round($replied / $active * 100, 1)) : 0];
     }
 
     $out = [

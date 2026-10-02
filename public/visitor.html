@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
 <meta name="theme-color" content="#1677ff">
 <title>在线咨询</title>
-<link rel="stylesheet" href="/assets/css/visitor.css?v=2.2.1">
+<link rel="stylesheet" href="/assets/css/visitor.css?v=2.3.0">
 </head>
 <body>
 <div id="app">
@@ -72,7 +72,13 @@
             <img v-if="isImg(agentAvatar || brand.avatar)" :src="agentAvatar || brand.avatar"><template v-else>{{ agentAvatar || brand.avatar }}</template>
           </div>
           <div class="msg-box">
-            <div class="msg-bubble">
+            <div class="msg-bubble ask-card" v-if="m.msg_type === 'ask_image'">
+              <div class="ac-ic">🖼️</div>
+              <div class="ac-t">客服请求您上传图片</div>
+              <div class="ac-s">{{ m.text }}</div>
+              <button class="ac-btn" @click="pickImage">上传图片</button>
+            </div>
+            <div class="msg-bubble" v-else>
               <template v-if="m.text"><template v-for="(seg, si) in linkSegs(m.text)" :key="si"><a v-if="seg.isUrl && linkMode === 'jump'" class="msg-link" :href="seg.t" target="_blank" rel="noopener noreferrer">{{ seg.t }}</a><span v-else-if="seg.isUrl && linkMode === 'copy'" class="msg-link-copy" @click="copyLink(seg.t)">🔗 复制链接</span><template v-else>{{ seg.t }}</template></template></template>
               <template v-for="(a, i) in (m.attachments || [])" :key="i">
                 <img v-if="a.type === 'image'" :src="a.url" @click="viewImage(a.url)">
@@ -85,6 +91,16 @@
             </div>
           </div>
         </template>
+      </div>
+    </div>
+
+    <!-- 会话已结束（客服结束会话后，聊天记录按提示清除） -->
+    <div class="ended-wrap" v-if="ended">
+      <div class="ended-card">
+        <div class="e-ic">✅</div>
+        <div class="e-t">本次会话已结束</div>
+        <div class="e-s">聊天记录已清除。如需继续咨询，可重新发起会话。</div>
+        <button class="e-btn" @click="restartChat">重新咨询</button>
       </div>
     </div>
 
@@ -102,7 +118,7 @@
       </div>
     </div>
 
-    <template v-else>
+    <template v-else-if="!ended">
     <div class="v-footer-wrap">
       <div class="v-tool">
         <button class="v-tool-btn" @click="pickImage"><span class="ic">🖼️</span>图片</button>
@@ -187,6 +203,6 @@
 </div>
 
 <script src="/assets/vendor/vue.global.js?v=2.0.1"></script>
-<script src="/assets/js/visitor.js?v=2.5.0"></script>
+<script src="/assets/js/visitor.js?v=2.6.0"></script>
 </body>
 </html>

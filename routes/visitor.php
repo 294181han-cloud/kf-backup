@@ -84,7 +84,7 @@ function tenant_brand(array $tenant): array
         'pre_inquiry_on' => ts_get($tid, 'pre_inquiry_on', '0') === '1',
         'show_position' => ts_get($tid, 'brand_position', 'right-bottom'),
         'notice_on'     => ts_get($tid, 'notice_on', '0') === '1',
-        'template'      => ts_get($tid, 'visitor_template', 'default'),
+        'template'      => ts_get($tid, 'visitor_template', 'whatsapp'),
         'notice_text'   => ts_get($tid, 'notice_text', ''),
         // 验证策略
         'robot'          => ts_get($tid, 'robot', 'no'),
@@ -104,9 +104,9 @@ function tenant_brand(array $tenant): array
         // 链接模式
         'link_mode'       => ts_get($tid, 'link_mode', 'no'),
         // 声音设置（v2.27，访客端：接收/发送分开开关与选音）
-        'snd_recv_on'    => ts_get($tid, 'visitor_snd_recv_on', '0') === '1',
+        'snd_recv_on'    => ts_get($tid, 'visitor_snd_recv_on', '1') === '1',
         'snd_recv_which' => ts_get($tid, 'visitor_snd_recv_which', 'dindon'),
-        'snd_send_on'    => ts_get($tid, 'visitor_snd_send_on', '0') === '1',
+        'snd_send_on'    => ts_get($tid, 'visitor_snd_send_on', '1') === '1',
         'snd_send_which' => ts_get($tid, 'visitor_snd_send_which', 'water'),
         // 访客头像/名称类型
         'user_head_type'  => ts_get($tid, 'user_head_type', 'default'),
@@ -437,9 +437,11 @@ function handle_visitor_poll(string $method): void
     // 接待客服头像：仅认图片头像（http// 或 /uploads 开头）；表情占位视为未设置，继续回退；
     // 租户开关 agent_avatar_on 关闭时直接使用品牌头像
     $agentAvatar = '';
-    $ss = $pdo->prepare('SELECT tenant_id, agent_id FROM v_sessions WHERE id = ?');
+    $ss = $pdo->prepare('SELECT tenant_id, agent_id, status FROM v_sessions WHERE id = ?');
     $ss->execute([$sid]);
+    $sessStatus = 'online';
     if ($sess = $ss->fetch()) {
+        $sessStatus = (string)($sess['status'] ?? 'online');
         $tid2 = (int)$sess['tenant_id'];
         $isImgUrl = function ($v) {
             return is_string($v) && (strpos($v, 'http://') === 0 || strpos($v, 'https://') === 0 || strpos($v, '/uploads') === 0);
@@ -460,7 +462,8 @@ function handle_visitor_poll(string $method): void
     }
     $st = $pdo->prepare('SELECT id, session_id, from_type AS `from`, sender_name, text, msg_type, attachments, recalled_at, created_at FROM messages WHERE session_id = ? AND id > ? ORDER BY id ASC');
     $st->execute([$sid, $sinceMsg]);
-    json_out(['messages' => array_map('to_msg', $st->fetchAll()), 'recalledIds' => $recalledIds, 'agent_avatar' => $agentAvatar, 'now' => time()]);
+    json_out(['messages' => array_map('to_msg', $st->fetchAll()), 'recalledIds' => $recalledIds,
+        'agent_avatar' => $agentAvatar, 'session_status' => $sessStatus, 'now' => time()]);
 }
 /* ---------- POST /api/visitor/send ---------- */
 function handle_visitor_send(string $method): void
