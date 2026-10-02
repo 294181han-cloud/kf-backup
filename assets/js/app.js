@@ -284,7 +284,7 @@ const app = createApp({
         // v2.30 客服码卡片样式 + 上次检测结果
         codeStyle.dot = b.code_dot || 'rounded';
         codeStyle.eye = b.code_eye || 'rounded';
-        codeStyle.brand = b.code_brand || '#2E6BE6';
+        codeStyle.brand = b.code_brand || '#07C160';
         codeStyle.logo = b.code_logo || 'none';
         codeStyle.logoSize = b.code_logo_size || 'std';
         codeStyle.topText = b.code_top_text || '扫码咨询';
@@ -1288,7 +1288,11 @@ const app = createApp({
     const previewSrc = ref('');
     const CODE_LOGOS = [['none', '无'], ['avatar', '头像'], ['all', '聚合'], ['wechat', '微信'],
                         ['alipay', '支付宝'], ['qq', 'QQ'], ['douyin', '抖音'], ['upload', '上传']];
-    const CODE_BRANDS = ['#16181d', '#2E6BE6', '#0E7A5F', '#6B3FE0', '#C2410C'];
+    // 二维码主色板：第一个是微信绿（默认）
+    const CODE_BRANDS = [
+      { c: '#07C160', n: '微信绿' }, { c: '#09BB07', n: '微信绿(旧)' }, { c: '#16181d', n: '黑色' },
+      { c: '#2E6BE6', n: '蓝色' }, { c: '#0E7A5F', n: '深绿' }, { c: '#6B3FE0', n: '紫色' }, { c: '#C2410C', n: '橙色' },
+    ];
     // 中心 Logo → 检测渠道：微信/QQ 有独立检测通道，其余走微信通道
     const CODE_CHANNEL = { wechat: 'wx', qq: 'qq', all: 'wx', alipay: 'wx', douyin: 'wx', avatar: 'wx', none: 'wx', custom: 'wx' };
     // 当前中心 Logo 对应的拦截检测通道（微信 logo → 查微信是否拦截；QQ logo → 查 QQ）
@@ -1300,7 +1304,7 @@ const app = createApp({
       none: '无', upload: '上传图', custom: '自定义图',
     }[codeStyle.logo] || '无'));
     const checkUseDefaultChannel = computed(() => codeStyle.logo !== 'wechat' && codeStyle.logo !== 'qq');
-    const CODE_STYLE_DEF = { dot: 'rounded', eye: 'rounded', brand: '#2E6BE6', logo: 'none', logoSize: 'std',
+    const CODE_STYLE_DEF = { dot: 'rounded', eye: 'rounded', brand: '#07C160', logo: 'none', logoSize: 'std',
                              topText: '扫码咨询', bottomText: '官方客服', colorDots: false, custom: '' };
     const codeStyle = reactive(Object.assign({}, CODE_STYLE_DEF));
     const codeImgCache = {};

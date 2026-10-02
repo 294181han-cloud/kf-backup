@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>客服工作台</title>
 <link rel="stylesheet" href="/assets/vendor/element-plus.css">
-<link rel="stylesheet" href="/assets/css/app.css?v=3.4.0">
+<link rel="stylesheet" href="/assets/css/app.css?v=3.5.0">
 <script src="/assets/ui/ui-registry.js?v=2.6.0"></script>
 <script src="/assets/ui/ui-loader.js?v=2.6.0" data-ui-cat="auto"></script>
 </head>
@@ -39,14 +39,8 @@
         <template v-if="me && me.role==='tenant'">
           <div class="nav-item" :class="{active: tab==='links'}" @click="tab='links'"><span class="nv-ic">🔗</span><span class="nv-text">客服码</span></div>
         </template>
-        <template v-for="g in navGroups" :key="g.g">
-          <div class="nav-group">{{ g.g }}</div>
-          <div class="nav-item" v-for="it in g.items" :key="it.v"
-               :class="{active: tab==='setting' && setTab===it.v}"
-               @click="openSetting(it.v)">
-            <span class="nv-ic">{{ it.i }}</span><span class="nv-text">{{ it.n }}</span>
-          </div>
-        </template>
+        <div class="nav-group">设 置</div>
+        <div class="nav-item" :class="{active: tab==='setting'}" @click="openSetting(setTab)"><span class="nv-ic">⚙️</span><span class="nv-text">设置</span></div>
       </div>
       <div class="me">
         <div class="me-top">
@@ -65,7 +59,7 @@
       </div>
     </div>
 
-    <div class="main">
+    <div class="main" :class="{'has-setmenu': tab==='setting'}">
       <div class="topbar">
         <button class="m-menu-btn" title="菜单" @click="mSideOpen = !mSideOpen">☰</button>
         <button class="m-back-btn" v-if="tab==='work' && currentId" title="返回会话列表" @click="currentId = null">‹</button>
@@ -78,6 +72,17 @@
 
 
       <!-- ============ 会话工作台 ============ -->
+      <!-- 设置页左侧竖排菜单（在选择器里挑，不占主侧栏） -->
+      <aside class="set-menu" v-if="tab==='setting'">
+        <div class="sm-group" v-for="g in setGroups" :key="g.g">
+          <div class="sm-gt">{{ g.g }}</div>
+          <button type="button" class="sm-item" v-for="it in g.items" :key="it.v"
+                  :class="{on: setTab===it.v}" @click="switchSetting(it.v)">
+            <span class="sm-ic">{{ it.i }}</span><span class="sm-n">{{ it.n }}</span>
+          </button>
+        </div>
+      </aside>
+
       <div class="content workbench" v-if="tab==='work'" :class="{'has-chat': !!currentId}">
         <div class="sess-col" :class="{collapsed: sessCollapsed}">
           <button class="sess-collapse-btn" :title="sessCollapsed ? '展开会话列表' : '收起会话列表'" @click="sessCollapsed = !sessCollapsed">{{ sessCollapsed ? '»' : '«' }}</button>
@@ -515,7 +520,7 @@
                 </div>
                 <span class="cp-lbl">主色</span>
                 <div class="cp-sw">
-                  <span v-for="c in CODE_BRANDS" :key="c" class="cp-sw-i" :class="{on: codeStyle.brand===c}" :style="{background: c}" @click="setCodeStyle('brand', c)"></span>
+                  <span v-for="c in CODE_BRANDS" :key="c.c" class="cp-sw-i" :class="{on: codeStyle.brand===c.c}" :title="c.n" :style="{background: c.c}" @click="setCodeStyle('brand', c.c)"></span>
                 </div>
                 <span class="cp-lbl">Logo 大小</span>
                 <div class="cp-seg">
@@ -1269,7 +1274,7 @@
 <script src="/assets/qr-poster.js?v=2.1.03"></script>
 <script src="/assets/api.js?v=2.0.1"></script>
 <script src="/assets/js/app-components.js?v=2.1.0"></script>
-<script src="/assets/js/app.js?v=3.1.0"></script>
+<script src="/assets/js/app.js?v=3.2.0"></script>
 <script src="/assets/js/app-boot.js?v=2.1.1"></script>
 </body>
 </html>

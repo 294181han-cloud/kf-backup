@@ -496,6 +496,48 @@ body.dark .guide-step { border-color: #3a4048 !important; color: #c9cdd4; }
 .qa-row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
 
 /* ===== 设置页子导航（侧栏瘦身：内容/访客/外观/系统 收进这里）===== */
+.main { position: relative; }
+/* 设置页：左侧竖排菜单 + 右侧内容 */
+.set-menu {
+  position: absolute; left: 0; top: 58px; bottom: 0; width: 186px;
+  background: #fff; border-right: 1px solid var(--v-line, #ecf0f6);
+  overflow-y: auto; padding: 12px 10px 20px; z-index: 5;
+}
+.set-menu .sm-group { margin-bottom: 10px; }
+.set-menu .sm-gt {
+  font-size: 10.5px; font-weight: 700; letter-spacing: 1.4px; color: #98a2b3;
+  padding: 6px 10px 4px;
+}
+.set-menu .sm-item {
+  display: flex; align-items: center; gap: 8px; width: 100%;
+  border: 0; background: transparent; color: #46506a; text-align: left;
+  border-radius: 9px; padding: 8px 10px; font-size: 13px; cursor: pointer;
+  font-family: inherit; transition: all .14s;
+}
+.set-menu .sm-item:hover { background: #f2f5fa; color: var(--theme, #1677ff); }
+.set-menu .sm-item.on {
+  background: var(--theme-grad, linear-gradient(135deg, #1677ff, #4d9bff));
+  color: #fff; font-weight: 650;
+  box-shadow: 0 6px 16px -8px color-mix(in srgb, var(--theme, #1677ff) 70%, transparent);
+}
+.set-menu .sm-ic { width: 16px; text-align: center; font-size: 14px; flex-shrink: 0; }
+.set-menu .sm-n { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.main.has-setmenu .content { margin-left: 186px; }
+body.dark .set-menu { background: #1e2229; border-right-color: #2b313a; }
+body.dark .set-menu .sm-item { color: #c6ccd8; }
+body.dark .set-menu .sm-item:hover { background: #262c34; color: #9fc7ff; }
+body.dark .set-menu .sm-gt { color: #7d879a; }
+/* 窄屏：左侧菜单变成顶部横向可滑的一条，不占宽度 */
+@media (max-width: 900px) {
+  .set-menu {
+    position: static; width: auto; border-right: 0; border-bottom: 1px solid var(--v-line, #ecf0f6);
+    display: flex; gap: 6px; overflow-x: auto; padding: 8px 10px; white-space: nowrap;
+  }
+  .set-menu .sm-group { display: flex; align-items: center; gap: 6px; margin: 0; }
+  .set-menu .sm-gt { padding: 0 6px 0 0; }
+  .set-menu .sm-item { width: auto; padding: 6px 12px; border-radius: 999px; background: #f2f5fa; }
+  .main.has-setmenu .content { margin-left: 0; }
+}
 .subnav {
   display: flex; align-items: center; gap: 6px; flex-wrap: wrap;
   padding: 12px 22px 12px;

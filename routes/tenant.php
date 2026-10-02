@@ -270,7 +270,7 @@ function handle_tenant_settings(string $method): void
             // 客服码卡片样式 + 上次检测结果（v2.30）
             'code_dot'         => ts_get($tid, 'code_dot', 'rounded'),
             'code_eye'         => ts_get($tid, 'code_eye', 'rounded'),
-            'code_brand'       => ts_get($tid, 'code_brand', '#2E6BE6'),
+            'code_brand'       => ts_get($tid, 'code_brand', '#07C160'),
             'code_logo'        => ts_get($tid, 'code_logo', 'none'),
             'code_logo_size'   => ts_get($tid, 'code_logo_size', 'std'),
             'code_top_text'    => ts_get($tid, 'code_top_text', '扫码咨询'),
