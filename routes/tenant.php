@@ -526,6 +526,8 @@ function handle_tenant_links(string $method): void
 function wxcheck_cfg(): array
 {
     return [
+        // 平台级开关：wxcheck_on=0 时只回报「未开通」，不显示绿色的「正常接待」（接口不可信时避免假绿）
+        'on'   => kv_get('wxcheck_on', '0') === '1',
         'user' => kv_get('wxcheck_user', ''),
         'key'  => kv_get('wxcheck_key', ''),
         'url'  => rtrim(kv_get('wxcheck_url', 'https://api.uouin.com/app'), '/'),
@@ -572,6 +574,18 @@ function handle_tenant_code_check(string $method): void
     $lastLink = ts_get($tid, 'code_check_link', '');
     $lastCh   = ts_get($tid, 'code_check_channel', '');
     $lastTs   = (int)ts_get($tid, 'code_check_at_ts', '0');
+    if (!$cfg['on']) {
+        ts_set($tid, 'code_check_state', 'off');
+        ts_set($tid, 'code_check_text', '检测未开通');
+        ts_set($tid, 'code_check_tag', '未开通');
+        ts_set($tid, 'code_check_msg', '检测接口未启用');
+        ts_set($tid, 'code_check_at', now_dt());
+        ts_set($tid, 'code_check_at_ts', (string)time());
+        ts_set($tid, 'code_check_link', $link);
+        ts_set($tid, 'code_check_channel', $channel);
+        json_out(['state' => 'off', 'text' => '检测未开通', 'tag' => '未开通', 'at' => now_dt(), 'msg' => '检测接口未启用']);
+        return;
+    }
     if (!$force && $lastLink === $link && $lastCh === $channel && (time() - $lastTs) < $cfg['ttl']) {
         json_out(['state' => ts_get($tid, 'code_check_state', 'idle'), 'text' => ts_get($tid, 'code_check_text', '未检测'),
                   'tag'   => ts_get($tid, 'code_check_tag', '未检测'),   'at'   => ts_get($tid, 'code_check_at', ''),

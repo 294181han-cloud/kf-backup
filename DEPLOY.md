@@ -608,3 +608,26 @@ v2.14 撤回同步改动遗漏了 `$recalledIds` 的块外初始化——**未�
   **线上 tenants 表存在历史遗留 `link` 列**（本地 schema 无），`tn.*` 同名列覆盖 `sc.link`
 - 修复：查询改 `sc.link AS sc_link` 显式别名，读值用 `sc_link`（不再受 tn.* 通配冲突影响）
 - 诊断代码已全部移除
+
+## v2.30 变更记录（客服码改版 + 拦截状态检测）
+
+### 前端
+- `public/app.html` 获客码页重排为单列紧凑卡：页头（客服码管理）+ 信息行（码值胶囊 / 状态标签 / 名称 / 换码 / 失效二维码）+ 公共链接面板（码点 / 码眼 / 主色 / Logo 大小 / 上下文案 / 中心 Logo 8 选 1 / 卡片预览 / 按钮排 / 码值 + 链接行）。
+- 二维码改为「卡片式」：顶部文案（默认「扫码咨询」）+ 二维码 + 底部主色通栏（默认「官方客服」），与微信收款码同构；卡片 680×960（码宽 = 卡宽 69%）。
+- `assets/qr-poster.js` 新增 `window.KFQCard.drawCodeCard(canvas, opts)`：支持码点（圆角/圆点/方形）、码眼（圆角/方形）、主色、中心 Logo（无/头像/聚合/微信/支付宝/QQ/抖音/上传）、上下文案、导出倍率。
+- `assets/js/app.js`：`renderMainQr` 改为渲染上述卡片；卡片样式随租户设置持久化（`code_*` 键）；「预览大图 / 下载二维码（4 倍图）/ 复制二维码」都导出这张卡片。
+- `assets/css/app.css` 追加 `.code-head/.code-pill/.code-state/.code-panel/.cp-*/.code-stage` 等样式，含 dark 主题覆盖。
+
+### 二维码可扫性（实测，cv2 + zbar 双解码器）
+- 中心 Logo 白底衬圆形直径 = 码宽 18%（模块 ≥10px 时）/ 14%（密排长链接），图标按 0.86 倍内缩；8 种 Logo × 3 种链接长度（33/45/57 模块）24 张导出图全部双解。
+- 码眼「圆形」作废：r=2.0~3.5 模块全部两个解码器都解不出；只保留圆角/方形。
+- 码点在模块 ≤8px（超长链接）时自动回退圆角，避免只有 cv2 能解。
+- 「Logo 大小 = 加大」（方形衬 24% / 图标 0.88）更醒目，但部分长链接下会退化为单解码器，默认仍是「标准」。
+
+### 后端
+- 新增 `POST /api/tenant/code/check`（`handle_tenant_code_check`）：检测当前客服码链接在微信/QQ 的拦截状态，结果落 `tenant_settings` 的 `code_check_*`；同链接同渠道 `wxcheck_ttl`（默认 300 秒）内复用，避免按次扣费。
+- 检测接口配置在 `kv_store`：`wxcheck_on`（开关，默认 0）/ `wxcheck_user` / `wxcheck_key` / `wxcheck_url` / `wxcheck_ttl`。换接口只改这几个键，不用改代码。
+- `handle_tenant_settings` 增补 `code_dot/code_eye/code_brand/code_logo/code_logo_size/code_top_text/code_bottom_text/code_color_dots/code_custom_logo` 读写，以及 `code_check_*` 只读返回。
+
+### 已知问题
+- 现有检测账号（麒麟 api.uouin.com）对**任何**输入都返回 `1001 正常访问`（含 x.com / telegram / 抖音 / 不存在的域名），无法识别「红」，故 `wxcheck_on=0`：界面只显示「检测未开通」，不显示绿色「正常接待」。换一家能报红的接口后把地址/账号填进 `kv_store` 并置 `wxcheck_on=1` 即可生效。
