@@ -34,7 +34,7 @@ function handle_sessions(string $method): void
         ELSE 'offline' END";
     $sql = "SELECT s.id, s.agent_id, a.nickname AS agent_name, s.visitor_name AS name,
         (SELECT value FROM contacts WHERE session_id = s.id AND type = 'note' LIMIT 1) AS note,
-        s.ip, s.from_url AS `from`, s.last_msg AS lastMsg, s.last_time AS lastTime, s.unread, s.source, s.geo,
+        s.ip, s.from_url AS `from`, s.last_msg AS lastMsg, s.last_time AS lastTime, s.unread, s.source, s.geo, s.ua,
         $onlineSql AS status,
         (SELECT COUNT(*) FROM messages WHERE session_id = s.id) AS message_count
         FROM v_sessions s LEFT JOIN agents a ON a.id = s.agent_id AND a.tenant_id = s.tenant_id
@@ -48,6 +48,12 @@ function handle_sessions(string $method): void
         $r['unread'] = (int)$r['unread'];
         $r['agent_id'] = (int)$r['agent_id'];
         $r['message_count'] = (int)$r['message_count'];
+        // 访客标签：设备（品牌/系统版本）、渠道（微信/浏览器…）、地区（城市，中文）
+        $uaInfo = parse_ua($r['ua'] ?? null);
+        $r['devTag'] = $uaInfo['dev_tag'];
+        $r['channel'] = $uaInfo['channel'];
+        $r['city'] = geo_city($r['geo'] ?? null);
+        unset($r['ua']);
     }
     unset($r);
     json_out($out);
@@ -266,7 +272,9 @@ function handle_session_profile(string $method, array $m): void
             'agent_id' => (int)$s['agent_id'], 'source' => $s['source'], 'created_at' => dt_to_iso($s['created_at'])],
         'ip' => $s['ip'], 'from_url' => $s['from_url'],
         'os' => $ua['os'], 'browser' => $ua['browser'], 'device' => $ua['device'],
-        'geo' => lookup_geo($s['ip']),
+        'dev_tag' => $ua['dev_tag'], 'channel' => $ua['channel'],
+        'geo' => ($geoStr = lookup_geo($s['ip'])),
+        'city' => geo_city($geoStr),
         'ua' => $ua,
         'visit_count' => $visitCount, 'message_count' => $msgCount,
         'first_time' => dt_to_iso($ft ?: $s['created_at']),
@@ -538,7 +546,7 @@ function handle_agent_poll(string $method): void
         ELSE 'offline' END";
     $st = $pdo->prepare("SELECT s.id, s.agent_id, a.nickname AS agent_name, s.visitor_name AS name,
         (SELECT value FROM contacts WHERE session_id = s.id AND type = 'note' LIMIT 1) AS note,
-        s.ip, s.from_url AS `from`, s.last_msg AS lastMsg, s.last_time AS lastTime, s.unread, s.source, s.geo,
+        s.ip, s.from_url AS `from`, s.last_msg AS lastMsg, s.last_time AS lastTime, s.unread, s.source, s.geo, s.ua,
         $onlineSql AS status,
         (SELECT COUNT(*) FROM messages WHERE session_id = s.id) AS message_count
         FROM v_sessions s LEFT JOIN agents a ON a.id = s.agent_id AND a.tenant_id = s.tenant_id
@@ -551,6 +559,11 @@ function handle_agent_poll(string $method): void
         $r['unread'] = (int)$r['unread'];
         $r['agent_id'] = (int)$r['agent_id'];
         $r['message_count'] = (int)$r['message_count'];
+        $uaInfo = parse_ua($r['ua'] ?? null);          // 访客标签（设备/渠道/城市）
+        $r['devTag'] = $uaInfo['dev_tag'];
+        $r['channel'] = $uaInfo['channel'];
+        $r['city'] = geo_city($r['geo'] ?? null);
+        unset($r['ua']);
         $sessions[] = $r;
     }
 

@@ -91,7 +91,7 @@
             <div v-if="!filteredSessions.length" style="padding:40px;text-align:center;color:#a0a6ad;font-size:13px;">暂无会话</div>
             <div class="sess-item" v-for="s in filteredSessions" :key="s.id" :class="{active: currentId===s.id}" @click="openSession(s.id)">
               <div class="row1">
-                <span class="name">{{ s.name }}<span class="geo-tag" v-if="s.geo" :title="geoTag(s.geo)">{{ geoTag(s.geo) }}</span></span>
+                <span class="name">{{ s.name }}<span class="geo-tag" v-if="visitorTag(s)" :title="visitorTagFull(s)">{{ visitorTag(s) }}</span></span>
                 <span class="time">{{ shortTime(s.lastTime) }}</span>
               </div>
               <div class="row2">
@@ -108,7 +108,7 @@
           <template v-if="current">
             <div class="chat-head">
               <span class="name">{{ current.name }}</span>
-              <span class="geo-tag" v-if="current && current.geo" :title="geoTag(current.geo)">{{ geoTag(current.geo) }}</span>
+              <span class="geo-tag" v-if="visitorTag(current)" :title="visitorTagFull(current)">{{ visitorTag(current) }}</span>
               <span style="cursor:pointer;font-size:13px;" title="修改访客名称" @click="renameVisitor">✏️</span>
               <span style="cursor:pointer;font-size:13px;" title="搜索聊天记录" @click="chatSearchOn = !chatSearchOn">🔍</span>
               <el-tag size="small" :type="current.status==='online' ? 'success' : 'info'">{{ current.status==='online'?'在线':'离线' }}</el-tag>
@@ -197,11 +197,12 @@
         <div class="info-col" v-if="current">
           <h4>访客信息</h4>
           <div class="info-item"><span class="k">名称</span><span class="v" style="cursor:pointer;" title="点击修改" @click="renameVisitor">{{ current.name }} ✏️</span></div>
-          <div class="info-item" v-if="profile"><span class="k">系统</span><span class="v">{{ profile.os || '未知' }}</span></div>
-          <div class="info-item" v-if="profile"><span class="k">来源</span><span class="v">{{ profile.browser || '未知' }}</span></div>
+          <div class="info-item" v-if="profile"><span class="k">设备</span><span class="v">{{ profile.dev_tag || profile.os || '未知' }}</span></div>
+          <div class="info-item" v-if="profile"><span class="k">渠道</span><span class="v">{{ profile.channel || '浏览器' }}</span></div>
+          <div class="info-item" v-if="profile"><span class="k">浏览器</span><span class="v">{{ profile.browser || '未知' }}</span></div>
           <div class="info-item"><span class="k">I P</span><span class="v mono">{{ current.ip }}</span></div>
-          <div class="info-item" v-if="profile"><span class="k">地址</span><span class="v" style="font-size:12px;">{{ profile.geo || '未知' }}</span></div>
-          <div class="info-item"><span class="k">渠道</span><span class="v">{{ sourceText(current.source) }}</span></div>
+          <div class="info-item" v-if="profile"><span class="k">地区</span><span class="v" style="font-size:12px;">{{ profile.city || geoTag(profile.geo) || '未知' }}</span></div>
+          <div class="info-item"><span class="k">来源</span><span class="v">{{ sourceText(current.source) }}</span></div>
           <div class="info-item" v-if="profile"><span class="k">访问次数</span><span class="v">{{ profile.visit_count }}</span></div>
           <div class="info-item" v-if="profile"><span class="k">消息数</span><span class="v">{{ profile.message_count }}</span></div>
           <h4>联系方式</h4>
@@ -991,7 +992,7 @@
 <script src="/assets/qr-poster.js?v=2.0.1"></script>
 <script src="/assets/api.js?v=2.0.1"></script>
 <script src="/assets/js/app-components.js?v=2.1.0"></script>
-<script src="/assets/js/app.js?v=2.3.4"></script>
+<script src="/assets/js/app.js?v=2.3.5"></script>
 <script src="/assets/js/app-boot.js?v=2.1.1"></script>
 </body>
 </html>

@@ -1056,6 +1056,19 @@ const app = createApp({
       }
       return parts.join(' ');
     };
+    // 访客标签（v2.24）：设备（华为 安卓14 / iOS 17 / Windows 10/11…）· 渠道（微信/浏览器…）· 城市
+    const visitorTag = (s) => {
+      if (!s) return '';
+      return [s.devTag, s.channel, s.city].filter(Boolean).join(' · ') || geoTag(s.geo);
+    };
+    const visitorTagFull = (s) => {
+      if (!s) return '';
+      const bits = [s.devTag, s.channel, s.city].filter(Boolean);
+      if (s.browser && !bits.includes(s.browser)) bits.push(s.browser);
+      const g = geoTag(s.geo);
+      if (g && g !== s.city) bits.push(g);
+      return bits.join(' · ') || '';
+    };
 
     // 深色主题
     const dark = ref(false);
@@ -1155,7 +1168,7 @@ const app = createApp({
       posterCfg, posterQrBox, posterBgInput, pickPosterBg, onPosterBg, downloadPoster2,
       POSTER_POS, qrFreeStyle, qrLayerStyle, textStyle,
       cropDlg, cropSrc, cropZoomPct, cropStage, cropStyle, cropImgLoaded, cropDown, cropMove, cropUp, cropWheel, cropClose, openCrop, cropConfirm, avatarPreview,
-      geoTag,copyQrImage, downloadQrImage, codeRotateHint, rotateCode, loadHistory, disableLink, saveCodeCfg, meAvatarUrl,
+      geoTag, visitorTag, visitorTagFull, copyQrImage, downloadQrImage, codeRotateHint, rotateCode, loadHistory, disableLink, saveCodeCfg, meAvatarUrl,
       quickFields, welcomeFields, autoFields, blFields, preqFields,
       shortTime, fmtTime, sourceText, contactLabel, barW, quotaW,
       openSession, send, onKey, useQuick, sendQuick, onImage, startRec, stopRec, closeSession, doTransfer,

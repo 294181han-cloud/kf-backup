@@ -390,24 +390,62 @@ function lookup_geo(string $ip): string
 
 function parse_ua(?string $ua): array
 {
-    if (!$ua) return ['device' => '未知', 'os' => '未知', 'browser' => '未知'];
-    $device = '桌面'; $os = '未知'; $browser = '未知';
-    if (str_contains($ua, 'iPhone')) { $os = '苹果 iOS'; $device = '苹果 iPhone'; }
-    elseif (str_contains($ua, 'iPad')) { $os = '苹果 iPadOS'; $device = '苹果 iPad'; }
-    elseif (str_contains($ua, 'Android')) { $os = 'Android'; $device = str_contains($ua, 'Mobile') ? 'Android 手机' : 'Android 平板'; }
-    elseif (str_contains($ua, 'Windows NT 10')) $os = 'Windows 10/11';
-    elseif (str_contains($ua, 'Windows NT 6.3')) $os = 'Windows 8.1';
-    elseif (str_contains($ua, 'Windows NT 6.1')) $os = 'Windows 7';
-    elseif (str_contains($ua, 'Windows NT')) $os = 'Windows';
-    elseif (str_contains($ua, 'Mac OS X')) $os = 'macOS';
-    elseif (str_contains($ua, 'Linux')) $os = 'Linux';
-    if (str_contains($ua, 'MicroMessenger')) $browser = '微信内置浏览器';
+    if (!$ua) return ['device' => '未知', 'os' => '未知', 'browser' => '未知', 'brand' => '', 'channel' => '', 'os_short' => '', 'dev_tag' => '未知'];
+    $device = '桌面'; $os = '未知'; $browser = '未知'; $brand = ''; $channel = ''; $osShort = '';
+    // ----- 系统与设备 -----
+    if (str_contains($ua, 'iPhone')) {
+        $device = '苹果 iPhone'; $os = '苹果 iOS'; $osShort = 'iOS';
+        if (preg_match('/iPhone OS (\d+)[._](\d+)/', $ua, $m)) $osShort = 'iOS ' . $m[1] . ($m[2] !== '0' ? '.' . $m[2] : '');
+    } elseif (str_contains($ua, 'iPad')) {
+        $device = '苹果 iPad'; $os = '苹果 iPadOS'; $osShort = 'iPadOS';
+        if (preg_match('/CPU OS (\d+)[._](\d+)/', $ua, $m)) $osShort = 'iPadOS ' . $m[1];
+    } elseif (str_contains($ua, 'Android')) {
+        $device = str_contains($ua, 'Mobile') ? 'Android 手机' : 'Android 平板';
+        $osShort = '安卓';
+        if (preg_match('/Android (\d+)(?:\.(\d+))?/', $ua, $m)) $osShort = '安卓' . $m[1] . (isset($m[2]) && $m[2] !== '0' ? '.' . $m[2] : '');
+        $os = 'Android';
+        // 安卓 UA 的 Build 型号前缀推断品牌（如 "HUAWEI P30 Build/..."）
+        if (preg_match('/;\s*([A-Za-z][A-Za-z0-9 _-]{1,24}?)\s+(?:Build\/|\))/u', $ua, $bm)) {
+            $model = trim($bm[1]);
+            if (!preg_match('/^(WAP|Browser|Windows)/i', $model)) {
+                $brandMap = ['HUAWEI' => '华为', 'HONOR' => '荣耀', 'Xiaomi' => '小米', 'Redmi' => '红米',
+                    'MI ' => '小米', 'OPPO' => 'OPPO', 'OnePlus' => '一加', 'vivo' => 'vivo', 'iQOO' => 'iQOO',
+                    'samsung' => '三星', 'SM-' => '三星', 'Pixel' => '谷歌', 'meizu' => '魅族', 'MEIZU' => '魅族'];
+                foreach ($brandMap as $k => $v) {
+                    if (stripos($model, $k) === 0) { $brand = $v; break; }
+                }
+                if ($brand === '' && preg_match('/^[A-Z]{2,}\d/', $model)) $brand = $model;
+            }
+        }
+    } elseif (str_contains($ua, 'Windows NT 10')) {
+        $os = 'Windows 10/11'; $osShort = 'Windows 10/11';
+        if (str_contains($ua, 'Windows Phone')) { $device = 'Windows 手机'; $osShort = 'Win10 Mobile'; }
+    } elseif (str_contains($ua, 'Windows NT 6.3')) { $os = 'Windows 8.1'; $osShort = 'Windows 8.1'; }
+    elseif (str_contains($ua, 'Windows NT 6.1')) { $os = 'Windows 7'; $osShort = 'Windows 7'; }
+    elseif (str_contains($ua, 'Windows NT')) { $os = 'Windows'; $osShort = 'Windows'; }
+    elseif (str_contains($ua, 'Mac OS X')) {
+        $os = 'macOS'; $osShort = 'macOS';
+        if (preg_match('/Mac OS X (\d+)[._](\d+)/', $ua, $m)) $osShort = 'macOS ' . $m[1] . '.' . $m[2];
+    }
+    elseif (str_contains($ua, 'Linux')) { $os = 'Linux'; $osShort = 'Linux'; }
+    // ----- 渠道（内置 WebView 特征明确，先于普通浏览器判断）-----
+    if (str_contains($ua, 'MicroMessenger')) { $browser = '微信内置浏览器'; $channel = '微信'; }
+    elseif (str_contains($ua, 'AlipayClient')) { $browser = '支付宝内置浏览器'; $channel = '支付宝'; }
+    elseif (str_contains($ua, 'QQ/') && !str_contains($ua, 'QQBrowser')) { $browser = 'QQ 内置浏览器'; $channel = 'QQ'; }
+    elseif (str_contains($ua, 'DingTalk')) { $browser = '钉钉内置浏览器'; $channel = '钉钉'; }
+    elseif (str_contains($ua, 'ByteDance') || str_contains($ua, 'aweme')) { $browser = '抖音内置浏览器'; $channel = '抖音'; }
     elseif (str_contains($ua, 'Edg/')) $browser = 'Edge 浏览器';
     elseif (str_contains($ua, 'OPR/') || str_contains($ua, 'Opera')) $browser = 'Opera 浏览器';
     elseif (str_contains($ua, 'Chrome/') && !str_contains($ua, 'Chromium')) $browser = 'Chrome 浏览器';
     elseif (str_contains($ua, 'Safari/') && str_contains($ua, 'Version/')) $browser = 'Safari 浏览器';
     elseif (str_contains($ua, 'Firefox/')) $browser = 'Firefox 浏览器';
-    return ['device' => $device, 'os' => $os, 'browser' => $browser];
+    if ($channel === '') $channel = '浏览器';
+    // 设备标签：安卓=品牌+系统版本；其余=系统短名（iOS 17 / Windows 10/11 / macOS 14.5…）
+    if ($brand !== '') $devTag = $brand . ' ' . $osShort;
+    elseif ($osShort !== '') $devTag = $osShort;
+    else $devTag = $device;
+    return ['device' => $device, 'os' => $os, 'browser' => $browser,
+        'brand' => $brand, 'channel' => $channel, 'os_short' => $osShort, 'dev_tag' => $devTag];
 }
 
 function parse_language(?string $al): string
@@ -419,6 +457,27 @@ function parse_language(?string $al): string
         'en' => '英语', 'en-US' => '英语（美国）', 'ja' => '日语', 'ko' => '韩语'];
     if (isset($map[$first])) return $map[$first];
     return $map[explode('-', $first)[0]] ?? $first;
+}
+
+/* ================= 会话访客标签（设备 / 渠道 / 地区） ================= */
+
+/** geo 串取城市（格式 国家|地区|城市|ISP|国家码）；取不到城市时退回地区，再退国家；紧凑化后缀 */
+function geo_city(?string $geo): string
+{
+    if (!$geo) return '';
+    $p = array_map('trim', explode('|', $geo));
+    foreach ([2, 1, 0] as $i) {           // 城市 → 地区 → 国家
+        $v = $p[$i] ?? '';
+        if ($v !== '' && $v !== '0') {
+            if (mb_strlen($v) > 2) {
+                if (mb_substr($v, -1) === '市') $v = mb_substr($v, 0, -1);            // 深圳市 → 深圳（北京市 → 北京）
+                elseif (mb_substr($v, -3) === '地区') $v = mb_substr($v, 0, -3);
+                elseif ($i === 1 && mb_substr($v, -1) === '省') $v = mb_substr($v, 0, -1);  // 省级 fallback：浙江省 → 浙江
+            }
+            return $v;
+        }
+    }
+    return '';
 }
 
 /* ================= 随机串生成 ================= */
