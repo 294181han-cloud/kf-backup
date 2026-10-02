@@ -3,6 +3,28 @@
 const app = createApp({
   setup() {
     const tab = ref('work');
+    // 设置页内的子标签（内容 / 访客 / 外观 / 系统）
+    const setTab = ref('quick');
+    const SET_ITEMS = [
+      { v: 'quick', n: '快捷消息', i: '⚡' },
+      { v: 'welcome', n: '欢迎语', i: '👋' },
+      { v: 'auto', n: '智能回复', i: '🤖' },
+      { v: 'broadcast', n: '群发模板', i: '📢', t: 1 },
+      { v: 'preinq', n: '询前表单', i: '📝', t: 1 },
+      { v: 'policy', n: '访客策略', i: '🛡️', t: 1 },
+      { v: 'blacklist', n: 'IP黑名单', i: '🚫', t: 1 },
+      { v: 'brand', n: '访客端模板', i: '🎨', t: 1 },
+      { v: 'ui', n: '后台UI', i: '🖌️', t: 1 },
+      { v: 'agents', n: '坐席管理', i: '🎧', t: 1 },
+      { v: 'security', n: '安全与维护', i: '🔒', t: 1 },
+      { v: 'profile', n: '个人设置', i: '⚙️' },
+    ];
+    const SET_GROUP_DEF = [
+      { g: '内容', vs: ['quick', 'welcome', 'auto', 'broadcast'] },
+      { g: '访客', vs: ['preinq', 'policy', 'blacklist'] },
+      { g: '外观', vs: ['brand', 'ui'] },
+      { g: '系统', vs: ['agents', 'security', 'profile'] },
+    ];
     const booted = ref(false);
     const me = ref(null);
     const stats = ref(null);
@@ -140,6 +162,7 @@ const app = createApp({
       broadcast: '群发', blacklist: 'IP 黑名单', preinq: '询前表单', links: '获客链接', agents: '子客服管理',
       brand: '访客端模板', policy: '访客策略', visitors: '访客列表', security: '安全与维护', profile: '个人设置', ui: '后台 UI',
       quick: '快捷消息', auto: '智能回复', agents: '坐席管理', broadcast: '群发模板', links: '获客码',
+      setting: '设置 · ' + ((SET_ITEMS.find(x => x.v === setTab.value) || {}).n || ''),
     }[tab.value]));
     const current = computed(() => sessions.value.find(s => s.id === currentId.value) || null);
     const filteredSessions = computed(() => {
@@ -157,6 +180,20 @@ const app = createApp({
     const shortTime = (t) => { if (!t) return ''; const d = new Date(t); return `${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')} ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`; };
     const fmtTime = shortTime;
     const sourceText = (s) => ({ app: '客服码', web: '网页链接', direct: '直接访问' }[s] || s);
+    // 设置页子导航（按角色过滤租户专属项）
+    const setGroups = computed(() => {
+      const isTenant = !!(me.value && me.value.role === 'tenant');
+      return SET_GROUP_DEF.map(g => ({
+        g: g.g,
+        items: g.vs.map(v => SET_ITEMS.find(x => x.v === v)).filter(it => it && (!it.t || isTenant)),
+      })).filter(g => g.items.length);
+    });
+    const openSetting = (v) => {
+      tab.value = 'setting';
+      if (v) setTab.value = v;
+      if (setTab.value === 'security') loadSecurityPage();
+    };
+    const switchSetting = (v) => { setTab.value = v; if (v === 'security') loadSecurityPage(); };
     // 会话列表/会话头：按来访设备/平台给一个图标，比纯文字更好认
     const sessIcon = (s) => {
       const u = String((s && (s.ua || '')) || '') + ' ' + String((s && (s.source || '')) || '');
@@ -199,6 +236,31 @@ const app = createApp({
         ElementPlus.ElMessage.success('已添加，聊天窗口里一点就发');
       } catch (e) { ElementPlus.ElMessage.error(e.message); }
       finally { qa.saving = false; }
+    };
+    // 聊天里的「快捷消息 → 设置」弹窗：增删改 + 直接发送，不用离开会话
+    const quickDlg = ref(false);
+    const qe = reactive({ title: '', content: '' });
+    const openQuickDlg = async () => { quickDlg.value = true; await loadQuick(); };
+    const quickSave = async (q) => {
+      try {
+        await API.put('/api/quick-msgs/' + q.id, { title: q.title, content: q.content, group_name: q.group_name || '通用', sort: q.sort || 0, attachments: q.attachments || [] });
+        ElementPlus.ElMessage.success('已保存');
+      } catch (e) { ElementPlus.ElMessage.error(e.message); await loadQuick(); }
+    };
+    const quickDel = async (q) => {
+      try { await API.del('/api/quick-msgs/' + q.id); await loadQuick(); ElementPlus.ElMessage.success('已删除'); }
+      catch (e) { ElementPlus.ElMessage.error(e.message); }
+    };
+    const quickSendNow = async (q) => {
+      if (!currentId.value) { ElementPlus.ElMessage.warning('请先选择会话'); return; }
+      try {
+        await API.post('/api/sessions/' + currentId.value + '/messages', { text: q.content || q.title, attachments: (q.attachments || []).length ? q.attachments : undefined });
+        const m = await API.get('/api/sessions/' + currentId.value + '/messages?since=' + maxMsgId.value);
+        const list = m.messages || [];
+        if (list.length) { msgs.value.push(...list); maxMsgId.value = list[list.length - 1].id; prefetchAudio(list); scrollBottom(); }
+        sendBeep();
+        quickDlg.value = false;
+      } catch (e) { ElementPlus.ElMessage.error(e.message); }
     };
     const loadWelcome = async () => { try { welcomeMsgs.value = await API.get('/api/welcome-messages'); } catch (e) {} };
     const loadAuto = async () => { try { autoReplies.value = await API.get('/api/auto-reply'); } catch (e) {} };
@@ -507,7 +569,7 @@ const app = createApp({
       const q = quickCtx.item;
       quickCtx.show = false;
       if (!q) return;
-      tab.value = 'quick';
+      openSetting('quick');
       // 表格渲染 + 数据加载都需要时间，轮询重试（最多 2s）
       let tries = 0;
       const tryOpen = () => {
@@ -1027,8 +1089,8 @@ const app = createApp({
     const guide = computed(() => {
       if (!me.value || me.value.role !== 'tenant') return [];
       return [
-        { k: 'welcome', icon: '👋', label: '设置欢迎语', desc: '访客进入自动打招呼', done: welcomeMsgs.value.length > 0, go: () => tab.value = 'welcome' },
-        { k: 'auto', icon: '🤖', label: '设置自动回复', desc: '关键词自动应答', done: autoReplies.value.length > 0, go: () => tab.value = 'auto' },
+        { k: 'welcome', icon: '👋', label: '设置欢迎语', desc: '访客进入自动打招呼', done: welcomeMsgs.value.length > 0, go: () => openSetting('welcome') },
+        { k: 'auto', icon: '🤖', label: '设置自动回复', desc: '关键词自动应答', done: autoReplies.value.length > 0, go: () => openSetting('auto') },
         { k: 'link', icon: '🔗', label: '生成获客链接', desc: '专属链接 / 客服码', done: !!(links.value && (links.value.domain_link || (links.value.codes || []).length)), go: () => tab.value = 'links' },
       ];
     });
@@ -1779,6 +1841,7 @@ const app = createApp({
       quickFields, welcomeFields, autoFields, blFields, preqFields,
       shortTime, fmtTime, sourceText, contactLabel, barW, quotaW,
       sessIcon,
+      setTab, setGroups, openSetting, switchSetting,
       audioPlaying, audioDur, waveBars, toggleAudio,
       openSession, send, onKey, useQuick, sendQuick, quickClick, onImage, startRec, stopRec, closeSession, doTransfer,
       pendingAtts, rmPendingAtt, quickCtx, openQuickCtx, editQuick,
@@ -1792,6 +1855,7 @@ const app = createApp({
       refreshing, refreshChat, askUpload,
       askDlg, askForm, ASK_PRESETS, ASK_DEFAULT, openAskDialog, sendAskDialog,
       qa, quickAdd,
+      quickDlg, qe, openQuickDlg, quickSave, quickDel, quickSendNow,
     };
   }
 });

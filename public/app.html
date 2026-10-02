@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>客服工作台</title>
 <link rel="stylesheet" href="/assets/vendor/element-plus.css">
-<link rel="stylesheet" href="/assets/css/app.css?v=2.9.2">
+<link rel="stylesheet" href="/assets/css/app.css?v=3.0.0">
 <script src="/assets/ui/ui-registry.js?v=2.6.0"></script>
 <script src="/assets/ui/ui-loader.js?v=2.6.0" data-ui-cat="auto"></script>
 </head>
@@ -40,32 +40,14 @@
       </div>
       <div class="nav">
         <div class="nav-group" style="padding-top:6px;">工 作</div>
-        <div class="nav-item" :class="{active: tab==='stats'}" @click="tab='stats'; restartPoll()"><span class="nv-ic">📊</span><span class="nv-text">数据面板</span></div>
         <div class="nav-item" :class="{active: tab==='work'}" @click="tab='work'; restartPoll()"><span class="nv-ic">💬</span><span class="nv-text">工作台</span><span class="nv-dot" v-if="unreadTotal>0"></span></div>
+        <div class="nav-item" :class="{active: tab==='stats'}" @click="tab='stats'; restartPoll()"><span class="nv-ic">📊</span><span class="nv-text">数据面板</span></div>
         <div class="nav-item" :class="{active: tab==='visitors'}" @click="tab='visitors'; loadVisitors()"><span class="nv-ic">👥</span><span class="nv-text">访客列表</span></div>
         <template v-if="me && me.role==='tenant'">
-          <div class="nav-item" :class="{active: tab==='agents'}" @click="tab='agents'"><span class="nv-ic">🎧</span><span class="nv-text">坐席管理</span></div>
           <div class="nav-item" :class="{active: tab==='links'}" @click="tab='links'"><span class="nv-ic">🔗</span><span class="nv-text">客服码</span></div>
         </template>
-        <div class="nav-group">内 容</div>
-        <div class="nav-item" :class="{active: tab==='quick'}" @click="tab='quick'"><span class="nv-ic">⚡</span><span class="nv-text">快捷消息</span></div>
-        <div class="nav-item" :class="{active: tab==='welcome'}" @click="tab='welcome'"><span class="nv-ic">👋</span><span class="nv-text">欢迎语</span></div>
-        <div class="nav-item" :class="{active: tab==='auto'}" @click="tab='auto'"><span class="nv-ic">🤖</span><span class="nv-text">智能回复</span></div>
-        <template v-if="me && me.role==='tenant'">
-          <div class="nav-item" :class="{active: tab==='broadcast'}" @click="tab='broadcast'"><span class="nv-ic">📢</span><span class="nv-text">群发模板</span></div>
-        </template>
-        <div class="nav-group">数 据</div>
-        <div class="nav-item" :class="{active: tab==='blacklist'}" @click="tab='blacklist'"><span class="nv-ic">🚫</span><span class="nv-text">IP黑名单</span></div>
-        <template v-if="me && me.role==='tenant'">
-          <div class="nav-group">系 统</div>
-          <div class="nav-item" :class="{active: tab==='brand'}" @click="tab='brand'"><span class="nv-ic">🎨</span><span class="nv-text">访客端模板</span></div>
-          <div class="nav-item" :class="{active: tab==='ui'}" @click="tab='ui'"><span class="nv-ic">🖌️</span><span class="nv-text">后台UI</span></div>
-          <div class="nav-item" :class="{active: tab==='preinq'}" @click="tab='preinq'"><span class="nv-ic">📝</span><span class="nv-text">询前表单</span></div>
-          <div class="nav-item" :class="{active: tab==='policy'}" @click="tab='policy'"><span class="nv-ic">🛡️</span><span class="nv-text">访客策略</span></div>
-          <div class="nav-item" :class="{active: tab==='security'}" @click="tab='security'; loadSecurityPage()"><span class="nv-ic">🔒</span><span class="nv-text">安全与维护</span></div>
-        </template>
-        <div class="nav-group">账 号</div>
-        <div class="nav-item" :class="{active: tab==='profile'}" @click="tab='profile'"><span class="nv-ic">⚙️</span><span class="nv-text">个人设置</span></div>
+        <div class="nav-group">设 置</div>
+        <div class="nav-item" :class="{active: tab==='setting'}" @click="openSetting(setTab)"><span class="nv-ic">⚙️</span><span class="nv-text">设置</span></div>
       </div>
       <div class="me">
         <span style="cursor:pointer;display:inline-block;margin-bottom:6px;" @click="toggleDark">{{ dark ? '☀️ 浅色模式' : '🌙 深色模式' }}</span><br>
@@ -86,6 +68,17 @@
           <span v-if="unreadTotal > 0" class="unread-chip">{{ unreadTotal }} 条未读</span>
           <span class="clock">{{ clock }}</span>
         </div>
+      </div>
+
+      <!-- 设置页子导航（把内容/访客/外观/系统四大类收进来，侧栏就不用堆那么多项） -->
+      <div class="subnav" v-if="tab==='setting'">
+        <template v-for="g in setGroups" :key="g.g">
+          <span class="sn-group">{{ g.g }}</span>
+          <button type="button" v-for="it in g.items" :key="it.v" class="sn-item" :class="{on: setTab===it.v}" @click="switchSetting(it.v)">
+            <span class="sn-ic">{{ it.i }}</span>{{ it.n }}
+          </button>
+        </template>
+        <span class="sn-sp"></span>
       </div>
 
       <!-- ============ 会话工作台 ============ -->
@@ -140,8 +133,7 @@
                 </div>
                 <div class="ch-sub">
                   <span class="ch-chip" v-if="profile && profile.dev_tag">📱 {{ profile.dev_tag }}</span>
-                  <span class="ch-chip" v-if="profile && profile.channel && profile.channel !== '未知'">{{ profile.channel }}</span>
-                  <span class="ch-chip src">{{ sourceText(current.source) }}</span>
+                  <span class="ch-chip src" :title="'访客是通过「' + sourceText(current.source) + '」进来的'">进入：{{ sourceText(current.source) }}</span>
                   <span title="访客 IP">🌐 {{ current.ip || '—' }}</span>
                   <span v-if="profile">📍 {{ profile.region || profile.city || geoTag(profile.geo) || '未知' }}</span>
                   <span v-if="profile">👣 访问 {{ profile.visit_count }} 次</span>
@@ -220,6 +212,10 @@
                   <svg class="q-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2 4.5 13.5h6L9 22l10.5-12H13L13 2z"/></svg>
                   快捷消息 <span style="font-size:11px;">{{ showQuick ? '▾' : '▸' }}</span>
                 </button>
+                <button class="quick-toggle-btn" title="在弹窗里管理快捷消息（增删改，不用离开聊天）" @click="openQuickDlg">
+                  <svg class="q-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.9l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-2.9 1.2 2 2 0 1 1-4 0 1.7 1.7 0 0 0-2.9-1.2l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1A1.7 1.7 0 0 0 3 15a2 2 0 1 1 0-4 1.7 1.7 0 0 0 1.5-2.9l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1A1.7 1.7 0 0 0 10 4.6a2 2 0 1 1 4 0 1.7 1.7 0 0 0 2.9 1.2l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1A1.7 1.7 0 0 0 21 11a2 2 0 1 1 0 4 1.7 1.7 0 0 0-1.6 0z"/></svg>
+                  设置
+                </button>
               </div>
               <div class="quick-bar" :class="{open: showQuick}">
                 <div class="quick-scroll">
@@ -264,12 +260,11 @@
         <div class="info-col" v-if="current">
           <h4>访客信息</h4>
           <div class="info-item"><span class="k">名称</span><span class="v" style="cursor:pointer;" title="点击修改" @click="renameVisitor">{{ current.name }} ✏️</span></div>
-          <div class="info-item" v-if="profile"><span class="k">设备</span><span class="v">{{ profile.dev_tag || profile.os || '未知' }}</span></div>
-          <div class="info-item" v-if="profile"><span class="k">渠道</span><span class="v">{{ profile.channel || '浏览器' }}</span></div>
+          <div class="info-item" v-if="profile"><span class="k">设备 / 平台</span><span class="v">{{ profile.dev_tag || profile.os || '未知' }}</span></div>
           <div class="info-item" v-if="profile"><span class="k">浏览器</span><span class="v">{{ profile.browser || '未知' }}</span></div>
           <div class="info-item"><span class="k">I P</span><span class="v mono">{{ current.ip }}</span></div>
           <div class="info-item" v-if="profile"><span class="k">地区</span><span class="v" style="font-size:12px;">{{ profile.region || profile.city || geoTag(profile.geo) || '未知' }}</span></div>
-          <div class="info-item"><span class="k">来源</span><span class="v">{{ sourceText(current.source) }}</span></div>
+          <div class="info-item"><span class="k">进入方式</span><span class="v">{{ sourceText(current.source) }}</span></div>
           <div class="info-item" v-if="profile"><span class="k">访问次数</span><span class="v">{{ profile.visit_count }}</span></div>
           <div class="info-item" v-if="profile"><span class="k">消息数</span><span class="v">{{ profile.message_count }}</span></div>
           <h4>联系方式</h4>
@@ -362,7 +357,7 @@
       </div>
 
       <!-- ============ 快捷回复 ============ -->
-      <div class="content" v-if="tab==='quick'">
+      <div class="content" v-if="tab==='setting' && setTab==='quick'">
         <div class="panel" style="max-width:1100px;margin:0 auto 14px;">
           <div class="panel-title">快捷消息（聊天窗口里一点就发）</div>
           <div class="qa-row">
@@ -381,7 +376,7 @@
       </div>
 
       <!-- ============ 欢迎语 ============ -->
-      <div class="content" v-if="tab==='welcome'">
+      <div class="content" v-if="tab==='setting' && setTab==='welcome'">
         <crud-table
           :rows="welcomeMsgs" :fields="welcomeFields" title="欢迎语（访客进入时自动发送，按顺序最多 5 条）" add-text="新增欢迎语"
           @reload="loadWelcome" api="/api/welcome-messages"
@@ -389,7 +384,7 @@
       </div>
 
       <!-- ============ 自动回复 ============ -->
-      <div class="content" v-if="tab==='auto'">
+      <div class="content" v-if="tab==='setting' && setTab==='auto'">
         <crud-table
           :rows="autoReplies" :fields="autoFields" title="自动回复（访客消息包含关键词时自动应答）" add-text="新增规则"
           @reload="loadAuto" api="/api/auto-reply"
@@ -397,7 +392,7 @@
       </div>
 
       <!-- ============ 群发 ============ -->
-      <div class="content" v-if="tab==='broadcast' && me.role==='tenant'">
+      <div class="content" v-if="tab==='setting' && setTab==='broadcast' && me.role==='tenant'">
         <div class="panel" style="max-width:960px;margin:0 auto;">
           <div class="panel-title">群发消息</div>
           <p class="muted" style="margin:0 0 12px;">向近 24 小时内活跃的未结束会话发送消息，发送后计入会话记录。</p>
@@ -407,7 +402,7 @@
       </div>
 
       <!-- ============ IP 黑名单 ============ -->
-      <div class="content" v-if="tab==='blacklist' && me.role==='tenant'">
+      <div class="content" v-if="tab==='setting' && setTab==='blacklist' && me.role==='tenant'">
         <crud-table
           :rows="blacklist" :fields="blFields" title="IP 黑名单（仅作用于您的访客）" add-text="添加 IP"
           @reload="loadBlacklist" api="/api/ip-blacklist"
@@ -415,7 +410,7 @@
       </div>
 
       <!-- ============ 询前表单 ============ -->
-      <div class="content" v-if="tab==='preinq' && me.role==='tenant'">
+      <div class="content" v-if="tab==='setting' && setTab==='preinq' && me.role==='tenant'">
         <div class="panel" style="max-width:960px;margin:0 auto 14px;">
           <div class="panel-title">询前表单开关</div>
           <el-switch v-model="preqOn" active-text="访客进入时先填写表单" @change="savePreqOn"></el-switch>
@@ -560,7 +555,7 @@
       </div>
 
 <!-- ============ 子客服管理 ============ -->
-      <div class="content" v-if="tab==='agents' && me.role==='tenant'">
+      <div class="content" v-if="tab==='setting' && setTab==='agents' && me.role==='tenant'">
         <div class="panel">
           <div class="panel-title" style="justify-content:flex-start;gap:12px;">
             子客服（{{ agents.length }} / {{ me.max_agents }}）
@@ -605,7 +600,7 @@
       </div>
 
       <!-- ============ 访客端外观 ============ -->
-      <div class="content" v-if="tab==='brand' && me.role==='tenant'">
+      <div class="content" v-if="tab==='setting' && setTab==='brand' && me.role==='tenant'">
         <div class="panel" style="max-width:960px;margin:0 auto;">
           <div class="panel-title">访客端外观</div>
           <el-form label-width="100px">
@@ -656,7 +651,7 @@
       </div>
 
       <!-- ============ 后台UI（模板+配色） ============ -->
-      <div class="content" v-if="tab==='ui' && me.role==='tenant'">
+      <div class="content" v-if="tab==='setting' && setTab==='ui' && me.role==='tenant'">
         <div class="panel" style="max-width:960px;margin:0 auto;">
           <div class="panel-title">后台 UI</div>
           <div class="muted" style="margin:-6px 0 14px;font-size:12px;line-height:1.7;">
@@ -691,7 +686,7 @@
       </div>
 
       <!-- ============ 访客策略 ============ -->
-      <div class="content" v-if="tab==='policy' && me.role==='tenant'">
+      <div class="content" v-if="tab==='setting' && setTab==='policy' && me.role==='tenant'">
         <div class="panel" style="max-width:960px;margin:0 auto;">
           <div class="panel-title">验证策略（访客进入前的验证方式）</div>
           <el-form label-width="90px">
@@ -861,7 +856,7 @@
       </div>
 
       <!-- ============ 安全与维护 ============ -->
-      <div class="content" v-if="tab==='security' && me.role==='tenant'">
+      <div class="content" v-if="tab==='setting' && setTab==='security' && me.role==='tenant'">
         <div class="panel">
           <div class="panel-title">公告（访客端顶部横幅）</div>
           <el-switch v-model="sec.notice_on" active-text="在访客聊天窗口顶部展示公告"></el-switch>
@@ -922,7 +917,7 @@
       </div>
 
       <!-- ============ 个人设置 ============ -->
-      <div class="content" v-if="tab==='profile'">
+      <div class="content" v-if="tab==='setting' && setTab==='profile'">
         <div class="panel" style="max-width:820px;margin:0 auto;">
           <div class="panel-title">个人资料</div>
           <div style="display:flex;align-items:center;gap:16px;margin-bottom:16px;">
@@ -1029,6 +1024,31 @@
   </div>
 
   <!-- ============ 弹窗们 ============ -->
+<el-dialog v-model="quickDlg" title="快捷消息（聊天里一点就发）" width="620px" align-center>
+  <div class="qd">
+    <div class="qd-add">
+      <el-input v-model="qe.title" placeholder="按钮文字，如：请发送手机号" maxlength="20" style="width:200px;"></el-input>
+      <el-input v-model="qe.content" placeholder="发送内容" maxlength="200" style="flex:1;min-width:200px;" @keyup.enter="quickAdd"></el-input>
+      <el-button type="primary" :loading="qa.saving" :disabled="!qe.title.trim()" @click="quickAdd">添加</el-button>
+    </div>
+    <div class="qd-list">
+      <div class="qd-row" v-for="q in quickMsgs" :key="q.id">
+        <el-input v-model="q.title" size="small" maxlength="20" style="width:180px;" @change="quickSave(q)"></el-input>
+        <el-input v-model="q.content" size="small" maxlength="200" style="flex:1;min-width:180px;" @change="quickSave(q)"></el-input>
+        <el-button size="small" text type="primary" @click="quickSendNow(q)">发送</el-button>
+        <el-popconfirm title="删除这条快捷消息？" @confirm="quickDel(q)">
+          <template #reference><el-button size="small" text type="danger">删除</el-button></template>
+        </el-popconfirm>
+      </div>
+      <div class="qd-empty" v-if="!quickMsgs.length">还没有快捷消息，上面输入「按钮文字」直接加一条。</div>
+    </div>
+  </div>
+  <template #footer>
+    <span class="muted" style="float:left;font-size:11.5px;line-height:32px;">聊天里单击＝直接发送，Ctrl+单击＝填到输入框</span>
+    <el-button size="small" @click="quickDlg=false">关闭</el-button>
+  </template>
+</el-dialog>
+
 <el-dialog v-model="askDlg" title="请求访客上传图片" width="520px" align-center>
   <div class="ask-dlg">
     <div class="ad-lbl">发给访客的话术（可改）</div>
@@ -1247,7 +1267,7 @@
 <script src="/assets/qr-poster.js?v=2.1.03"></script>
 <script src="/assets/api.js?v=2.0.1"></script>
 <script src="/assets/js/app-components.js?v=2.1.0"></script>
-<script src="/assets/js/app.js?v=2.9.2"></script>
+<script src="/assets/js/app.js?v=3.0.0"></script>
 <script src="/assets/js/app-boot.js?v=2.1.1"></script>
 </body>
 </html>

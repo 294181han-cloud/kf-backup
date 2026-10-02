@@ -495,6 +495,42 @@ body.dark .guide-step { border-color: #3a4048 !important; color: #c9cdd4; }
 /* 快捷消息：控制台内联添加行 */
 .qa-row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
 
+/* ===== 设置页子导航（侧栏瘦身：内容/访客/外观/系统 收进这里）===== */
+.subnav {
+  display: flex; align-items: center; gap: 6px; flex-wrap: wrap;
+  padding: 10px 22px; background: #fff; border-bottom: 1px solid var(--v-line, #ecf0f6);
+  flex-shrink: 0;
+}
+.subnav .sn-group {
+  font-size: 10px; letter-spacing: 1.2px; color: #a8b0c0;
+  padding: 0 10px 0 4px; margin-left: 4px; border-left: 1px solid var(--v-line, #ecf0f6);
+}
+.subnav .sn-group:first-child { border-left: 0; padding-left: 0; margin-left: 0; }
+.subnav .sn-item {
+  display: inline-flex; align-items: center; gap: 5px;
+  border: 1px solid var(--v-line-2, #e3e8f0); background: #fff; color: #4b5563;
+  border-radius: 999px; padding: 6px 13px; font-size: 13px; cursor: pointer;
+  font-family: inherit; transition: all .15s;
+}
+.subnav .sn-item:hover { border-color: color-mix(in srgb, var(--theme, #1677ff) 45%, #fff); color: var(--theme, #1677ff); }
+.subnav .sn-item.on {
+  background: color-mix(in srgb, var(--theme, #1677ff) 10%, #fff);
+  border-color: color-mix(in srgb, var(--theme, #1677ff) 45%, #fff);
+  color: var(--theme, #1677ff); font-weight: 650;
+}
+.subnav .sn-ic { font-size: 13px; }
+.subnav .sn-sp { flex: 1; }
+body.dark .subnav { background: #1e2229; border-bottom-color: #2b313a; }
+body.dark .subnav .sn-item { background: #232830; border-color: #333a44; color: #b6bfcd; }
+body.dark .subnav .sn-group { border-left-color: #2b313a; }
+
+/* 聊天里的快捷消息设置弹窗 */
+.qd .qd-add { display: flex; gap: 8px; align-items: center; margin-bottom: 14px; }
+.qd .qd-list { max-height: 46vh; overflow-y: auto; }
+.qd .qd-row { display: flex; gap: 8px; align-items: center; padding: 7px 0; border-bottom: 1px dashed #f0f2f6; }
+.qd .qd-row:last-child { border-bottom: 0; }
+.qd .qd-empty { color: var(--v-ink-3, #97a1b3); font-size: 13px; padding: 18px 0; text-align: center; }
+
 /* ===== 语音气泡（播放键 + 波形 + 秒数，替代原生 audio 控件）===== */
 .voice-bubble { display: flex; align-items: center; gap: 8px; min-width: 132px; cursor: pointer; user-select: none; }
 .vb-play {
