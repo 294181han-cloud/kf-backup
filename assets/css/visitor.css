@@ -581,3 +581,46 @@ body[data-tpl="whatsapp"] .v-hold-btn { background: rgba(255, 255, 255, .95); bo
 }
 body[data-tpl="whatsapp"] .v-btn { box-shadow: 0 6px 16px rgba(0, 128, 105, .32); }
 .v-footer-wrap { box-shadow: 0 -8px 30px rgba(6, 40, 32, .10); }
+
+/* =====================================================================
+   v2.38 访客端再升级：日期分隔 / 圆形发送键 / 更现代的聊天观感
+   ===================================================================== */
+/* 日期分隔胶囊 */
+.day-sep { display: flex; justify-content: center; margin: 4px 0 14px; }
+.day-sep span {
+  font-size: 11px; color: #8b95a7; background: rgba(255, 255, 255, .82);
+  padding: 3px 12px; border-radius: 999px; backdrop-filter: blur(4px);
+}
+body[data-tpl="whatsapp"] .day-sep span { background: rgba(255, 255, 255, .85); color: #667781; }
+
+/* 圆形发送键（图标） */
+.v-btn {
+  width: 46px; height: 46px; min-width: 46px; border-radius: 50%;
+  display: inline-flex; align-items: center; justify-content: center; padding: 0;
+}
+.v-btn svg { width: 21px; height: 21px; display: block; margin-left: 2px; }
+
+/* 气泡更圆润、行距更舒服 */
+.msg-bubble { border-radius: 16px; padding: 10px 14px; font-size: 15px; line-height: 1.62; }
+.msg-row.agent .msg-bubble { border-top-left-radius: 6px; }
+.msg-row.visitor .msg-bubble { border-top-right-radius: 6px; }
+body[data-tpl="default"] .msg-row.visitor .msg-bubble { border-top-right-radius: 6px; }
+body[data-tpl="whatsapp"] .msg-row .msg-bubble { border-radius: 12px; }
+body[data-tpl="whatsapp"] .msg-row.visitor .msg-bubble { border-top-right-radius: 4px; }
+body[data-tpl="whatsapp"] .msg-row.agent .msg-bubble { border-top-left-radius: 4px; }
+.msg-row { margin-bottom: 14px; }
+
+/* 头部更精致：圆角下沿 + 光晕 */
+.v-header { border-radius: 0 0 20px 20px; }
+body[data-tpl="whatsapp"] .v-header { border-radius: 0; }
+.v-avatar { box-shadow: 0 4px 14px rgba(4, 30, 24, .22), inset 0 0 0 2px rgba(255, 255, 255, .6); }
+
+/* 输入区：白色卡片 + 更大圆角 */
+.v-footer-wrap { border-radius: 22px 22px 0 0; padding: 10px 14px calc(12px + env(safe-area-inset-bottom)); }
+.v-input { border-radius: 22px; padding: 11px 16px; }
+
+/* 宽屏：更像一个 App 窗口 */
+@media (min-width: 820px) {
+  #app { max-width: 480px; border-radius: 26px; box-shadow: 0 30px 80px rgba(16, 40, 80, .22), 0 0 0 1px rgba(255, 255, 255, .5); }
+  .v-footer-wrap { border-radius: 22px 22px 26px 26px; }
+}

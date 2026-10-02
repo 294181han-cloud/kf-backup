@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
 <meta name="theme-color" content="#1677ff">
 <title>在线咨询</title>
-<link rel="stylesheet" href="/assets/css/visitor.css?v=2.5.0">
+<link rel="stylesheet" href="/assets/css/visitor.css?v=2.6.0">
 </head>
 <body>
 <div id="app">
@@ -66,7 +66,9 @@
         <div class="w-tip"><i></i>客服通常 1 分钟内回复，请放心咨询</div>
       </div>
 
-      <div class="msg-row" :class="m.from === 'visitor' ? 'visitor' : 'agent'" v-for="m in visibleMessages" :key="m.id">
+      <template v-for="(m, mi) in visibleMessages" :key="m.id">
+      <div class="day-sep" v-if="needDaySep(mi)"><span>{{ dayText(m.time) }}</span></div>
+      <div class="msg-row" :class="m.from === 'visitor' ? 'visitor' : 'agent'">
         <template v-if="m.recalled">
           <div class="msg-bubble recall-capsule">{{ m.from === 'visitor' ? '你撤回了一条消息' : '对方撤回了一条消息' }}</div>
         </template>
@@ -96,6 +98,7 @@
           </div>
         </template>
       </div>
+      </template>
     </div>
 
     <!-- 会话已结束（客服结束会话后，聊天记录按提示清除） -->
@@ -133,7 +136,9 @@
         <textarea class="v-input" ref="inputRef" rows="1" v-model="draft"
           @focus="scrollBottom" placeholder="请输入您的问题…"
           @keydown.enter.exact.prevent="send"></textarea>
-        <button class="v-btn" :disabled="!draft.trim() || sending" @click="send">发送</button>
+        <button class="v-btn" :disabled="!draft.trim() || sending" @click="send" title="发送">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12l16-8-6.5 8L20 20z"/></svg>
+        </button>
       </div>
       <div class="v-hold-row" v-else>
         <button class="v-hold-btn" :class="{on: holding && !holdCancel, cancel: holding && holdCancel}"
@@ -217,6 +222,6 @@
 </div>
 
 <script src="/assets/vendor/vue.global.js?v=2.0.1"></script>
-<script src="/assets/js/visitor.js?v=2.7.0"></script>
+<script src="/assets/js/visitor.js?v=2.8.0"></script>
 </body>
 </html>

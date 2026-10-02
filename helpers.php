@@ -514,9 +514,9 @@ function geo_lookup_cn(string $ip): string
     if (function_exists('mb_convert_encoding')) $body = mb_convert_encoding($body, 'UTF-8', 'GBK,GB2312,UTF-8');
     $d = json_decode($body, true);
     if (!is_array($d) || ($d['err'] ?? '') !== '' || ($d['pro'] ?? '') === '') return '';
-    $pro  = trim((string)$d['pro']);
-    $city = trim((string)$d['city']);
-    $reg  = trim((string)$d['region']);            // 区县（如 普宁市）
+    $pro  = geo_clean((string)$d['pro']);
+    $city = geo_clean((string)$d['city']);
+    $reg  = geo_clean((string)$d['region']);       // 区县（如 普宁市）
     $addr = trim((string)($d['addr'] ?? ''));
     $isp  = geo_isp_norm($addr);
     if ($city === '' && $reg !== '') $city = $reg;  // 只有区县时用区县
@@ -535,6 +535,70 @@ function geo_lookup_world(string $ip): string
     return implode('|', $parts);
 }
 
+/** 国内备用源：淘宝/阿里 IP 库（省市运营商，字段规范） */
+function geo_lookup_taobao(string $ip): string
+{
+    $body = geo_http_get('https://ip.taobao.com/outGetIpInfo?ip=' . urlencode($ip) . '&accessKey=alibaba-inc', 3);
+    $d = $body ? json_decode($body, true) : null;
+    if (!is_array($d) || (int)($d['code'] ?? -1) !== 0 || !is_array($d['data'] ?? null)) return '';
+    $x = $d['data'];
+    $country = geo_clean((string)($x['country'] ?? ''));
+    $prov = geo_clean((string)($x['region'] ?? ''));
+    $city = geo_clean((string)($x['city'] ?? ''));
+    $isp = geo_isp_norm((string)($x['isp'] ?? ''));
+    if ($prov === '' && $city === '') return '';   // 没有省市信息（海外/未知）交给其它源
+    $isCn = $country === '' || mb_strpos($country, '中国') !== false;
+    return implode('|', [$isCn ? '中国' : ($country ?: '0'),
+        $prov !== '' ? $prov : '0', $city !== '' ? $city : '0',
+        $isp !== '' ? $isp : '0', $isCn ? 'CN' : '0']);
+}
+
+/** 省市名归一，用于两库比对（去掉 省/市/区/县/自治州 等后缀） */
+function geo_name_key(string $v): string
+{
+    $v = trim($v);
+    if ($v === '' || $v === '0') return '';
+    $v = preg_replace('/(省|市|自治区|特别行政区|回族|维吾尔|壮族|自治州|地区|盟|区|县)+$/u', '', $v);
+    return trim((string)$v);
+}
+
+/** 去掉各种占位符（淘宝会返回 XX；也有库返回 未知/无/- 等） */
+function geo_clean(string $v): string
+{
+    $v = trim($v);
+    if ($v === '' || $v === '0') return '';
+    if (preg_match('/^(xx|XX|未知|无|--|-|null|NULL|N\/A)$/u', $v)) return '';
+    return $v;
+}
+
+/** 可选：ipip.net 付费接口（在平台设置里填 token 即启用，城域网/手机 IP 更准）
+ *  https://ipapi.ipip.net/find?addr=IP   Header: Token: xxx  → ["中国","山东","潍坊","移动"] */
+function geo_lookup_ipip(string $ip): string
+{
+    $token = kv_get('geo_ipip_token', '');
+    if ($token === '') return '';
+    $ch = curl_init('https://ipapi.ipip.net/find?addr=' . urlencode($ip));
+    curl_setopt_array($ch, [
+        CURLOPT_RETURNTRANSFER => true,
+        CURLOPT_TIMEOUT => 3, CURLOPT_CONNECTTIMEOUT => 2,
+        CURLOPT_HTTPHEADER => ['Token: ' . $token],
+        CURLOPT_USERAGENT => 'kfxt/2.37',
+    ]);
+    $body = (string)curl_exec($ch);
+    curl_close($ch);
+    $d = $body ? json_decode($body, true) : null;
+    if (!is_array($d) || count($d) < 3) return '';
+    if (isset($d['ret']) && $d['ret'] !== 'ok') return '';
+    $country = geo_clean((string)($d[0] ?? ''));
+    $prov = geo_clean((string)($d[1] ?? ''));
+    $city = geo_clean((string)($d[2] ?? ''));
+    $isp  = geo_isp_norm(geo_clean((string)($d[3] ?? '')));
+    if ($prov === '' && $city === '') return '';
+    $isCn = $country === '' || mb_strpos($country, '中国') !== false;
+    return implode('|', [$isCn ? '中国' : $country, $prov !== '' ? $prov : '0',
+        $city !== '' ? $city : '0', $isp !== '' ? $isp : '0', $isCn ? 'CN' : '0']);
+}
+
 function lookup_geo(string $ip): string
 {
     if (!$ip || $ip === '127.0.0.1') return '';
@@ -544,7 +608,33 @@ function lookup_geo(string $ip): string
         if ($v !== false && $v !== '') return $v;
     }
     // 国内 IP 走国内库（城市/区县/运营商更准），海外或失败再走 ip-api
-    $out = geo_lookup_cn($ip);
+    // ① 有 ipip token 就优先用（城域网/手机 IP 最准）
+    $out = geo_lookup_ipip($ip);
+    if ($out !== '') { @file_put_contents($cacheFile, $out); return $out; }
+    $cn1 = geo_lookup_cn($ip);        // 太平洋（可到区县）
+    $cn2 = geo_lookup_taobao($ip);    // 淘宝/阿里
+    $out = '';
+    if ($cn1 !== '' || $cn2 !== '') {
+        $a = $cn1 !== '' ? explode('|', $cn1) : null;
+        $b = $cn2 !== '' ? explode('|', $cn2) : null;
+        if ($a && $b) {
+            $ca = geo_name_key($a[2]); $cb = geo_name_key($b[2]);
+            $pa = geo_name_key($a[1]); $pb = geo_name_key($b[1]);
+            $prov = $a[1] !== '0' ? $a[1] : $b[1];
+            $isp  = $a[3] !== '0' ? $a[3] : $b[3];
+            if ($ca !== '' && $cb !== '' && $ca === $cb) {
+                // 两个库城市一致 → 可信，用城市
+                $out = implode('|', ['中国', $prov, $a[2] !== '0' ? $a[2] : $b[2], $isp, 'CN']);
+            } elseif ($pa !== '' && $pa === $pb) {
+                // 省级一致但市级不一致（多为移动/城域网 IP）→ 只显示到省，不给错城市
+                $out = implode('|', ['中国', $prov, '0', $isp, 'CN']);
+            } else {
+                $out = $a[4] === 'CN' ? $cn1 : $cn2;   // 连省都不一致 → 取国内库原值
+            }
+        } else {
+            $out = $cn1 !== '' ? $cn1 : $cn2;
+        }
+    }
     if ($out === '') $out = geo_lookup_world($ip);
     if ($out !== '') @file_put_contents($cacheFile, $out);
     return $out;

@@ -288,10 +288,17 @@ const app = createApp({
         // 提示音只在"来了还没读的新消息"时响：
         // ① 未读总数增加（别的会话来了新消息）；② 页面切到后台时当前会话来了新消息。
         // 当前正在看的会话消息会立刻标记已读，不再重复响。
+        // 注意：unreadTotal 是 computed，必须取 .value；之前写成 unreadTotal > x 恒为 false，导致完全没提示音。
         const inMsgs = (r.messages || []).filter(m => m.from === 'visitor');
-        const unreadIncreased = unreadTotal > lastUnreadTotal && lastUnreadTotal >= 0;
-        if (unreadIncreased || (inMsgs.length > 0 && document.hidden)) beep();
-        lastUnreadTotal = unreadTotal;
+        const unreadNow = unreadTotal.value;
+        const unreadIncreased = unreadNow > lastUnreadTotal && lastUnreadTotal >= 0;
+        const needNotify = unreadIncreased || (inMsgs.length > 0 && document.hidden);
+        if (needNotify) {
+          beep();
+          if (inMsgs.length > 0 || unreadIncreased) desktopNotify(inMsgs, unreadNow);
+        }
+        lastUnreadTotal = unreadNow;
+        flashTitle(unreadNow);
         if (r.messages && r.messages.length) {
           const fresh = r.messages.filter(m => !msgs.value.some(x => x.id === m.id)); // 去重防重复显示
           msgs.value.push(...fresh);
@@ -1560,6 +1567,40 @@ const app = createApp({
     const tickClock = () => { clock.value = new Date().toLocaleString('zh-CN', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit' }); };
     tickClock(); setInterval(tickClock, 1000);
     const unreadTotal = Vue.computed(() => sessions.value.reduce((a, s) => a + (s.unread || 0), 0));
+    // 标题栏提示（页面在后台时最直观）：有未读显示 "(3) 客服工作台"
+    const BASE_TITLE = '客服工作台';
+    const lastTitle = ref('');
+    const flashTitle = (n) => {
+      const t = n > 0 ? `(${n > 99 ? '99+' : n}) ${BASE_TITLE}` : BASE_TITLE;
+      if (t !== lastTitle.value) { lastTitle.value = t; try { document.title = t; } catch (e) {} }
+    };
+    // 桌面通知（需浏览器授权；在「个人设置」里开启）
+    const notifyOn = ref(false);
+    const notifySupported = typeof window !== 'undefined' && 'Notification' in window;
+    try { notifyOn.value = localStorage.getItem('kfxt_notify') === '1' && notifySupported && Notification.permission === 'granted'; } catch (e) {}
+    const enableNotify = async () => {
+      if (!notifySupported) { ElementPlus.ElMessage.warning('当前浏览器不支持桌面通知'); notifyOn.value = false; return; }
+      if (notifyOn.value) {
+        if (Notification.permission !== 'granted') {
+          try { const p = await Notification.requestPermission(); notifyOn.value = (p === 'granted'); } catch (e) { notifyOn.value = false; }
+        }
+      }
+      if (notifyOn.value && Notification.permission !== 'granted') notifyOn.value = false;
+      try { localStorage.setItem('kfxt_notify', notifyOn.value ? '1' : '0'); } catch (e) {}
+      ElementPlus.ElMessage.success(notifyOn.value ? '已开启桌面通知' : '已关闭桌面通知');
+    };
+    const desktopNotify = (inMsgs, unreadNow) => {
+      if (!notifyOn.value || !notifySupported || Notification.permission !== 'granted') return;
+      try {
+        const s = sessions.value.filter(x => x.unread > 0)
+          .sort((a, b) => new Date(b.lastTime || 0) - new Date(a.lastTime || 0))[0];
+        const title = inMsgs.length && !s ? '收到新消息' : `新消息 · ${(s && s.name) || '访客'}`;
+        const body = inMsgs.length ? (inMsgs[inMsgs.length - 1].text || '[图片/语音]').slice(0, 60)
+          : ((s && s.lastMsg) || '有新的访客咨询').slice(0, 60);
+        const n = new Notification(title, { body, tag: 'kfxt-msg', renotify: true });
+        n.onclick = () => { try { window.focus(); n.close(); } catch (e) {} };
+      } catch (e) {}
+    };
     const meAvatarUrl = Vue.computed(() => (me.value && me.value.avatar) || '');
     const avatarPreview = meAvatarUrl;
     // 地域标签格式化：国家 省 市（去 0/空，去重相邻）
@@ -1689,6 +1730,7 @@ const app = createApp({
       sessScope, sessCounts, archiveSession,
       ctxMenu, openCtxMenu, closeCtxMenu, ctxMenuArchive, ctxMenuClose, ctxMenuDelete,
       SOUND_OPTS, sndCfg, playSound, saveSnd,
+      notifyOn, notifySupported, enableNotify,
       voiceHold, startHoldVoice, moveHoldVoice, endHoldVoice,
       manageDlg, history, codeCfg, qrWrap, currentLink, renderMainQr,
       codeCanvas, logoFile, previewDlg, previewSrc, codeValue, codeStyle, codeCheck,

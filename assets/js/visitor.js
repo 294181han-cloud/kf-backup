@@ -106,6 +106,22 @@ createApp({
       (m.from !== 'system' || m.sender_name === '欢迎语')
     ));
     const canRecall = (m) => m.from === 'visitor' && !m.recalled && m.id > 0 && (Date.now() - new Date(m.time).getTime()) < 120000;
+    // 日期分隔（今天 / 昨天 / M月D日）
+    const dayKey = (t) => { const d = new Date(t); return d.getFullYear() + '-' + d.getMonth() + '-' + d.getDate(); };
+    const needDaySep = (mi) => {
+      const list = visibleMessages.value;
+      if (!list.length) return false;
+      if (mi === 0) return true;
+      return dayKey(list[mi].time) !== dayKey(list[mi - 1].time);
+    };
+    const dayText = (t) => {
+      const d = new Date(t), now = new Date();
+      const k = (x) => x.getFullYear() + '-' + x.getMonth() + '-' + x.getDate();
+      const y = new Date(now.getTime() - 86400000);
+      if (k(d) === k(now)) return '今天';
+      if (k(d) === k(y)) return '昨天';
+      return (d.getMonth() + 1) + '月' + d.getDate() + '日';
+    };
     const recallMine = async (m) => {
       try {
         await fetch('/api/visitor/recall', { method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -548,6 +564,7 @@ createApp({
       voiceMode, holding, holdSecs, holdCancel, toggleVoice, startHold, moveHold, endHold,
       toastMsg, SUGGEST, suggest,
       send, pickImage, onImage, fmtTime, scrollBottom, onlineText, isImg, visibleMessages, navTitle, canRecall, recallMine,
+      needDaySep, dayText,
       ui, robotType, verifyTitle, verifyBg, verifyPassed, verifyValue, verifyErr, codeText, codeInput,
       genCode, codeVerify, verifyGo, slideStart, slideMove, slideEnd, doEnter,
       pubShow, pubTitle, pubContent, linkMode, linkSegs, copyLink, myAvatar,
