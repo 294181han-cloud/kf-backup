@@ -473,6 +473,20 @@ createApp({
 
     const viewImage = (url) => { viewing.value = url; };
 
+    // ===== 滚动状态：不在底部时显示「回到最新」按钮 =====
+    const atBottom = ref(true);
+    const onBodyScroll = () => {
+      const el = bodyRef.value; if (!el) return;
+      atBottom.value = (el.scrollHeight - el.scrollTop - el.clientHeight) < 60;
+    };
+    const scrollBottomNow = () => { scrollBottom(); atBottom.value = true; };
+    // 输入框随内容自动长高（最多 5 行）
+    const onDraftInput = (e) => {
+      const el = e && e.target; if (!el) return;
+      el.style.height = 'auto';
+      el.style.height = Math.min(110, el.scrollHeight) + 'px';
+    };
+
     const onlineText = ref('客服在线');
     const navTitle = ref('在线客服');
 
@@ -565,6 +579,7 @@ createApp({
       toastMsg, SUGGEST, suggest,
       send, pickImage, onImage, fmtTime, scrollBottom, onlineText, isImg, visibleMessages, navTitle, canRecall, recallMine,
       needDaySep, dayText,
+      atBottom, onBodyScroll, scrollBottomNow, onDraftInput,
       ui, robotType, verifyTitle, verifyBg, verifyPassed, verifyValue, verifyErr, codeText, codeInput,
       genCode, codeVerify, verifyGo, slideStart, slideMove, slideEnd, doEnter,
       pubShow, pubTitle, pubContent, linkMode, linkSegs, copyLink, myAvatar,

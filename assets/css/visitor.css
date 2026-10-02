@@ -624,3 +624,112 @@ body[data-tpl="whatsapp"] .v-header { border-radius: 0; }
   #app { max-width: 480px; border-radius: 26px; box-shadow: 0 30px 80px rgba(16, 40, 80, .22), 0 0 0 1px rgba(255, 255, 255, .5); }
   .v-footer-wrap { border-radius: 22px 22px 26px 26px; }
 }
+
+/* =====================================================================
+   v2.39 访客端「现代客服组件」重构（借鉴 Intercom / Crisp / Tidio 的做法）
+   · 去掉整行工具条，图标收进输入条内 + 圆形渐变发送键
+   · 消息浮在柔和渐变底上，底部输入区悬浮并带渐隐遮罩
+   · 回到最新按钮、日期胶囊、自动长高输入框
+   ===================================================================== */
+/* 页面底：柔和渐变 + 品牌色光斑（不是白底一片） */
+body[data-tpl="default"] {
+  background:
+    radial-gradient(120% 60% at 12% -8%, color-mix(in srgb, var(--theme) 22%, #fff) 0%, transparent 60%),
+    radial-gradient(100% 50% at 92% 0%, color-mix(in srgb, var(--theme) 12%, #fff) 0%, transparent 55%),
+    linear-gradient(180deg, #eef2f9 0%, #f6f8fc 60%, #f3f6fb 100%);
+  background-attachment: fixed;
+}
+/* 头部：悬浮圆角卡（左右留边），发丝高光 */
+body[data-tpl="default"] .v-header {
+  margin: 10px 10px 0; border-radius: 22px; padding: 14px 16px;
+  background: var(--theme-grad);
+  box-shadow: 0 12px 30px color-mix(in srgb, var(--theme) 26%, transparent);
+}
+body[data-tpl="whatsapp"] .v-header { margin: 0; border-radius: 0 0 18px 18px; }
+.v-header .v-title { text-shadow: 0 1px 2px rgba(0, 0, 0, .12); }
+
+/* 消息区：更宽的留白；底部给输入条留出空间 */
+.v-body { padding: 14px 16px 12px; }
+.msg-box { max-width: 78%; }
+.msg-bubble {
+  border-radius: 18px; padding: 10px 14px; font-size: 15px; line-height: 1.6;
+  box-shadow: 0 1px 2px rgba(16, 40, 80, .06), 0 6px 16px -10px rgba(16, 40, 80, .18);
+}
+.msg-row.agent .msg-bubble { border-top-left-radius: 6px; }
+.msg-row.visitor .msg-bubble { border-top-right-radius: 6px; }
+.msg-ava { width: 32px; height: 32px; font-size: 17px; }
+.msg-row { margin-bottom: 12px; gap: 8px; }
+.b-time { font-size: 10px; opacity: .5; }
+
+/* WhatsApp 模板同步微调（保留墙纸，但更干净） */
+body[data-tpl="whatsapp"] {
+  /* 墙纸更淡：图案只做质感，不抢内容 */
+  background-color: #f3efe8;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='280' height='280' viewBox='0 0 280 280'%3E%3Cg fill='none' stroke='%23d8cfc2' stroke-width='1.4' stroke-linecap='round' stroke-linejoin='round' opacity='.32'%3E%3Ccircle cx='42' cy='44' r='11'/%3E%3Cpath d='M38 44h8M42 40v8'/%3E%3Cpath d='M118 26l9 9-9 9-9-9z'/%3E%3Cpath d='M198 40c-5-7 5-15 9-8 4-7 14 1 9 8l-9 10z'/%3E%3Cpath d='M246 96h18m-9-9v18'/%3E%3Ccircle cx='132' cy='132' r='13'/%3E%3Cpath d='M196 128h16l-3 15h-10zM200 143v7M208 143v7M214 122v8'/%3E%3Cpath d='M128 196q11-13 22 0t-11 14z'/%3E%3Cpath d='M60 246l12 12m0-12-12 12'/%3E%3Ccircle cx='150' cy='252' r='8'/%3E%3Cpath d='M236 236l14-6-6 14-3-5z'/%3E%3C/g%3E%3C/svg%3E");
+}
+body[data-tpl="whatsapp"] .msg-bubble { border-radius: 14px; }
+body[data-tpl="whatsapp"] .msg-row.visitor .msg-bubble { border-top-right-radius: 5px; }
+body[data-tpl="whatsapp"] .msg-row.agent .msg-bubble { border-top-left-radius: 5px; }
+
+/* 悬浮输入条：图标在条内 + 圆形发送键 */
+.v-footer-wrap {
+  background: transparent; box-shadow: none; border-radius: 0;
+  padding: 8px 12px calc(12px + env(safe-area-inset-bottom));
+  position: relative;
+}
+.v-footer-wrap::before {
+  content: ''; position: absolute; left: 0; right: 0; top: -26px; height: 26px;
+  background: linear-gradient(180deg, transparent, rgba(246, 248, 252, .92));
+  pointer-events: none;
+}
+body[data-tpl="whatsapp"] .v-footer-wrap::before { background: linear-gradient(180deg, transparent, rgba(239, 231, 221, .95)); }
+.v-bar {
+  display: flex; align-items: flex-end; gap: 6px;
+  background: #fff; border-radius: 26px; padding: 6px 8px;
+  box-shadow: 0 10px 30px rgba(16, 40, 80, .14), 0 0 0 1px rgba(16, 40, 80, .04);
+}
+.v-icon-btn {
+  width: 38px; height: 38px; flex-shrink: 0; border: 0; border-radius: 50%;
+  background: #f2f5fa; color: #61708b; display: inline-flex; align-items: center; justify-content: center;
+  cursor: pointer; transition: all .15s;
+}
+.v-icon-btn:hover { background: #e9eef7; color: var(--theme); }
+.v-icon-btn:active { transform: scale(.94); }
+.v-icon-btn svg { width: 20px; height: 20px; display: block; }
+.v-bar .v-input {
+  flex: 1; min-width: 0; border: 0; background: transparent; padding: 9px 4px 9px 6px;
+  font-size: 15px; line-height: 1.5; max-height: 110px; resize: none;
+}
+.v-bar .v-input:focus { outline: none; background: transparent; }
+.v-bar .v-btn {
+  width: 42px; height: 42px; min-width: 42px; border-radius: 50%; padding: 0;
+  display: inline-flex; align-items: center; justify-content: center;
+  background: #cfd7e3; color: #fff; box-shadow: none;
+}
+.v-bar .v-btn.ready {
+  background: var(--theme-grad);
+  box-shadow: 0 8px 20px color-mix(in srgb, var(--theme) 40%, transparent);
+}
+body[data-tpl="whatsapp"] .v-bar .v-btn.ready { background: linear-gradient(135deg, #008069, #00a884); }
+.v-bar .v-btn:disabled { opacity: 1; }
+.v-bar .v-hold-btn { flex: 1; height: 42px; border-radius: 21px; border: 0; background: #f2f5fa; margin: 0 4px; }
+.v-bar .v-hold-btn.on { background: color-mix(in srgb, var(--theme) 14%, #fff); color: var(--theme); }
+.v-bar .v-hold-btn.cancel { background: #fdeeee; color: #e5484d; }
+
+/* 回到最新 */
+.v-tobottom {
+  position: absolute; right: 18px; bottom: 92px; z-index: 30;
+  width: 38px; height: 38px; border-radius: 50%; border: 0; cursor: pointer;
+  background: #fff; color: #4b5563; display: inline-flex; align-items: center; justify-content: center;
+  box-shadow: 0 8px 22px rgba(16, 40, 80, .18), 0 0 0 1px rgba(16, 40, 80, .05);
+  animation: msgIn .18s ease-out;
+}
+.v-tobottom svg { width: 19px; height: 19px; }
+.v-tobottom:active { transform: scale(.94); }
+
+/* 空状态：更像现代组件 */
+.welcome-card {
+  background: rgba(255, 255, 255, .92); backdrop-filter: blur(8px);
+  box-shadow: 0 20px 50px -20px rgba(16, 40, 80, .35), 0 0 0 1px rgba(255, 255, 255, .6);
+}
+.w-chip { background: rgba(255, 255, 255, .9); }
