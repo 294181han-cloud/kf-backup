@@ -51,7 +51,7 @@ html[data-ui-cat="mobile"][data-ui-template="default"] .side {
 html[data-ui-cat="mobile"][data-ui-template="default"] .side.collapsed { width: min(80vw, 300px); }
 html[data-ui-cat="mobile"][data-ui-template="default"] .layout.m-side-open .side { transform: none; }
 html[data-ui-cat="mobile"][data-ui-template="default"] .m-mask {
-  position: fixed; inset: 0; z-index: 65; background: rgba(15,23,42,.45);
+  display: block; position: fixed; inset: 0; z-index: 65; background: rgba(15,23,42,.45);
 }
 html[data-ui-cat="mobile"][data-ui-template="default"] .side-tools { display: none; }
 html[data-ui-cat="mobile"][data-ui-template="default"] .side .nav-item { height: 42px; line-height: 42px; font-size: 14px; margin: 1px 10px; }
