@@ -65,9 +65,26 @@ createApp({
       return pad(d.getHours()) + ':' + pad(d.getMinutes());
     };
 
+    // 声音设置（v2.27，租户级）：访客端接收/发送分开
+    const snd = reactive({ recv_on: false, recv_which: 'dindon', send_on: false, send_which: 'water' });
+    const audioCache = {};
+    const playSnd = (which) => {
+      const key = ['water', 'pling', 'weixin', 'dindon', 'click'].includes(which) ? which : 'dindon';
+      try {
+        if (!audioCache[key]) audioCache[key] = new Audio('/assets/sounds/' + key + '.mp3');
+        const a = audioCache[key].cloneNode();
+        a.volume = 0.8;
+        a.play().catch(() => {});   // 浏览器自动播放策略：未交互过会被拒，静默忽略
+      } catch (e) {}
+    };
+
     const applyBrand = (b) => {
       Object.assign(brand, b);
       if (b.theme_color) document.documentElement.style.setProperty('--theme', b.theme_color);
+      snd.recv_on = !!b.snd_recv_on;
+      snd.recv_which = b.snd_recv_which || 'dindon';
+      snd.send_on = !!b.snd_send_on;
+      snd.send_which = b.snd_send_which || 'water';
     };
 
     const storeToken = (t) => {
@@ -97,14 +114,17 @@ createApp({
     };
     const pushMessages = (list) => {
       let added = false;
+      let gotAgent = false;
       for (const m of (list || [])) {
         if (m.id > maxMsgId.value) {
           maxMsgId.value = m.id;
           messages.value.push(m);
           added = true;
+          if (m.from === 'agent') gotAgent = true;   // 客服新消息 → 接收提示音
         }
       }
       if (added) scrollBottom();
+      if (gotAgent && snd.recv_on) playSnd(snd.recv_which);
     };
 
     // ---- 初始化流程 ----
@@ -268,7 +288,7 @@ createApp({
           method: 'POST', headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ session_id: sessionId.value, text })
         }).then(x => { if (!x.ok) return x.json().then(j => { throw new Error(j.error); }); return x.json(); });
-        if (r.message) { pushMessages([r.message]); }
+        if (r.message) { pushMessages([r.message]); if (snd.send_on) playSnd(snd.send_which); }
         if (r.auto_reply) { pushMessages([r.auto_reply]); }
       } catch (e) {
         draft.value = text;

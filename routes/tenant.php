@@ -253,6 +253,15 @@ function handle_tenant_settings(string $method): void
             'dedup_on'       => ts_get($tid, 'dedup_on', '0') === '1',
             'ip_limit_on'    => ts_get($tid, 'ip_limit_on', '0') === '1',
             'ip_limit_count' => (int)ts_get($tid, 'ip_limit_count', '5'),
+            // 声音设置（v2.27，租户级；客服端/访客端分开，发送/接收分开）
+            'agent_snd_recv_on'   => ts_get($tid, 'agent_snd_recv_on', '1') === '1',
+            'agent_snd_recv_which' => ts_get($tid, 'agent_snd_recv_which', 'dindon'),
+            'agent_snd_send_on'   => ts_get($tid, 'agent_snd_send_on', '0') === '1',
+            'agent_snd_send_which' => ts_get($tid, 'agent_snd_send_which', 'click'),
+            'visitor_snd_recv_on'   => ts_get($tid, 'visitor_snd_recv_on', '0') === '1',
+            'visitor_snd_recv_which' => ts_get($tid, 'visitor_snd_recv_which', 'dindon'),
+            'visitor_snd_send_on'   => ts_get($tid, 'visitor_snd_send_on', '0') === '1',
+            'visitor_snd_send_which' => ts_get($tid, 'visitor_snd_send_which', 'water'),
         ]);
     }
 
@@ -264,7 +273,10 @@ function handle_tenant_settings(string $method): void
             'robot' => '验证策略', 'robot_frequency' => '验证频率', 'robot_code' => '邀请码/密码',
             'link_mode' => '链接模式', 'user_head_type' => '访客头像类型', 'user_head' => '自定义访客头像',
             'user_name_type' => '访客名称类型', 'publicity_title' => '弹窗公告标题', 'publicity_content' => '弹窗公告内容',
-            'inform_text' => '滚动通知文案', 'tpl_nav_title' => '导航栏标题', 'vip_badge' => 'VIP标识', 'footer_text' => '底部标识'];
+            'inform_text' => '滚动通知文案', 'tpl_nav_title' => '导航栏标题', 'vip_badge' => 'VIP标识', 'footer_text' => '底部标识',
+            // 声音选择（v2.27）：water 水滴 / pling / weixin 微信 / dindon / click 点击
+            'agent_snd_recv_which' => '客服端接收提示音', 'agent_snd_send_which' => '客服端发送提示音',
+            'visitor_snd_recv_which' => '访客端接收提示音', 'visitor_snd_send_which' => '访客端发送提示音'];
         foreach ($labels as $k => $label) {
             if (array_key_exists($k, $data)) {
                 $v = mb_substr(trim((string)$data[$k]), 0, 500);
@@ -276,7 +288,7 @@ function handle_tenant_settings(string $method): void
                 ts_set($tid, $k, $v);
             }
         }
-        foreach (['pre_inquiry_on', 'notice_on', 'auto_blacklist', 'dedup_on', 'ip_limit_on', 'filtration_wx', 'filtration_pc', 'filtration_area', 'publicity_on', 'inform_on', 'tpl_nav_on'] as $k) {
+        foreach (['pre_inquiry_on', 'notice_on', 'auto_blacklist', 'dedup_on', 'ip_limit_on', 'filtration_wx', 'filtration_pc', 'filtration_area', 'publicity_on', 'inform_on', 'tpl_nav_on', 'agent_snd_recv_on', 'agent_snd_send_on', 'visitor_snd_recv_on', 'visitor_snd_send_on'] as $k) {
             if (array_key_exists($k, $data)) ts_set($tid, $k, $data[$k] ? '1' : '0');
         }
         if (array_key_exists('ip_limit_count', $data)) {
@@ -290,6 +302,10 @@ function handle_tenant_settings(string $method): void
             'user_head_type' => ['default', 'random', 'custom'],
             'user_name_type' => ['default', 'random'],
             'code_logo_type' => ['avatar', 'wechat', 'alipay', 'mix'],
+            'agent_snd_recv_which' => ['water', 'pling', 'weixin', 'dindon', 'click'],
+            'agent_snd_send_which' => ['water', 'pling', 'weixin', 'dindon', 'click'],
+            'visitor_snd_recv_which' => ['water', 'pling', 'weixin', 'dindon', 'click'],
+            'visitor_snd_send_which' => ['water', 'pling', 'weixin', 'dindon', 'click'],
         ];
         foreach ($enums as $k => $allow) {
             if (array_key_exists($k, $data)) {

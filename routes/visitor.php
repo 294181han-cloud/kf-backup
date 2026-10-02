@@ -90,6 +90,11 @@ function tenant_brand(array $tenant): array
         'footer_text'     => ts_get($tid, 'footer_text', ''),
         // 链接模式
         'link_mode'       => ts_get($tid, 'link_mode', 'no'),
+        // 声音设置（v2.27，访客端：接收/发送分开开关与选音）
+        'snd_recv_on'    => ts_get($tid, 'visitor_snd_recv_on', '0') === '1',
+        'snd_recv_which' => ts_get($tid, 'visitor_snd_recv_which', 'dindon'),
+        'snd_send_on'    => ts_get($tid, 'visitor_snd_send_on', '0') === '1',
+        'snd_send_which' => ts_get($tid, 'visitor_snd_send_which', 'water'),
         // 访客头像/名称类型
         'user_head_type'  => ts_get($tid, 'user_head_type', 'default'),
         'user_head'       => ts_get($tid, 'user_head', ''),

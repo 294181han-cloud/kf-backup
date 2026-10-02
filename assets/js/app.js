@@ -193,6 +193,16 @@ const app = createApp({
           closed_keep_days: b.closed_keep_days != null ? b.closed_keep_days : 3,
           max_sessions: b.max_sessions != null ? b.max_sessions : 0,
         });
+        Object.assign(sndCfg, {
+          agent_recv_on: b.agent_snd_recv_on !== false,
+          agent_recv_which: b.agent_snd_recv_which || 'dindon',
+          agent_send_on: !!b.agent_snd_send_on,
+          agent_send_which: b.agent_snd_send_which || 'click',
+          visitor_recv_on: !!b.visitor_snd_recv_on,
+          visitor_recv_which: b.visitor_snd_recv_which || 'dindon',
+          visitor_send_on: !!b.visitor_snd_send_on,
+          visitor_send_which: b.visitor_snd_send_which || 'water',
+        });
         Object.assign(sec, {
           notice_on: !!b.notice_on, notice_text: b.notice_text || '',
           filter_keywords: b.filter_keywords || '', auto_blacklist: !!b.auto_blacklist,
@@ -242,15 +252,36 @@ const app = createApp({
     const restartPoll = () => { if (pollTimer) { stopPoll(); loopPoll(); } };
     const stopPoll = () => { if (pollTimer) { clearTimeout(pollTimer); pollTimer = null; } };
 
-    const beep = () => {
-      if (me.value && me.value.role === 'agent' && !me.value.sound_enabled) return;
+    // ===== 提示音（v2.27）：租户级设置，客服端接收/发送分开；素材 assets/sounds/*.mp3 =====
+    const SOUND_OPTS = [
+      { v: 'water', l: '水滴' }, { v: 'pling', l: 'Pling' }, { v: 'weixin', l: '微信' },
+      { v: 'dindon', l: 'Dindon' }, { v: 'click', l: '点击' },
+    ];
+    const sndCfg = reactive({
+      agent_recv_on: true, agent_recv_which: 'dindon',
+      agent_send_on: false, agent_send_which: 'click',
+      visitor_recv_on: false, visitor_recv_which: 'dindon',
+      visitor_send_on: false, visitor_send_which: 'water',
+    });
+    const audioCache = {};
+    const playSound = (which) => {
+      const key = ['water', 'pling', 'weixin', 'dindon', 'click'].includes(which) ? which : 'dindon';
       try {
-        const ctx = new (window.AudioContext || window.webkitAudioContext)();
-        const o = ctx.createOscillator(); const g = ctx.createGain();
-        o.connect(g); g.connect(ctx.destination);
-        o.frequency.value = 880; g.gain.value = .12;
-        o.start(); o.stop(ctx.currentTime + .18);
+        if (!audioCache[key]) audioCache[key] = new Audio('/assets/sounds/' + key + '.mp3');
+        const a = audioCache[key].cloneNode();
+        a.volume = 0.8;
+        a.play().catch(() => {});
       } catch (e) {}
+    };
+    const beep = () => {   // 接收提示（新访客消息/新未读）；租户设置优先，子客服个人 sound_enabled 仍生效
+      if (me.value && me.value.role === 'agent' && !me.value.sound_enabled) return;
+      if (!sndCfg.agent_recv_on) return;
+      playSound(sndCfg.agent_recv_which);
+    };
+    const sendBeep = () => {
+      if (me.value && me.value.role === 'agent' && !me.value.sound_enabled) return;
+      if (!sndCfg.agent_send_on) return;
+      playSound(sndCfg.agent_send_which);
     };
 
     const scrollBottom = () => nextTick(() => { if (chatBody.value) chatBody.value.scrollTop = chatBody.value.scrollHeight; });
@@ -288,6 +319,7 @@ const app = createApp({
         draft.value = '';
         showQuick.value = false;
         scrollBottom();
+        sendBeep();
         const s = sessions.value.find(x => x.id === currentId.value);
         if (s) { s.lastMsg = text.slice(0, 60); s.agent_id = s.agent_id || (me.value.role === 'agent' ? me.value.id : s.agent_id); }
       } catch (e) { ElementPlus.ElMessage.error(e.message); }
@@ -296,6 +328,13 @@ const app = createApp({
     const onKey = (e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(); } };
 
     // 快捷回复：点击直接发送全部内容
+    // 快捷消息（v2.27 改版）：单击 = 文字填入输入框（可编辑后发送）；Ctrl+单击 = 直接发送
+    const quickClick = (q, ev) => {
+      if (ev && (ev.ctrlKey || ev.metaKey)) { sendQuick(q); return; }
+      draft.value = q.content || '';
+      const input = document.querySelector('.chat-input textarea, .chat-input input');
+      if (input) { input.focus(); }
+    };
     const sendQuick = async (q) => {
       if (!currentId.value || sending.value) { ElementPlus.ElMessage.warning('请先选择会话'); return; }
       const text = q.content || '';
@@ -307,6 +346,7 @@ const app = createApp({
         msgs.value.push(r.message);
         maxMsgId.value = r.message.id;
         scrollBottom();
+        sendBeep();
         const s = sessions.value.find(x => x.id === currentId.value);
         if (s) s.lastMsg = (text || (atts.length ? '[图片]' : '')).slice(0, 60);
       } catch (e) { ElementPlus.ElMessage.error(e.message); }
@@ -665,6 +705,18 @@ const app = createApp({
       try {
         await API.put('/api/tenant/settings', { ...pol });
         ElementPlus.ElMessage.success('已保存');
+      } catch (e) { ElementPlus.ElMessage.error(e.message); }
+    };
+    // 声音设置保存（v2.27）：键映射到租户 settings
+    const saveSnd = async () => {
+      try {
+        await API.put('/api/tenant/settings', {
+          agent_snd_recv_on: sndCfg.agent_recv_on, agent_snd_recv_which: sndCfg.agent_recv_which,
+          agent_snd_send_on: sndCfg.agent_send_on, agent_snd_send_which: sndCfg.agent_send_which,
+          visitor_snd_recv_on: sndCfg.visitor_recv_on, visitor_snd_recv_which: sndCfg.visitor_recv_which,
+          visitor_snd_send_on: sndCfg.visitor_send_on, visitor_snd_send_which: sndCfg.visitor_send_which,
+        });
+        ElementPlus.ElMessage.success('声音设置已保存');
       } catch (e) { ElementPlus.ElMessage.error(e.message); }
     };
     // ===== 安全与维护 / 访客资源 / 引导 / 深色 =====
@@ -1213,6 +1265,7 @@ const app = createApp({
       pol, savePolicy, uploadPolHead, clock, unreadTotal, sessCollapsed,
       sessScope, sessCounts, archiveSession,
       ctxMenu, openCtxMenu, closeCtxMenu, ctxMenuArchive, ctxMenuClose, ctxMenuDelete,
+      SOUND_OPTS, sndCfg, playSound, saveSnd,
       manageDlg, history, codeCfg, qrWrap, currentLink, renderMainQr,
       posterCfg, posterQrBox, posterBgInput, pickPosterBg, onPosterBg, downloadPoster2,
       POSTER_POS, qrFreeStyle, qrLayerStyle, textStyle,
@@ -1220,7 +1273,7 @@ const app = createApp({
       geoTag, visitorTag, visitorTagFull, copyQrImage, downloadQrImage, codeRotateHint, rotateCode, loadHistory, disableLink, saveCodeCfg, meAvatarUrl,
       quickFields, welcomeFields, autoFields, blFields, preqFields,
       shortTime, fmtTime, sourceText, contactLabel, barW, quotaW,
-      openSession, send, onKey, useQuick, sendQuick, onImage, startRec, stopRec, closeSession, doTransfer,
+      openSession, send, onKey, useQuick, sendQuick, quickClick, onImage, startRec, stopRec, closeSession, doTransfer,
       editContact, saveContact, contactDlg, editingContact, saveNote, sendBroadcast,
       copy, createLink, renewLink, newCode, delCode, showQr,
       agentDlg, agentMode, agentForm, openAgentEdit, saveAgent, resetAgentPw, toggleAgent, delAgent,
