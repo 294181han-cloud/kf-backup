@@ -574,7 +574,7 @@ const app = createApp({
     const closeSession = async () => {
       const sid = currentId.value;
       if (!sid) return;
-      try { await confirmEndSession((current.value && current.value.name) || ''); } catch (e) { return; }
+      // 头部「✔ 结束」按钮本身带 popconfirm（含「访客端聊天记录将清除」提示），此处不再二次弹窗
       try {
         await API.post('/api/sessions/' + sid + '/close');
         ElementPlus.ElMessage.success('会话已结束');
