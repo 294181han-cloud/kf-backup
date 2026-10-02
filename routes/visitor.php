@@ -9,6 +9,16 @@ declare(strict_types=1);
 /** 解析访客上下文：返回 ['tenant'=>行, 'agent_id'=>int] 或 null */
 function resolve_visitor_context(): ?array
 {
+    // TEMP-DEBUG（部署验证后删除）
+    if (isset($_GET['__dbg_host'])) {
+        header('Content-Type: application/json; charset=utf-8');
+        $h = strtolower($_SERVER['HTTP_HOST'] ?? '');
+        $h = preg_replace('/:\d+$/', '', $h);
+        $rows = db()->query('SELECT link FROM service_codes')->fetchAll(PDO::FETCH_COLUMN);
+        echo json_encode(['host' => $h, 'links' => array_slice($rows, -6)], JSON_UNESCAPED_UNICODE);
+        exit;
+    }
+
     $pdo = db();
     $code = trim((string)input('code', ''));
     $t = trim((string)input('t', ''));
