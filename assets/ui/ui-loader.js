@@ -16,6 +16,11 @@
 
   var script = document.currentScript;
   var cat = (script && script.getAttribute('data-ui-cat')) || 'pc';
+  // auto：同一页面按设备宽度选分类（手机浏览器 → mobile，其余 → pc）
+  if (cat === 'auto') {
+    var vw = window.innerWidth || document.documentElement.clientWidth || 1024;
+    cat = (vw <= 768) ? 'mobile' : 'pc';
+  }
   var conf = REG.categories[cat] || REG.categories.pc;
 
   // 旧版工作台主题键迁移（kfxt_theme: default/purple/sky/green）
@@ -83,7 +88,7 @@
     var head = document.head || document.getElementsByTagName('head')[0];
     var needBase = !!conf.base && !head.querySelector('link[data-ui-base]');
     // 模板 css（结构性外观，可选）
-    var tplHref = tpl.css ? tpl.css + '?v=' + REG.version : null;
+    var tplHref = tpl.css ? tpl.css : null;
     var oldTpl = head.querySelector('link[data-ui-tpl]');
     if (tplHref) {
       if (!oldTpl || oldTpl.getAttribute('href') !== tplHref) {

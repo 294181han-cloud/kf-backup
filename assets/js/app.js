@@ -913,6 +913,12 @@ const app = createApp({
     const applyDark = () => { document.body.classList.toggle('dark', dark.value); };
     const toggleDark = () => { dark.value = !dark.value; try { localStorage.setItem('kfxt_dark', dark.value ? '1' : '0'); } catch (e) {} applyDark(); };
     applyDark();
+    // 手机端后台：折叠交互无意义，强制展开形态
+    const isMobileUi = document.documentElement.getAttribute('data-ui-cat') === 'mobile';
+    if (isMobileUi) { sessCollapsed.value = false; sideCollapsed.value = false; }
+    // 手机端抽屉导航
+    const mSideOpen = ref(false);
+    Vue.watch(() => tab.value, () => { mSideOpen.value = false; });
 
     // CRUD 字段配置
     const quickFields = [
@@ -989,7 +995,7 @@ const app = createApp({
       uploadAvatar, isImg,
       sec, loginLogs, visitors, cleanupOpts, loadSecurityPage, saveSecurity, doCleanup, loadVisitors, openVisitorSessions,
       guide, guideDone, dark, toggleDark, renameVisitor, renderCodeQrs, tplList,
-      uiCatList, uiSel, uiTplList, uiColorList, uiPick, sideCollapsed,
+      uiCatList, uiSel, uiTplList, uiColorList, uiPick, sideCollapsed, mSideOpen,
       blockSession, blockIp, kwList, kwInput, kwSaving, addKw, removeKw, saveFilter, agentCmd, restartPoll,
       chatSearchOn, chatSearchKw, searchHit, visibleMsgs, canRecall, recallMsg, isRead,
       pol, savePolicy, uploadPolHead, clock, unreadTotal, sessCollapsed,

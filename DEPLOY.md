@@ -326,3 +326,39 @@ v2.14 撤回同步改动遗漏了 `$recalledIds` 的块外初始化——**未�
 - 本地：默认视觉不变；8 款 PC 配色（含旧 4 款）切换全局生效；深色模式侧栏深色、活动项醒目；
   账号区单行显示；后台UI 页双分类选择即时生效；访客页 ?ui= 与 localStorage 兼容旧值；无 JS 红错
 - 按用户指示跳过 selftest 回归（本次改动含页面模板与 JS，已用浏览器逐项过检代替）
+
+## 23. v2.20 变更记录（纠正：UI 体系服务客服后台；手机端后台默认模板，2026-10-02）
+
+### 纠正（用户指出的理解偏差）
+- 上一版把 mobile 分类错挂到访客页 visitor.html。正确模型：**本体系只服务客服后台**——
+  客服有的用电脑、有的用手机；访客页外观由「访客端模板」（品牌色/平台皮肤，服务端配置）负责，
+  与本模板/配色系统无关
+- **分类重定义**：pc = 电脑端后台（app.html/admin.html 电脑浏览器）；
+  mobile = 手机端后台（**手机浏览器打开 app.html**）
+- visitor.html 移除 ui-registry/ui-loader 引用，回归纯「基础样式 + 品牌色/皮肤」模型；
+  mobile 配色文件（默认亮色/暗色/薄荷/樱花粉/暖阳橙/香芋紫）转为手机端后台配色
+
+### 新增：手机端后台「默认」模板
+- app.html 的 ui-loader 改 data-ui-cat="auto"：加载器按宽度 ≤768px 自动选 mobile 分类
+  （admin.html 保持恒为 pc）
+- 新增 assets/ui/mobile/_base.css（el 主色接线 + 契约变量兜底）与
+  assets/ui/mobile/default/template.css（结构：抽屉侧栏 + 顶栏汉堡/返回 + 会话/聊天单屏切换
+  + 信息栏收起 + 弹窗限宽 + 面板横向滚动）；颜色全部引用配色变量，各配色即装即用；
+  亮色表面用 body:not(.dark) 让位深色模式
+- 页面结构钩子（app.html + app.js 小改）：.m-menu-btn 汉堡、.m-mask 遮罩、.layout.m-side-open、
+  工作台 .has-chat（有会话时列表/聊天单屏切换）、chat-head 返回按钮（currentId=null）；
+  手机端强制展开侧栏/会话列折叠状态，切页自动收起抽屉
+- 电脑端零变化：钩子元素默认 display:none，模板规则全部限定在 mobile 分类作用域
+
+### 后台UI 配置页
+- 两分组变为：电脑端（app.html / admin.html）与 手机端（app.html）；
+  说明改为「访客页外观请用访客端模板（品牌色/平台皮肤）」
+
+### 版本
+- registry version 2.5.0；registry/loader ?v=2.5.0（app/admin 两页）；app.js/app.css ?v=2.3.0；
+  visitor.html 移除两处 ui 引用
+
+### 验证
+- 本地：电脑宽度下 pc 分类不受影响（钩子隐藏、无模板 css）；访客页解耦后正常加载、无 [ui] 日志
+- 线上（推送后）：手机视口（390px）登录测试租户验证抽屉/单屏切换/配色切换；电脑视口回归
+- selftest 按用户指示继续跳过（浏览器过检代替）

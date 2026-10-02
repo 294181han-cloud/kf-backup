@@ -1,0 +1,24 @@
+/* mobile/_base.css - 手机端后台共用的接线（app.html 手机浏览器；由加载器注入，先于模板/配色 css）
+   做"变量 → 组件"的映射与契约变量兜底；具体颜色由各配色 theme.css 提供。 */
+
+:root {
+  /* 契约变量兜底默认值（配色缺失/未加载时页面仍可用） */
+  --theme: #1677ff;
+  --theme-grad: linear-gradient(135deg, #1677ff 0%, #4d9bff 100%);
+  --bg: #f0f2f7;
+  --card: #ffffff;
+  --ink: #1a2233;
+  --ink-2: #5c6b85;
+  --ink-3: #9aa7bd;
+  --line: #e8ecf3;
+  --radius: 14px;
+
+  /* Element Plus 主色跟随配色主题色（按钮/链接/菜单/开关等全部生效） */
+  --el-color-primary: var(--theme);
+  --el-color-primary-light-3: color-mix(in srgb, var(--theme) 70%, white);
+  --el-color-primary-light-5: color-mix(in srgb, var(--theme) 50%, white);
+  --el-color-primary-light-7: color-mix(in srgb, var(--theme) 30%, white);
+  --el-color-primary-light-8: color-mix(in srgb, var(--theme) 20%, white);
+  --el-color-primary-light-9: color-mix(in srgb, var(--theme) 10%, white);
+  --el-color-primary-dark-2: color-mix(in srgb, var(--theme) 80%, black);
+}

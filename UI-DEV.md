@@ -9,8 +9,11 @@
 
 | 分类 | 适用页面 | 基础样式 | 目录 |
 |------|---------|---------|---------|
-| pc（电脑端） | /app.html、/admin.html | /assets/css/app.css、admin.css + /assets/ui/pc/_base.css | /assets/ui/pc/ |
-| mobile（手机端） | /visitor.html | /assets/css/visitor.css | /assets/ui/mobile/ |
+| pc（电脑端后台） | /app.html、/admin.html（电脑浏览器） | /assets/css/app.css、admin.css + /assets/ui/pc/_base.css | /assets/ui/pc/ |
+| mobile（手机端后台） | /app.html（手机浏览器，加载器按宽度 ≤768px 自动选中） | /assets/css/app.css + /assets/ui/mobile/_base.css | /assets/ui/mobile/ |
+
+**本体系只服务客服后台。** 访客页 visitor.html 不属于本系统：其外观由租户品牌色 +
+平台皮肤（工作台「访客端模板」页，服务端配置）控制。
 
 - **模板**（结构性外观）：`assets/ui/<分类>/<模板id>/template.css`（可选；为 null 表示沿用基础样式结构）。
   当前只有「默认」模板。
@@ -21,6 +24,8 @@
   并在 `<html>` 上设 `data-ui-cat="pc|mobile"`、`data-ui-template="<模板id>"`、`data-ui="<配色id>"`。
 - 选择优先级：URL `?ui=<配色id>` / `?uit=<模板id>`（预览用，写入 localStorage）> localStorage > 注册表默认。
 - 配色切换即时生效（工作台「系统 → 后台UI」页选择，保存在本浏览器）。
+- 手机端后台的模板需要页面结构钩子（.m-menu-btn/.m-mask/.m-side-open/.has-chat 等，
+  见 app.html 与 mobile/default/template.css），新模板沿用同一批钩子。
 - 深色模式（工作台 `body.dark`）是独立开关，与模板/配色正交，不要在配色里管它。
 
 ## 2. 变量契约（配色 theme.css 必须覆盖全部变量）
@@ -89,9 +94,9 @@
 6. PC 配色额外：工作台按钮/菜单/链接颜色跟随、深色模式开启后侧栏为深色且活动项仍醒目
 7. `git diff` 范围：新配色/模板目录 + ui-registry.js（登记行 + version）+（如涉引用文件）?v= 提升
 
-## 8. 现有清单（2026-10，v2.19）
+## 8. 现有清单（2026-10，v2.20）
 
-- 分类：pc 电脑端（app/admin）/ mobile 手机端（visitor）；各只有一个「默认」模板
+- 分类：pc 电脑端后台（app/admin）/ mobile 手机端后台（app.html 手机浏览器）；各只有一个「默认」模板
 - PC 配色：经典蓝（default）/ 优雅紫 / 天空蓝 / 清新绿 / 玫瑰红 / 暖阳橙 / 靛蓝 / 石墨灰
 - Mobile 配色：默认亮色（default）/ 暗色 / 薄荷 / 樱花粉 / 暖阳橙 / 香芋紫
 - 注意：访客端「19 套平台皮肤模板」（微信/支付宝皮肤等，body[data-tpl]）是**租户营销功能**，

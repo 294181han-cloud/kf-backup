@@ -38,11 +38,11 @@
 │   ├── qr-poster.js     # 共享二维码海报绘制
 │   ├── css/             # 页面基础样式：app.css / admin.css / visitor.css
 │   ├── js/              # 页面逻辑：app.js / app-components.js / app-boot.js / admin.js / visitor.js
-│   ├── ui/              # 多 UI 系统：分类(pc/mobile)→模板→配色（见 UI-DEV.md）
+│   ├── ui/              # 多 UI 系统：客服后台的 分类(pc电脑端/mobile手机端)→模板→配色（见 UI-DEV.md）
 │   │   ├── ui-registry.js  # 注册表：分类→模板→配色三级（新增在此登记）
-│   │   ├── ui-loader.js    # 加载器（base+模板+配色注入，?ui=/​?uit= 预览）
-│   │   ├── pc/          # 工作台/管理台配色：_base.css + default/purple/sky/green/rose/sunset/indigo/graphite
-│   │   └── mobile/      # 访客端配色：default/dark/mint/sakura/sunset/taro
+│   │   ├── ui-loader.js    # 加载器（base+模板+配色注入；app.html data-ui-cat="auto" 按宽度自动选端）
+│   │   ├── pc/          # 电脑端后台配色：_base.css + default/purple/sky/green/rose/sunset/indigo/graphite
+│   │   └── mobile/      # 手机端后台（app.html 手机浏览器）：_base.css + 默认模板(抽屉+单屏) + 6 配色
 │   └── vendor/          # 第三方库（vue/element-plus/echarts/qrcode），不修改
 ├── selftest.ps1         # 112 项全流程回归（直接跑线上！幂等可重跑）
 ├── DEPLOY.md            # 部署运维 + v1~v5 全部变更记录（新变更追加在文末）

@@ -1,0 +1,109 @@
+/* mobile/default/template.css - 手机端后台「默认」模板
+   作用域：html[data-ui-cat="mobile"][data-ui-template="default"]（仅手机浏览器打开 app.html 时由加载器选中）
+   结构覆盖：抽屉侧栏 + 顶栏 + 会话/聊天单屏切换；颜色一律引用配色契约变量，不写死。
+   亮色表面用 body:not(.dark) 让位给深色模式（body.dark 系列规则继续生效）。
+   依赖 app.html 中的结构钩子：.m-menu-btn（汉堡）、.m-mask（遮罩）、.layout.m-side-open、
+   .content.workbench.has-chat、.chat-head .m-back-btn。 */
+
+/* ===== 全局 ===== */
+html[data-ui-cat="mobile"][data-ui-template="default"] body { background: var(--bg); }
+html[data-ui-cat="mobile"][data-ui-template="default"] .layout {
+  display: block; height: 100vh; height: 100dvh; overflow: hidden; position: relative;
+}
+html[data-ui-cat="mobile"][data-ui-template="default"] .panel { overflow-x: auto; }
+html[data-ui-cat="mobile"][data-ui-template="default"] .content { padding: 12px; max-width: none; }
+/* 弹窗不超出屏幕 */
+html[data-ui-cat="mobile"] .el-dialog { max-width: 94vw; }
+html[data-ui-cat="mobile"] .el-message-box { max-width: 90vw; }
+
+/* ===== 顶栏：汉堡菜单 + 返回 ===== */
+html[data-ui-cat="mobile"][data-ui-template="default"] .m-menu-btn,
+html[data-ui-cat="mobile"][data-ui-template="default"] .m-back-btn {
+  display: inline-flex; align-items: center; justify-content: center;
+  min-width: 32px; height: 32px; padding: 0 8px; flex-shrink: 0;
+  border: none; border-radius: 8px; background: transparent;
+  font-size: 18px; line-height: 1; cursor: pointer; color: var(--ink, #1f2329);
+}
+html[data-ui-cat="mobile"][data-ui-template="default"] .m-menu-btn:active,
+html[data-ui-cat="mobile"][data-ui-template="default"] .m-back-btn:active {
+  background: color-mix(in srgb, var(--theme) 12%, transparent);
+}
+html[data-ui-cat="mobile"][data-ui-template="default"] .topbar {
+  position: sticky; top: 0; z-index: 30; height: 50px; padding: 0 10px; gap: 8px;
+}
+html[data-ui-cat="mobile"][data-ui-template="default"] .topbar .title {
+  font-size: 15.5px; flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+html[data-ui-cat="mobile"][data-ui-template="default"] .topbar .clock { display: none; }
+html[data-ui-cat="mobile"][data-ui-template="default"] .unread-chip { font-size: 11px; padding: 1px 8px; }
+html[data-ui-cat="mobile"][data-ui-template="default"] body:not(.dark) .topbar {
+  background: var(--card); border-bottom-color: var(--line);
+}
+
+/* ===== 抽屉侧栏 ===== */
+html[data-ui-cat="mobile"][data-ui-template="default"] .side {
+  position: fixed; top: 0; bottom: 0; left: 0; z-index: 70;
+  width: min(80vw, 300px);
+  transform: translateX(-103%); transition: transform .22s ease;
+  box-shadow: 0 0 40px rgba(0,0,0,.22);
+  overflow-y: auto;
+}
+html[data-ui-cat="mobile"][data-ui-template="default"] .side.collapsed { width: min(80vw, 300px); }
+html[data-ui-cat="mobile"][data-ui-template="default"] .layout.m-side-open .side { transform: none; }
+html[data-ui-cat="mobile"][data-ui-template="default"] .m-mask {
+  position: fixed; inset: 0; z-index: 65; background: rgba(15,23,42,.45);
+}
+html[data-ui-cat="mobile"][data-ui-template="default"] .side-tools { display: none; }
+html[data-ui-cat="mobile"][data-ui-template="default"] .side .nav-item { height: 42px; line-height: 42px; font-size: 14px; margin: 1px 10px; }
+html[data-ui-cat="mobile"][data-ui-template="default"] .side .logo { padding: 14px 16px 10px; }
+/* 抽屉内强制展开形态（收起态是桌面交互，手机无意义） */
+html[data-ui-cat="mobile"][data-ui-template="default"] .side.collapsed .nv-text,
+html[data-ui-cat="mobile"][data-ui-template="default"] .side.collapsed .nav-group,
+html[data-ui-cat="mobile"][data-ui-template="default"] .side.collapsed .side-hero { display: revert; }
+/* 活动项主题色（浅深色通吃，跟随配色） */
+html[data-ui-cat="mobile"][data-ui-template="default"] .side .nav-item.active {
+  color: var(--theme);
+  background: color-mix(in srgb, var(--theme) 10%, var(--card));
+  box-shadow: inset 3px 0 0 var(--theme);
+}
+/* 亮色表面跟随配色（深色交给 body.dark 规则） */
+html[data-ui-cat="mobile"][data-ui-template="default"] body:not(.dark) .side { background: var(--card); }
+html[data-ui-cat="mobile"][data-ui-template="default"] body:not(.dark) .side .logo,
+html[data-ui-cat="mobile"][data-ui-template="default"] body:not(.dark) .side .nav-item,
+html[data-ui-cat="mobile"][data-ui-template="default"] body:not(.dark) .side .me b { color: var(--ink); }
+html[data-ui-cat="mobile"][data-ui-template="default"] body:not(.dark) .side .me { color: var(--ink-2); border-top-color: var(--line); }
+html[data-ui-cat="mobile"][data-ui-template="default"] body:not(.dark) .side .nav-group { color: var(--ink-3); }
+html[data-ui-cat="mobile"][data-ui-template="default"] body:not(.dark) .side .nav-item:hover { background: color-mix(in srgb, var(--theme) 6%, var(--card)); }
+html[data-ui-cat="mobile"][data-ui-template="default"] body:not(.dark) .side .side-hero { background: color-mix(in srgb, var(--theme) 4%, var(--card)); border-bottom-color: var(--line); }
+
+/* ===== 工作台：会话列表 / 聊天 单屏切换 ===== */
+html[data-ui-cat="mobile"][data-ui-template="default"] .content.workbench {
+  display: flex; max-width: none; width: 100%; padding: 0;
+}
+html[data-ui-cat="mobile"][data-ui-template="default"] .sess-col { width: 100%; max-width: none; border-right: none; }
+html[data-ui-cat="mobile"][data-ui-template="default"] .sess-col.collapsed { width: 100%; }
+html[data-ui-cat="mobile"][data-ui-template="default"] .sess-collapse-btn { display: none; }
+html[data-ui-cat="mobile"][data-ui-template="default"] .content.workbench.has-chat .sess-col { display: none; }
+html[data-ui-cat="mobile"][data-ui-template="default"] .content.workbench:not(.has-chat) .chat-col { display: none; }
+html[data-ui-cat="mobile"][data-ui-template="default"] .info-col { display: none; }
+html[data-ui-cat="mobile"][data-ui-template="default"] .chat-head .m-back-btn { margin-left: -6px; }
+html[data-ui-cat="mobile"][data-ui-template="default"] .msg-box { max-width: 84%; }
+html[data-ui-cat="mobile"][data-ui-template="default"] .chat-input textarea { height: 52px; }
+html[data-ui-cat="mobile"][data-ui-template="default"] body:not(.dark) .sess-col { background: var(--card); }
+html[data-ui-cat="mobile"][data-ui-template="default"] body:not(.dark) .chat-col { background: var(--bg); }
+html[data-ui-cat="mobile"][data-ui-template="default"] body:not(.dark) .chat-head { background: var(--card); border-bottom-color: var(--line); }
+html[data-ui-cat="mobile"][data-ui-template="default"] body:not(.dark) .chat-input { background: var(--card); border-top-color: var(--line); }
+html[data-ui-cat="mobile"][data-ui-template="default"] body:not(.dark) .msg-bubble { background: var(--card); color: var(--ink); }
+html[data-ui-cat="mobile"][data-ui-template="default"] body:not(.dark) .msg-ava { background: var(--card); }
+html[data-ui-cat="mobile"][data-ui-template="default"] body:not(.dark) .msg-row.mine .msg-bubble {
+  background: color-mix(in srgb, var(--theme) 14%, white); color: var(--ink);
+}
+html[data-ui-cat="mobile"][data-ui-template="default"] body:not(.dark) .chat-search { background: var(--card); }
+html[data-ui-cat="mobile"][data-ui-template="default"] body:not(.dark) .quick-toggle-btn { background: var(--card); color: var(--ink); }
+
+/* ===== 数据面板/管理页自适应 ===== */
+html[data-ui-cat="mobile"][data-ui-template="default"] .stat-grid { grid-template-columns: repeat(2, 1fr); }
+html[data-ui-cat="mobile"][data-ui-template="default"] .code-body { flex-direction: column; }
+html[data-ui-cat="mobile"][data-ui-template="default"] .code-img-panel,
+html[data-ui-cat="mobile"][data-ui-template="default"] .code-set-panel { min-width: 0; }
+html[data-ui-cat="mobile"][data-ui-template="default"] .img-viewer img { max-width: 100vw; max-height: 86vh; }
