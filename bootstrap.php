@@ -16,7 +16,7 @@ ini_set('display_errors', '0');
 @set_time_limit(300);
 
 const PROTECTED_PREFIX = ['config.php', 'data/', 'uploads/'];   // 永不写入的路径
-const SELF = __FILE__;
+
 
 $step = 'form';           // form | done | error | installed
 $error = '';
@@ -151,8 +151,8 @@ if (($isCli || ($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') && !$installed 
         $cronLine = "*/5 * * * * curl -fsS -m 20 -X POST {$mainUrl}/api/internal/sync -H 'Content-Type: application/json' -d '{\"secret\":\"$relaySecret\"}' -o " . __DIR__ . "/data/blcache.json";
         $step = 'done';
         $results[] = '✓ 安装器自删除';
-        if (!$isCli) { @unlink(SELF); }
-        else { @unlink(SELF); }
+        if (!$isCli) { @unlink(__FILE__); }
+        else { @unlink(__FILE__); }
     } catch (Throwable $e) {
         $step = 'error';
         $error = $e->getMessage();
