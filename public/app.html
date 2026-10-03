@@ -168,7 +168,6 @@
                   <span class="ch-chip chn" v-if="profile && profile.channel"
                         :title="'渠道：访客从「' + profile.channel + '」里进来的' + (profile.browser ? '（' + profile.browser + '）' : '')">渠道：{{ profile.channel }}</span>
                   <span class="ch-chip" v-if="profile && profile.dev_tag">📱 {{ profile.dev_tag }}</span>
-                  <span class="ch-chip src m-hide" :title="'访客是通过「' + sourceText(current.source) + '」进来的'">进入：{{ sourceText(current.source) }}</span>
                   <span class="m-hide" title="访客 IP">🌐 {{ current.ip || '—' }}</span>
                   <span v-if="profile">📍 {{ profile.region || profile.city || geoTag(profile.geo) || '未知' }}</span>
                   <span v-if="profile" class="m-hide">👣 访问 {{ profile.visit_count }} 次</span>

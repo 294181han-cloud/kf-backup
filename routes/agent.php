@@ -31,6 +31,14 @@ function session_scope_sql(string $scope): string
     return " AND s.status NOT IN ('closed', 'archived')";
 }
 
+/** v2.66：只把「访客真的说过话」的会话放进列表。
+ *  访客点开聊天页就会建一条 v_sessions（last_msg 是「等待接入...」占位），
+ *  人还没开口时列表里不该出现 —— 等他一发消息（messages.from_type='visitor'）自然就进来了。 */
+function session_spoken_sql(): string
+{
+    return " AND EXISTS (SELECT 1 FROM messages m WHERE m.session_id = s.id AND m.from_type = 'visitor')";
+}
+
 /** 已结束会话自动清理（poll 时懒执行；closed_keep_days=0 表示永久保留） */
 function cleanup_closed_sessions(int $tenantId): void
 {
@@ -70,7 +78,7 @@ function handle_sessions(string $method): void
         $onlineSql AS status,
         (SELECT COUNT(*) FROM messages WHERE session_id = s.id) AS message_count
         FROM v_sessions s LEFT JOIN agents a ON a.id = s.agent_id AND a.tenant_id = s.tenant_id
-        WHERE s.tenant_id = ?" . session_scope_sql($scope) . session_visible_sql($ctx) . "
+        WHERE s.tenant_id = ?" . session_scope_sql($scope) . session_visible_sql($ctx) . session_spoken_sql() . "
         ORDER BY s.pinned DESC, s.pinned_at DESC, s.last_time DESC LIMIT 500";
     $rows = $pdo->prepare($sql);
     $rows->execute([$ctx['tenant_id']]);
@@ -93,7 +101,7 @@ function handle_sessions(string $method): void
     }
     unset($r);
     // 各分区计数（供 tab 徽标：在线/归档的未读合计提示）
-    $vis = session_visible_sql($ctx);
+    $vis = session_visible_sql($ctx) . session_spoken_sql();
     $cnt = $pdo->prepare("SELECT
         SUM(status NOT IN ('closed','archived')) AS online_cnt,
         SUM(status = 'archived') AS archived_cnt,
@@ -865,7 +873,7 @@ function handle_agent_poll(string $method): void
         $onlineSql AS status,
         (SELECT COUNT(*) FROM messages WHERE session_id = s.id) AS message_count
         FROM v_sessions s LEFT JOIN agents a ON a.id = s.agent_id AND a.tenant_id = s.tenant_id
-        WHERE s.tenant_id = ?" . session_scope_sql($scope) . session_visible_sql($ctx) . "
+        WHERE s.tenant_id = ?" . session_scope_sql($scope) . session_visible_sql($ctx) . session_spoken_sql() . "
         ORDER BY s.pinned DESC, s.pinned_at DESC, s.last_time DESC LIMIT 500");
     $st->execute([$ctx['tenant_id']]);
     $sessions = [];
@@ -885,7 +893,7 @@ function handle_agent_poll(string $method): void
         $sessions[] = $r;
     }
     // 各分区计数（tab 徽标 + 未读提示）
-    $vis = session_visible_sql($ctx);
+    $vis = session_visible_sql($ctx) . session_spoken_sql();
     $cnt = $pdo->prepare("SELECT
         SUM(status NOT IN ('closed','archived')) AS online_cnt,
         SUM(status = 'archived') AS archived_cnt,
