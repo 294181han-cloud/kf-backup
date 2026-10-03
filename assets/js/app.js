@@ -1706,6 +1706,112 @@ const app = createApp({
     // ===== 获客码页（统一码） =====
     const manageDlg = ref(false);
     const history = ref({ links: [], codes: [] });
+    /* v2.61 管理码弹窗：自定义客服码 + 逐条「检测码」（只查微信红没红） */
+    const customCode = ref('');
+    const customSaving = ref(false);
+    const rowChecking = reactive({});   // { 客服码: true } 检测中
+    const rowCheck = reactive({});      // { 客服码: {state, tag, text} }
+    /* 批量：勾选 → 一键挑红的 → 批量作废。检测按次扣费，服务端有 5 分钟缓存兜底。 */
+    const codeTableRef = ref(null);
+    const codeSel = ref([]);
+    const batchChecking = ref(false);
+    const batchDone = ref(0);
+    const batchTotal = ref(0);
+    const onCodeSel = (rows) => { codeSel.value = rows || []; };
+    const selAllCodes = () => {
+      const t = codeTableRef.value;
+      if (!t) return;
+      (history.value.codes || []).forEach(r => t.toggleRowSelection(r, true));
+    };
+    const clearCodeSel = () => { if (codeTableRef.value) codeTableRef.value.clearSelection(); };
+    const selRedCodes = () => {
+      const t = codeTableRef.value;
+      if (!t) return;
+      const reds = (history.value.codes || []).filter(r => (rowCheck[r.code] || {}).state === 'red');
+      if (!reds.length) { ElementPlus.ElMessage.warning('还没有检测出"红"的码，先点「批量检测」'); return; }
+      (history.value.codes || []).forEach(r => t.toggleRowSelection(r, reds.includes(r)));
+      ElementPlus.ElMessage.success('已选中 ' + reds.length + ' 个被拦截的码');
+    };
+    const checkOne = async (row) => {
+      const key = row.code || row.link;
+      rowChecking[key] = true;
+      try {
+        // 永远实时（force:1）：检测要的就是此刻的状态
+        const r = await API.post('/api/tenant/code/check', { force: 1, channel: 'wx', link: row.link }) || {};
+        rowCheck[key] = { state: r.state || 'err', tag: r.tag || '异常', text: r.text || '', at: r.at || '' };
+        return r;
+      } catch (e) {
+        rowCheck[key] = { state: 'err', tag: '异常', text: e.message };
+        return { state: 'err' };
+      } finally { rowChecking[key] = false; }
+    };
+    const batchCheck = async () => {
+      const list = codeSel.value.length ? codeSel.value.slice() : (history.value.codes || []).slice();
+      if (!list.length) { ElementPlus.ElMessage.warning('这里还没有客服码'); return; }
+      if (!codeSel.value.length) {
+        try {
+          await ElementPlus.ElMessageBox.confirm('没有勾选任何码，要实时检测全部 ' + list.length + ' 个吗？\n（实时检测，按次扣费：这次会消耗 ' + list.length + ' 次）', '批量检测',
+            { confirmButtonText: '检测全部', cancelButtonText: '取消' });
+        } catch (e) { return; }
+      }
+      batchChecking.value = true; batchDone.value = 0; batchTotal.value = list.length;
+      let red = 0, ok = 0, other = 0;
+      for (const row of list) {
+        const r = await checkOne(row);
+        if (r.state === 'red') red++; else if (r.state === 'ok') ok++; else other++;
+        batchDone.value++;
+        await new Promise(res => setTimeout(res, 250));   // 稍微错开，别把接口打爆
+      }
+      batchChecking.value = false;
+      ElementPlus.ElMessage({
+        type: red ? 'warning' : 'success',
+        message: '检测完成：正常 ' + ok + ' 个' + (red ? ('，红了 ' + red + ' 个（可点「只选红的」批量作废）') : '') + (other ? ('，异常 ' + other + ' 个') : ''),
+        duration: 6000,
+      });
+    };
+    const batchDeleteCodes = async () => {
+      const list = codeSel.value.slice();
+      if (!list.length) return;
+      try {
+        await ElementPlus.ElMessageBox.confirm('作废选中的 ' + list.length + ' 个客服码？作废后这些链接立即失效，不可恢复。', '批量作废',
+          { type: 'warning', confirmButtonText: '作废', cancelButtonText: '取消' });
+      } catch (e) { return; }
+      let n = 0;
+      for (const row of list) {
+        try { await API.del('/api/tenant/service-code?code=' + row.code); n++; } catch (e) {}
+      }
+      ElementPlus.ElMessage.success('已作废 ' + n + ' 个');
+      clearCodeSel();
+      await loadLinks(); await loadHistory(); renderMainQr(); checkCode(true);
+    };
+    const newCodeCustom = async () => {
+      const c = (customCode.value || '').trim();
+      if (c && !/^[A-Za-z0-9]{4,32}$/.test(c)) { ElementPlus.ElMessage.warning('客服码只能是 4~32 位字母或数字'); return; }
+      customSaving.value = true;
+      try {
+        await API.post('/api/tenant/service-code', c ? { code: c } : {});
+        ElementPlus.ElMessage.success(c ? ('已生成自定义码 ' + c) : '已生成新客服码');
+        customCode.value = '';
+        await loadLinks(); await loadHistory(); renderMainQr(); checkCode(true);
+      } catch (e) { ElementPlus.ElMessage.error(e.message); }
+      finally { customSaving.value = false; }
+    };
+    // 逐条检测：指定这条链接，只看微信红没红（不覆盖主卡上的检测状态）
+    const checkRowCode = async (row) => {
+      if (!row || !row.link) return;
+      const key = row.code || row.link;
+      rowChecking[key] = true;
+      try {
+        const r = await API.post('/api/tenant/code/check', { force: 1, channel: 'wx', link: row.link }) || {};
+        rowCheck[key] = { state: r.state || 'err', tag: r.tag || '异常', text: r.text || '', at: r.at || '' };
+        if (r.state === 'ok') ElementPlus.ElMessage.success('该码在微信里正常（未红）');
+        else if (r.state === 'red') ElementPlus.ElMessage.error('该码已被微信拦截（红了）');
+        else ElementPlus.ElMessage.warning(r.text || '检测未完成');
+      } catch (e) {
+        rowCheck[key] = { state: 'err', tag: '异常', text: e.message };
+        ElementPlus.ElMessage.error(e.message);
+      } finally { rowChecking[key] = false; }
+    };
     const codeCfg = reactive({ nicknameOn: true, supportOn: true });
     const qrWrap = ref(null);
     const currentLink = Vue.computed(() => {
@@ -2364,6 +2470,9 @@ const app = createApp({
       editContact, saveContact, contactDlg, editingContact, saveNote, sendBroadcast,
       copy, createLink, renewLink, newCode, delCode, showQr,
       viewQrOf, viewLink, viewCode, closePreview, downloadViewed, copyViewedImage,
+      customCode, customSaving, newCodeCustom, rowChecking, rowCheck, checkRowCode,
+      codeTableRef, codeSel, onCodeSel, selAllCodes, clearCodeSel, selRedCodes,
+      batchChecking, batchDone, batchTotal, batchCheck, batchDeleteCodes,
       agentDlg, agentMode, agentForm, openAgentEdit, saveAgent, resetAgentPw, toggleAgent, delAgent,
       createdAgentVisible, createdAgent,
       saveBrand, savePreqOn, saveProfile, changePw, exportCsv, logout,

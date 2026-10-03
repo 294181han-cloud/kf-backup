@@ -67,6 +67,20 @@ function ensure_upgrade(): void
         try { $pdo->exec("ALTER TABLE v_sessions ADD COLUMN pinned TINYINT NOT NULL DEFAULT 0"); } catch (\Throwable $e) { /* 列已存在 */ }
         try { $pdo->exec("ALTER TABLE v_sessions ADD COLUMN pinned_at DATETIME NULL"); } catch (\Throwable $e) { /* 列已存在 */ }
         try { $pdo->exec("ALTER TABLE v_sessions ADD INDEX idx_tenant_pinned (tenant_id, pinned, last_time)"); } catch (\Throwable $e) { /* 已存在 */ }
+        // v2.61 逐条/批量「检测码」的结果缓存（同链接同渠道 5 分钟内不重复扣费）
+        $pdo->exec("CREATE TABLE IF NOT EXISTS code_check_cache (
+            id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+            tenant_id INT UNSIGNED NOT NULL,
+            link_hash CHAR(32) NOT NULL,
+            channel VARCHAR(8) NOT NULL DEFAULT 'wx',
+            link VARCHAR(500) NOT NULL DEFAULT '',
+            state VARCHAR(16) NOT NULL DEFAULT '',
+            tag VARCHAR(32) NOT NULL DEFAULT '',
+            text VARCHAR(255) NOT NULL DEFAULT '',
+            msg VARCHAR(500) NOT NULL DEFAULT '',
+            at_ts INT UNSIGNED NOT NULL DEFAULT 0,
+            UNIQUE KEY uq_check (tenant_id, link_hash, channel)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
         // v2.41 语音转文字缓存（同一条语音只转一次，不重复扣费）
         $pdo->exec("CREATE TABLE IF NOT EXISTS msg_transcripts (
             id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,

@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>客服工作台</title>
 <link rel="stylesheet" href="/assets/vendor/element-plus.css">
-<link rel="stylesheet" href="/assets/css/app.css?v=3.21.0">
+<link rel="stylesheet" href="/assets/css/app.css?v=3.23.0">
 <script src="/assets/ui/ui-registry.js?v=2.8.0"></script>
 <script src="/assets/ui/ui-loader.js?v=2.8.0" data-ui-cat="auto"></script>
 </head>
@@ -593,7 +593,9 @@
               <span class="cp-hd-t">公共链接</span>
               <span class="cp-hd-hint">微信 Logo → 查微信拦截；QQ Logo → 查 QQ；其它 Logo 统一按微信通道检测</span>
               <span class="cp-hd-sp"></span>
-              <el-button size="small" text @click="manageDlg = true; loadHistory()">管理码</el-button>
+              <el-button type="primary" plain @click="manageDlg = true; loadHistory()" style="font-weight:600;">
+                📋 管理码
+              </el-button>
             </div>
 
             <div class="cp-body">
@@ -1328,13 +1330,52 @@
   </el-dialog>
 
   ﻿  <!-- 管理码：历史记录 -->
-  <el-dialog v-model="manageDlg" title="管理码 - 历史记录" width="760px">
+  <el-dialog v-model="manageDlg" title="管理码 - 历史记录" width="880px">
+    <!-- v2.61 自定义客服码：客服码就是链接里 ?key= 后面那串，用来标识入口 -->
     <div class="panel" style="margin-bottom:12px;">
-      <div class="panel-title" style="font-size:14px;">历史客服码</div>
-      <el-table :data="history.codes || []" size="small" stripe max-height="240">
+      <div class="panel-title" style="font-size:14px;">新建客服码</div>
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+        <el-input v-model="customCode" placeholder="自定义客服码（留空 = 自动生成）" maxlength="32"
+          style="width:260px;" clearable></el-input>
+        <el-button type="primary" :loading="customSaving" @click="newCodeCustom">生成新码</el-button>
+        <span class="muted" style="font-size:11.5px;line-height:1.7;">
+          客服码就是链接里 <b>?key=</b> 后面那串（现在的码长这样：随机 10 位）。<br>
+          想自己起名就用 <b>4~32 位字母或数字</b>（比如 <span class="mono">douyin01</span>），不能和别人重复；
+          建议别太短，太短容易被别人猜到。
+        </span>
+      </div>
+    </div>
+    <div class="panel" style="margin-bottom:12px;">
+      <div class="panel-title" style="font-size:14px;justify-content:flex-start;gap:10px;">
+        历史客服码
+        <span class="muted" style="font-size:12px;font-weight:400;">已选 {{ codeSel.length }} 个</span>
+      </div>
+      <!-- 批量操作条：检测是按次扣费的，所以有 5 分钟缓存；红了的一键挑出来批量作废 -->
+      <div class="qa-io" style="margin:0 0 10px;padding-top:0;border-top:0;">
+        <el-button size="small" @click="selAllCodes">全选</el-button>
+        <el-button size="small" type="danger" plain @click="selRedCodes">只选红的</el-button>
+        <el-button size="small" @click="clearCodeSel">清空选择</el-button>
+        <span style="width:8px;"></span>
+        <el-button size="small" type="primary" :loading="batchChecking" @click="batchCheck">
+          {{ batchChecking ? ('检测中 ' + batchDone + '/' + batchTotal) : '批量检测（微信）' }}
+        </el-button>
+        <el-button size="small" type="danger" :disabled="!codeSel.length" @click="batchDeleteCodes">批量作废</el-button>
+        <span class="muted" style="font-size:11.5px;line-height:1.6;">
+          每次都是<b>实时检测</b>（按次扣费，测几个就扣几次）——检测要的就是此刻红没红，所以不做缓存
+        </span>
+      </div>
+      <el-table ref="codeTableRef" :data="history.codes || []" size="small" stripe max-height="240" @selection-change="onCodeSel">
+        <el-table-column type="selection" width="42"></el-table-column>
         <el-table-column prop="code" label="码" width="120"><template #default="{row}"><span class="mono">{{ row.code }}</span></template></el-table-column>
         <el-table-column prop="link" label="链接" min-width="200" show-overflow-tooltip></el-table-column>
         <el-table-column label="创建时间" width="150"><template #default="{row}">{{ (row.created_at||'').slice(0,16) }}</template></el-table-column>
+        <el-table-column label="微信检测" width="150">
+          <template #default="{row}">
+            <span v-if="rowCheck[row.code]" class="ck-res" :class="'ckr-' + rowCheck[row.code].state"
+                  :title="(rowCheck[row.code].text || '') + (rowCheck[row.code].at ? ('\n检测于 ' + (rowCheck[row.code].at||'').slice(11,19)) : '')">{{ rowCheck[row.code].tag }}</span>
+            <el-button size="small" plain :loading="rowChecking[row.code]" @click="checkRowCode(row)">检测码</el-button>
+          </template>
+        </el-table-column>
         <el-table-column label="操作" width="150">
           <template #default="{row}">
             <el-button size="small" type="primary" plain @click="viewQrOf(row)">查看码</el-button>
@@ -1417,7 +1458,7 @@
 <script src="/assets/qr-poster.js?v=2.1.03"></script>
 <script src="/assets/api.js?v=2.0.1"></script>
 <script src="/assets/js/app-components.js?v=2.4.0"></script>
-<script src="/assets/js/app.js?v=3.12.0"></script>
+<script src="/assets/js/app.js?v=3.15.0"></script>
 <script src="/assets/js/app-boot.js?v=2.1.1"></script>
 </body>
 </html>

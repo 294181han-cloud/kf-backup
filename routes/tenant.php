@@ -124,7 +124,17 @@ function handle_tenant_service_code(string $method): void
         $rows = $pdo->query('SELECT domain, wildcard FROM domain_pool WHERE enabled = 1 ORDER BY id ASC')->fetchAll();
         if (!$rows) json_error('域名池为空，请联系平台管理员添加可用域名', 400);
         $pick = $rows[array_rand($rows)];
-        $code = gen_code_token();
+        // v2.61 支持自定义客服码（就是链接里 ?key= 后面那串）
+        $want = trim((string)input('code', ''));
+        if ($want !== '') {
+            if (!preg_match('/^[A-Za-z0-9]{4,32}$/', $want)) json_error('客服码只能是 4~32 位字母或数字');
+            $dup = $pdo->prepare('SELECT 1 FROM service_codes WHERE code = ? LIMIT 1');
+            $dup->execute([$want]);
+            if ($dup->fetch()) json_error('这个客服码已经被用了，换一个');
+            $code = $want;
+        } else {
+            $code = gen_code_token();
+        }
         $scheme = 'https';
         // v2.59 防红：入口改成「日期目录 + 随机文件名.html?key=客服码」
         // 看起来就是一个普通静态页，页面本身没有任何内容（见 public/gate.html）
@@ -572,11 +582,29 @@ function handle_tenant_code_check(string $method): void
     if (!in_array($channel, ['wx', 'qq'], true)) $channel = 'wx';
     $chName = $channel === 'qq' ? 'QQ' : '微信';
 
+    /* v2.61 「检测码」：允许指定某一条链接来查（管理码里逐条查用）。
+       指定链接时：必须属于本租户；而且**不读写 tenant_settings 那个单一缓存槽**，
+       免得把主卡上的检测状态覆盖掉。 */
+    $pdo = db();
+    $skipCache = false;
+    $linkOverride = trim((string)($data['link'] ?? ''));
     $link = tenant_current_link($tid);
+    if ($linkOverride !== '') {
+        $own = fetch_count($pdo, 'SELECT COUNT(*) FROM service_codes WHERE tenant_id = ? AND link = ?', [$tid, $linkOverride])
+             + fetch_count($pdo, 'SELECT COUNT(*) FROM domain_links WHERE tenant_id = ? AND link = ?', [$tid, $linkOverride]);
+        if (!$own) { json_error('这条链接不属于当前账号', 403); return; }
+        $link = $linkOverride;
+        $skipCache = true;
+    }
     if ($link === '') {
         json_out(['state' => 'none', 'text' => '尚未生成客服码', 'tag' => '未生成', 'at' => '', 'msg' => '', 'channel' => $channel]);
         return;
     }
+
+    // v2.62 指定链接（逐条 / 批量「检测码」）**永远实时查**：
+    // 检测的意义就是"此刻红没红"，用 5 分钟前的旧结论没意义。
+    // code_check_cache 只作为"上次检测记录"写下来（返回值里带 at），不再拿它当结果返回。
+    $hash = md5($link);
 
     $cfg = wxcheck_cfg();
     $lastLink = ts_get($tid, 'code_check_link', '');
@@ -595,7 +623,7 @@ function handle_tenant_code_check(string $method): void
             'msg' => '平台未开通拦截检测，请联系管理员', 'channel' => $channel]);
         return;
     }
-    if (!$force && $lastLink === $link && $lastCh === $channel && (time() - $lastTs) < $cfg['ttl']) {
+    if (!$skipCache && !$force && $lastLink === $link && $lastCh === $channel && (time() - $lastTs) < $cfg['ttl']) {
         json_out(['state' => ts_get($tid, 'code_check_state', 'idle'), 'text' => ts_get($tid, 'code_check_text', '未检测'),
                   'tag'   => ts_get($tid, 'code_check_tag', '未检测'),   'at'   => ts_get($tid, 'code_check_at', ''),
                   'msg'   => ts_get($tid, 'code_check_msg', ''), 'channel' => $channel, 'cached' => true]);
@@ -631,13 +659,25 @@ function handle_tenant_code_check(string $method): void
         }
     }
     $at = now_dt();
-    ts_set($tid, 'code_check_state', $state);
-    ts_set($tid, 'code_check_text', $text);
-    ts_set($tid, 'code_check_tag', $tag);
-    ts_set($tid, 'code_check_msg', mb_substr($msg, 0, 300));
-    ts_set($tid, 'code_check_at', $at);
-    ts_set($tid, 'code_check_at_ts', (string)time());
-    ts_set($tid, 'code_check_link', $link);
-    ts_set($tid, 'code_check_channel', $channel);
-    json_out(['state' => $state, 'text' => $text, 'tag' => $tag, 'at' => $at, 'msg' => $msg, 'channel' => $channel]);
+    if ($skipCache) {
+        // 指定链接：只作为「上次检测记录」留档（不动主卡那个单一缓存槽），不参与结果返回
+        try {
+            db()->prepare('INSERT INTO code_check_cache (tenant_id, link_hash, channel, link, state, tag, text, msg, at_ts)
+                VALUES (?,?,?,?,?,?,?,?,?)
+                ON DUPLICATE KEY UPDATE state=VALUES(state), tag=VALUES(tag), text=VALUES(text), msg=VALUES(msg),
+                  link=VALUES(link), at_ts=VALUES(at_ts)')
+                ->execute([$tid, $hash, $channel, mb_substr($link, 0, 500), $state, $tag, $text, mb_substr($msg, 0, 500), time()]);
+        } catch (\Throwable $e) { /* 缓存写失败不影响本次结果 */ }
+    } else {   // 主卡检测：照旧写 tenant_settings
+        ts_set($tid, 'code_check_state', $state);
+        ts_set($tid, 'code_check_text', $text);
+        ts_set($tid, 'code_check_tag', $tag);
+        ts_set($tid, 'code_check_msg', mb_substr($msg, 0, 300));
+        ts_set($tid, 'code_check_at', $at);
+        ts_set($tid, 'code_check_at_ts', (string)time());
+        ts_set($tid, 'code_check_link', $link);
+        ts_set($tid, 'code_check_channel', $channel);
+    }
+    json_out(['state' => $state, 'text' => $text, 'tag' => $tag, 'at' => $at, 'msg' => $msg,
+        'channel' => $channel, 'link' => $link]);
 }
