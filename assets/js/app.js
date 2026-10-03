@@ -568,6 +568,7 @@ const app = createApp({
     const quickCtx = reactive({ show: false, x: 0, y: 0, item: null });
     const openQuickCtx = (q, ev) => {
       ev.preventDefault();
+      ev.stopPropagation();
       quickCtx.x = ev.clientX; quickCtx.y = ev.clientY;
       quickCtx.item = q; quickCtx.show = true;
     };
@@ -683,18 +684,26 @@ const app = createApp({
     // ===== 可见消息（撤回的显示为系统胶囊） =====
     const visibleMsgs = Vue.computed(() => msgs.value);
 
-    // 图片/语音
-    const onImage = async (ev) => {
-      const file = ev.target.files[0];
-      ev.target.value = '';
-      if (!file || !currentId.value) return;
-      if (file.size > 5 * 1024 * 1024) { ElementPlus.ElMessage.warning('图片不能超过 5MB'); return; }
+    // 上传一张图并放进「待发区」（不直接发出去），返回是否成功
+    const stageImage = async (file) => {
+      if (!file) return false;
+      if (!/^image\//.test(file.type)) { ElementPlus.ElMessage.warning('只能发送图片'); return false; }
+      if (file.size > 5 * 1024 * 1024) { ElementPlus.ElMessage.warning('图片不能超过 5MB'); return false; }
       const data = await new Promise(res => { const fr = new FileReader(); fr.onload = () => res(fr.result); fr.readAsDataURL(file); });
       try {
-        const up = await API.post('/api/upload', { data, kind: 'image', filename: file.name });
-        const r = await API.post('/api/sessions/' + currentId.value + '/messages', { text: '', attachments: [up] });
-        msgs.value.push(r.message); maxMsgId.value = r.message.id; scrollBottom();
-      } catch (e) { ElementPlus.ElMessage.error(e.message); }
+        const up = await API.post('/api/upload', { data, kind: 'image', filename: file.name || 'image.png' });
+        pendingAtts.value.push(up);
+        return true;
+      } catch (e) { ElementPlus.ElMessage.error(e.message); return false; }
+    };
+    // 图片/语音：选图只放进待发区，可以配文字、多张一起发
+    const onImage = async (ev) => {
+      const files = Array.from(ev.target.files || []);
+      ev.target.value = '';
+      if (!files.length || !currentId.value) return;
+      let ok = 0;
+      for (const f of files) { if (await stageImage(f)) ok++; }
+      if (ok) ElementPlus.ElMessage.success('已加入 ' + ok + ' 张图片，可以继续打字或再加图，最后点发送');
     };
     /* ===== v2.43：引用回复 / 消息菜单 / 多选 / 粘贴发图 / 视频·文件·定位 ===== */
     const replyTo = ref(null);
@@ -746,10 +755,13 @@ const app = createApp({
     const msgMenu = reactive({ show: false, x: 0, y: 0, msg: null });
     const openMsgMenu = (m, ev) => {
       if (selMode.value) return;
+      ev.stopPropagation();   // 别让 #app 上的右键「关闭全部浮层」把刚打开的这个也关掉
       closeCtxMenu(); quickCtx.show = false;
       msgMenu.msg = m; msgMenu.x = ev.clientX; msgMenu.y = ev.clientY; msgMenu.show = true;
     };
     const closeMsgMenu = () => { msgMenu.show = false; };
+    // 点空白处 / 右键空白处都关掉所有浮层（右键不触发 click，必须单独挂）
+    const closeAllMenus = () => { ctxMenu.show = false; quickCtx.show = false; msgMenu.show = false; };
     const deleteMsg = async (m) => {
       msgMenu.show = false;
       if (!m) return;
@@ -802,21 +814,12 @@ const app = createApp({
       for (const it of items) { if (it.kind === 'file') { const f = it.getAsFile(); if (f) files.push(f); } }
       if (!files.length) return;
       ev.preventDefault();
-      for (const f of files) {
-        if (!/^image\//.test(f.type)) { ElementPlus.ElMessage.warning('只能粘贴图片'); continue; }
-        if (f.size > 5 * 1024 * 1024) { ElementPlus.ElMessage.warning('粘贴的图片不能超过 5MB'); continue; }
-        const data = await new Promise(res => { const fr = new FileReader(); fr.onload = () => res(fr.result); fr.readAsDataURL(f); });
-        try {
-          const up = await API.post('/api/upload', { data, kind: 'image', filename: f.name || 'clipboard.png' });
-          const body = { text: draft.value.trim(), attachments: [up] };
-          if (replyTo.value) body.reply_to = replyTo.value.id;
-          const r = await API.post('/api/sessions/' + currentId.value + '/messages', body);
-          msgs.value.push(r.message); maxMsgId.value = r.message.id;
-          draft.value = ''; replyTo.value = null; scrollBottom();
-        } catch (e) { ElementPlus.ElMessage.error(e.message); }
-      }
+      // v2.43.1：粘贴的图片只放进「待发区」，不直接发送 —— 可以配文字、连粘多张再一起发
+      let ok = 0;
+      for (const f of files) { if (await stageImage(f)) ok++; }
+      if (ok) ElementPlus.ElMessage.success('已粘贴 ' + ok + ' 张图片到待发区，配好文字后点发送');
     };
-    // --- 发视频 / 发文件 ---
+    // --- 发视频 / 发文件：同样先进待发区，和文字一起发 ---
     const MAX_UPLOAD_MEDIA = 20 * 1024 * 1024;
     const sendFile = async (ev, kind) => {
       const file = ev.target.files[0];
@@ -826,12 +829,8 @@ const app = createApp({
       const data = await new Promise(res => { const fr = new FileReader(); fr.onload = () => res(fr.result); fr.readAsDataURL(file); });
       try {
         const up = await API.post('/api/upload', { data, kind, filename: file.name });
-        const body = { text: '', attachments: [up] };
-        if (replyTo.value) body.reply_to = replyTo.value.id;
-        const r = await API.post('/api/sessions/' + currentId.value + '/messages', body);
-        msgs.value.push(r.message); maxMsgId.value = r.message.id; replyTo.value = null; scrollBottom();
-        const s = sessions.value.find(x => x.id === currentId.value);
-        if (s) s.lastMsg = kind === 'video' ? '[视频]' : '[文件]';
+        pendingAtts.value.push(up);
+        ElementPlus.ElMessage.success((kind === 'video' ? '视频' : '文件') + '已加入待发区，配好文字后点发送');
       } catch (e) { ElementPlus.ElMessage.error(e.message); }
     };
     // --- 发定位：能定位就用真实坐标，不能定位就让客服手填地点名 ---
@@ -965,6 +964,7 @@ const app = createApp({
     const ctxMenu = reactive({ show: false, x: 0, y: 0, sid: 0, name: '', pinned: 0 });
     const openCtxMenu = (s, ev) => {
       ev.preventDefault();
+      ev.stopPropagation();
       closeMsgMenu(); quickCtx.show = false;
       ctxMenu.x = ev.clientX; ctxMenu.y = ev.clientY;
       ctxMenu.sid = s.id; ctxMenu.name = s.name; ctxMenu.pinned = s.pinned ? 1 : 0;
@@ -2033,7 +2033,13 @@ const app = createApp({
     };
     const isImg = (v) => typeof v === 'string' && (v.startsWith('http') || v.startsWith('/uploads'));
 
+    // 浮层关闭：挂在 document 上（模板根是 #app 的 innerHTML，#app 上的 @click 根本绑不上）
+    // 打开菜单的地方都做了 stopPropagation，所以这里只要无脑全关就不会误伤刚打开的菜单。
+    const onDocClick = () => closeAllMenus();
+    const onDocCtx = (ev) => { if (ev && ev.target && ev.target.closest && ev.target.closest('.ctx-menu')) return; closeAllMenus(); };
     onMounted(async () => {
+      document.addEventListener('click', onDocClick);
+      document.addEventListener('contextmenu', onDocCtx);
       try {
         await loadMe();
         if (me.value.role === 'admin') { location.href = '/admin.html'; return; }
@@ -2048,7 +2054,11 @@ const app = createApp({
         if (!String(e.message).includes('登录已失效')) ElementPlus.ElMessage.error(e.message);
       }
     });
-    onUnmounted(stopPoll);
+    onUnmounted(() => {
+      stopPoll();
+      document.removeEventListener('click', onDocClick);
+      document.removeEventListener('contextmenu', onDocCtx);
+    });
 
     return {
       tab, tabTitle, booted, me, expireText, stats, sessions, sessSearch, filteredSessions, currentId, current,
@@ -2068,7 +2078,7 @@ const app = createApp({
       ctxMenu, openCtxMenu, openCtxMenuFromBtn, closeCtxMenu, ctxMenuArchive, ctxMenuClose, ctxMenuDelete,
       ctxMenuPin, ctxMenuUnread, ctxMenuBlock,
       replyTo, quoteOf, quoteWho, quoteText, startReply, jumpToMsg, copyMsg, flashId, fmtSize, mapUrl,
-      msgMenu, openMsgMenu, closeMsgMenu, deleteMsg,
+      msgMenu, openMsgMenu, closeMsgMenu, closeAllMenus, deleteMsg,
       selMode, selIds, enterSel, exitSel, toggleSel, selAll, selCopy, selDelete,
       onPaste, sendFile, sendLocation,
       SOUND_OPTS, sndCfg, playSound, saveSnd,

@@ -313,17 +313,19 @@ createApp({
     // ---- 发送 ----
     const send = async () => {
       const text = draft.value.trim();
-      if (!text || sending.value || !sessionId.value) return;
+      const atts = pendingAtts.value.slice();          // v2.43.1：待发附件跟文字一起发
+      if ((!text && !atts.length) || sending.value || !sessionId.value) return;
       sending.value = true;
       draft.value = '';
       try {
         const body = { session_id: sessionId.value, text };
+        if (atts.length) body.attachments = atts;
         if (replyTo.value) body.reply_to = replyTo.value.id;   // v2.43 引用回复
         const r = await fetch('/api/visitor/send', {
           method: 'POST', headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(body)
         }).then(x => { if (!x.ok) return x.json().then(j => { throw new Error(j.error); }); return x.json(); });
-        if (r.message) { pushMessages([r.message]); replyTo.value = null; if (snd.send_on) playSnd(snd.send_which); }
+        if (r.message) { pushMessages([r.message]); replyTo.value = null; pendingAtts.value = []; if (snd.send_on) playSnd(snd.send_which); }
         if (r.auto_reply) { pushMessages([r.auto_reply]); }
       } catch (e) {
         draft.value = text;
@@ -396,51 +398,39 @@ createApp({
       for (const it of items) { if (it.kind === 'file') { const f = it.getAsFile(); if (f) files.push(f); } }
       if (!files.length) return;
       ev.preventDefault();
-      for (const f of files) {
-        if (!/^image\//.test(f.type)) { toast('只能粘贴图片'); continue; }
-        if (f.size > 5 * 1024 * 1024) { toast('图片不能超过 5MB'); continue; }
-        const data = await new Promise(res => { const fr = new FileReader(); fr.onload = () => res(fr.result); fr.readAsDataURL(f); });
-        try {
-          const up = await fetch('/api/visitor/upload', {
-            method: 'POST', headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ session_id: sessionId.value, data, kind: 'image', filename: f.name || 'clipboard.png' })
-          }).then(x => { if (!x.ok) return x.json().then(j => { throw new Error(j.error); }); return x.json(); });
-          const body = { session_id: sessionId.value, text: draft.value.trim(), attachments: [up] };
-          if (replyTo.value) body.reply_to = replyTo.value.id;
-          const r = await fetch('/api/visitor/send', {
-            method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body)
-          }).then(x => x.json());
-          if (r.message) { pushMessages([r.message]); draft.value = ''; replyTo.value = null; }
-        } catch (e) { toast(e.message || '发送失败'); }
-      }
+      let ok = 0;
+      for (const f of files) { if (await stageImage(f)) ok++; }
+      if (ok) toast('已粘贴 ' + ok + ' 张图片，可继续输入文字后一起发送');
     };
-    // 引用回复也要带上 reply_to
-    const sendImageWithReply = async (up) => {
-      const body = { session_id: sessionId.value, text: '', attachments: [up] };
-      if (replyTo.value) body.reply_to = replyTo.value.id;
-      const r = await fetch('/api/visitor/send', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body)
-      }).then(x => x.json());
-      if (r.message) { pushMessages([r.message]); replyTo.value = null; }
-    };
-
-    const pickImage = () => imgInput.value && imgInput.value.click();
-    const onImage = async (ev) => {
-      const file = ev.target.files[0];
-      ev.target.value = '';
-      if (!file) return;
-      if (file.size > 5 * 1024 * 1024) { alert('图片不能超过 5MB'); return; }
+    // v2.43.1：图片先进待发区，不直接发送；发送时和文字、引用一起带出去
+    const pendingAtts = ref([]);
+    const rmPending = (i) => { pendingAtts.value.splice(i, 1); };
+    const stageImage = async (file) => {
+      if (!file) return false;
+      if (!/^image\//.test(file.type)) { toast('只能发送图片'); return false; }
+      if (file.size > 5 * 1024 * 1024) { toast('图片不能超过 5MB'); return false; }
       const data = await new Promise(res => { const fr = new FileReader(); fr.onload = () => res(fr.result); fr.readAsDataURL(file); });
       try {
         const up = await fetch('/api/visitor/upload', {
           method: 'POST', headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ session_id: sessionId.value, data, kind: 'image', filename: file.name })
+          body: JSON.stringify({ session_id: sessionId.value, data, kind: 'image', filename: file.name || 'image.png' })
         }).then(x => { if (!x.ok) return x.json().then(j => { throw new Error(j.error); }); return x.json(); });
-        await sendImageWithReply(up);
+        pendingAtts.value.push(up);
+        return true;
       } catch (e) {
-        if (String(e.message).includes('会话已结束')) handleEnded();
-        else alert(e.message);
+        if (String(e.message).includes('会话已结束')) handleEnded(); else toast(e.message || '上传失败');
+        return false;
       }
+    };
+
+    const pickImage = () => imgInput.value && imgInput.value.click();
+    const onImage = async (ev) => {
+      const files = Array.from(ev.target.files || []);
+      ev.target.value = '';
+      if (!files.length) return;
+      let ok = 0;
+      for (const f of files) { if (await stageImage(f)) ok++; }
+      if (ok) toast('已加入 ' + ok + ' 张图片，可继续输入文字后一起发送');
     };
 
     // ---- 录音 ----
@@ -710,6 +700,7 @@ createApp({
       ended, handleEnded, restartChat,
       replyTo, quoteOf, quoteWho, quoteText, fmtSize, mapUrl, jumpTo, startReply,
       actSheet, openActSheet, copyMsg, onMsgTouchStart, onMsgTouchEnd, onPaste, flashId,
+      pendingAtts, rmPending,
     };
   }
 }).mount('#app');

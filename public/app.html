@@ -5,12 +5,14 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>客服工作台</title>
 <link rel="stylesheet" href="/assets/vendor/element-plus.css">
-<link rel="stylesheet" href="/assets/css/app.css?v=3.9.0">
+<link rel="stylesheet" href="/assets/css/app.css?v=3.9.1">
 <script src="/assets/ui/ui-registry.js?v=2.6.0"></script>
 <script src="/assets/ui/ui-loader.js?v=2.6.0" data-ui-cat="auto"></script>
 </head>
 <body>
-<div id="app" v-cloak @click="closeCtxMenu(); quickCtx.show=false; closeMsgMenu()">
+<!-- 注意：#app 是挂载容器，写在这里的 @click 不会被绑定（模板取的是它的 innerHTML）。
+     浮层的"点空白关闭"由 app.js 里的 document 监听负责。 -->
+<div id="app" v-cloak>
   <!-- 右键菜单（会话列表项触发） -->
   <div class="ctx-menu" v-if="ctxMenu.show" :style="{left: ctxMenu.x + 'px', top: ctxMenu.y + 'px'}" @click.stop>
     <div class="ctx-item" @click="ctxMenuPin">📌 {{ ctxMenu.pinned ? '取消置顶' : '置顶会话' }}<div class="ctx-sub">置顶后一直排在最上面</div></div>
@@ -283,7 +285,7 @@
                 <button class="tool-btn" title="请求访客上传图片（可改话术 / 选候选）" @click="openAskDialog"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15V6a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h9"/><path d="M3 16l4.5-4.5 4 4"/><circle cx="15.5" cy="8.5" r="1.4"/><path d="M18 20v-6M15.5 16.5 18 14l2.5 2.5"/></svg></button>
                 <button class="tool-btn" :class="{spinning: refreshing}" title="刷新聊天记录" @click="refreshChat"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M20 11a8 8 0 1 0-2.3 5.7"/><path d="M20 5v6h-6"/></svg></button>
                 <span class="tools-hint">支持 Ctrl+V 直接粘贴图片</span>
-                <input ref="imgInput" type="file" accept="image/png,image/jpeg,image/gif,image/webp" style="display:none" @change="onImage"/>
+                <input ref="imgInput" type="file" accept="image/png,image/jpeg,image/gif,image/webp" multiple style="display:none" @change="onImage"/>
                 <input ref="videoInput" type="file" accept="video/*" style="display:none" @change="sendFile($event,'video')"/>
                 <input ref="fileInput" type="file" style="display:none" @change="sendFile($event,'file')"/>
               </div>
@@ -295,7 +297,11 @@
               </div>
               <div class="pending-atts" v-if="!recording && pendingAtts.length">
                 <div class="pa-item" v-for="(a, ai) in pendingAtts" :key="ai">
-                  <img :src="a.url">
+                  <img v-if="!a.type || a.type==='image'" :src="a.url">
+                  <div v-else class="pa-file" :title="a.name || ''">
+                    <span>{{ a.type==='video' ? '🎬' : (a.type==='audio' ? '🎤' : '📄') }}</span>
+                    <em>{{ a.type==='video' ? '视频' : (a.type==='audio' ? '语音' : '文件') }}</em>
+                  </div>
                   <span class="pa-rm" @click="rmPendingAtt(ai)" title="移除">✕</span>
                 </div>
               </div>
@@ -1358,7 +1364,7 @@
 <script src="/assets/qr-poster.js?v=2.1.03"></script>
 <script src="/assets/api.js?v=2.0.1"></script>
 <script src="/assets/js/app-components.js?v=2.2.0"></script>
-<script src="/assets/js/app.js?v=3.4.0"></script>
+<script src="/assets/js/app.js?v=3.4.3"></script>
 <script src="/assets/js/app-boot.js?v=2.1.1"></script>
 </body>
 </html>

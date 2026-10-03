@@ -1369,3 +1369,13 @@ body.dark .loc-bubble .lb-sub { color: #9db3a5; }
 
 /* 工具条右侧小提示 */
 .tools-hint { font-size: 11px; color: #a8b0bd; margin-left: auto; }
+
+/* 待发区里的非图片附件（视频/文件/语音） */
+.pa-file {
+  width: 56px; height: 56px; border-radius: 8px; border: 1px solid #e5e6eb; background: #f7f9fc;
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1px;
+}
+.pa-file span { font-size: 19px; line-height: 1; }
+.pa-file em { font-style: normal; font-size: 10px; color: #8b95a7; }
+body.dark .pa-file { background: #232830; border-color: #333a44; }
+body.dark .pa-file em { color: #98a3b4; }
