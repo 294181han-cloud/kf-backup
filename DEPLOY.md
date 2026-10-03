@@ -1426,3 +1426,61 @@ document.addEventListener('contextmenu', onDocCtx);   // 右键菜单本身除�
 | ⋯ 按钮 | 触屏常显（opacity 1），不再需要点两下 ✅ |
 | 趋势/明细顺序 | 均为最新在上 ✅ |
 | JS 错误 | 桌面 + 手机 双端 0 个 ✅ |
+
+## 46. v2.48 变更记录（手机端没被认出来 + 输入框被顶出屏幕，2026-10-03）
+
+### 背景：用户发来手机实拍截图，头部被压成一条缝
+截图里聊天头部只剩 ~30px 宽：名字、`渠道：浏览器` 全是**一个汉字一行**竖着排，
+按钮横着溢出屏幕；用户提示"**是不是不知道是手机登录的**"——说对了。
+
+### 根因一：设备判断不可靠（这是主因）
+`ui-loader.js` 原来只有一句：
+```js
+var vw = window.innerWidth || document.documentElement.clientWidth || 1024;
+cat = (vw <= 768) ? 'mobile' : 'pc';
+```
+- **在 `<head>` 里同步执行**：微信 X5 / 部分安卓 WebView 解析 head 时 `innerWidth` 还是默认的 **980**，
+  于是手机被判成"电脑"→ 加载 **电脑版** 三栏布局，挤在手机屏上就是这个样子。
+- **只判断一次**：旋屏、折叠屏展开、分屏调整后不会重新判断。
+- 手机开着"桌面版网站"时，layout viewport 就是 980，同样误判。
+
+**修法**：
+1. 多来源取最小宽度：`innerWidth` / `documentElement.clientWidth` / `screen.width` / `screen.availWidth`
+   —— 只要有一个是真实手机宽度就按手机算（桌面版网页模式下 `screen.width` 仍是真实设备宽）。
+2. 手机 UA 兜底：`Android/iPhone/Mobile/HarmonyOS…` 且宽度 ≤900 → 手机（排除 iPad/Tablet）。
+3. **加载完成后 + 旋屏/改窗口尺寸时复核**，发现判错了就 `location.reload()` 一次（只在 `data-ui-cat="auto"` 时）。
+
+### 根因二：手机端竖向高度链断了（"看不到输入框"的真正原因）
+`mobile/default/template.css` 把 `.layout` 设成 `display:block`，但 `.main` / `.content` 上的 `flex:1` 就失效了，
+高度退回**内容高度**。结果 `.chat-col` 只有内容那么高、`.chat-body` 不会内部滚动 ——
+**消息一多，输入区就被顶到视口外面**（`.layout` 是 `overflow:hidden`，直接看不见）。
+
+**修法**：把高度链显式接上：
+`.layout{height:100dvh}` → `.main{height:100%; flex column}` → `.content{flex:1; min-height:0}`
+→ `.content.workbench{flex column; overflow:hidden}` → `.chat-col{flex:1; min-height:0}`
+→ `.chat-body{flex:1; min-height:0; overflow-y:auto}`。
+（同一套也加进了 app.css 的 `@media (max-width:900px)`，两种加载路径都覆盖。）
+
+### 根因三：PC 样式在窄屏会把头部压垮
+电脑版 `.chat-head` 是「头像 + 信息 + 按钮」一行，`.chat-head-btns` 还是 `flex-shrink:0`，
+窄屏下中间的 `.ch-info`（`flex:1 1 0; min-width:0`）会被压到**只剩一个字符宽**。
+**修法**：手机模板里直接写上头部结构（不再依赖 app.css 的媒体查询）：
+`.chat-head{flex-wrap:wrap}`、`.ch-info{flex:1 1 100%; order:3}`、`.chat-head-btns{flex:1 1 100%; flex-wrap:wrap}`、
+`.ch-chip{white-space:nowrap}`（防止 chip 里的字被拆成竖排）。
+
+### 版本
+- `ui-registry.js` version `2.7.0 → 2.8.0`（模板/加载器的缓存破坏，必须改）
+- app.html 里 `ui-registry.js / ui-loader.js` 的 `?v=` 同步到 2.8.0
+- app.css `3.11.0 → 3.12.0`
+
+### 验证：多机型扫描（每种都打开消息最多的那个会话）
+| 场景 | 判定 | 输入区底 / 视口高 | 消息区内部可滚 | 横向溢出 | 输入框在屏内 |
+|---|---|---|---|---|---|
+| 手机 360×800（安卓微信 UA） | mobile | 800 / 800 | ✅ | 0 | ✅ |
+| 手机 390×844（iOS 微信 UA） | mobile | 844 / 844 | ✅ | 0 | ✅ |
+| **桌面版模式 980×1600（screen 390）** | **mobile**（修正前是 pc ❌） | 1600 / 1600 | — | 0 | ✅ |
+| 窄窗 594×900 | mobile | 900 / 900 | ✅ | 0 | ✅ |
+| 平板 768×1024 | mobile | — | ✅ | 0 | ✅ |
+| 电脑 1280×800 | pc（正常，不受影响） | 800 / 800 | — | 0 | ✅ |
+
+所有场景：`.ch-info` 宽度 ≥327px（不再出现竖排单字），JS 错误 0 个。

@@ -10,6 +10,25 @@ html[data-ui-cat="mobile"][data-ui-template="default"] body { background: var(--
 html[data-ui-cat="mobile"][data-ui-template="default"] .layout {
   display: block; height: 100vh; height: 100dvh; overflow: hidden; position: relative;
 }
+/* v2.48 关键：竖向高度链必须一路铺到底。
+   .layout 是 display:block，.main/.content 上的 flex:1 就失效了、高度退回内容高度，
+   于是 .chat-col 只有内容那么高、.chat-body 不内部滚动 —— 消息一多输入框就被顶到屏幕外
+   （用户反馈"有的对话看不到输入框"就是这个）。这里把高度显式接上：100% → flex 撑满。 */
+html[data-ui-cat="mobile"][data-ui-template="default"] .main {
+  height: 100%; display: flex; flex-direction: column; min-height: 0;
+}
+html[data-ui-cat="mobile"][data-ui-template="default"] .content {
+  flex: 1 1 auto; min-height: 0; overflow-y: auto;
+}
+html[data-ui-cat="mobile"][data-ui-template="default"] .content.workbench {
+  flex: 1 1 auto; min-height: 0; overflow: hidden; display: flex; flex-direction: column;
+}
+html[data-ui-cat="mobile"][data-ui-template="default"] .content.workbench .chat-col {
+  flex: 1 1 auto; min-height: 0;
+}
+html[data-ui-cat="mobile"][data-ui-template="default"] .content.workbench .chat-body {
+  flex: 1 1 auto; min-height: 0; overflow-y: auto;
+}
 html[data-ui-cat="mobile"][data-ui-template="default"] .panel { overflow-x: auto; }
 html[data-ui-cat="mobile"][data-ui-template="default"] .content { padding: 12px; max-width: none; }
 /* 弹窗不超出屏幕 */
@@ -127,6 +146,20 @@ html[data-ui-cat="mobile"][data-ui-template="default"] .msg-bubble video { max-w
 html[data-ui-cat="mobile"][data-ui-template="default"] .chat-head .m-back-btn { margin-left: -6px; }
 html[data-ui-cat="mobile"][data-ui-template="default"] .msg-box { max-width: 84%; }
 html[data-ui-cat="mobile"][data-ui-template="default"] .chat-input textarea { height: 52px; }
+/* 聊天头部结构（v2.48 从 app.css 的媒体查询搬进来）：
+   电脑版是「头像 + 信息 + 按钮」一行不换行，手机上会把中间那列压成一条缝、
+   文字一个字符一行（用户截图就是这个）。手机端强制换行：信息一行、按钮一行。 */
+html[data-ui-cat="mobile"][data-ui-template="default"] .chat-head {
+  flex-wrap: wrap; row-gap: 6px; padding: 8px 10px; align-items: flex-start;
+}
+html[data-ui-cat="mobile"][data-ui-template="default"] .chat-head .ch-info {
+  flex: 1 1 100%; order: 3; min-width: 0;
+}
+html[data-ui-cat="mobile"][data-ui-template="default"] .chat-head .ch-sub { flex-wrap: wrap; row-gap: 4px; }
+html[data-ui-cat="mobile"][data-ui-template="default"] .chat-head-btns {
+  flex: 1 1 100%; order: 4; min-width: 0; flex-wrap: wrap; gap: 6px;
+}
+html[data-ui-cat="mobile"][data-ui-template="default"] .ch-chip { white-space: nowrap; }
 html[data-ui-cat="mobile"][data-ui-template="default"] body:not(.dark) .sess-col { background: var(--card); }
 html[data-ui-cat="mobile"][data-ui-template="default"] body:not(.dark) .chat-col { background: var(--bg); }
 html[data-ui-cat="mobile"][data-ui-template="default"] body:not(.dark) .chat-head { background: var(--card); border-bottom-color: var(--line); }

@@ -15,12 +15,40 @@
   if (!REG) { console.warn('[ui] ui-registry.js 未加载，使用页面内置默认样式'); return; }
 
   var script = document.currentScript;
-  var cat = (script && script.getAttribute('data-ui-cat')) || 'pc';
-  // auto：同一页面按设备宽度选分类（手机浏览器 → mobile，其余 → pc）
-  if (cat === 'auto') {
-    var vw = window.innerWidth || document.documentElement.clientWidth || 1024;
-    cat = (vw <= 768) ? 'mobile' : 'pc';
+  var catAttr = (script && script.getAttribute('data-ui-cat')) || 'pc';
+  var autoCat = (catAttr === 'auto');
+
+  // auto：按「设备」选分类（手机 → mobile，其余 → pc）
+  // v2.48 修：原来只有一句 window.innerWidth <= 768，且在 <head> 里只跑一次。
+  //   微信 X5 / 部分安卓 WebView 在解析 head 时 innerWidth 还是默认的 980，
+  //   于是手机被误判成「电脑」→ 电脑版三栏挤在手机屏上（用户反馈：头像旁边被压成一条缝）。
+  //   现在：①多来源取最小值（innerWidth / documentElement / screen 都是 980 才当电脑）
+  //        ②手机 UA 兜底（桌面版网页模式下 screen.width 仍是真实设备宽）
+  //        ③加载后 + 旋屏/改窗口时复核，发现判错了就重载一次。
+  function minViewportWidth() {
+    var w = window.innerWidth || 0;
+    try {
+      var d = document.documentElement;
+      if (d && d.clientWidth) w = w ? Math.min(w, d.clientWidth) : d.clientWidth;
+      if (window.screen) {
+        if (screen.width) w = w ? Math.min(w, screen.width) : screen.width;
+        if (screen.availWidth) w = w ? Math.min(w, screen.availWidth) : screen.availWidth;
+      }
+    } catch (e) {}
+    return w || 1024;
   }
+  function isPhoneUA() {
+    var ua = navigator.userAgent || '';
+    if (/iPad|Tablet|PlayBook|Silk|Kindle/i.test(ua)) return false;
+    return /Android|iPhone|iPod|Mobile|HarmonyOS|Windows Phone|BlackBerry/i.test(ua);
+  }
+  function detectCat() {
+    var w = minViewportWidth();
+    if (w <= 768) return 'mobile';
+    if (isPhoneUA() && w <= 900) return 'mobile';   // 桌面版网页模式兜底
+    return 'pc';
+  }
+  var cat = autoCat ? detectCat() : catAttr;
   var conf = REG.categories[cat] || REG.categories.pc;
 
   // 旧版工作台主题键迁移（kfxt_theme: default/purple/sky/green）
@@ -147,4 +175,19 @@
       return true;
     },
   };
+
+  // 判错了就纠正：加载完成后 + 旋屏/改窗口尺寸时复核一次（只在 auto 模式下）
+  if (autoCat) {
+    var recheckTimer = null;
+    var recheck = function () {
+      if (detectCat() !== cat) location.reload();
+    };
+    window.addEventListener('load', function () { setTimeout(recheck, 300); });
+    window.addEventListener('orientationchange', function () {
+      clearTimeout(recheckTimer); recheckTimer = setTimeout(recheck, 500);
+    });
+    window.addEventListener('resize', function () {
+      clearTimeout(recheckTimer); recheckTimer = setTimeout(recheck, 400);
+    });
+  }
 })();

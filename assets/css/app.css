@@ -1436,12 +1436,15 @@ body.dark .loc-bubble .lb-sub { color: #9db3a5; }
   .m-only { display: inline-flex !important; }
 
   /* ---------- 会话列表 ↔ 聊天：两屏切换 ---------- */
-  .content.workbench { flex-direction: column; }
+  /* 竖向高度链：不接上的话消息一多输入框会被顶出屏幕 */
+  .main { height: 100%; display: flex; flex-direction: column; min-height: 0; }
+  .content { flex: 1 1 auto; min-height: 0; }
+  .content.workbench { flex-direction: column; flex: 1 1 auto; min-height: 0; overflow: hidden; }
   .sess-col, .sess-col.collapsed { width: 100% !important; min-width: 0; border-right: 0; }
   .sess-collapse-btn { display: none !important; }
   .workbench.has-chat .sess-col { display: none !important; }
   .workbench:not(.has-chat) .chat-col { display: none !important; }
-  .chat-col { width: 100%; }
+  .chat-col { width: 100%; flex: 1 1 auto; min-height: 0; }
 
   /* ---------- 聊天头部：允许换行，按钮横滑，别把内容挤没 ---------- */
   .chat-head { padding: 8px 10px; flex-wrap: wrap; gap: 8px; row-gap: 6px; }
