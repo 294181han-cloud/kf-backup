@@ -43,5 +43,5 @@ return [
     // 非主站节点需要：DB 指向主站 MySQL（db.host），上传经中转落到主站（site_main_url + relay_secret）
     'site_role'     => getenv('SITE_ROLE') ?: 'main',
     'site_main_url' => getenv('SITE_MAIN_URL') ?: '',   // 主站对外地址，如 https://kf.ylcz.cc（非 main 节点必填）
-    'relay_secret'  => getenv('RELAY_SECRET') ?: '',    // 上传中转共享密钥（非空时主站开放 /api/internal/upload）
+    'relay_secret'  => getenv('RELAY_SECRET') ?: 'f242a61a4986f89ba3257c670100b5ac948d18c471b6faf5',    // 上传中转共享密钥（非空时主站开放 /api/internal/upload）
 ];
