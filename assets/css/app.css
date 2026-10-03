@@ -1211,6 +1211,14 @@ body.dark .nav-item.active {
   box-shadow: inset 3px 0 0 var(--theme, #1677ff);
 }
 .nav-item .nv-dot { margin-left: auto; }
+/* v2.51 工作台未读角标（数字，不是小红点） */
+.nav-item .nv-badge {
+  margin-left: auto; flex-shrink: 0;
+  min-width: 19px; height: 19px; padding: 0 6px; border-radius: 10px;
+  background: linear-gradient(135deg, #ff7a7a, #f5455c); color: #fff;
+  font-size: 11.5px; font-weight: 700; line-height: 19px; text-align: center;
+  box-shadow: 0 2px 8px rgba(245, 69, 92, .38);
+}
 
 /* ---------- 左下账号卡放大 ---------- */
 .side .me { padding: 16px 14px 18px; }
@@ -1444,6 +1452,32 @@ body.dark .msg-sheet .ms-item.ghost { border-top-color: #2b313a; color: #8b95a7;
   }
   .msg-more:active { background: #eef1f7; color: var(--theme, #1677ff); border-color: var(--theme, #1677ff); }
   body.dark .msg-more { background: #262c34; border-color: #333a44; color: #9aa4b5; }
+}
+
+/* =====================================================================
+   v2.51 消息排版：头像与气泡顶部齐平
+   之前头像是对齐「名字那一行」的顶部，看起来比气泡高一截。
+   现在头像对齐气泡：有名字行时把头像下移一个名字的高度。
+   （自己的消息已经不再显示名字，所以那边天然就是齐平的。）
+   ===================================================================== */
+.msg-ava { align-self: flex-start; }
+.msg-row:has(.msg-sender) .msg-ava { margin-top: 17px; }
+
+/* =====================================================================
+   v2.52 聊天里那排快捷按钮：按住拖动排序
+   ===================================================================== */
+.quick-scroll .quick-btn { cursor: pointer; }
+.quick-scroll .quick-btn.dragging {
+  opacity: .9; transform: scale(1.06) translateY(-1px);
+  box-shadow: 0 8px 20px -8px rgba(16, 24, 40, .45);
+  outline: 2px solid var(--theme, #1677ff); outline-offset: 1px;
+  z-index: 3; position: relative;
+}
+/* 拖动过程中整条提示一下：手指松开会保存 */
+.quick-scroll .quick-btn.drag-armed { cursor: grabbing; }
+/* 触屏：按钮上不接管滚动就没法拖（touch-action 是在 touchstart 那一刻定下来的） */
+@media (hover: none), (max-width: 900px) {
+  .quick-scroll .quick-btn { touch-action: none; }
 }
 
 /* =====================================================================

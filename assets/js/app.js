@@ -574,6 +574,7 @@ const app = createApp({
     // 快捷消息（v2.28 改版）：单击 = 直接发送；Ctrl+单击 = 填入输入框（文字+图片均可编辑）
     const pendingAtts = ref([]);   // 待发附件（编辑模式带入的图片，发送时随消息发出）
     const quickClick = (q, ev) => {
+      if (qDrag.suppressClick) { qDrag.suppressClick = false; return; }   // 刚拖完，别把消息发出去
       if (ev && (ev.ctrlKey || ev.metaKey)) {
         draft.value = q.content || '';
         pendingAtts.value = (q.attachments || []).filter(a => a && a.url).slice();   // 修复：带图话术图片不再丢失
@@ -586,6 +587,71 @@ const app = createApp({
     const rmPendingAtt = (i) => { pendingAtts.value.splice(i, 1); };
     // 快捷按钮右键：编辑该条（跳转快捷消息页并打开编辑框）
     const quickCtx = reactive({ show: false, x: 0, y: 0, item: null });
+    /* ===== v2.52 聊天里那排快捷按钮：按住拖动 = 调整全局顺序 =====
+       鼠标：一动就进拖动；触屏：先按住 250ms 再拖（否则会和「点一下就发」冲突）。
+       拖完调 saveQuickOrder 存库（和设置页里拖表格是同一套顺序）。 */
+    const qDrag = reactive({ on: false, idx: -1, moved: false, suppressClick: false });
+    const qPress = { idx: -1, x: 0, y: 0, touch: false, el: null, pid: 0, timer: null };
+    const enterQuickDrag = () => {
+      if (qPress.idx < 0) return;
+      qDrag.on = true; qDrag.idx = qPress.idx; qDrag.moved = false;
+      try { qPress.el.setPointerCapture(qPress.pid); } catch (e) {}
+      if (navigator.vibrate) { try { navigator.vibrate(12); } catch (e) {} }
+    };
+    const quickDragDown = (i, ev) => {
+      if (ev.button !== undefined && ev.button > 0) return;   // 只认左键/单指
+      clearTimeout(qPress.timer);
+      qPress.idx = i; qPress.x = ev.clientX; qPress.y = ev.clientY;
+      qPress.el = ev.currentTarget; qPress.pid = ev.pointerId;
+      qPress.touch = ev.pointerType !== 'mouse';
+      if (qPress.touch) qPress.timer = setTimeout(enterQuickDrag, 250);
+    };
+    const quickDragMove = (ev) => {
+      if (!qDrag.on) {
+        if (qPress.idx < 0) return;
+        const far = Math.abs(ev.clientX - qPress.x) + Math.abs(ev.clientY - qPress.y) > 8;
+        if (!far || qPress.touch) return;   // 触屏必须等长按；没动够就更不算
+        enterQuickDrag();
+      }
+      ev.preventDefault();
+      const wrap = document.querySelector('.quick-scroll');
+      if (!wrap) return;
+      const x = ev.clientX, y = ev.clientY;
+      let to = qDrag.idx;
+      [...wrap.querySelectorAll('.quick-btn')].forEach((b, i) => {
+        const r = b.getBoundingClientRect();
+        if (x >= r.left && x <= r.right && y >= r.top && y <= r.bottom) to = i;
+      });
+      if (to !== qDrag.idx && to >= 0 && to < quickMsgs.value.length) {
+        const arr = quickMsgs.value.slice();
+        const [it] = arr.splice(qDrag.idx, 1);
+        arr.splice(to, 0, it);
+        quickMsgs.value = arr;
+        qDrag.idx = to; qDrag.moved = true;
+      }
+    };
+    const quickDragUp = () => {
+      clearTimeout(qPress.timer);
+      const wasOn = qDrag.on, moved = qDrag.moved;
+      qDrag.on = false; qDrag.idx = -1; qPress.idx = -1;
+      if (!wasOn) return;
+      if (!moved) return;                       // 只是按住没拖：当普通点击处理
+      qDrag.suppressClick = true;               // 松手后会跟一个 click，别顺手把消息发出去
+      setTimeout(() => { qDrag.suppressClick = false; }, 500);
+      saveQuickOrder(quickMsgs.value.map(x => x.id));
+    };
+    // 右键菜单里的「往前/往后挪一位」：触屏上万一拖不动还能用这个
+    const quickMove = async (dir) => {
+      const it = quickCtx.item; quickCtx.show = false;
+      if (!it) return;
+      const arr = quickMsgs.value.slice();
+      const i = arr.findIndex(x => x.id === it.id);
+      const j = i + dir;
+      if (i < 0 || j < 0 || j >= arr.length) return;
+      const t = arr[i]; arr[i] = arr[j]; arr[j] = t;
+      quickMsgs.value = arr;
+      await saveQuickOrder(arr.map(x => x.id));
+    };
     const openQuickCtx = (q, ev) => {
       ev.preventDefault();
       ev.stopPropagation();
@@ -2146,6 +2212,7 @@ const app = createApp({
       asrText, asrBusy, transcribe,
       openSession, send, onKey, useQuick, sendQuick, quickClick, onImage, startRec, stopRec, closeSession, doTransfer,
       pendingAtts, rmPendingAtt, quickCtx, openQuickCtx, editQuick,
+      qDrag, quickDragDown, quickDragMove, quickDragUp, quickMove,
       imgZoom, imgRot, imgWheel, downloadImage,
       editContact, saveContact, contactDlg, editingContact, saveNote, sendBroadcast,
       copy, createLink, renewLink, newCode, delCode, showQr,
