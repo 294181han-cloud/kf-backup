@@ -561,7 +561,8 @@ const app = createApp({
         draft.value = '';
         pendingAtts.value = [];
         replyTo.value = null;
-        showQuick.value = false;
+        // v2.53 发完消息不再自动收起快捷栏（用户反馈"每次都要点一次才显示"）；
+        // 想收起就点「⚡快捷消息」那个按钮，纯手动。
         scrollBottom();
         sendBeep();
         const s = sessions.value.find(x => x.id === currentId.value);
@@ -698,7 +699,8 @@ const app = createApp({
       } catch (e) { ElementPlus.ElMessage.error(e.message); }
       finally { sending.value = false; }
     };
-    const useQuick = (q) => { draft.value = q.content; showQuick.value = false; };
+    // v2.53 用快捷消息填到输入框后也不收起快捷栏（同上，别让人反复点）
+    const useQuick = (q) => { draft.value = q.content; };
 
     // ===== 聊天内搜索 =====
     const chatSearchOn = ref(false);
