@@ -12,7 +12,7 @@
  */
 declare(strict_types=1);
 error_reporting(E_ALL);
-ini_set('display_errors', '1');  // 临时排错
+ini_set('display_errors', '0');
 @set_time_limit(300);
 
 const PROTECTED_PREFIX = ['config.php', 'data/', 'uploads/'];   // 永不写入的路径
@@ -58,7 +58,7 @@ function http_post_json(string $url, array $body): array
 function env_checks(): array
 {
     $dataOk = is_dir(__DIR__ . '/data') ? is_writable(__DIR__ . '/data') : is_writable(__DIR__);
-    $gitOut = trim((string)@shell_exec('git --version 2>/dev/null'));
+    $gitOut = function_exists('shell_exec') ? trim((string)@shell_exec('git --version 2>/dev/null')) : '';
     return [
         ['PHP ≥ 8.0', version_compare(PHP_VERSION, '8.0.0', '>='), PHP_VERSION],
         ['curl 扩展', function_exists('curl_init'), function_exists('curl_init') ? '可用' : '缺失（必需）'],
