@@ -77,6 +77,40 @@ const app = createApp({
       }
     };
     const imgWheel = (e) => { imgZoom.value = Math.max(0.2, Math.min(6, imgZoom.value + (e.deltaY < 0 ? 0.15 : -0.15))); };
+    /* v2.69 图片查看器：把当前会话里的图片排成一列，可以左右翻。
+       —— 键盘 ← → 翻页、Esc 关闭、+/- 缩放；界面上也给了文字按钮和「第 x / y 张」。 */
+    const viewImages = computed(() => {
+      const out = [];
+      (visibleMsgs.value || []).forEach(m => {
+        (m.attachments || []).forEach(a => {
+          if (a && a.type === 'image' && a.url && !a.deleted) out.push(a.url);
+        });
+      });
+      return out;
+    });
+    const viewIdx = computed(() => viewImages.value.indexOf(viewing.value));
+    const imgGo = (step) => {
+      const list = viewImages.value;
+      if (list.length < 2) { showImgToast('这条会话只有这一张图'); return; }
+      let i = list.indexOf(viewing.value);
+      if (i < 0) i = 0;
+      i = (i + step % list.length + list.length) % list.length;
+      viewing.value = list[i];
+      imgZoom.value = 1; imgRot.value = 0;
+      showImgToast('第 ' + (i + 1) + ' / ' + list.length + ' 张', 600);
+    };
+    const imgKey = (e) => {
+      if (!viewing.value) return;
+      const t = e.target || {};
+      const tag = (t.tagName || '').toLowerCase();
+      if (tag === 'input' || tag === 'textarea' || t.isContentEditable) return;
+      if (e.key === 'ArrowLeft')       { e.preventDefault(); imgGo(-1); }
+      else if (e.key === 'ArrowRight') { e.preventDefault(); imgGo(1); }
+      else if (e.key === 'Escape')     { viewing.value = ''; }
+      else if (e.key === '+' || e.key === '=') { imgZoom.value = Math.min(6, imgZoom.value + 0.2); }
+      else if (e.key === '-' || e.key === '_') { imgZoom.value = Math.max(0.2, imgZoom.value - 0.2); }
+      else if (e.key === '0')          { imgZoom.value = 1; imgRot.value = 0; }
+    };
     const downloadImage = (url) => {
       if (!url) return;
       const a = document.createElement('a');
@@ -2474,6 +2508,7 @@ const app = createApp({
     onMounted(async () => {
       document.addEventListener('click', onDocClick);
       document.addEventListener('contextmenu', onDocCtx);
+      window.addEventListener('keydown', imgKey);   // v2.69 图片查看器：← → 翻页 / Esc 关闭
       try {
         await loadMe();
         if (me.value.role === 'admin') { location.href = '/admin.html'; return; }
@@ -2548,6 +2583,7 @@ const app = createApp({
       pendingAtts, rmPendingAtt, quickCtx, openQuickCtx, editQuick,
       qDrag, quickDragDown, quickDragMove, quickDragUp, quickMove,
       imgZoom, imgRot, imgWheel, downloadImage, copyImage, imgToast,
+      viewImages, viewIdx, imgGo,
       editContact, saveContact, contactDlg, editingContact, saveNote, sendBroadcast,
       copy, createLink, renewLink, newCode, delCode, showQr,
       viewQrOf, viewLink, viewCode, closePreview, downloadViewed, copyViewedImage,

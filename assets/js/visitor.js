@@ -596,7 +596,37 @@ createApp({
       nextTick(() => { if (inputRef.value) inputRef.value.focus(); scrollBottom(); });
     };
 
-    const viewImage = (url) => { viewing.value = url; };
+    const viewImage = (url) => { viewing.value = url; imgZoom.value = 1; };
+    /* v2.69 看图：把当前聊天里的图片排一列，能左右翻（键盘 ← → 也行），按钮全部用文字 */
+    const imgZoom = ref(1);
+    const viewImages = Vue.computed(() => {
+      const out = [];
+      (messages.value || []).forEach(m => (m.attachments || []).forEach(a => {
+        if (a && a.type === 'image' && a.url) out.push(a.url);
+      }));
+      return out;
+    });
+    const viewIdx = Vue.computed(() => viewImages.value.indexOf(viewing.value));
+    const showToast = (t, ms = 1200) => { toastMsg.value = t; clearTimeout(toastTimer); toastTimer = setTimeout(() => { toastMsg.value = ''; }, ms); };
+    const imgGo = (step) => {
+      const list = viewImages.value;
+      if (list.length < 2) { showToast('只有这一张图'); return; }
+      let i = list.indexOf(viewing.value);
+      if (i < 0) i = 0;
+      i = (i + step % list.length + list.length) % list.length;
+      viewing.value = list[i];
+      imgZoom.value = 1;
+      showToast('第 ' + (i + 1) + ' / ' + list.length + ' 张');
+    };
+    const imgKey = (e) => {
+      if (!viewing.value) return;
+      if (e.key === 'ArrowLeft')  { e.preventDefault(); imgGo(-1); }
+      else if (e.key === 'ArrowRight') { e.preventDefault(); imgGo(1); }
+      else if (e.key === 'Escape') { viewing.value = ''; }
+      else if (e.key === '+' || e.key === '=') { imgZoom.value = Math.min(6, imgZoom.value + 0.25); }
+      else if (e.key === '-' || e.key === '_') { imgZoom.value = Math.max(0.3, imgZoom.value - 0.25); }
+    };
+    onMounted(() => window.addEventListener('keydown', imgKey));
 
     // ===== 滚动状态：不在底部时显示「回到最新」按钮 =====
     const atBottom = ref(true);
@@ -698,6 +728,7 @@ createApp({
     return {
       page, blockedTitle, blockedDesc, brand, messages, draft, sending, agentAvatar,
       bodyRef, inputRef, imgInput, viewing, viewImage,
+      imgZoom, viewImages, viewIdx, imgGo,
       showForm, formItems, formValues, formSubmitting, submitForm,
       recording, recSecs, startRec, stopRec,
       voiceMode, holding, holdSecs, holdCancel, toggleVoice, startHold, moveHold, endHold,

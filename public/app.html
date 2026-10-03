@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>小米客服</title>
 <link rel="stylesheet" href="/assets/vendor/element-plus.css">
-<link rel="stylesheet" href="/assets/css/app.css?v=3.25.0">
+<link rel="stylesheet" href="/assets/css/app.css?v=3.26.0">
 <script src="/assets/ui/ui-registry.js?v=2.8.0"></script>
 <script src="/assets/ui/ui-loader.js?v=2.8.0" data-ui-cat="auto"></script>
 </head>
@@ -1431,15 +1431,27 @@
   </el-dialog>
 
   <div class="img-viewer" v-if="viewing" @click.self="viewing=''">
+    <!-- 左右翻页热区（图上直接点左右半边也能翻） -->
+    <div class="iv-side left" v-if="viewImages.length > 1" @click.stop="imgGo(-1)" title="上一张（键盘 ←）">
+      <span class="iv-side-t">‹ 上一张</span>
+    </div>
     <img :src="viewing" :style="{ transform: 'scale(' + imgZoom + ') rotate(' + imgRot + 'deg)' }" @wheel.prevent="imgWheel" @click.stop>
+    <div class="iv-side right" v-if="viewImages.length > 1" @click.stop="imgGo(1)" title="下一张（键盘 →）">
+      <span class="iv-side-t">下一张 ›</span>
+    </div>
     <div class="iv-tools" @click.stop>
-      <span class="iv-btn" title="缩小" @click="imgZoom = Math.max(0.2, imgZoom - 0.2)">－</span>
-      <span class="iv-btn" title="放大" @click="imgZoom = Math.min(6, imgZoom + 0.2)">＋</span>
-      <span class="iv-btn" title="还原" @click="imgZoom = 1; imgRot = 0">⤢</span>
-      <span class="iv-btn" title="旋转" @click="imgRot += 90">⟳</span>
-      <span class="iv-btn" title="复制图片" @click="copyImage(viewing)">⧉</span>
-      <span class="iv-btn" title="下载" @click="downloadImage(viewing)">⤓</span>
-      <span class="iv-btn" title="关闭" @click="viewing=''">✕</span>
+      <span class="iv-btn" :class="{dis: viewImages.length < 2}" title="上一张（键盘 ←）" @click="imgGo(-1)">← 上一张</span>
+      <span class="iv-btn" :class="{dis: viewImages.length < 2}" title="下一张（键盘 →）" @click="imgGo(1)">下一张 →</span>
+      <span class="iv-count" v-if="viewImages.length > 1">第 {{ (viewIdx < 0 ? 0 : viewIdx) + 1 }} / {{ viewImages.length }} 张</span>
+      <span class="iv-sep"></span>
+      <span class="iv-btn" title="缩小（键盘 -）" @click="imgZoom = Math.max(0.2, imgZoom - 0.2)">缩小</span>
+      <span class="iv-btn" title="放大（键盘 +）" @click="imgZoom = Math.min(6, imgZoom + 0.2)">放大</span>
+      <span class="iv-btn" title="原始大小（键盘 0）" @click="imgZoom = 1; imgRot = 0">原始大小</span>
+      <span class="iv-btn" title="旋转 90°" @click="imgRot += 90">旋转</span>
+      <span class="iv-btn" title="复制到剪贴板" @click="copyImage(viewing)">复制</span>
+      <span class="iv-btn" title="下载" @click="downloadImage(viewing)">下载</span>
+      <span class="iv-sep"></span>
+      <span class="iv-btn close" title="关闭（键盘 Esc）" @click="viewing = ''">关闭</span>
     </div>
     <div class="iv-toast" v-if="imgToast">{{ imgToast }}</div>
   </div>
@@ -1460,7 +1472,7 @@
 <script src="/assets/qr-poster.js?v=2.1.03"></script>
 <script src="/assets/api.js?v=2.0.1"></script>
 <script src="/assets/js/app-components.js?v=2.5.0"></script>
-<script src="/assets/js/app.js?v=3.18.0"></script>
+<script src="/assets/js/app.js?v=3.19.0"></script>
 <script src="/assets/js/app-boot.js?v=2.1.1"></script>
 </body>
 </html>

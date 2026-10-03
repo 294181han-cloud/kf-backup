@@ -415,7 +415,7 @@ function tg_run_checks(): int
                 tg_send((int)$o['chat_id'],
                     "⌛️ <b>订单已超时关闭</b>\n━━━━━━━━━━━━━━━\n🧾 " . tg_h($o['order_no'])
                     . "\n💰 " . number_format((float)$o['amount'], 2) . " USDT\n\n如果钱已经转了，请把 TXID 发给客服人工补单。",
-                    [[tg_btn('🛒 重新下单', 'buy'), tg_btn('💬 联系客服', 'support')]]);
+                    [[tg_btn('🛒 重新下单', 'buy'), tg_support_btn()]]);
             }
             continue;
         }
@@ -481,7 +481,7 @@ function tg_main_menu(int $chat, array $u = [], int $mid = 0): void
         [tg_btn('🛒 购买卡密', 'buy'), tg_btn('♻️ 续费已有卡密', 'renew')],
         [tg_btn('🎁 免费领测试卡', 'trial')],
         [tg_btn('📦 我的卡密', 'mine'), tg_btn('📖 使用教程', 'help')],
-        [tg_btn('💬 联系客服', 'support')],
+        [tg_support_btn()],
     ];
     if (tg_is_admin((int)($u['id'] ?? 0))) array_unshift($kb, [tg_btn('🛠 管理后台', 'admin')]);
     if ($mid > 0) tg_edit($chat, $mid, $html, $kb); else tg_send($chat, $html, $kb);
@@ -518,8 +518,8 @@ function tg_trial(int $chat, array $u, array $me, int $mid = 0): void
 
     if (!$cfg['trial_on']) {
         $html = "🎁 <b>测试卡</b>\n━━━━━━━━━━━━━━━\n暂时不开放自助领取，需要试用请联系客服。";
-        if ($mid > 0) tg_edit($chat, $mid, $html, [[tg_btn('💬 联系客服', 'support'), tg_btn('⬅️ 主菜单', 'menu')]]);
-        else tg_send($chat, $html, [[tg_btn('💬 联系客服', 'support')]]);
+        if ($mid > 0) tg_edit($chat, $mid, $html, [[tg_support_btn(), tg_btn('⬅️ 主菜单', 'menu')]]);
+        else tg_send($chat, $html, [[tg_support_btn()]]);
         return;
     }
 
@@ -582,6 +582,44 @@ function tg_help_text(): string
         . "4️⃣ 进「客服码」生成你的咨询二维码 / 链接，贴到微信、抖音、网站都行\n"
         . "5️⃣ 有访客咨询时「工作台」会响铃提醒，聊天界面和微信一样好用\n\n"
         . "💡 一个卡密可以再开子客服账号，访客额度用完了找我续费就行。";
+}
+
+/** 「联系客服」的正文 + 按钮（support 支持 @username 或完整 t.me 链接） */
+function tg_support_view(): array
+{
+    $sp = trim(tg_cfg()['support']);
+    $html = "💬 <b>联系客服</b>\n━━━━━━━━━━━━━━━\n";
+    $kb = [];
+    if ($sp !== '') {
+        if (preg_match('#^https?://#i', $sp)) {
+            $url = $sp;
+            $label = $sp;
+            $html .= "👉 " . tg_h($sp) . "\n";
+        } else {
+            $handle = ltrim($sp, '@');
+            $url = 'https://t.me/' . $handle;
+            $label = '@' . $handle;
+            $html .= "👉 <b>" . tg_h($label) . "</b>\n";
+        }
+        $html .= "\n点下面的按钮直接找我，也可以直接在这里发消息。";
+        $kb[] = [tg_url('💬 打开会话 ' . $label, $url)];
+    } else {
+        $html .= "直接在这里发消息就行，客服看到会尽快回你。";
+    }
+    $kb[] = [tg_btn('🛒 购买卡密', 'buy'), tg_btn('🎁 领测试卡', 'trial')];
+    $kb[] = [tg_btn('⬅️ 返回主菜单', 'menu')];
+    return [$html, $kb];
+}
+
+/** 客服按钮：配了 @用户名 / t.me 链接就是「点一下直接跳过去」的直链按钮，
+ *  没配就退回成点了显示联系方式的普通按钮 */
+function tg_support_btn(string $text = '💬 联系客服'): array
+{
+    $sp = trim(tg_cfg()['support']);
+    if ($sp === '') return tg_btn($text, 'support');
+    if (preg_match('#^https?://#i', $sp)) return tg_url($text, $sp);
+    $handle = ltrim($sp, '@');
+    return tg_url($text . ' ' . '@' . $handle, 'https://t.me/' . $handle);
 }
 
 function tg_mine(int $chat, int $tgId, int $mid = 0): void
@@ -715,10 +753,8 @@ function tg_on_update(array $u): void
         if ($data === 'help')  { tg_cb_answer((string)$cq['id']); tg_edit($chat, $mid, tg_help_text(), [[tg_url('🔗 打开登录页', TG_BASE_URL . '/login.html')], [tg_btn('⬅️ 返回主菜单', 'menu')]]); return; }
         if ($data === 'support') {
             tg_cb_answer((string)$cq['id']);
-            $sp = tg_cfg()['support'];
-            tg_edit($chat, $mid, "💬 <b>联系客服</b>\n━━━━━━━━━━━━━━━\n"
-                . ($sp !== '' ? "👉 " . tg_h($sp) . "\n\n" : "")
-                . "也可以直接在这里发消息，客服看到会尽快回你。", [[tg_btn('⬅️ 返回主菜单', 'menu')]]);
+            [$html, $kb] = tg_support_view();
+            tg_edit($chat, $mid, $html, $kb);
             return;
         }
         if ($data === 'admin' && tg_is_admin($tgId)) {
@@ -809,6 +845,7 @@ function tg_on_update(array $u): void
     if ($cmd === '/trial' || $cmd === '/test') { tg_trial($chat, $from, $me); return; }
     if ($cmd === '/my' || $cmd === '/mine') { tg_mine($chat, $tgId); return; }
     if ($cmd === '/help') { tg_send($chat, tg_help_text(), [[tg_url('🔗 打开登录页', TG_BASE_URL . '/login.html')], [tg_btn('⬅️ 返回主菜单', 'menu')]]); return; }
+    if ($cmd === '/support' || $cmd === '/kf') { [$h, $k] = tg_support_view(); tg_send($chat, $h, $k); return; }
     if ($cmd === '/admin' && tg_is_admin($tgId)) {
         $pdo = db();
         $today = date('Y-m-d');
@@ -886,6 +923,7 @@ function tg_set_webhook(): array
         ['command' => 'my',    'description' => '我的卡密'],
         ['command' => 'help',  'description' => '使用教程'],
         ['command' => 'id',    'description' => '查看我的 Telegram ID'],
+        ['command' => 'support', 'description' => '联系客服'],
     ]]);
     return ['ok' => (bool)($r['ok'] ?? false), 'url' => $url, 'resp' => $r];
 }

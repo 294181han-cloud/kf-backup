@@ -1720,3 +1720,37 @@ body.dark .sess-multi-bar .smb-row { color: #a9b0bb; }
 body.dark .sess-check { background: #1b1e24; border-color: #3a4048; }
 body.dark .sess-check.on { background: var(--theme, #1677ff); border-color: var(--theme, #1677ff); }
 body.dark .sess-item.checked { background: color-mix(in srgb, var(--theme, #1677ff) 20%, #17191e); }
+
+/* ===== v2.69 图片查看器：文字按钮 + 左右翻页 ===== */
+.iv-tools {
+  gap: 4px; padding: 6px 8px; border-radius: 12px; max-width: 96vw; flex-wrap: wrap; justify-content: center;
+  background: rgba(24,28,36,.86); box-shadow: 0 12px 32px -10px rgba(0,0,0,.6);
+}
+.iv-btn {
+  width: auto; height: 32px; padding: 0 12px; border-radius: 8px; font-size: 13px; font-weight: 600;
+  white-space: nowrap; flex-shrink: 0;
+}
+.iv-btn.dis { opacity: .38; cursor: default; }
+.iv-btn.dis:hover { background: rgba(255,255,255,.1); }
+.iv-btn.close { background: rgba(245,63,63,.22); }
+.iv-btn.close:hover { background: rgba(245,63,63,.42); }
+.iv-count { color: rgba(255,255,255,.72); font-size: 12px; padding: 0 8px; display: inline-flex; align-items: center; white-space: nowrap; }
+.iv-sep { width: 1px; height: 18px; background: rgba(255,255,255,.22); margin: 0 5px; align-self: center; }
+
+/* 左右翻页热区：中间留出一块不挡图片，点两侧空白处翻页 */
+.iv-side { position: fixed; top: 0; bottom: 92px; width: 16vw; min-width: 84px; display: flex; align-items: center; justify-content: center; cursor: pointer; z-index: 202; }
+.iv-side.left { left: 0; justify-content: flex-start; padding-left: 22px; }
+.iv-side.right { right: 0; justify-content: flex-end; padding-right: 22px; }
+.iv-side-t {
+  color: #fff; font-size: 13px; font-weight: 600; white-space: nowrap;
+  background: rgba(24,28,36,.72); border-radius: 999px; padding: 8px 14px;
+  opacity: .82; transition: .15s; user-select: none;
+}
+.iv-side:hover .iv-side-t { opacity: 1; background: var(--theme, #1677ff); }
+@media (max-width: 900px) {
+  .iv-side { width: 22vw; }
+  .iv-side-t { font-size: 12px; padding: 6px 10px; }
+  .iv-tools { bottom: 14px; gap: 3px; padding: 5px 6px; }
+  .iv-btn { height: 30px; padding: 0 9px; font-size: 12px; }
+  .iv-count { padding: 0 4px; }
+}

@@ -830,3 +830,29 @@ body.dark .v-sheet .vs-item.ghost { border-top-color: #2b313a; color: #8b95a7; }
 body.dark .v-pending .vp-item img, body.dark .v-pending .vp-file { border-color: #333a44; }
 body.dark .v-pending .vp-file { background: #232830; }
 body.dark .v-pending .vp-tip { color: #98a3b4; }
+
+/* ===== v2.69 访客端看图：半透明底 + 文字按钮 + 左右翻图 ===== */
+.img-viewer { background: rgba(16,24,40,.45); backdrop-filter: blur(3px); flex-direction: column; gap: 14px; }
+.img-viewer img { max-width: 94vw; max-height: 78vh; transition: transform .12s ease; cursor: default; }
+.iv-tools {
+  position: fixed; bottom: 22px; left: 50%; transform: translateX(-50%);
+  display: flex; align-items: center; flex-wrap: wrap; justify-content: center; gap: 4px;
+  max-width: 94vw; padding: 6px 8px; border-radius: 12px;
+  background: rgba(24,28,36,.88); box-shadow: 0 12px 32px -10px rgba(0,0,0,.6); z-index: 102;
+}
+.iv-btn {
+  height: 32px; padding: 0 12px; border-radius: 8px; font-size: 13px; font-weight: 600; white-space: nowrap;
+  background: rgba(255,255,255,.1); color: #fff; display: inline-flex; align-items: center; cursor: pointer; user-select: none;
+}
+.iv-btn:hover { background: rgba(255,255,255,.24); }
+.iv-btn.dis { opacity: .38; cursor: default; }
+.iv-btn.dis:hover { background: rgba(255,255,255,.1); }
+.iv-btn.close { background: rgba(245,63,63,.22); }
+.iv-btn.close:hover { background: rgba(245,63,63,.42); }
+.iv-count { color: rgba(255,255,255,.72); font-size: 12px; padding: 0 8px; display: inline-flex; align-items: center; white-space: nowrap; }
+.iv-sep { width: 1px; height: 18px; background: rgba(255,255,255,.22); margin: 0 5px; }
+@media (max-width: 560px) {
+  .iv-tools { bottom: 12px; gap: 3px; padding: 5px 6px; }
+  .iv-btn { height: 30px; padding: 0 9px; font-size: 12px; }
+  .iv-count { padding: 0 4px; }
+}
