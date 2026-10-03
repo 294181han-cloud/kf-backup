@@ -13,7 +13,7 @@ createApp({
     const defVal = reactive({ default_quota_web: 200, default_quota_app: 200, default_max_agents: 5 });
     const pwOld = ref(''); const pwNew = ref('');
 
-    const tabTitle = computed(() => ({ overview: '平台概览', tenants: '租户管理', domains: '域名池', settings: '全局设置' }[tab.value]));
+    const tabTitle = computed(() => ({ overview: '平台概览', tenants: '租户管理', domains: '域名池', tg: '发卡机器人', settings: '全局设置' }[tab.value]));
     const locationOrigin = location.origin;
 
     const barWidth = (v, list) => {
@@ -28,6 +28,83 @@ createApp({
       const r = await API.get('/api/admin/root-domain'); rootDomain.value = r.root_domain;
       Object.assign(defVal, await API.get('/api/admin/defaults'));
     };
+    // ---------- 发卡机器人（v2.68）----------
+    const tg = ref(null);
+    const tgCfg = reactive({ token: '', pay_addr: '', support: '', admins: '', ttl: 30, tron_key: '', enabled: true, dry: false, trial_on: true, trial_hours: 24 });
+    const tgSaving = ref(false); const tgHooking = ref(false); const tgChecking = ref(false);
+    const loadTg = async () => {
+      const r = await API.get('/api/admin/tg');
+      tg.value = r;
+      tgCfg.token = r.cfg.token || '';
+      tgCfg.pay_addr = r.cfg.pay_addr || '';
+      tgCfg.support = r.cfg.support || '';
+      tgCfg.admins = r.cfg.admins || '';
+      tgCfg.ttl = r.cfg.ttl || 30;
+      tgCfg.tron_key = r.cfg.tron_key || '';
+      tgCfg.enabled = !!r.cfg.enabled;
+      tgCfg.dry = !!r.cfg.dry;
+      tgCfg.trial_on = !!r.cfg.trial_on;
+      tgCfg.trial_hours = r.cfg.trial_hours || 24;
+    };
+    const saveTg = async () => {
+      tgSaving.value = true;
+      try {
+        await API.post('/api/admin/tg/save', {
+          token: tgCfg.token, pay_addr: tgCfg.pay_addr, support: tgCfg.support, admins: tgCfg.admins,
+          ttl: tgCfg.ttl, tron_key: tgCfg.tron_key, enabled: tgCfg.enabled ? 1 : 0, dry: tgCfg.dry ? 1 : 0,
+          trial_on: tgCfg.trial_on ? 1 : 0, trial_hours: tgCfg.trial_hours,
+        });
+        ElementPlus.ElMessage.success('已保存');
+        await loadTg();
+      } catch (e) { ElementPlus.ElMessage.error(e.message); } finally { tgSaving.value = false; }
+    };
+    const setTgWebhook = async () => {
+      tgHooking.value = true;
+      try {
+        const r = await API.post('/api/admin/tg/webhook');
+        if (r.ok) ElementPlus.ElMessage.success('Webhook 设置成功');
+        else ElementPlus.ElMessage.error('设置失败：' + JSON.stringify(r.resp));
+        await loadTg();
+      } catch (e) { ElementPlus.ElMessage.error(e.message); } finally { tgHooking.value = false; }
+    };
+    const runTgCheck = async () => {
+      tgChecking.value = true;
+      try {
+        const r = await API.post('/api/admin/tg/check');
+        ElementPlus.ElMessage.success('核款完成，本轮到账发货 ' + r.delivered + ' 单');
+        await loadTg();
+      } catch (e) { ElementPlus.ElMessage.error(e.message); } finally { tgChecking.value = false; }
+    };
+    const pkgVisible = ref(false); const pkgSaving = ref(false);
+    const pkgForm = reactive({ id: 0, name: '', days: 30, quota_web: 200, quota_app: 200, max_agents: 5, price: 9.9, badge: '', sort: 0, enabled: true });
+    const openPkg = (row) => {
+      Object.assign(pkgForm, row
+        ? { id: row.id, name: row.name, days: row.days, quota_web: row.quota_web, quota_app: row.quota_app,
+            max_agents: row.max_agents, price: Number(row.price), badge: row.badge, sort: row.sort, enabled: Number(row.enabled) === 1 }
+        : { id: 0, name: '', days: 30, quota_web: 200, quota_app: 200, max_agents: 5, price: 9.9, badge: '', sort: 0, enabled: true });
+      pkgVisible.value = true;
+    };
+    const savePkg = async () => {
+      if (!pkgForm.name.trim()) { ElementPlus.ElMessage.warning('请填套餐名称'); return; }
+      pkgSaving.value = true;
+      try {
+        await API.post('/api/admin/tg/pkg', Object.assign({}, pkgForm, { enabled: pkgForm.enabled ? 1 : 0 }));
+        ElementPlus.ElMessage.success('已保存');
+        pkgVisible.value = false;
+        await loadTg();
+      } catch (e) { ElementPlus.ElMessage.error(e.message); } finally { pkgSaving.value = false; }
+    };
+    const delPkg = async (row) => {
+      try { await API.post('/api/admin/tg/pkg-delete?id=' + row.id); ElementPlus.ElMessage.success('已删除'); await loadTg(); }
+      catch (e) { ElementPlus.ElMessage.error(e.message); }
+    };
+    const tgOrder = async (row, action) => {
+      try {
+        const r = await API.post('/api/admin/tg/order', { order_no: row.order_no, action: action });
+        ElementPlus.ElMessage.success(action === 'deliver' ? ('已发货：' + (r.kami || '')) : '已取消');
+        await loadTg();
+      } catch (e) { ElementPlus.ElMessage.error(e.message); }
+    };
     const loadAll = async () => {
       try {
         me.value = await API.me();
@@ -36,6 +113,8 @@ createApp({
         booted.value = true;
       } catch (e) { ElementPlus.ElMessage.error(e.message); }
     };
+    // 打开「发卡机器人」页签时才去拉数据（里面有 Telegram API 调用，别拖慢首屏）
+    Vue.watch(tab, (v) => { if (v === 'tg') loadTg().catch(e => ElementPlus.ElMessage.error(e.message)); });
 
     // 租户 CRUD
     const dlgVisible = ref(false);
@@ -152,6 +231,8 @@ createApp({
     onMounted(loadAll);
     return {
       tab, tabTitle, booted, me, ov, tenants, domains, newDomain, rootDomain, defVal, pwOld, pwNew,
+      tg, tgCfg, tgSaving, tgHooking, tgChecking, saveTg, setTgWebhook, runTgCheck,
+      pkgVisible, pkgForm, pkgSaving, openPkg, savePkg, delPkg, tgOrder,
       barWidth, locationOrigin,
       dlgVisible, dlgMode, dlg, dlgSaving, openCreate, openEdit, saveTenant, toggleTenant, delTenant,
       createdVisible, created, copyCreated, openGen, genVisible, genPair, doGen, fillGenKami, openTrial,

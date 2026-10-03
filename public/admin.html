@@ -21,6 +21,7 @@
         <div class="nav-item" :class="{active: tab==='overview'}" @click="tab='overview'">📊 概览</div>
         <div class="nav-item" :class="{active: tab==='tenants'}" @click="tab='tenants'">👥 租户管理</div>
         <div class="nav-item" :class="{active: tab==='domains'}" @click="tab='domains'">🌐 域名池</div>
+        <div class="nav-item" :class="{active: tab==='tg'}" @click="tab='tg'">🤖 发卡机器人</div>
         <div class="nav-item" :class="{active: tab==='settings'}" @click="tab='settings'">⚙️ 全局设置</div>
       </div>
       <div class="foot" @click="logout">退出登录</div>
@@ -155,6 +156,167 @@
           </div>
         </template>
 
+        <!-- ===================== 发卡机器人 ===================== -->
+        <template v-if="tab==='tg'">
+          <div class="stat-grid" v-if="tg">
+            <div class="stat-card"><span class="sc-ic a1">📅</span><div class="sc-body"><div class="v">{{ tg.stat.today_count }}</div><div class="l">今日下单</div></div></div>
+            <div class="stat-card"><span class="sc-ic a2">💰</span><div class="sc-body"><div class="v ok">{{ tg.stat.today_paid }}</div><div class="l">今日收款 (USDT)</div></div></div>
+            <div class="stat-card"><span class="sc-ic a4">💵</span><div class="sc-body"><div class="v">{{ tg.stat.total_paid }}</div><div class="l">累计收款 (USDT)</div></div></div>
+            <div class="stat-card"><span class="sc-ic a2">✅</span><div class="sc-body"><div class="v ok">{{ tg.stat.total_done }}</div><div class="l">累计发货</div></div></div>
+            <div class="stat-card"><span class="sc-ic a3">⏳</span><div class="sc-body"><div class="v bad">{{ tg.stat.pending }}</div><div class="l">待支付</div></div></div>
+            <div class="stat-card"><span class="sc-ic a5">👤</span><div class="sc-body"><div class="v">{{ tg.stat.users }}</div><div class="l">机器人用户</div></div></div>
+          </div>
+
+          <div class="panel" v-if="tg">
+            <div class="panel-title" style="display:flex;justify-content:space-between;align-items:center;">
+              <span>机器人设置</span>
+              <span style="font-size:12px;">
+                <el-tag v-if="tg.bot" type="success" size="small">@{{ tg.bot.username }}</el-tag>
+                <el-tag v-else type="danger" size="small">Token 无效</el-tag>
+                <el-tag :type="tg.hook && tg.hook.url ? 'success' : 'warning'" size="small" style="margin-left:6px;">
+                  {{ tg.hook && tg.hook.url ? 'Webhook 已设置' : 'Webhook 未设置' }}
+                </el-tag>
+              </span>
+            </div>
+            <el-form label-width="140px" style="max-width:720px;">
+              <el-form-item label="机器人 Token">
+                <el-input v-model="tgCfg.token" placeholder="123456:AA...（@BotFather 给的）"></el-input>
+              </el-form-item>
+              <el-form-item label="USDT 收款地址">
+                <el-input v-model="tgCfg.pay_addr" placeholder="TRC-20 地址（T 开头）"></el-input>
+              </el-form-item>
+              <el-form-item label="TronGrid API Key">
+                <el-input v-model="tgCfg.tron_key" placeholder="用于查链上转账，不填容易被限流"></el-input>
+              </el-form-item>
+              <el-form-item label="客服联系方式">
+                <el-input v-model="tgCfg.support" placeholder="例如 @your_support"></el-input>
+              </el-form-item>
+              <el-form-item label="管理员 TG ID">
+                <el-input v-model="tgCfg.admins" placeholder="多个用英文逗号隔开；在机器人里发 /id 就能看到自己的 ID"></el-input>
+              </el-form-item>
+              <el-form-item label="订单有效期(分钟)">
+                <el-input-number v-model="tgCfg.ttl" :min="5" :max="1440"></el-input-number>
+              </el-form-item>
+              <el-form-item label="免费测试卡">
+                <el-switch v-model="tgCfg.trial_on"></el-switch>
+                <span style="margin-left:10px;">每人限领 1 张，有效期</span>
+                <el-input-number v-model="tgCfg.trial_hours" :min="1" :max="720" style="margin-left:8px;"></el-input-number>
+                <span style="margin-left:6px;">小时（已领 {{ tg.stat.trials }} 张）</span>
+              </el-form-item>
+              <el-form-item label="启用机器人">
+                <el-switch v-model="tgCfg.enabled"></el-switch>
+              </el-form-item>
+              <el-form-item label="演练模式">
+                <el-switch v-model="tgCfg.dry"></el-switch>
+                <span style="margin-left:10px;font-size:12px;color:#86909c;">开启后只把要发的消息写进日志，不会真的发给用户（调试用）</span>
+              </el-form-item>
+              <el-form-item>
+                <el-button type="primary" :loading="tgSaving" @click="saveTg">保存设置</el-button>
+                <el-button :loading="tgHooking" @click="setTgWebhook">重新设置 Webhook</el-button>
+                <el-button :loading="tgChecking" @click="runTgCheck">立刻核款一次</el-button>
+              </el-form-item>
+            </el-form>
+            <div style="background:#f7f8fa;border-radius:8px;padding:10px 14px;font-size:12.5px;color:#4e5969;line-height:2;">
+              <div>Webhook 地址：<span class="mono">{{ tg.cfg.webhook }}</span></div>
+              <div v-if="tg.hook">待处理更新：{{ tg.hook.pending_update_count || 0 }}　最近错误：{{ tg.hook.last_error_message || '无' }}</div>
+            </div>
+          </div>
+
+          <div class="panel" v-if="tg">
+            <div class="panel-title" style="display:flex;justify-content:space-between;align-items:center;">
+              <span>套餐（{{ tg.pkgs.length }}）</span>
+              <el-button type="primary" size="small" @click="openPkg()">＋ 新增套餐</el-button>
+            </div>
+            <el-table :data="tg.pkgs" stripe>
+              <el-table-column prop="sort" label="排序" width="70"></el-table-column>
+              <el-table-column label="名称" width="110">
+                <template #default="{row}"><b>{{ row.name }}</b> <el-tag v-if="row.badge" size="small" type="warning">{{ row.badge }}</el-tag></template>
+              </el-table-column>
+              <el-table-column prop="days" label="天数" width="70"></el-table-column>
+              <el-table-column label="价格" width="110">
+                <template #default="{row}"><b style="color:#f53f3f;">{{ row.price }}</b> USDT</template>
+              </el-table-column>
+              <el-table-column label="额度（网页/客服码）" width="170">
+                <template #default="{row}">{{ row.quota_web }} / {{ row.quota_app }}</template>
+              </el-table-column>
+              <el-table-column prop="max_agents" label="子客服" width="80"></el-table-column>
+              <el-table-column label="状态" width="80">
+                <template #default="{row}"><el-tag :type="Number(row.enabled) ? 'success' : 'info'" size="small">{{ Number(row.enabled) ? '在售' : '下架' }}</el-tag></template>
+              </el-table-column>
+              <el-table-column label="操作" width="150">
+                <template #default="{row}">
+                  <el-button size="small" @click="openPkg(row)">编辑</el-button>
+                  <el-popconfirm title="删除该套餐？" @confirm="delPkg(row)">
+                    <template #reference><el-button size="small" type="danger">删除</el-button></template>
+                  </el-popconfirm>
+                </template>
+              </el-table-column>
+            </el-table>
+          </div>
+
+          <div class="panel" v-if="tg">
+            <div class="panel-title">最近订单（{{ tg.orders.length }}）</div>
+            <el-table :data="tg.orders" stripe max-height="520">
+              <el-table-column label="订单号" width="180">
+                <template #default="{row}"><span class="mono" style="font-size:12px;">{{ row.order_no }}</span></template>
+              </el-table-column>
+              <el-table-column label="客户" width="130">
+                <template #default="{row}">{{ row.tg_name || '—' }}<br><span style="font-size:11px;color:#86909c;">{{ row.tg_id }}</span></template>
+              </el-table-column>
+              <el-table-column label="类型" width="90">
+                <template #default="{row}">{{ row.kind === 'renew' ? '续费' : '新开' }}<span v-if="row.renew_kami" style="font-size:11px;color:#86909c;"><br>{{ row.renew_kami }}</span></template>
+              </el-table-column>
+              <el-table-column prop="pkg_name" label="套餐" width="90"></el-table-column>
+              <el-table-column label="金额" width="100">
+                <template #default="{row}"><b>{{ row.amount }}</b></template>
+              </el-table-column>
+              <el-table-column label="状态" width="100">
+                <template #default="{row}">
+                  <el-tag v-if="row.status==='delivered'" type="success" size="small">已发货</el-tag>
+                  <el-tag v-else-if="row.status==='pending'" type="warning" size="small">待支付</el-tag>
+                  <el-tag v-else-if="row.status==='expired'" type="info" size="small">已超时</el-tag>
+                  <el-tag v-else-if="row.status==='canceled'" type="info" size="small">已取消</el-tag>
+                  <el-tag v-else type="danger" size="small">{{ row.status }}</el-tag>
+                </template>
+              </el-table-column>
+              <el-table-column label="卡密" width="120">
+                <template #default="{row}"><span class="mono" style="font-size:12px;">{{ row.kami || '—' }}</span></template>
+              </el-table-column>
+              <el-table-column label="时间" width="150">
+                <template #default="{row}"><span style="font-size:12px;color:#86909c;">{{ (row.delivered_at || row.created_at || '').slice(5,16) }}</span></template>
+              </el-table-column>
+              <el-table-column label="操作" width="170" fixed="right">
+                <template #default="{row}">
+                  <el-popconfirm v-if="row.status!=='delivered'" title="确认已收到款并立刻开卡发货？" @confirm="tgOrder(row,'deliver')">
+                    <template #reference><el-button size="small" type="primary">补发货</el-button></template>
+                  </el-popconfirm>
+                  <el-popconfirm v-if="row.status==='pending'" title="取消该订单？" @confirm="tgOrder(row,'cancel')">
+                    <template #reference><el-button size="small" type="danger">取消</el-button></template>
+                  </el-popconfirm>
+                </template>
+              </el-table-column>
+            </el-table>
+          </div>
+        </template>
+
+        <el-dialog v-model="pkgVisible" :title="pkgForm.id ? '编辑套餐' : '新增套餐'" width="480px">
+          <el-form label-width="130px">
+            <el-form-item label="名称"><el-input v-model="pkgForm.name" placeholder="例如 月卡"></el-input></el-form-item>
+            <el-form-item label="角标"><el-input v-model="pkgForm.badge" placeholder="可留空，例如 热门 / 最划算"></el-input></el-form-item>
+            <el-form-item label="天数"><el-input-number v-model="pkgForm.days" :min="1" :max="3650"></el-input-number></el-form-item>
+            <el-form-item label="价格 (USDT)"><el-input-number v-model="pkgForm.price" :min="0" :precision="2" :step="1"></el-input-number></el-form-item>
+            <el-form-item label="网页额度"><el-input-number v-model="pkgForm.quota_web" :min="0" :step="50"></el-input-number></el-form-item>
+            <el-form-item label="客服码额度"><el-input-number v-model="pkgForm.quota_app" :min="0" :step="50"></el-input-number></el-form-item>
+            <el-form-item label="子客服上限"><el-input-number v-model="pkgForm.max_agents" :min="0" :max="50"></el-input-number></el-form-item>
+            <el-form-item label="排序"><el-input-number v-model="pkgForm.sort" :min="0" :max="999"></el-input-number></el-form-item>
+            <el-form-item label="在售"><el-switch v-model="pkgForm.enabled"></el-switch></el-form-item>
+          </el-form>
+          <template #footer>
+            <el-button @click="pkgVisible=false">取消</el-button>
+            <el-button type="primary" :loading="pkgSaving" @click="savePkg">保存</el-button>
+          </template>
+        </el-dialog>
+
         <!-- ===================== 全局设置 ===================== -->
         <template v-if="tab==='settings'">
           <div class="panel">
@@ -260,6 +422,6 @@
 <script src="/assets/vendor/vue.global.js?v=2.0.1"></script>
 <script src="/assets/vendor/element-plus.js?v=2.0.1"></script>
 <script src="/assets/api.js?v=2.0.1"></script>
-<script src="/assets/js/admin.js?v=2.3.0"></script>
+<script src="/assets/js/admin.js?v=2.4.0"></script>
 </body>
 </html>

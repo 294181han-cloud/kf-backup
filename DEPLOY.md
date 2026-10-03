@@ -2277,3 +2277,64 @@ AND EXISTS (SELECT 1 FROM messages m WHERE m.session_id = s.id AND m.from_type =
   带一个不存在的 id 时 → `done:2, skipped:1`；非法 action 被拒 ✅
 - 界面（Playwright 实拍）：点 3 行 → "已选 3 项"；全选 → "已选 9 项"；清空 → "已选 0 项" 且按钮变灰；退出多选操作条消失；
   控制台无 JS 报错 ✅
+
+
+### v2.68 变更记录（发卡机器人 @xiaomikefubot + 后台「发卡机器人」页签，2026-10-03）
+
+用户："搞一个发卡密的机器人吧 … 收款地址 TYqHjF35ovKPRL5vA9CSbVs5mGEkBvsYBB 这个发卡机器人搞得好看一点"，
+外加"机器人每人可以领一张测试卡"，并提供了 TronGrid API Key。
+
+**长什么样（消息全部用 HTML + 分隔线排版，按钮全是 inline keyboard）**
+- `/start`：🎫 小米云客服 · 发卡中心 → 购买卡密 / 续费已有卡密 / 🎁 免费领测试卡 / 我的卡密 / 使用教程 / 联系客服
+- 套餐列表：🔥 角标套餐 + 💰 价格 + 📅 天数 + 👥 子客服 + 💬 额度，一行一个按钮
+- 订单卡片：套餐 / 应付金额 / TRC-20 / 剩余时间 / 收款地址（`<code>` 里一点就复制）
+  + 「✅ 我已支付」「📋 复制收款地址」（copy_text 按钮）「❌ 取消订单」
+- 发货卡片：🎫 卡密 + 🔑 密码（都放 `<code>` 里，一点复制）+ 📅 到期 + 额度 + 🧾 订单号 + 🔗 TXID，
+  按钮「🔗 立即登录」直接跳 /login.html
+- 续费成功是单独的 ♻️ 卡片（不重复发密码）；原订单消息会 edit 成「✅ 订单已完成」，防止重复点「我已支付」
+
+**怎么收款的（关键设计）**
+1. 每张订单的应付金额 = 套餐价 + **未被占用的唯一尾数**（同价位有并发订单时 9.90 → 9.91 → 9.92…），
+   用金额就能区分是谁转的，不用给每个用户单独地址。卡片里会明确提示"只转这个精确金额"。
+2. 收款地址固定：`kv_store.tg_pay_addr`（默认就是用户给的 `TYqHjF35ovKPRL5vA9CSbVs5mGEkBvsYBB`）。
+3. cron 每分钟拉一次该地址的 USDT-TRC20 转入记录 → 写 `tg_chain_cache` →
+   拿"待支付订单"按 `金额误差 < 0.005` + `转账时间在订单创建之后` + `该笔转账没被别的订单用过` 匹配 →
+   命中就 `tg_order_deliver()`：开租户 / 续期 + 发卡密 + 改订单状态。
+4. 主接口 TronGrid（带用户给的 `TRON-PRO-API-KEY: b1c9add7-…` 避免限流），挂了自动降级 Tronscan。
+5. 订单超时（默认 30 分钟）自动标记 expired 并通知用户；超时后转账的走人工补单（后台有「补发货」）。
+
+**测试卡（每人限领一张）**
+- `tg_users.trial_kami` 记录领过的卡；再点 → 直接把他那张卡再报一遍（带剩余时间），不会重复发。
+- 时长 `kv_store.tg_trial_hours`（默认 24 小时，后台可改 1~720），额度固定 网页 50 / 客服码 50 / 1 个子客服。
+- 开关 `kv_store.tg_trial_on`。
+
+**新文件 / 改动**
+| 文件 | 说明 |
+|------|------|
+| `routes/telegram.php` | 机器人全部逻辑（API 封装 / 界面文案 / 下单 / 核款 / 发货 / 测试卡 / webhook 入口） |
+| `routes/tgadmin.php` | 后台管理接口（`/api/admin/tg*`） |
+| `bin/tg_orders.php` | 核款 cron（每分钟） |
+| `index.php` | 注册 `/api/tg/webhook` + 建表；首次自动生成 webhook secret |
+| `public/admin.html` + `assets/js/admin.js` | 新增「🤖 发卡机器人」页签（`admin.js?v=2.4.0`） |
+
+新建表：`tg_users` / `tg_pkgs`（首灌 体验卡1天1U、月卡30天9.9U、季卡90天25U、年卡365天88U）/ `tg_orders` / `tg_chain_cache`。
+
+**部署要点**
+- webhook：`https://kf.ylcz.cc/api/tg/webhook?secret=<kv:tg_webhook_secret>`，
+  同时给 Telegram 设了 `secret_token`；入口 query secret 和 `X-Telegram-Bot-Api-Secret-Token` 头两种校验都认。
+- crontab（已加）：`* * * * * /usr/bin/php /www/wwwroot/kf.ylcz.cc/bin/tg_orders.php >> /www/server/cron/kfxt-tg.log 2>&1`
+- ⚠️ **坑**：`data/tg.log` 一开始是 root 建的 644，PHP-FPM（www）写不进去 → 网页侧报错完全看不到日志。
+  已 `chown www:www` + `chmod 664`。以后新增"网页进程要写的日志文件"注意别用 root 建。
+
+**验证（都是真跑的，不是读代码）**
+1. 全流程演练（`_tgtest.php flow`，演练模式只把要发的消息写日志）：
+   `/start` → 点测试卡（发卡成功并记录 `trial_kami`）→ 再点一次（提示"你已经领过啦"，**不重复发**，租户里测试卡仍只有 1 张）
+   → 购买 → 点月卡（生成订单 KM…，应付 9.90）→ 点「我已支付」（提示核链中）→
+   往 `tg_chain_cache` 灌一笔金额完全一致的转账 → 核款匹配成功 → **订单 delivered + 租户开好 + 生成卡密卡片** ✅
+2. 发货出来的卡密**真的能登录**：拿卡片里的卡密+密码打 `/api/auth/login` → HTTP 200 拿到 tenant token ✅
+3. 续费：点续费 → 发卡密 → 选季卡（25.00）→ 到账 → 到期日从 2026-11-02 顺延到 2027-01-31（+90 天）✅
+4. 后台接口：读配置 / 存配置 / 新增套餐 / 删套餐 / 手动核款 / 设置 webhook 全通；
+   设置后用 `getWebhookInfo` 复核 → url 正确、`pending_update_count=0`、无 `last_error` ✅
+5. webhook 真实链路：不带 secret → 403；带错 secret → 403；带对 secret（或 Telegram 那个头）→ 200 `ok`，
+   并且 `data/tg.log` 显示它真的去调了 Telegram（假 chat id 被拒：`Bad Request: chat not found`）
+   —— 说明"收更新 → 处理 → 发消息"整条链是通的 ✅

@@ -208,11 +208,25 @@ require_once __DIR__ . '/routes/visitor.php';
 require_once __DIR__ . '/routes/agent.php';
 require_once __DIR__ . '/routes/tenant.php';
 require_once __DIR__ . '/routes/admin.php';
+require_once __DIR__ . '/routes/telegram.php';
+require_once __DIR__ . '/routes/tgadmin.php';
+
+/* 发卡机器人：建表 + 首次灌默认套餐（只跑一次，避免每请求都查） */
+try {
+    if (kv_get('tg_schema_v', '') !== '1') {
+        tg_schema();
+        tg_seed_pkgs();
+        kv_set('tg_schema_v', '1');
+        if (kv_get('tg_webhook_secret', '') === '') kv_set('tg_webhook_secret', bin2hex(random_bytes(16)));
+    }
+} catch (\Throwable $e) { /* 忽略：首次请求重试 */ }
 
 function dispatch_api(string $method, string $uri): void
 {
     // ---- 认证 ----
     if ($uri === '/api/auth/login')    handle_auth_login($method);
+    // ---- 发卡机器人 webhook（Telegram 直接 POST，不走登录态，用 secret 校验）----
+    if ($uri === '/api/tg/webhook')    handle_tg_webhook($method);
     if ($uri === '/api/auth/me')       handle_auth_me($method);
     if ($uri === '/api/auth/password') handle_auth_password($method);
     if ($uri === '/api/auth/profile')  handle_auth_profile($method);
@@ -285,6 +299,14 @@ function dispatch_api(string $method, string $uri): void
     if (preg_match('#^/api/admin/domain-pool/(\d+)$#', $uri, $m)) handle_admin_domain_pool_id($method, (int)$m[1]);
     if ($uri === '/api/admin/root-domain')       handle_admin_root_domain($method);
     if ($uri === '/api/admin/defaults')          handle_admin_defaults($method);
+    // ---- 发卡机器人（平台管理员）----
+    if ($uri === '/api/admin/tg')                handle_admin_tg($method);
+    if ($uri === '/api/admin/tg/save')           handle_admin_tg_save($method);
+    if ($uri === '/api/admin/tg/pkg')            handle_admin_tg_pkg($method);
+    if ($uri === '/api/admin/tg/pkg-delete')     handle_admin_tg_pkg_delete($method);
+    if ($uri === '/api/admin/tg/webhook')        handle_admin_tg_webhook($method);
+    if ($uri === '/api/admin/tg/order')          handle_admin_tg_order($method);
+    if ($uri === '/api/admin/tg/check')          handle_admin_tg_check($method);
 
     // ---- 轮询（客服版需登录；访客版公开） ----
     if ($uri === '/api/poll') {
