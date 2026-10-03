@@ -5,9 +5,9 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>客服工作台</title>
 <link rel="stylesheet" href="/assets/vendor/element-plus.css">
-<link rel="stylesheet" href="/assets/css/app.css?v=3.9.3">
-<script src="/assets/ui/ui-registry.js?v=2.6.0"></script>
-<script src="/assets/ui/ui-loader.js?v=2.6.0" data-ui-cat="auto"></script>
+<link rel="stylesheet" href="/assets/css/app.css?v=3.11.0">
+<script src="/assets/ui/ui-registry.js?v=2.7.0"></script>
+<script src="/assets/ui/ui-loader.js?v=2.7.0" data-ui-cat="auto"></script>
 </head>
 <body>
 <!-- 注意：#app 是挂载容器，写在这里的 @click 不会被绑定（模板取的是它的 innerHTML）。
@@ -44,7 +44,8 @@
   <div class="layout" v-else :class="{'m-side-open': mSideOpen}">
     <div class="m-mask" v-if="mSideOpen" @click="mSideOpen = false"></div>
     <!-- ============ 侧栏导航 ============ -->
-    <div class="side">
+    <!-- 手机端点侧栏里任何东西后自动收起抽屉 -->
+    <div class="side" @click="mSideOpen = false">
       <div class="logo">💬 客服工作台</div>
       <div class="nav">
         <div class="nav-group" style="padding-top:6px;">工 作</div>
@@ -154,19 +155,20 @@
                   <span class="ch-chip chn" v-if="profile && profile.channel"
                         :title="'渠道：访客从「' + profile.channel + '」里进来的' + (profile.browser ? '（' + profile.browser + '）' : '')">渠道：{{ profile.channel }}</span>
                   <span class="ch-chip" v-if="profile && profile.dev_tag">📱 {{ profile.dev_tag }}</span>
-                  <span class="ch-chip src" :title="'访客是通过「' + sourceText(current.source) + '」进来的'">进入：{{ sourceText(current.source) }}</span>
-                  <span title="访客 IP">🌐 {{ current.ip || '—' }}</span>
+                  <span class="ch-chip src m-hide" :title="'访客是通过「' + sourceText(current.source) + '」进来的'">进入：{{ sourceText(current.source) }}</span>
+                  <span class="m-hide" title="访客 IP">🌐 {{ current.ip || '—' }}</span>
                   <span v-if="profile">📍 {{ profile.region || profile.city || geoTag(profile.geo) || '未知' }}</span>
-                  <span v-if="profile">👣 访问 {{ profile.visit_count }} 次</span>
-                  <span v-if="profile">💬 消息 {{ profile.message_count }}</span>
-                  <span v-if="profile && profile.first_time" title="首次进入时间">🕒 首次 {{ shortTime(profile.first_time) }}</span>
-                  <span v-if="current.lastTime" title="最近活跃">⏱ 最近 {{ shortTime(current.lastTime) }}</span>
-                  <span v-if="current.agent_name" title="接待客服">🎧 {{ current.agent_name }}</span>
-                  <span class="ch-id" title="会话编号">#{{ current.id }}</span>
+                  <span v-if="profile" class="m-hide">👣 访问 {{ profile.visit_count }} 次</span>
+                  <span v-if="profile" class="m-hide">💬 消息 {{ profile.message_count }}</span>
+                  <span v-if="profile" class="m-hide" title="首次进入时间">🕒 首次 {{ shortTime(profile.first_time) }}</span>
+                  <span v-if="current.lastTime" class="m-hide" title="最近活跃">⏱ 最近 {{ shortTime(current.lastTime) }}</span>
+                  <span v-if="current.agent_name" class="m-hide" title="接待客服">🎧 {{ current.agent_name }}</span>
+                  <span class="ch-id m-hide" title="会话编号">#{{ current.id }}</span>
                 </div>
               </div>
 
               <span class="chat-head-btns">
+                <el-button size="small" plain class="cbtn m-only" title="访客信息" @click="infoOpen = !infoOpen">ℹ️ 资料</el-button>
                 <el-button size="small" plain class="cbtn icon" title="搜索聊天记录" @click="chatSearchOn = !chatSearchOn">🔍</el-button>
                 <el-popconfirm title="拉黑该访客 IP？拉黑后其无法再进入或发消息" @confirm="blockSession">
                   <template #reference><el-button size="small" type="danger" plain class="cbtn">🚫 拉黑</el-button></template>
@@ -331,8 +333,14 @@
           </div>
         </div>
 
-        <div class="info-col" v-if="current">
-          <h4>访客信息</h4>
+        <!-- 手机端：访客信息抽屉的遮罩 -->
+        <div class="m-mask m-info-mask" v-if="infoOpen" @click="infoOpen = false"></div>
+
+        <div class="info-col" v-if="current" :class="{open: infoOpen}">
+          <h4>
+            访客信息
+            <button type="button" class="info-close m-only" title="收起" @click="infoOpen = false">✕</button>
+          </h4>
           <div class="info-item"><span class="k">名称</span><span class="v" style="cursor:pointer;" title="点击修改" @click="renameVisitor">{{ current.name }} ✏️</span></div>
           <div class="info-item" v-if="profile"><span class="k">设备 / 平台</span><span class="v">{{ profile.dev_tag || profile.os || '未知' }}</span></div>
             <div class="info-item" v-if="profile"><span class="k">渠道</span><span class="v" :title="profile.browser ? ('浏览器标识：' + profile.browser) : ''">{{ profile.channel || profile.browser || '未知' }}</span></div>
@@ -384,9 +392,21 @@
           <div class="stat-card"><span class="sc-ic c5">🗂️</span><div class="sc-body"><div class="v">{{ stats.total_sessions }}</div><div class="l">总会话</div></div></div>
         </div>
         <div class="panel">
-          <div class="panel-title">近 7 天会话趋势</div>
+          <div class="panel-title">近 7 天会话趋势
+            <span class="trend-legend">
+              <i class="lg-new"></i>新会话
+              <i class="lg-act"></i>活跃会话
+            </span>
+          </div>
           <div class="bar-row" v-for="d in stats.trend7" :key="d.date">
-            <div class="nm">{{ d.date }}</div><div class="bar"><div :style="{width:barW(d.count, stats.trend7)}"></div></div><div class="num">{{ d.count }}</div>
+            <div class="nm">{{ d.date }}</div>
+            <div class="bar bar2">
+              <div class="b-new" :style="{width: trendW(d.count)}"></div>
+              <div class="b-act" :style="{width: trendW(d.active)}"></div>
+            </div>
+            <div class="num" :title="'新会话 ' + d.count + ' · 活跃会话 ' + d.active + ' · 已回复 ' + d.replied">
+              {{ d.count }}<em v-if="d.active">/{{ d.active }}</em>
+            </div>
           </div>
         </div>
         <div class="panel" v-if="stats.quota">
@@ -1364,7 +1384,7 @@
 <script src="/assets/qr-poster.js?v=2.1.03"></script>
 <script src="/assets/api.js?v=2.0.1"></script>
 <script src="/assets/js/app-components.js?v=2.3.0"></script>
-<script src="/assets/js/app.js?v=3.5.1"></script>
+<script src="/assets/js/app.js?v=3.5.3"></script>
 <script src="/assets/js/app-boot.js?v=2.1.1"></script>
 </body>
 </html>

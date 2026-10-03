@@ -212,6 +212,10 @@ const app = createApp({
     const contactLabel = (t) => ({ note: '备注', mobile: '手机', qq: 'QQ', wechat: '微信', email: '邮箱', other: '其他' }[t] || t);
     const barW = (v, list) => { const max = Math.max(1, ...list.map(x => x.count)); return Math.round(v / max * 100) + '%'; };
     const quotaW = (u, l) => Math.min(100, l > 0 ? Math.round(u / l * 100) : 100) + '%';
+    // v2.47 趋势图：新会话 / 活跃会话 两条共用同一刻度（取两者最大值），否则两条没法比
+    const trendMax = Vue.computed(() => Math.max(1, ...((stats.value && stats.value.trend7) || [])
+        .map(d => Math.max(d.count || 0, d.active || 0))));
+    const trendW = (v) => Math.round(((Number(v) || 0) / trendMax.value) * 100) + '%';
 
     // ---------- 数据加载 ----------
     const loadMe = async () => {
@@ -509,6 +513,7 @@ const app = createApp({
       msgs.value = [];
       maxMsgId.value = 0;
       profile.value = null;
+      infoOpen.value = false;   // v2.46 手机端：切会话时收起访客信息抽屉
       try {
         const r = await API.get('/api/sessions/' + id + '/messages');
         msgs.value = r.messages || [];
@@ -707,6 +712,7 @@ const app = createApp({
     };
     /* ===== v2.43：引用回复 / 消息菜单 / 多选 / 粘贴发图 / 视频·文件·定位 ===== */
     const replyTo = ref(null);
+    const infoOpen = ref(false);   // v2.46 手机端访客信息抽屉
     const flashId = ref(0);
     const quoteOf = (m) => (m && m.reply_to) ? msgs.value.find(x => x.id === m.reply_to) : null;
     const quoteWho = (m) => !m ? '' : (m.from === 'agent' ? (m.sender_name || '客服') : ((current.value && current.value.name) || '访客'));
@@ -2078,6 +2084,7 @@ const app = createApp({
       ctxMenu, openCtxMenu, openCtxMenuFromBtn, closeCtxMenu, ctxMenuArchive, ctxMenuClose, ctxMenuDelete,
       ctxMenuPin, ctxMenuUnread, ctxMenuBlock,
       replyTo, quoteOf, quoteWho, quoteText, startReply, jumpToMsg, copyMsg, flashId, fmtSize, mapUrl,
+      infoOpen,
       msgMenu, openMsgMenu, closeMsgMenu, closeAllMenus, deleteMsg,
       selMode, selIds, enterSel, exitSel, toggleSel, selAll, selCopy, selDelete,
       onPaste, sendFile, sendLocation,
@@ -2095,7 +2102,7 @@ const app = createApp({
       cropDlg, cropSrc, cropZoomPct, cropStage, cropStyle, cropImgLoaded, cropDown, cropMove, cropUp, cropWheel, cropClose, openCrop, cropConfirm, avatarPreview,
       geoTag, visitorTag, visitorTagFull, visitorChnClass, copyQrImage, downloadQrImage, codeRotateHint, rotateCode, loadHistory, disableLink, saveCodeCfg, meAvatarUrl,
       quickFields, welcomeFields, autoFields, blFields, preqFields,
-      shortTime, fmtTime, sourceText, contactLabel, barW, quotaW,
+      shortTime, fmtTime, sourceText, contactLabel, barW, quotaW, trendW,
       sessIcon,
       setTab, setGroups, openSetting, switchSetting,
       navGroups,

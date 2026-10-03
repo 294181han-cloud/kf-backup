@@ -85,7 +85,45 @@ html[data-ui-cat="mobile"][data-ui-template="default"] .sess-col.collapsed { wid
 html[data-ui-cat="mobile"][data-ui-template="default"] .sess-collapse-btn { display: none; }
 html[data-ui-cat="mobile"][data-ui-template="default"] .content.workbench.has-chat .sess-col { display: none; }
 html[data-ui-cat="mobile"][data-ui-template="default"] .content.workbench:not(.has-chat) .chat-col { display: none; }
-html[data-ui-cat="mobile"][data-ui-template="default"] .info-col { display: none; }
+/* 访客信息：右侧抽屉。
+   原来是直接 display:none —— 手机上完全看不到访客资料（用户反馈"访客信息也看不到，应该滑动出去"）。
+   现在由聊天头部的「ℹ️ 资料」按钮控制 .open，从右侧滑出。 */
+html[data-ui-cat="mobile"][data-ui-template="default"] .info-col {
+  display: block; position: fixed; right: 0; top: 0; bottom: 0; z-index: 70;
+  width: min(86vw, 340px); min-width: 0; max-width: none; overflow-y: auto;
+  transform: translateX(103%); transition: transform .22s ease;
+  box-shadow: 0 0 40px rgba(0, 0, 0, .22);
+  padding-bottom: calc(18px + env(safe-area-inset-bottom));
+}
+html[data-ui-cat="mobile"][data-ui-template="default"] .info-col.open { transform: none; }
+html[data-ui-cat="mobile"][data-ui-template="default"] .info-col h4 {
+  display: flex; align-items: center; justify-content: space-between;
+}
+html[data-ui-cat="mobile"][data-ui-template="default"] .info-close {
+  border: 0; background: transparent; color: var(--ink-3, #8b95a7);
+  width: 28px; height: 28px; border-radius: 8px; font-size: 14px; line-height: 1;
+  cursor: pointer; margin: 0; flex-shrink: 0;
+}
+html[data-ui-cat="mobile"][data-ui-template="default"] .info-close:active {
+  background: color-mix(in srgb, var(--theme) 12%, transparent);
+}
+html[data-ui-cat="mobile"][data-ui-template="default"] body:not(.dark) .info-col {
+  background: var(--card); border-left: 1px solid var(--line);
+}
+/* 手机上聊天头只留关键信息，其余进抽屉，避免把输入框挤出屏幕 */
+html[data-ui-cat="mobile"][data-ui-template="default"] .ch-sub .m-hide { display: none; }
+/* 触摸体验：去掉双击缩放的 300ms 等待，输入框字号 ≥16px 防 iOS 聚焦自动放大 */
+html[data-ui-cat="mobile"] { touch-action: manipulation; }
+html[data-ui-cat="mobile"] .chat-input textarea { font-size: 16px; }
+/* 聊天列用 flex 正确收缩：消息区可缩到 0，输入区永远留在屏幕内 */
+html[data-ui-cat="mobile"][data-ui-template="default"] .chat-col { min-height: 0; }
+html[data-ui-cat="mobile"][data-ui-template="default"] .chat-body { min-height: 0; }
+html[data-ui-cat="mobile"][data-ui-template="default"] .chat-input { flex-shrink: 0; }
+html[data-ui-cat="mobile"][data-ui-template="default"] .chat-head { flex-shrink: 0; }
+/* 触屏没有 hover，悬停才出现的按钮点第一下会像没反应 */
+html[data-ui-cat="mobile"][data-ui-template="default"] .sess-more { opacity: 1; }
+html[data-ui-cat="mobile"][data-ui-template="default"] .msg-bubble img { max-width: 66vw; height: auto; }
+html[data-ui-cat="mobile"][data-ui-template="default"] .msg-bubble video { max-width: 66vw; height: auto; }
 html[data-ui-cat="mobile"][data-ui-template="default"] .chat-head .m-back-btn { margin-left: -6px; }
 html[data-ui-cat="mobile"][data-ui-template="default"] .msg-box { max-width: 84%; }
 html[data-ui-cat="mobile"][data-ui-template="default"] .chat-input textarea { height: 52px; }

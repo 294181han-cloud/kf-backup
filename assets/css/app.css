@@ -210,6 +210,23 @@ body.dark .tool-btn:hover { color: var(--theme, #69b1ff); }
 .bar-row .bar { flex: 1; background: #f2f3f5; border-radius: 4px; height: 16px; }
 .bar-row .bar > div { height: 100%; border-radius: 4px; background: linear-gradient(90deg,#1677ff,#69b1ff); min-width: 2px; }
 .bar-row .num { width: 40px; text-align: right; color: #86909c; }
+
+/* v2.47 近 7 天趋势：一根行里两条（上=新会话，下=活跃会话），共用同一刻度 */
+.bar-row .bar2 { background: transparent; display: flex; flex-direction: column; justify-content: center; gap: 2px; }
+.bar-row .bar2 .b-new, .bar-row .bar2 .b-act { height: 7px; border-radius: 3px; min-width: 2px; }
+.bar-row .bar2 .b-new { background: linear-gradient(90deg, var(--theme, #1677ff), color-mix(in srgb, var(--theme, #1677ff) 55%, #fff)); }
+.bar-row .bar2 .b-act { background: color-mix(in srgb, var(--theme, #1677ff) 30%, #fff); }
+.bar-row .num em { font-style: normal; color: #b6bdc9; font-size: 11.5px; }
+.trend-legend {
+  display: inline-flex; align-items: center; gap: 5px; margin-left: 12px;
+  font-size: 11.5px; font-weight: 400; color: var(--v-ink-3, #97a1b3);
+}
+.trend-legend i { width: 11px; height: 7px; border-radius: 2px; display: inline-block; }
+.trend-legend .lg-new { background: var(--theme, #1677ff); }
+.trend-legend .lg-act { background: color-mix(in srgb, var(--theme, #1677ff) 30%, #fff); margin-left: 8px; }
+body.dark .bar-row .bar2 .b-new { background: linear-gradient(90deg, var(--theme, #1677ff), color-mix(in srgb, var(--theme, #1677ff) 60%, #1e2229)); }
+body.dark .bar-row .bar2 .b-act { background: color-mix(in srgb, var(--theme, #1677ff) 42%, #1e2229); }
+body.dark .trend-legend { color: #98a3b4; }
 .mono { font-family: Consolas, monospace; }
 .muted { color: #86909c; font-size: 13px; }
 .link-line { display: flex; align-items: center; gap: 8px; padding: 8px 10px; background: #f7f8fa; border-radius: 8px; margin-bottom: 8px; font-size: 13px; word-break: break-all; }
@@ -1369,6 +1386,127 @@ body.dark .loc-bubble .lb-sub { color: #9db3a5; }
 
 /* 工具条右侧小提示 */
 .tools-hint { font-size: 11px; color: #a8b0bd; margin-left: auto; }
+
+/* =====================================================================
+   v2.46 工作台手机端适配（≤900px）
+   之前完全没有移动端布局：侧栏 234 + 会话列 326 + 访客信息 300 硬挤在一行，
+   手机上聊天区被压成一条缝（看不到输入框/图片），访客信息直接挤没了。
+   现在：侧栏＝左抽屉、会话列表↔聊天＝两屏切换、访客信息＝右抽屉。
+   ===================================================================== */
+.m-only { display: none !important; }   /* 只在手机端出现的元素 */
+
+@media (max-width: 900px) {
+  /* 手机浏览器地址栏会吃掉 100vh，用 dvh 让输入框不被顶到屏幕外 */
+  .layout { height: 100dvh; }
+  /* 去掉"双击才生效"：默认双击是缩放，浏览器要等 ~300ms 判断，导致第一次点像没反应 */
+  html, body { touch-action: manipulation; -webkit-text-size-adjust: 100%; }
+  * { -webkit-tap-highlight-color: rgba(0, 0, 0, .06); }
+  /* 触屏没有 hover：悬停才出现的按钮一律常显，否则要点两下 */
+  .sess-more { opacity: 1 !important; }
+
+  /* ---------- 侧栏 → 左侧抽屉 ---------- */
+  .side {
+    position: fixed; left: 0; top: 0; bottom: 0; z-index: 220; width: 262px;
+    transform: translateX(-100%); transition: transform .22s ease;
+    box-shadow: 0 0 28px rgba(8, 10, 14, .28);
+  }
+  .layout.m-side-open .side { transform: none; }
+  .side.collapsed { width: 262px; }
+  .side.collapsed .nav-item .nv-text, .side.collapsed .nav-group, .side.collapsed .logo .lg-text { display: inline; }
+  .m-mask {
+    display: block; position: fixed; inset: 0; z-index: 210;
+    background: rgba(8, 10, 14, .45);
+  }
+  .m-menu-btn {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 34px; height: 34px; border: 0; background: #f2f5fa; color: #46506a;
+    border-radius: 10px; font-size: 16px; cursor: pointer; flex-shrink: 0;
+  }
+  .m-back-btn {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 34px; height: 34px; border: 0; background: #f2f5fa; color: #46506a;
+    border-radius: 10px; font-size: 20px; line-height: 1; cursor: pointer; flex-shrink: 0;
+  }
+  body.dark .m-menu-btn, body.dark .m-back-btn { background: #262c34; color: #c6ccd8; }
+
+  /* ---------- 顶栏 ---------- */
+  .topbar { height: 50px; padding: 0 10px; gap: 8px; }
+  .topbar .title { font-size: 15px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .topbar .clock { display: none; }
+  .m-only { display: inline-flex !important; }
+
+  /* ---------- 会话列表 ↔ 聊天：两屏切换 ---------- */
+  .content.workbench { flex-direction: column; }
+  .sess-col, .sess-col.collapsed { width: 100% !important; min-width: 0; border-right: 0; }
+  .sess-collapse-btn { display: none !important; }
+  .workbench.has-chat .sess-col { display: none !important; }
+  .workbench:not(.has-chat) .chat-col { display: none !important; }
+  .chat-col { width: 100%; }
+
+  /* ---------- 聊天头部：允许换行，按钮横滑，别把内容挤没 ---------- */
+  .chat-head { padding: 8px 10px; flex-wrap: wrap; gap: 8px; row-gap: 6px; }
+  .chat-head .ch-ava { width: 36px; height: 36px; font-size: 18px; border-radius: 11px; }
+  .chat-head .ch-top .name { font-size: 15px; max-width: 46vw; }
+  .chat-head .ch-info { flex: 1 1 100%; order: 3; }
+  .chat-head .ch-sub { flex-wrap: wrap; overflow-x: visible; row-gap: 4px; }
+  .chat-head .ch-sub > span { max-width: 88vw; }
+  .chat-head-btns {
+    flex: 1 1 100%; order: 4; overflow-x: auto; padding-bottom: 2px;
+    scrollbar-width: none; -ms-overflow-style: none;
+  }
+  .chat-head-btns::-webkit-scrollbar { height: 0; display: none; }
+  .chat-head-btns .cbtn { flex-shrink: 0; }
+
+  /* ---------- 聊天区 / 输入区 ---------- */
+  .chat-body { padding: 12px 10px; min-height: 0; }
+  .chat-col { min-height: 0; }
+  .chat-head { flex-shrink: 0; }
+  .chat-input { flex-shrink: 0; }
+  /* 手机上聊天头只留关键信息（渠道/设备/地区），其余进访客信息抽屉 */
+  .ch-sub .m-hide { display: none; }
+  .msg-bubble { max-width: 78vw; }
+  .msg-bubble img, .msg-bubble video, .vb-video { max-width: 100%; height: auto; }
+  .msg-bubble img { max-width: 68vw; }
+  .file-bubble, .loc-bubble { min-width: 0; width: 100%; }
+  .chat-input { padding: 8px 10px calc(10px + env(safe-area-inset-bottom)); }
+  .chat-input textarea { height: 62px; font-size: 16px; }   /* ≥16px 防 iOS 聚焦自动放大 */
+  .send-btn { padding: 10px 20px; }
+  .quick-bar .quick-scroll { overflow-x: auto; }
+  .tools-hint { display: none; }
+
+  /* ---------- 访客信息 → 右侧抽屉 ---------- */
+  .info-col {
+    position: fixed; right: 0; top: 0; bottom: 0; z-index: 220;
+    width: 86vw; max-width: 360px; min-width: 0;
+    transform: translateX(100%); transition: transform .22s ease;
+    box-shadow: 0 0 28px rgba(8, 10, 14, .28);
+    padding-bottom: calc(18px + env(safe-area-inset-bottom));
+  }
+  .info-col.open { transform: none; }
+  .m-info-mask { z-index: 210; }
+  .info-col h4 { display: flex; align-items: center; justify-content: space-between; }
+  .info-close {
+    border: 0; background: #f2f5fa; color: #6b7688; width: 26px; height: 26px;
+    border-radius: 8px; font-size: 13px; cursor: pointer; margin: 0;
+  }
+  body.dark .info-close { background: #262c34; color: #c6ccd8; }
+
+  /* ---------- 设置页 / 内容页在手机上留点边距 ---------- */
+  .content { padding: 14px 12px; }
+  .grid2, .grid-auto { gap: 12px; }
+  .panel { padding: 14px 14px; }
+  .qa-row { flex-wrap: wrap; }
+  .qa-row .el-input { width: 100% !important; }
+  .stat-grid { gap: 10px; }
+  .el-dialog { width: 92vw !important; }
+  .el-message-box { width: 88vw !important; }
+}
+
+/* 超窄屏（iPhone SE 之类）再收一点 */
+@media (max-width: 420px) {
+  .chat-head .ch-top .name { max-width: 38vw; }
+  .msg-bubble { max-width: 82vw; }
+}
 
 /* 待发区里的非图片附件（视频/文件/语音） */
 .pa-file {

@@ -625,27 +625,20 @@ function handle_stats_dashboard(string $method): void
     $today = date('Y-m-d');
     $weekAgo = date('Y-m-d', strtotime('-6 days'));
 
-    $today_sessions = fetch_count($pdo, "SELECT COUNT(*) FROM v_sessions s WHERE s.tenant_id = ? AND date(s.last_time) = ?$vis", [$tid, $today]);
+    // v2.47 修正口径：卡片写的是「今日新会话」，就该按 created_at 数，而不是「今天最后活跃过的会话」
+    // （老口径会把昨天创建、今天又说了句话的老会话也算成"今天的新会话"，和下面明细表的「新会话」对不上）
+    $today_sessions = fetch_count($pdo, "SELECT COUNT(*) FROM v_sessions s WHERE s.tenant_id = ? AND date(s.created_at) = ?$vis", [$tid, $today]);
     $today_active   = fetch_count($pdo, "SELECT COUNT(DISTINCT m.session_id) FROM messages m JOIN v_sessions s ON s.id = m.session_id WHERE s.tenant_id = ? AND date(m.created_at) = ? AND m.from_type = 'visitor'$vis", [$tid, $today]);
     $today_replied  = fetch_count($pdo, "SELECT COUNT(*) FROM messages m JOIN v_sessions s ON s.id = m.session_id WHERE s.tenant_id = ? AND date(m.created_at) = ? AND m.from_type = 'agent'$vis", [$tid, $today]);
     $online_visitors= fetch_count($pdo, "SELECT COUNT(*) FROM v_sessions s WHERE s.tenant_id = ? AND s.status != 'closed' AND s.last_online_at > DATE_SUB(NOW(), INTERVAL 25 SECOND)$vis", [$tid]);
     $total_sessions = fetch_count($pdo, "SELECT COUNT(*) FROM v_sessions s WHERE s.tenant_id = ?$vis", [$tid]);
     $waiting        = fetch_count($pdo, "SELECT COUNT(*) FROM v_sessions s WHERE s.tenant_id = ? AND s.status != 'closed' AND s.agent_id = 0$vis", [$tid]);
 
-    // 近 7 天趋势（当日有活跃的会话数）
-    $st = $pdo->prepare("SELECT date(s.last_time) AS day, COUNT(*) c FROM v_sessions s WHERE s.tenant_id = ? AND date(s.last_time) >= ?$vis GROUP BY day");
-    $st->execute([$tid, $weekAgo]);
-    $map = [];
-    foreach ($st->fetchAll() as $r) $map[$r['day']] = (int)$r['c'];
-    $trend = [];
-    for ($i = 6; $i >= 0; $i--) {
-        $d = date('Y-m-d', strtotime("-$i days"));
-        $trend[] = ['date' => substr($d, 5), 'count' => $map[$d] ?? 0];
-    }
+    // 来源分布（仅 tenant 视角有额度意义；agent 也按可见范围统计）—— 同样按 created_at 口径
+    $srcApp = fetch_count($pdo, "SELECT COUNT(*) FROM v_sessions s WHERE s.tenant_id = ? AND s.quota_key = 'app' AND date(s.created_at) >= ?$vis", [$tid, $weekAgo]);
+    $srcWeb = fetch_count($pdo, "SELECT COUNT(*) FROM v_sessions s WHERE s.tenant_id = ? AND s.quota_key = 'web' AND date(s.created_at) >= ?$vis", [$tid, $weekAgo]);
 
-    // 来源分布（仅 tenant 视角有额度意义；agent 也按可见范围统计）
-    $srcApp = fetch_count($pdo, "SELECT COUNT(*) FROM v_sessions s WHERE s.tenant_id = ? AND s.quota_key = 'app' AND date(s.last_time) >= ?$vis", [$tid, $weekAgo]);
-    $srcWeb = fetch_count($pdo, "SELECT COUNT(*) FROM v_sessions s WHERE s.tenant_id = ? AND s.quota_key = 'web' AND date(s.last_time) >= ?$vis", [$tid, $weekAgo]);
+    // 近 7 天趋势在下面用 recMap/actMap/repMap 一起算（口径与「近 7 天接待明细」完全一致）
 
     // 每日接待明细（口径统一，均可对账）：
     //   新会话   = 当天创建的会话数（created_at）
@@ -675,6 +668,22 @@ function handle_stats_dashboard(string $method): void
         $daily[] = ['date' => $d, 'received' => $received, 'active' => $active, 'replied' => $replied,
             'replied_msgs' => $repMsgMap[$d] ?? 0,
             'reply_rate' => $active > 0 ? min(100, round($replied / $active * 100, 1)) : 0];
+    }
+
+    // 近 7 天趋势（v2.47 修正）：
+    //   旧口径 = 按 date(last_time) 分组，等于"每条会话只算在它最后一次说话的那天"，
+    //           既不是新增也不是活跃，还会把老会话挪到后一天 —— 用户反馈"趋势不对"。
+    //   新口径 = 和「接待明细」同一套数（同一天同一份数据，图表和表格必须对得上）：
+    //           count  = 当天新会话（created_at）
+    //           active = 当天有发言的去重会话（访客消息）
+    //           replied= 当天被客服回复过的去重会话
+    $trend = [];
+    for ($i = 6; $i >= 0; $i--) {
+        $d = date('Y-m-d', strtotime("-$i days"));
+        $trend[] = ['date' => substr($d, 5),
+            'count'   => $recMap[$d] ?? 0,
+            'active'  => $actMap[$d] ?? 0,
+            'replied' => $repMap[$d] ?? 0];
     }
 
     $out = [
