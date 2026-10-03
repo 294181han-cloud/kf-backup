@@ -868,6 +868,18 @@ function gen_subdomain(): string
     return $s;
 }
 
+/**
+ * 防红中转页的文件名（v2.59）：8 位小写字母数字。
+ * 配合 /MM-DD/ 目录使用，让客服码看起来是"某天生成的一个普通静态页"。
+ */
+function gen_gate_name(): string
+{
+    $chars = 'abcdefghjkmnpqrstuvwxyz23456789';
+    $s = '';
+    for ($i = 0; $i < 8; $i++) $s .= $chars[random_int(0, strlen($chars) - 1)];
+    return $s;
+}
+
 /** 访客默认名：月-日 编号 */
 function gen_visitor_name(int $tenantId): string
 {

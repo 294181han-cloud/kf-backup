@@ -519,6 +519,29 @@ function handle_visitor_poll(string $method): void
         'agent_avatar' => $agentAvatar, 'session_status' => $sessStatus, 'now' => time()]);
 }
 /* ---------- POST /api/visitor/send ---------- */
+/* ---------- 防红中转（v2.59）：空壳页拿 key 换真实入口 ----------
+   请求里只有客服码，不落任何业务内容；码无效/租户停用/已到期都给一句人话提示。 */
+function handle_gate_check(string $method): void
+{
+    if ($method !== 'POST') { json_error('方法不允许', 405); return; }
+    $key = trim((string)input('key', ''));
+    if ($key === '' || !preg_match('/^[A-Za-z0-9]{4,64}$/', $key)) {
+        json_out(['ok' => false, 'msg' => '链接不完整，请重新扫码进入']);
+        return;
+    }
+    $st = db()->prepare('SELECT sc.code, sc.tenant_id, t.status, t.expires_at
+        FROM service_codes sc JOIN tenants t ON t.id = sc.tenant_id WHERE sc.code = ? LIMIT 1');
+    $st->execute([$key]);
+    $row = $st->fetch();
+    if (!$row) { json_out(['ok' => false, 'msg' => '链接已失效，请重新扫码进入']); return; }
+    if (($row['status'] ?? '') !== 'active') { json_out(['ok' => false, 'msg' => '该客服已停用，请联系管理员']); return; }
+    if (!empty($row['expires_at']) && strtotime((string)$row['expires_at']) < time()) {
+        json_out(['ok' => false, 'msg' => '该客服已到期，请联系管理员']);
+        return;
+    }
+    json_out(['ok' => true, 'code' => (string)$row['code'], 'url' => '/visitor.html']);
+}
+
 function handle_visitor_send(string $method): void
 {
     if ($method !== 'POST') { json_error('方法不允许', 405); return; }

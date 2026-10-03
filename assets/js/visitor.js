@@ -35,7 +35,11 @@ createApp({
 
     const params = () => {
       const p = {};
+      // v2.59 防红中转：空壳页 /MM-DD/xxxx.html?key=… 会把真实页面 document.write 进来，
+      // 此时地址栏里没有 code，客服码由中转页注入到 window.__KF_CODE__
+      const inj = (typeof window !== 'undefined' && window.__KF_CODE__) || '';
       if (qs.get('code')) p.code = qs.get('code');
+      else if (inj) p.code = inj;
       if (qs.get('t')) p.t = qs.get('t');
       return p;
     };
@@ -88,13 +92,16 @@ createApp({
       snd.send_which = b.snd_send_which || 'water';
     };
 
+    // 中转进来的访客也要跟直连用同一个本地标识 key，否则会被当成两个人
+    const visitorTkKey = () => 'kfxt_vt_' + (qs.get('code')
+      || (typeof window !== 'undefined' && window.__KF_CODE__) || qs.get('t') || location.hostname);
     const storeToken = (t) => {
       visitorToken.value = t;
-      const key = 'kfxt_vt_' + (qs.get('code') || qs.get('t') || location.hostname);
+      const key = visitorTkKey();
       try { localStorage.setItem(key, t); } catch (e) {}
     };
     const loadToken = () => {
-      const key = 'kfxt_vt_' + (qs.get('code') || qs.get('t') || location.hostname);
+      const key = visitorTkKey();
       try { return localStorage.getItem(key) || ''; } catch (e) { return ''; }
     };
 

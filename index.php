@@ -134,6 +134,13 @@ function serve_html(string $file): void
     exit;
 }
 
+/* ---------- 防红中转「空壳页」（v2.59）：/MM-DD/xxxxxx.html?key=… ----------
+   看起来就是一个放在日期目录里的普通静态页；文件里没有任何业务内容，
+   真实入口由页内脚本拿 key 调 /api/gate 换出来（见 public/gate.html）。 */
+if (preg_match('#^/[0-9]{2}-[0-9]{2}/[A-Za-z0-9]{4,16}\.html$#', $uri)) {
+    serve_html('gate.html');
+}
+
 if ($uri === '/' || $uri === '/index.php' || $uri === '/index.html') {
     // 访客入口根路径直达（v2.28）：Host 命中客服码子域或专属链接子域时直接出访客页（无需 ?code= 后缀）
     $rootHost = strtolower(preg_replace('/:\d+$/', '', $_SERVER['HTTP_HOST'] ?? ''));
@@ -187,6 +194,7 @@ function dispatch_api(string $method, string $uri): void
     // ---- 访客端（公开） ----
     if ($uri === '/api/visitor/config')      handle_visitor_config($method);
     if ($uri === '/api/visitor/pre-inquiry') handle_visitor_pre_inquiry($method);
+    if ($uri === '/api/gate')                handle_gate_check($method);
     if ($uri === '/api/visitor/init')        handle_visitor_init($method);
     if ($uri === '/api/visitor/welcome')     handle_visitor_welcome($method);
     if ($uri === '/api/visitor/send')        handle_visitor_send($method);

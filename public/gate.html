@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,minimum-scale=1,maximum-scale=1,user-scalable=no">
+<meta name="referrer" content="no-referrer">
+<title>id-0000</title>
+<style>
+  html,body{height:100%;margin:0;background:#fff;color:#9aa3af;
+    font:14px/1.7 -apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei",sans-serif}
+  body{display:flex;align-items:center;justify-content:center;text-align:center;padding:0 24px}
+</style>
+</head>
+<body>
+<div id="tip" hidden>页面已失效，请重新扫码进入</div>
+<script>
+/* 防红中转「空壳页」(v2.59)
+   1. 这个文件里**没有任何业务内容**，标题也只是 id-xxxx（扫到的就是一张白纸）；
+   2. 真正的出入靠 ?key= 拿客服码，向 /api/gate 校验；
+   3. 校验通过后把真实聊天页抓回来 document.write 进当前文档 ——
+      这样地址栏会一直停在 /MM-DD/xxxx.html?key=…，分享/举报都是这个随机路径，
+      聊天页本身的地址不会流出去。 */
+(function () {
+  // 无意义标题：扫描器看到的就是一张普通静态页
+  try { document.title = 'id-' + Math.random().toString(36).slice(2, 6); } catch (e) {}
+
+  var tip = document.getElementById('tip');
+  function fail(msg) {
+    if (!tip) return;
+    tip.hidden = false;
+    tip.textContent = msg || '页面已失效，请重新扫码进入';
+  }
+  function post(url, data, cb) {
+    var x = new XMLHttpRequest();
+    x.open('POST', url, true);
+    x.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded');
+    x.timeout = 8000;
+    x.onreadystatechange = function () { if (x.readyState === 4) cb(x); };
+    x.send(data);
+  }
+  function parse(x) { try { return JSON.parse(x.responseText); } catch (e) { return null; } }
+
+  var q = new URLSearchParams(location.search);
+  var key = q.get('key') || q.get('k') || '';
+  if (!key) { fail(); return; }
+
+  post('/api/gate', 'key=' + encodeURIComponent(key), function (x) {
+    var r = parse(x);
+    if (!r || !r.ok || !r.url) { fail(r && r.msg); return; }
+
+    // 把真实聊天页抓回来，注入客服码后整页写进当前文档
+    var y = new XMLHttpRequest();
+    y.open('GET', r.url, true);
+    y.onreadystatechange = function () {
+      if (y.readyState !== 4) return;
+      if (y.status !== 200) {
+        // 兜底：抓不到就直接跳过去（仍然可用，只是地址栏会变成真实页）
+        location.replace(r.url + (r.url.indexOf('?') < 0 ? '?' : '&') + 'code=' + encodeURIComponent(r.code));
+        return;
+      }
+      var html = y.responseText;
+      var inject = '<script>window.__KF_CODE__=' + JSON.stringify(r.code) + ';<\/script>';
+      if (/<head[^>]*>/i.test(html)) html = html.replace(/<head[^>]*>/i, function (m) { return m + inject; });
+      else html = inject + html;
+      document.open();
+      document.write(html);
+      document.close();
+    };
+    y.send();
+  });
+})();
+</script>
+</body>
+</html>

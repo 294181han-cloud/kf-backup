@@ -126,12 +126,14 @@ function handle_tenant_service_code(string $method): void
         $pick = $rows[array_rand($rows)];
         $code = gen_code_token();
         $scheme = 'https';
+        // v2.59 防红：入口改成「日期目录 + 随机文件名.html?key=客服码」
+        // 看起来就是一个普通静态页，页面本身没有任何内容（见 public/gate.html）
+        $gatePath = date('m-d') . '/' . gen_gate_name() . '.html?key=' . $code;
         if ($pick['wildcard']) {
-            // 泛解析域名：随机子域即入口标识，根路径直达（无 /visitor.html?code= 后缀）
             $sub = substr(preg_replace('/[^a-z0-9]/', 'x', strtolower(base64_encode(random_bytes(6)))), 0, 8);
-            $url = "$scheme://$sub.{$pick['domain']}/";
+            $url = "$scheme://$sub.{$pick['domain']}/$gatePath";
         } else {
-            $url = "$scheme://{$pick['domain']}/visitor.html?code=$code";
+            $url = "$scheme://{$pick['domain']}/$gatePath";
         }
         $pdo->prepare('INSERT INTO service_codes (tenant_id, code, link) VALUES (?,?,?)')->execute([$tid, $code, $url]);
         json_out(['ok' => true, 'code' => ['id' => (int)$pdo->lastInsertId(), 'code' => $code, 'link' => $url, 'created_at' => dt_to_iso(now_dt())]], 201);
