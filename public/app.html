@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>客服工作台</title>
 <link rel="stylesheet" href="/assets/vendor/element-plus.css">
-<link rel="stylesheet" href="/assets/css/app.css?v=3.9.1">
+<link rel="stylesheet" href="/assets/css/app.css?v=3.9.2">
 <script src="/assets/ui/ui-registry.js?v=2.6.0"></script>
 <script src="/assets/ui/ui-loader.js?v=2.6.0" data-ui-cat="auto"></script>
 </head>
@@ -442,6 +442,17 @@
           <p class="muted" style="font-size:11.5px;margin:8px 0 0;">
             聊天框底部「⚡快捷消息」里：<b>单击=直接发送</b>，Ctrl+单击=填到输入框再改；带图片的话术请在下方表格里编辑。
           </p>
+          <!-- v2.44 快捷消息 导入 / 导出 -->
+          <div class="qa-io">
+            <span class="qa-io-lbl">批量处理：</span>
+            <el-button size="small" @click="exportQuick('json')" :disabled="!quickMsgs.length">⬇ 导出全部（JSON）</el-button>
+            <el-button size="small" @click="exportQuick('csv')" :disabled="!quickMsgs.length">⬇ 导出表格（CSV）</el-button>
+            <el-button size="small" type="primary" plain @click="$refs.importQuickInput.click()">⬆ 从文件导入</el-button>
+            <input ref="importQuickInput" type="file" accept=".json,.csv,.txt" style="display:none" @change="importQuick($event)"/>
+            <span class="muted" style="font-size:11.5px;">
+              支持 JSON（完整，含附件，可原样搬走）和 CSV（标题/内容/分组/排序，Excel 另存为 CSV 即可）
+            </span>
+          </div>
         </div>
         <crud-table
           :rows="quickMsgs" :fields="quickFields" title="全部快捷消息" add-text="高级新增（可带图）"
@@ -1364,7 +1375,7 @@
 <script src="/assets/qr-poster.js?v=2.1.03"></script>
 <script src="/assets/api.js?v=2.0.1"></script>
 <script src="/assets/js/app-components.js?v=2.2.0"></script>
-<script src="/assets/js/app.js?v=3.4.3"></script>
+<script src="/assets/js/app.js?v=3.5.0"></script>
 <script src="/assets/js/app-boot.js?v=2.1.1"></script>
 </body>
 </html>

@@ -240,6 +240,129 @@ const app = createApp({
       } catch (e) { ElementPlus.ElMessage.error(e.message); }
       finally { qa.saving = false; }
     };
+    /* ===== v2.44 快捷消息：导出 / 导入 ===== */
+    const downloadText = (text, mime, filename) => {
+      const blob = new Blob([text], { type: mime + ';charset=utf-8' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url; a.download = filename;
+      document.body.appendChild(a); a.click(); a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 4000);
+    };
+    const csvCell = (v) => {
+      const s = String(v == null ? '' : v);
+      return /[",\r\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
+    };
+    const exportQuick = (format) => {
+      const rows = quickMsgs.value || [];
+      if (!rows.length) { ElementPlus.ElMessage.warning('还没有快捷消息可导出'); return; }
+      const stamp = new Date().toISOString().slice(0, 10).replace(/-/g, '');
+      if (format === 'csv') {
+        const lines = ['标题,内容,分组,排序'];
+        for (const q of rows) {
+          lines.push([q.title, q.content, q.group_name || '通用', q.sort || 0].map(csvCell).join(','));
+        }
+        downloadText('\uFEFF' + lines.join('\r\n'), 'text/csv', '快捷消息-' + stamp + '.csv');
+      } else {
+        const data = {
+          type: 'kfxt-quick-msgs', version: 1, exported_at: new Date().toISOString(), count: rows.length,
+          items: rows.map(q => ({
+            title: q.title || '', content: q.content || '',
+            group_name: q.group_name || '通用', sort: Number(q.sort) || 0,
+            attachments: (q.attachments || []).map(a => ({
+              type: a.type || 'image', url: a.url || '', name: a.name || '', size: Number(a.size) || 0,
+            })),
+          })),
+        };
+        downloadText(JSON.stringify(data, null, 2), 'application/json', '快捷消息-' + stamp + '.json');
+      }
+      ElementPlus.ElMessage.success('已导出 ' + rows.length + ' 条');
+    };
+    // CSV 解析：支持双引号包裹、内部逗号/换行、"" 转义、BOM
+    const csvRows = (text) => {
+      const s = String(text || '').replace(/^\uFEFF/, '');
+      const rows = []; let row = []; let cell = ''; let inQ = false;
+      for (let i = 0; i < s.length; i++) {
+        const c = s[i];
+        if (inQ) {
+          if (c === '"') { if (s[i + 1] === '"') { cell += '"'; i++; } else inQ = false; }
+          else cell += c;
+        } else if (c === '"') inQ = true;
+        else if (c === ',') { row.push(cell); cell = ''; }
+        else if (c === '\n') { row.push(cell); rows.push(row); row = []; cell = ''; }
+        else if (c !== '\r') cell += c;
+      }
+      if (cell !== '' || row.length) { row.push(cell); rows.push(row); }
+      return rows.filter(r => r.some(x => String(x).trim() !== ''));
+    };
+    const parseQuickCsv = (text) => {
+      const rows = csvRows(text);
+      if (!rows.length) return [];
+      const head = rows[0].map(x => String(x).trim().toLowerCase());
+      const alias = { '标题': 'title', 'title': 'title', '内容': 'content', 'content': 'content',
+        '分组': 'group_name', 'group': 'group_name', 'group_name': 'group_name',
+        '排序': 'sort', 'sort': 'sort' };
+      const mapped = {};
+      head.forEach((h, i) => { if (alias[h] && mapped[alias[h]] === undefined) mapped[alias[h]] = i; });
+      const hasHeader = Object.keys(mapped).length > 0;
+      const body = hasHeader ? rows.slice(1) : rows;
+      const at = (r, k, def) => {
+        const i = hasHeader ? mapped[k] : undefined;
+        if (i === undefined) return def;
+        return r[i] !== undefined ? r[i] : def;
+      };
+      return body.map((r, n) => ({
+        title: String(hasHeader ? at(r, 'title', '') : (r[0] || '')).trim(),
+        content: String(hasHeader ? at(r, 'content', '') : (r[1] || '')).trim(),
+        group_name: String(hasHeader ? at(r, 'group_name', '通用') : (r[2] || '通用')).trim() || '通用',
+        sort: Number(hasHeader ? at(r, 'sort', 0) : (r[3] || 0)) || 0,
+      }));
+    };
+    const importQuick = async (ev) => {
+      const file = ev.target.files[0];
+      ev.target.value = '';
+      if (!file) return;
+      const text = await new Promise(res => {
+        const fr = new FileReader();
+        fr.onload = () => res(String(fr.result || ''));
+        fr.readAsText(file, 'utf-8');
+      });
+      let items = [];
+      try {
+        const t = text.trim();
+        if (/\.json$/i.test(file.name) || t.startsWith('{') || t.startsWith('[')) {
+          const j = JSON.parse(text);
+          items = Array.isArray(j) ? j : (Array.isArray(j.items) ? j.items : []);
+        } else {
+          items = parseQuickCsv(text);
+        }
+      } catch (e) { ElementPlus.ElMessage.error('文件解析失败：' + e.message); return; }
+      items = items.filter(it => it && String(it.title || '').trim());
+      if (!items.length) {
+        ElementPlus.ElMessage.warning('没解析到有效数据（每条至少要有「标题」；CSV 列顺序：标题,内容,分组,排序）');
+        return;
+      }
+      try {
+        await ElementPlus.ElMessageBox.confirm(
+          '解析到 ' + items.length + ' 条快捷消息，会「追加」到现有列表（不删原有的）。确认导入？',
+          '导入快捷消息', { confirmButtonText: '开始导入', cancelButtonText: '取消' });
+      } catch (e) { return; }
+      let ok = 0, fail = 0;
+      for (const it of items) {
+        try {
+          await API.post('/api/quick-msgs', {
+            title: String(it.title).trim().slice(0, 20),
+            content: String(it.content || '').slice(0, 200),
+            group_name: String(it.group_name || '通用').slice(0, 32),
+            sort: Number(it.sort) || 0,
+            attachments: Array.isArray(it.attachments) ? it.attachments.filter(a => a && a.url) : [],
+          });
+          ok++;
+        } catch (e) { fail++; }
+      }
+      await loadQuick();
+      ElementPlus.ElMessage.success('导入完成：成功 ' + ok + ' 条' + (fail ? '，失败 ' + fail + ' 条' : ''));
+    };
     // 聊天里的「快捷消息 → 设置」弹窗：增删改 + 直接发送，不用离开会话
     const quickDlg = ref(false);
     const qe = reactive({ title: '', content: '' });
@@ -2114,6 +2237,7 @@ const app = createApp({
       askDlg, askForm, ASK_PRESETS, ASK_DEFAULT, openAskDialog, sendAskDialog,
       qa, quickAdd,
       quickDlg, qe, openQuickDlg, quickSave, quickDel, quickSendNow,
+      exportQuick, importQuick,
     };
   }
 });
