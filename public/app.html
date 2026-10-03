@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>小米客服</title>
 <link rel="stylesheet" href="/assets/vendor/element-plus.css">
-<link rel="stylesheet" href="/assets/css/app.css?v=3.24.0">
+<link rel="stylesheet" href="/assets/css/app.css?v=3.24.1">
 <script src="/assets/ui/ui-registry.js?v=2.8.0"></script>
 <script src="/assets/ui/ui-loader.js?v=2.8.0" data-ui-cat="auto"></script>
 </head>
@@ -59,7 +59,7 @@
     <!-- ============ 侧栏导航 ============ -->
     <!-- 手机端点侧栏里任何东西后自动收起抽屉 -->
     <div class="side" @click="mSideOpen = false">
-      <div class="logo"><img class="lg-mi" src="/assets/img/mi-logo.svg" alt=""><span class="lg-text">小米客服</span></div>
+      <div class="logo"><img class="lg-mi" src="/assets/img/mi-logo.png" alt=""><span class="lg-text">小米客服</span></div>
       <div class="nav">
         <div class="nav-group" style="padding-top:6px;">工 作</div>
         <div class="nav-item" :class="{active: tab==='work'}" @click="tab='work'; restartPoll()"><span class="nv-ic">💬</span><span class="nv-text">工作台</span><span class="nv-badge" v-if="unreadTotal>0" :title="unreadTotal + ' 条未读消息'">{{ unreadTotal>99 ? '99+' : unreadTotal }}</span></div>
@@ -73,7 +73,7 @@
       </div>
       <div class="me">
         <div class="me-top">
-          <span class="me-ava"><img v-if="meAvatarUrl" :src="meAvatarUrl"><img v-else src="/assets/img/mi-logo.svg" alt="小米客服"></span>
+          <span class="me-ava"><img v-if="meAvatarUrl" :src="meAvatarUrl"><img v-else src="/assets/img/mi-logo.png" alt="小米客服"></span>
           <div class="me-id">
             <b>{{ me ? (me.nickname || me.kami || '') : '' }}</b>
             <span class="me-sub mono" v-if="me && me.role==='tenant'">{{ me.kami }} · {{ expireText }}</span>
