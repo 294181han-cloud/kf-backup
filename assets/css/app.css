@@ -1464,6 +1464,17 @@ body.dark .msg-sheet .ms-item.ghost { border-top-color: #2b313a; color: #8b95a7;
 .msg-row:has(.msg-sender) .msg-ava { margin-top: 17px; }
 
 /* =====================================================================
+   v2.54 修：自己发的消息，气泡贴着头像（原来短消息右边空一大截）
+   原因：.msg-box 的宽度是按「最宽的那行」定的（通常是下面那行时间+已读），
+   而气泡是块级 fit-content，默认左对齐 → 消息越短，气泡右边到头像的空隙越大（比如发一个"2"）。
+   修法：把 .msg-box 变成纵向 flex 容器，自己发的右对齐、对方发的左对齐，
+   气泡/引用条/时间整组一起贴边。
+   ===================================================================== */
+.msg-box { display: flex; flex-direction: column; }
+.msg-row.mine .msg-box { align-items: flex-end; }
+.msg-row.from-them .msg-box { align-items: flex-start; }
+
+/* =====================================================================
    v2.52 聊天里那排快捷按钮：按住拖动排序
    ===================================================================== */
 .quick-scroll .quick-btn { cursor: pointer; }
