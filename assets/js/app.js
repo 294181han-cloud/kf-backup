@@ -730,7 +730,7 @@ const app = createApp({
     };
     const startReply = (m) => {
       if (!m) return;
-      msgMenu.show = false;
+      msgMenu.show = false; msgSheet.show = false;
       replyTo.value = m;
       const el = document.querySelector('.chat-input textarea');
       if (el) el.focus();
@@ -743,7 +743,7 @@ const app = createApp({
       setTimeout(() => { if (flashId.value === id) flashId.value = 0; }, 1400);
     };
     const copyMsg = async (m) => {
-      msgMenu.show = false;
+      msgMenu.show = false; msgSheet.show = false;
       const t = (m && m.text) || '';
       if (!t) { ElementPlus.ElMessage.warning('这条消息没有文字'); return; }
       try { await navigator.clipboard.writeText(t); ElementPlus.ElMessage.success('已复制'); }
@@ -765,14 +765,30 @@ const app = createApp({
     const openMsgMenu = (m, ev) => {
       if (selMode.value) return;
       ev.stopPropagation();   // 别让 #app 上的右键「关闭全部浮层」把刚打开的这个也关掉
-      closeCtxMenu(); quickCtx.show = false;
+      closeCtxMenu(); quickCtx.show = false; msgSheet.show = false;
       msgMenu.msg = m; msgMenu.x = ev.clientX; msgMenu.y = ev.clientY; msgMenu.show = true;
     };
     const closeMsgMenu = () => { msgMenu.show = false; };
     // 点空白处 / 右键空白处都关掉所有浮层（右键不触发 click，必须单独挂）
-    const closeAllMenus = () => { ctxMenu.show = false; quickCtx.show = false; msgMenu.show = false; };
+    const closeAllMenus = () => { ctxMenu.show = false; quickCtx.show = false; msgMenu.show = false; msgSheet.show = false; };
+    // v2.49 手机端：长按消息弹底部操作面板（iOS 长按不会触发 contextmenu，右键菜单在手机上等于没有）
+    const msgSheet = reactive({ show: false, msg: null });
+    let lpTimer = null, lpMoved = false;
+    const onMsgTouchStart = (m, ev) => {
+      if (selMode.value) return;
+      lpMoved = false;
+      clearTimeout(lpTimer);
+      lpTimer = setTimeout(() => {
+        if (lpMoved) return;
+        msgSheet.msg = m;
+        msgSheet.show = true;
+        if (navigator.vibrate) { try { navigator.vibrate(15); } catch (e) {} }
+      }, 450);
+    };
+    const onMsgTouchMove = () => { lpMoved = true; clearTimeout(lpTimer); };
+    const onMsgTouchEnd = () => { lpMoved = true; clearTimeout(lpTimer); };
     const deleteMsg = async (m) => {
-      msgMenu.show = false;
+      msgMenu.show = false; msgSheet.show = false;
       if (!m) return;
       try {
         const r = await API.post('/api/sessions/' + currentId.value + '/messages/' + m.id + '/delete');
@@ -785,7 +801,7 @@ const app = createApp({
     // --- 多选 ---
     const selMode = ref(false);
     const selIds = ref([]);
-    const enterSel = (m) => { msgMenu.show = false; selMode.value = true; selIds.value = m ? [m.id] : []; };
+    const enterSel = (m) => { msgMenu.show = false; msgSheet.show = false; selMode.value = true; selIds.value = m ? [m.id] : []; };
     const exitSel = () => { selMode.value = false; selIds.value = []; };
     const toggleSel = (id) => {
       const i = selIds.value.indexOf(id);
@@ -2089,6 +2105,7 @@ const app = createApp({
       replyTo, quoteOf, quoteWho, quoteText, startReply, jumpToMsg, copyMsg, flashId, fmtSize, mapUrl,
       infoOpen,
       msgMenu, openMsgMenu, closeMsgMenu, closeAllMenus, deleteMsg,
+      msgSheet, onMsgTouchStart, onMsgTouchMove, onMsgTouchEnd,
       selMode, selIds, enterSel, exitSel, toggleSel, selAll, selCopy, selDelete,
       onPaste, sendFile, sendLocation,
       SOUND_OPTS, sndCfg, playSound, saveSnd,

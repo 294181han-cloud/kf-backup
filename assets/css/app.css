@@ -1388,6 +1388,33 @@ body.dark .loc-bubble .lb-sub { color: #9db3a5; }
 .tools-hint { font-size: 11px; color: #a8b0bd; margin-left: auto; }
 
 /* =====================================================================
+   v2.49 手机端长按消息 → 底部操作面板（回复 / 复制 / 多选 / 删除）
+   只挂右键菜单在手机上等于没有：iOS 长按不会触发 contextmenu。
+   这套样式是全局的（不看宽度），因为长按在任何尺寸的触屏设备上都该能用。
+   ===================================================================== */
+.msg-sheet-mask { position: fixed; inset: 0; z-index: 3000; background: rgba(8, 10, 14, .38); }
+.msg-sheet {
+  position: fixed; left: 0; right: 0; bottom: 0; z-index: 3001;
+  background: #fff; border-radius: 16px 16px 0 0;
+  box-shadow: 0 -8px 30px rgba(16, 24, 40, .2);
+  padding: 8px 10px calc(10px + env(safe-area-inset-bottom));
+}
+.msg-sheet .ms-item {
+  display: block; width: 100%; border: 0; background: transparent; color: #1f2329;
+  text-align: center; font-size: 16px; padding: 15px 10px; border-radius: 10px;
+  cursor: pointer; font-family: inherit;
+}
+.msg-sheet .ms-item:active { background: #f2f5fa; }
+.msg-sheet .ms-item.danger { color: #e5484d; }
+.msg-sheet .ms-item.ghost { color: #8b95a7; border-top: 1px solid #eef1f5; border-radius: 0; margin-top: 4px; }
+body.dark .msg-sheet { background: #1e2229; }
+body.dark .msg-sheet .ms-item { color: #e7eaf0; }
+body.dark .msg-sheet .ms-item:active { background: #262c34; }
+body.dark .msg-sheet .ms-item.ghost { border-top-color: #2b313a; color: #8b95a7; }
+/* iOS 长按会弹系统菜单（拷贝/查询），挡掉它，长按才是我们的操作面板 */
+.msg-row, .msg-bubble { -webkit-touch-callout: none; }
+
+/* =====================================================================
    v2.46 工作台手机端适配（≤900px）
    之前完全没有移动端布局：侧栏 234 + 会话列 326 + 访客信息 300 硬挤在一行，
    手机上聊天区被压成一条缝（看不到输入框/图片），访客信息直接挤没了。
