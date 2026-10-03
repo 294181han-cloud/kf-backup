@@ -686,7 +686,29 @@ function lookup_geo(string $ip): string
     }
     if ($out === '') $out = geo_lookup_world($ip);
     if ($out !== '') @file_put_contents($cacheFile, $out);
+    geo_cache_gc();
     return $out;
+}
+
+/**
+ * 地区缓存文件的自清理（v2.63）
+ * 这些文件本身 24 小时就过期不用了（见上面的 filemtime 判断），
+ * 这里只是防止长期堆积（每个不同 IP 一个文件）。
+ * 刻意做成"按概率触发"：大约每 50 次地区查询顺手扫一次，平时完全不做事。
+ * 只删 **超过 2 天** 且文件名符合我们前缀的临时文件，碰不到别的东西。
+ */
+function geo_cache_gc(): void
+{
+    try {
+        if (random_int(1, 50) !== 1) return;
+        $dir = sys_get_temp_dir();
+        $files = @glob($dir . '/kfxt_geo_v2_*.json');
+        if (!$files) return;
+        $now = time();
+        foreach ($files as $f) {
+            if ($now - (int)@filemtime($f) > 172800) @unlink($f);
+        }
+    } catch (\Throwable $e) { /* 清理失败无所谓 */ }
 }
 
 /* ================= UA / 语言 ================= */
