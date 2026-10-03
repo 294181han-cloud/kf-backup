@@ -1384,25 +1384,8 @@
         </el-table-column>
       </el-table>
     </div>
-    <div class="panel" style="margin-bottom:0;">
-      <div class="panel-title" style="font-size:14px;">历史专属链接</div>
-      <el-table :data="history.links || []" size="small" stripe max-height="200">
-        <el-table-column prop="subdomain" label="子域" width="130"><template #default="{row}"><span class="mono">{{ row.subdomain }}</span></template></el-table-column>
-        <el-table-column prop="link" label="链接" min-width="220" show-overflow-tooltip></el-table-column>
-        <el-table-column label="状态" width="80">
-          <template #default="{row}"><el-tag size="small" :type="row.active?'success':'info'">{{ row.active?'使用中':'已作废' }}</el-tag></template>
-        </el-table-column>
-        <el-table-column label="创建时间" width="150"><template #default="{row}">{{ (row.created_at||'').slice(0,16) }}</template></el-table-column>
-        <el-table-column label="操作" width="90">
-          <template #default="{row}">
-            <el-popconfirm v-if="row.active" title="作废该链接？" @confirm="disableLink(row)">
-              <template #reference><el-button size="small" type="danger" plain>作废</el-button></template>
-            </el-popconfirm>
-            <span v-else class="muted" style="font-size:12px;">—</span>
-          </template>
-        </el-table-column>
-      </el-table>
-    </div>
+    <!-- v2.64 「专属链接」功能已废弃：创建入口早前就被移除，剩下的历史数据指向的是配置示例里的
+         占位域名（根本解析不了），留着只会让人以为有个能用的链接。这里整块拿掉。 -->
   </el-dialog>
 
     <!-- 头像裁剪 -->
@@ -1458,7 +1441,7 @@
 <script src="/assets/qr-poster.js?v=2.1.03"></script>
 <script src="/assets/api.js?v=2.0.1"></script>
 <script src="/assets/js/app-components.js?v=2.4.0"></script>
-<script src="/assets/js/app.js?v=3.15.0"></script>
+<script src="/assets/js/app.js?v=3.16.0"></script>
 <script src="/assets/js/app-boot.js?v=2.1.1"></script>
 </body>
 </html>

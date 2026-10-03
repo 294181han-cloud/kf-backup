@@ -1539,7 +1539,7 @@ const app = createApp({
       return [
         { k: 'welcome', icon: '👋', label: '设置欢迎语', desc: '访客进入自动打招呼', done: welcomeMsgs.value.length > 0, go: () => openSetting('welcome') },
         { k: 'auto', icon: '🤖', label: '设置自动回复', desc: '关键词自动应答', done: autoReplies.value.length > 0, go: () => openSetting('auto') },
-        { k: 'link', icon: '🔗', label: '生成获客链接', desc: '专属链接 / 客服码', done: !!(links.value && (links.value.domain_link || (links.value.codes || []).length)), go: () => tab.value = 'links' },
+        { k: 'link', icon: '🔗', label: '生成客服码', desc: '扫码咨询入口', done: !!(links.value && (links.value.codes || []).length), go: () => tab.value = 'links' },
       ];
     });
     const guideDone = computed(() => guide.value.filter(g => g.done).length);
@@ -1816,7 +1816,8 @@ const app = createApp({
     const qrWrap = ref(null);
     const currentLink = Vue.computed(() => {
       if (!links.value) return '';
-      if (links.value.domain_link && links.value.domain_link.active) return links.value.domain_link.link;
+      // v2.64 「专属链接」已废弃：入口只认客服码（原来那句 domain_link.active 判断其实是死代码——
+      // 接口压根不返回 active 字段，所以本来就没生效；现在直接删掉，避免以后误导）。
       const cs = (links.value.codes || []).filter(x => x.link);
       return cs.length ? cs[0].link : '';
     });
@@ -1853,8 +1854,6 @@ const app = createApp({
     const codeImgCache = {};
     const codeCheck = reactive({ state: 'idle', text: '未检测', tag: '未检测', atText: '—', msg: '', channel: 'wx', loading: false });
     const codeValue = computed(() => {
-      const dl = links.value && links.value.domain_link;
-      if (dl && dl.subdomain) return dl.subdomain;
       const cs = ((links.value && links.value.codes) || []).filter(x => x.code);
       return cs.length ? cs[0].code : '—';
     });
@@ -2227,13 +2226,12 @@ const app = createApp({
         document.body.appendChild(a); a.click(); a.remove();
       } catch (e) { ElementPlus.ElMessage.error('海报生成失败：' + (e.message || e)); }
     };
-    const codeRotateHint = Vue.computed(() =>
-      (links.value && links.value.domain_link) ? '更换后旧链接立即失效，确定？' : '生成一个新的客服码？');
+    // v2.64 永远只生成新客服码（专属链接功能已废弃，不再走 renew 分支）
+    const codeRotateHint = Vue.computed(() => '生成一个新的客服码？（老的继续有效）');
     const rotateCode = async () => {
       try {
-        if (links.value && links.value.domain_link) await API.post('/api/tenant/link/renew');
-        else await API.post('/api/tenant/service-code');
-        ElementPlus.ElMessage.success('已更换');
+        await API.post('/api/tenant/service-code');
+        ElementPlus.ElMessage.success('已生成新客服码（老码仍可用）');
         await loadLinks(); renderMainQr(); checkCode(true);
       } catch (e) { ElementPlus.ElMessage.error(e.message); }
     };
