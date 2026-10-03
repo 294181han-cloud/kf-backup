@@ -272,6 +272,83 @@ function handle_session_delete(string $method, array $m): void
     json_out(['ok' => true]);
 }
 
+/* ---------- 会话批量操作（v2.67）：多选后批量 归档 / 取消归档 / 结束 / 删除 / 标已读 ----------
+   入参：{ ids: [1,2,3], action: 'archive'|'unarchive'|'close'|'delete'|'read' }
+   越权的 id 与「状态不允许」的 id 直接跳过并回报，不整批失败。 */
+function handle_sessions_bulk(string $method): void
+{
+    if ($method !== 'POST') { json_error('方法不允许', 405); return; }
+    $ctx = require_workspace();
+    $data = body();
+    $action = (string)($data['action'] ?? '');
+    $raw = $data['ids'] ?? [];
+    if (!is_array($raw)) json_error('参数错误：ids 需要是数组');
+    $ids = array_values(array_unique(array_filter(array_map('intval', $raw), fn($v) => $v > 0)));
+    if (!$ids) json_error('没有选中任何会话');
+    if (count($ids) > 500) json_error('一次最多操作 500 个会话');
+    if (!in_array($action, ['archive', 'unarchive', 'close', 'delete', 'read'], true)) json_error('不支持的操作');
+    if ($action === 'delete' && $ctx['role'] !== 'tenant') json_error('仅租户可删除会话', 403);
+
+    $tid = (int)$ctx['tenant_id'];
+    $pdo = db();
+    $ph = implode(',', array_fill(0, count($ids), '?'));
+    // 只取「本租户 + 自己有权看到」的会话，越权 id 自动落空
+    $st = $pdo->prepare("SELECT s.id, s.status FROM v_sessions s WHERE s.tenant_id = ? AND s.id IN ($ph)" . session_visible_sql($ctx));
+    $st->execute(array_merge([$tid], $ids));
+    $rows = $st->fetchAll();
+
+    $group = [];
+    foreach ($rows as $r) $group[(string)$r['status']][] = (int)$r['id'];
+    $all = array_column($rows, 'id');
+    $now = now_dt();
+    $skipped = count($ids) - count($rows);   // 不存在 / 越权
+
+    // 各操作能作用到的 id 集合
+    if ($action === 'read') {
+        $target = $all;
+    } elseif ($action === 'archive') {
+        $target = $group['online'] ?? [];                 // 已结束的不能归档
+    } elseif ($action === 'unarchive') {
+        $target = $group['archived'] ?? [];
+    } elseif ($action === 'close') {
+        $target = array_merge($group['online'] ?? [], $group['archived'] ?? []);
+    } else { // delete：任何状态都能删
+        $target = $all;
+    }
+    if ($action !== 'delete') $skipped += count($rows) - count($target);
+
+    if ($target) {
+        $in = implode(',', array_map('intval', $target));
+        if ($action === 'read') {
+            $pdo->exec("UPDATE v_sessions SET unread = 0 WHERE tenant_id = $tid AND id IN ($in)");
+        } elseif ($action === 'archive') {
+            $pdo->exec("UPDATE v_sessions SET status = 'archived', archived_at = " . $pdo->quote($now) . " WHERE tenant_id = $tid AND id IN ($in)");
+        } elseif ($action === 'unarchive') {
+            $pdo->exec("UPDATE v_sessions SET status = 'online', archived_at = NULL WHERE tenant_id = $tid AND id IN ($in)");
+        } elseif ($action === 'close') {
+            $pdo->exec("UPDATE v_sessions SET status = 'closed', closed_at = " . $pdo->quote($now) . ", archived_at = NULL WHERE tenant_id = $tid AND id IN ($in)");
+            // 与单条结束一致：给每个会话补一条系统提示（访客端据此显示「会话已结束」）
+            $ins = $pdo->prepare("INSERT INTO messages (tenant_id, session_id, from_type, sender_name, text, msg_type, created_at) VALUES (?,?,'system','系统','会话已结束','text',?)");
+            foreach ($target as $sid) $ins->execute([$tid, $sid, $now]);
+        } else {
+            $pdo->beginTransaction();
+            try {
+                $pdo->exec("DELETE FROM messages WHERE tenant_id = $tid AND session_id IN ($in)");
+                $pdo->exec("DELETE FROM contacts WHERE tenant_id = $tid AND session_id IN ($in)");
+                $pdo->exec("DELETE FROM welcome_sent WHERE tenant_id = $tid AND session_id IN ($in)");
+                $pdo->exec("DELETE FROM v_sessions WHERE tenant_id = $tid AND id IN ($in)");
+                $pdo->commit();
+            } catch (\Throwable $e) {
+                try { $pdo->rollBack(); } catch (\Throwable $e2) {}
+                json_error('删除失败：' . $e->getMessage(), 500);
+            }
+        }
+    }
+    $done = count($target);
+
+    json_out(['ok' => true, 'action' => $action, 'done' => $done, 'skipped' => $skipped]);
+}
+
 /* ---------- 标记已读 ---------- */
 function handle_session_read(string $method, array $m): void
 {

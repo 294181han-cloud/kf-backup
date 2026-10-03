@@ -2252,3 +2252,28 @@ AND EXISTS (SELECT 1 FROM messages m WHERE m.session_id = s.id AND m.from_type =
 验证（Playwright 实拍）：
 - 会话列表 `.sess-item` = **10** 条（等于 tenant 133 有访客消息的在线会话数；API 三个 scope 合计 13，与 SQL 口径一致）✅
 - `ch-sub` 文本不再包含「进入：」→ `渠道：浏览器 | 📱 安卓16 | 🌐 51.89.98.114 | 📍 伦敦 | 👣 访问 1 次 | 💬 消息 11 | 🕒 首次 … | ⏱ 最近 … | #357` ✅
+
+### v2.67 变更记录（会话列表多选 → 批量归档 / 结束 / 删除 / 已读，2026-10-03）
+
+用户："归档删除之类的让我可以批量操作 多选"。
+
+**后端**：`routes/agent.php` 新增 `handle_sessions_bulk()`，路由 `POST /api/sessions/bulk`（`index.php` 注册）。
+入参 `{ ids: [...], action: 'archive'|'unarchive'|'close'|'delete'|'read' }`。
+- 只取「本租户 + `session_visible_sql()` 可见」的会话 → 越权/不存在的 id 直接跳过，不整批失败
+- 各动作只作用到状态允许的行（例：`archive` 只动 `status='online'`，已结束的不动），跳过的数量在 `skipped` 里回报
+- `delete` 限租户角色；与单条删除一致，连带删 `messages` / `contacts` / `welcome_sent`
+- `close` 与单条结束一致，给每个会话补一条 `system`「会话已结束」（访客端据此提示）
+- 一次最多 500 条
+
+**前端**：
+- 搜索框右边加「☑ 多选」开关（`.sess-multi-btn`）
+- 多选态下每行左侧出现勾选框（`.sess-check`），点整行=勾选/取消；行内「⋯」按钮隐藏
+- 列表上方出现操作条 `.sess-multi-bar`：已选 N 项 / 全选 / 清空 / 完成 + 归档 / 结束 / 删除 / 已读（未选中时按钮禁用）
+- 删除、结束带二次确认；轮询刷新后自动剔除已不在列表里的勾选
+- 版本号：`app.css?v=3.25.0`、`app.js?v=3.18.0`
+
+**验证**
+- 接口（测试租户 74）：`archive` → `done:2` 且两条从"在线"移到"已归档"；`unarchive` → 两条回到"在线"；
+  带一个不存在的 id 时 → `done:2, skipped:1`；非法 action 被拒 ✅
+- 界面（Playwright 实拍）：点 3 行 → "已选 3 项"；全选 → "已选 9 项"；清空 → "已选 0 项" 且按钮变灰；退出多选操作条消失；
+  控制台无 JS 报错 ✅

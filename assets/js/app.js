@@ -396,12 +396,21 @@ const app = createApp({
     // 三级会话分区（v2.25）：online=在线 / archived=已归档 / closed=已结束
     const sessScope = ref('online');
     const sessCounts = reactive({ online: 0, archived: 0, closed: 0, online_unread: 0, archived_unread: 0 });
+    // v2.67 会话多选批量操作
+    const sessMulti = ref(false);
+    const sessChecked = ref([]);
     // 切换分区会改变未读合计，别把它当成"来了新消息"而响铃
     Vue.watch(sessScope, () => { lastUnreadTotal = -1; });
     const pollOnce = async () => {
       try {
         const r = await API.get('/api/poll?role=agent&session=' + currentId.value + '&sinceMsg=' + maxMsgId.value + '&scope=' + sessScope.value);
         sessions.value = r.sessions || [];
+        // 多选模式下：列表刷新后把已经不在列表里的勾选清掉
+        if (sessMulti.value && sessChecked.value.length) {
+          const alive = new Set(sessions.value.map(s => s.id));
+          const kept = sessChecked.value.filter(id => alive.has(id));
+          if (kept.length !== sessChecked.value.length) sessChecked.value = kept;
+        }
         if (r.counts) Object.assign(sessCounts, r.counts);
         readUpto.value = r.readUpto != null ? r.readUpto : readUpto.value;
         // 撤回同步：最近撤回的消息标记（客服撤回→胶囊；访客撤回→内容保留+撤回角标）
@@ -1215,6 +1224,41 @@ const app = createApp({
     };
     // 右键菜单（v2.26）：列表项右键弹出（删除腾额度 / 归档 / 结束）
     const ctxMenu = reactive({ show: false, x: 0, y: 0, sid: 0, name: '', pinned: 0 });
+
+    // ---------- 多选批量操作（v2.67）----------
+    const toggleMulti = () => {
+      sessMulti.value = !sessMulti.value;
+      sessChecked.value = [];
+      if (sessMulti.value) { try { closeCtxMenu(); } catch (e) {} }
+    };
+    const toggleSessCheck = (id) => {
+      const i = sessChecked.value.indexOf(id);
+      if (i >= 0) sessChecked.value.splice(i, 1); else sessChecked.value.push(id);
+    };
+    const checkAllSess = () => { sessChecked.value = filteredSessions.value.map(s => s.id); };
+    const bulkSessions = async (action) => {
+      const ids = sessChecked.value.slice();
+      if (!ids.length) return;
+      const label = { archive: '归档', close: '结束', delete: '删除', read: '标为已读' }[action] || action;
+      if (action === 'delete' || action === 'close') {
+        const tip = action === 'delete'
+          ? '彻底删除选中的 ' + ids.length + ' 个会话及其全部聊天记录？删除后不可恢复。'
+          : '结束选中的 ' + ids.length + ' 个会话？访客端聊天记录将清除。';
+        try {
+          await ElementPlus.ElMessageBox.confirm(tip, '批量' + label,
+            { type: 'warning', confirmButtonText: label, cancelButtonText: '取消' });
+        } catch (e) { return; }
+      }
+      try {
+        const r = await API.post('/api/sessions/bulk', { ids: ids, action: action });
+        const extra = r.skipped ? '（' + r.skipped + ' 个状态不允许，已跳过）' : '';
+        ElementPlus.ElMessage.success('已' + label + ' ' + r.done + ' 个会话' + extra);
+        sessChecked.value = [];
+        if (ids.indexOf(currentId.value) >= 0) { currentId.value = 0; msgs.value = []; }
+        await pollOnce();
+      } catch (e) { ElementPlus.ElMessage.error(e.message); }
+    };
+
     const openCtxMenu = (s, ev) => {
       ev.preventDefault();
       ev.stopPropagation();
@@ -2471,6 +2515,7 @@ const app = createApp({
       chatSearchOn, chatSearchKw, searchHit, visibleMsgs, canRecall, recallMsg, isRead,
       pol, savePolicy, uploadPolHead, clock, unreadTotal, sessCollapsed,
       sessScope, sessCounts, archiveSession,
+      sessMulti, sessChecked, toggleMulti, toggleSessCheck, checkAllSess, bulkSessions,
       ctxMenu, openCtxMenu, openCtxMenuFromBtn, closeCtxMenu, ctxMenuArchive, ctxMenuClose, ctxMenuDelete,
       ctxMenuPin, ctxMenuUnread, ctxMenuBlock,
       replyTo, quoteOf, quoteWho, quoteText, startReply, jumpToMsg, copyMsg, flashId, fmtSize, mapUrl,

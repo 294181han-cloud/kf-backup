@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>小米客服</title>
 <link rel="stylesheet" href="/assets/vendor/element-plus.css">
-<link rel="stylesheet" href="/assets/css/app.css?v=3.24.1">
+<link rel="stylesheet" href="/assets/css/app.css?v=3.25.0">
 <script src="/assets/ui/ui-registry.js?v=2.8.0"></script>
 <script src="/assets/ui/ui-loader.js?v=2.8.0" data-ui-cat="auto"></script>
 </head>
@@ -128,10 +128,30 @@
           </div>
           <div class="search" v-if="!sessCollapsed">
             <el-input v-model="sessSearch" placeholder="搜索访客/消息" size="small" clearable></el-input>
+            <button type="button" class="sess-multi-btn" :class="{on: sessMulti}" @click="toggleMulti"
+                    :title="sessMulti ? '退出多选' : '多选：批量归档 / 结束 / 删除'">☑</button>
+          </div>
+          <!-- 多选操作栏（v2.67） -->
+          <div class="sess-multi-bar" v-if="sessMulti && !sessCollapsed">
+            <div class="smb-row">
+              <span class="smb-n">已选 <b>{{ sessChecked.length }}</b> 项</span>
+              <a class="smb-link" @click="checkAllSess">全选</a>
+              <a class="smb-link" @click="sessChecked = []">清空</a>
+              <a class="smb-link smb-exit" @click="toggleMulti">完成</a>
+            </div>
+            <div class="smb-btns">
+              <button type="button" class="smb-btn" :disabled="!sessChecked.length" @click="bulkSessions('archive')">📦 归档</button>
+              <button type="button" class="smb-btn" :disabled="!sessChecked.length" @click="bulkSessions('close')">✅ 结束</button>
+              <button type="button" class="smb-btn danger" :disabled="!sessChecked.length" @click="bulkSessions('delete')">🗑 删除</button>
+              <button type="button" class="smb-btn" :disabled="!sessChecked.length" @click="bulkSessions('read')">👁 已读</button>
+            </div>
           </div>
           <div class="sess-list" v-if="!sessCollapsed">
             <div v-if="!filteredSessions.length" style="padding:40px;text-align:center;color:#a0a6ad;font-size:13px;">暂无会话</div>
-            <div class="sess-item" v-for="s in filteredSessions" :key="s.id" :class="{active: currentId===s.id, pinned: s.pinned}" @click="openSession(s.id)" @contextmenu="openCtxMenu(s, $event)">
+            <div class="sess-item" v-for="s in filteredSessions" :key="s.id"
+                 :class="{active: currentId===s.id, pinned: s.pinned, checked: sessMulti && sessChecked.includes(s.id)}"
+                 @click="sessMulti ? toggleSessCheck(s.id) : openSession(s.id)" @contextmenu="openCtxMenu(s, $event)">
+              <span class="sess-check" v-if="sessMulti" :class="{on: sessChecked.includes(s.id)}"></span>
               <div class="sess-ava" :class="{on: s.status==='online'}">
                 <span>{{ s.visitor_avatar || sessIcon(s) }}</span>
                 <i class="sess-ava-dot" :class="s.status"></i>
@@ -149,7 +169,7 @@
                   <span class="badge" v-if="s.unread>0">{{ s.unread>99?'99+':s.unread }}</span>
                 </div>
               </div>
-              <button type="button" class="sess-more" title="更多操作（拉黑 / 置顶 / 归档 / 结束 / 删除）" @click.stop="openCtxMenuFromBtn(s, $event)">⋯</button>
+              <button type="button" class="sess-more" v-if="!sessMulti" title="更多操作（拉黑 / 置顶 / 归档 / 结束 / 删除）" @click.stop="openCtxMenuFromBtn(s, $event)">⋯</button>
             </div>
           </div>
         </div>
@@ -1440,7 +1460,7 @@
 <script src="/assets/qr-poster.js?v=2.1.03"></script>
 <script src="/assets/api.js?v=2.0.1"></script>
 <script src="/assets/js/app-components.js?v=2.5.0"></script>
-<script src="/assets/js/app.js?v=3.17.0"></script>
+<script src="/assets/js/app.js?v=3.18.0"></script>
 <script src="/assets/js/app-boot.js?v=2.1.1"></script>
 </body>
 </html>

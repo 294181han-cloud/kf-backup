@@ -1677,3 +1677,46 @@ body.dark .msg-sheet .ms-item.ghost { border-top-color: #2b313a; color: #8b95a7;
 
 body.dark .pa-file { background: #232830; border-color: #333a44; }
 body.dark .pa-file em { color: #98a3b4; }
+
+/* ===== v2.67 会话多选批量操作（归档 / 结束 / 删除 / 已读）===== */
+.sess-col .search { display: flex; align-items: center; gap: 8px; }
+.sess-col .search .el-input { flex: 1; min-width: 0; }
+.sess-multi-btn {
+  flex-shrink: 0; width: 30px; height: 30px; border-radius: 9px; cursor: pointer;
+  border: 1px solid #dcdfe6; background: #fff; color: #86909c; font-size: 14px; line-height: 1;
+  display: inline-flex; align-items: center; justify-content: center; transition: .15s;
+}
+.sess-multi-btn:hover { color: var(--theme, #1677ff); border-color: var(--theme, #1677ff); }
+.sess-multi-btn.on { background: var(--theme, #1677ff); border-color: var(--theme, #1677ff); color: #fff; }
+
+.sess-multi-bar { padding: 8px 12px 10px; background: color-mix(in srgb, var(--theme, #1677ff) 6%, #fff); border-bottom: 1px solid var(--v-line, #e5e6eb); }
+.sess-multi-bar .smb-row { display: flex; align-items: center; gap: 10px; font-size: 12px; color: #4e5969; margin-bottom: 7px; }
+.sess-multi-bar .smb-n b { color: var(--theme, #1677ff); font-size: 13px; }
+.sess-multi-bar .smb-link { cursor: pointer; color: var(--theme, #1677ff); }
+.sess-multi-bar .smb-link:hover { text-decoration: underline; }
+.sess-multi-bar .smb-exit { margin-left: auto; color: #86909c; }
+.sess-multi-bar .smb-btns { display: flex; gap: 6px; }
+.smb-btn {
+  flex: 1; padding: 6px 4px; font-size: 12px; cursor: pointer; border-radius: 8px;
+  border: 1px solid #dcdfe6; background: #fff; color: #4e5969; transition: .15s; white-space: nowrap;
+}
+.smb-btn:hover:not(:disabled) { border-color: var(--theme, #1677ff); color: var(--theme, #1677ff); }
+.smb-btn.danger:hover:not(:disabled) { border-color: #f53f3f; color: #f53f3f; background: #fff5f5; }
+.smb-btn:disabled { opacity: .45; cursor: not-allowed; }
+
+.sess-check {
+  flex-shrink: 0; width: 17px; height: 17px; border-radius: 5px;
+  border: 1.5px solid #c9cdd4; background: #fff;
+  display: inline-flex; align-items: center; justify-content: center; transition: .14s;
+}
+.sess-check.on { background: var(--theme, #1677ff); border-color: var(--theme, #1677ff); }
+.sess-check.on::after { content: "\2713"; color: #fff; font-size: 11px; line-height: 1; font-weight: 700; }
+.sess-item.checked { background: color-mix(in srgb, var(--theme, #1677ff) 10%, #fff); }
+
+body.dark .sess-multi-btn, body.dark .smb-btn { background: #1b1e24; border-color: #2c313a; color: #c9cdd4; }
+body.dark .sess-multi-btn.on { background: var(--theme, #1677ff); border-color: var(--theme, #1677ff); color: #fff; }
+body.dark .sess-multi-bar { background: color-mix(in srgb, var(--theme, #1677ff) 14%, #17191e); border-bottom-color: #23262d; }
+body.dark .sess-multi-bar .smb-row { color: #a9b0bb; }
+body.dark .sess-check { background: #1b1e24; border-color: #3a4048; }
+body.dark .sess-check.on { background: var(--theme, #1677ff); border-color: var(--theme, #1677ff); }
+body.dark .sess-item.checked { background: color-mix(in srgb, var(--theme, #1677ff) 20%, #17191e); }
