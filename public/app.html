@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>客服工作台</title>
 <link rel="stylesheet" href="/assets/vendor/element-plus.css">
-<link rel="stylesheet" href="/assets/css/app.css?v=3.20.0">
+<link rel="stylesheet" href="/assets/css/app.css?v=3.21.0">
 <script src="/assets/ui/ui-registry.js?v=2.8.0"></script>
 <script src="/assets/ui/ui-loader.js?v=2.8.0" data-ui-cat="auto"></script>
 </head>
@@ -557,7 +557,7 @@
             <span class="cb-name">名称：<b>{{ me.nickname || '客服' }}</b></span>
             <span class="cb-sp"></span>
             <el-popconfirm :title="codeRotateHint" @confirm="rotateCode">
-              <template #reference><el-button type="primary" size="small">换码</el-button></template>
+              <template #reference><el-button type="primary" size="small">新码</el-button></template>
             </el-popconfirm>
             <el-button size="small" class="cb-danger" @click="manageDlg = true; loadHistory()">失效二维码</el-button>
           </div>
@@ -667,8 +667,24 @@
             </div>
           </div>
 
-          <el-dialog v-model="previewDlg" title="预览大图（长按或右键保存）" width="420px" align-center>
+          <!-- 预览 / 查看码：同一张卡片，带全套操作。查看历史码时下面会多出码与链接 -->
+          <el-dialog v-model="previewDlg" @close="closePreview" :title="viewCode ? ('查看码 · ' + viewCode) : '预览大图（长按或右键保存）'" width="440px" align-center>
             <img :src="previewSrc" style="width:100%;display:block;border-radius:12px;" alt="">
+            <p class="muted" style="font-size:11.5px;line-height:1.7;margin:10px 0 0;">
+              扫不出来就用「标准」Logo 大小 + 「圆角」码点；上传的深色图片 logo 建议配圆角码点。
+            </p>
+            <div style="display:flex;flex-wrap:wrap;gap:8px;justify-content:center;margin-top:12px;">
+              <el-button size="small" type="primary" @click="downloadViewed">下载二维码</el-button>
+              <el-button size="small" @click="copyViewedImage">复制二维码</el-button>
+              <el-button size="small" @click="copy(viewLink || currentLink)">复制链接</el-button>
+            </div>
+            <div v-if="viewLink" style="margin-top:12px;text-align:center;">
+              <div class="qc-code-chip">{{ viewCode }}</div>
+              <div class="mono" style="font-size:12px;color:#86909c;word-break:break-all;margin-top:6px;">
+                {{ viewLink }}
+                <a style="cursor:pointer;color:var(--theme,#1677ff);" @click="copy(viewLink)">复制</a>
+              </div>
+            </div>
           </el-dialog>
 
         </div>
@@ -1319,8 +1335,9 @@
         <el-table-column prop="code" label="码" width="120"><template #default="{row}"><span class="mono">{{ row.code }}</span></template></el-table-column>
         <el-table-column prop="link" label="链接" min-width="200" show-overflow-tooltip></el-table-column>
         <el-table-column label="创建时间" width="150"><template #default="{row}">{{ (row.created_at||'').slice(0,16) }}</template></el-table-column>
-        <el-table-column label="操作" width="90">
+        <el-table-column label="操作" width="150">
           <template #default="{row}">
+            <el-button size="small" type="primary" plain @click="viewQrOf(row)">查看码</el-button>
             <el-popconfirm title="作废该码？" @confirm="delCode(row)"><template #reference><el-button size="small" type="danger" plain>作废</el-button></template></el-popconfirm>
           </template>
         </el-table-column>
@@ -1400,7 +1417,7 @@
 <script src="/assets/qr-poster.js?v=2.1.03"></script>
 <script src="/assets/api.js?v=2.0.1"></script>
 <script src="/assets/js/app-components.js?v=2.4.0"></script>
-<script src="/assets/js/app.js?v=3.10.0"></script>
+<script src="/assets/js/app.js?v=3.12.0"></script>
 <script src="/assets/js/app-boot.js?v=2.1.1"></script>
 </body>
 </html>

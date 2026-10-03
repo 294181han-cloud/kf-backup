@@ -1406,6 +1406,14 @@ body.dark .loc-bubble .lb-sub { color: #9db3a5; }
 /* 工具条右侧小提示 */
 .tools-hint { font-size: 11px; color: #a8b0bd; margin-left: auto; }
 
+/* 「查看码」弹窗里的客服码小胶囊（和主卡上的那个一致） */
+.qc-code-chip {
+  display: inline-block; font-family: Consolas, Menlo, monospace; font-size: 12.5px;
+  color: var(--theme, #1677ff); background: color-mix(in srgb, var(--theme, #1677ff) 10%, #fff);
+  border-radius: 8px; padding: 3px 10px;
+}
+body.dark .qc-code-chip { background: color-mix(in srgb, var(--theme, #1677ff) 26%, #1e2229); color: #9fc7ff; }
+
 /* =====================================================================
    v2.50 表格拖动排序手柄（快捷消息用）
    touch-action:none 很关键 —— 否则手机上手指一往下拖，页面先滚起来了

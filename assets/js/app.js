@@ -1719,6 +1719,10 @@ const app = createApp({
     const logoFile = ref(null);
     const previewDlg = ref(false);
     const previewSrc = ref('');
+    /* v2.60 「查看码」：预览/下载指定的那一个客服码（管理码弹窗里用）。
+       viewLink 为空时一切照旧走当前主码，不影响原来那套。 */
+    const viewLink = ref('');
+    const viewCode = ref('');
     const CODE_LOGOS = [['none', '无'], ['avatar', '头像'], ['all', '聚合'], ['wechat', '微信'],
                         ['alipay', '支付宝'], ['qq', 'QQ'], ['douyin', '抖音'], ['upload', '上传']];
     // 二维码主色板：第一个是微信绿（默认）
@@ -1762,7 +1766,7 @@ const app = createApp({
     const codeCardOpts = (scale) => {
       const big = codeStyle.logoSize === 'big';
       return {
-        link: currentLink.value || 'https://example.com/',
+        link: viewLink.value || currentLink.value || 'https://example.com/',
         topText: codeStyle.topText || ' ', bottomText: codeStyle.bottomText || ' ',
         brand: codeStyle.brand, dot: codeStyle.dot, eye: codeStyle.eye, colorDots: !!codeStyle.colorDots,
         knock: big ? 'square' : 'circle', logoRatio: big ? 0.24 : undefined,
@@ -1853,8 +1857,37 @@ const app = createApp({
       } finally { codeCheck.loading = false; }
     };
     const previewBig = () => {
+      viewLink.value = ''; viewCode.value = '';   // 走当前主码
       try { previewSrc.value = codeExportCanvas(2).toDataURL('image/png'); previewDlg.value = true; }
       catch (e) { ElementPlus.ElMessage.error('预览失败'); }
+    };
+    // v2.60 管理码弹窗里「查看码」：把指定那个码按当前样式渲染出来，可看可下载可复制链接
+    const viewQrOf = (row) => {
+      if (!row || !row.link) return;
+      if (!window.KFQCard) { ElementPlus.ElMessage.warning('二维码组件未就绪，请稍后再试'); return; }
+      viewLink.value = row.link; viewCode.value = row.code || '';
+      try {
+        previewSrc.value = codeExportCanvas(2).toDataURL('image/png');
+        previewDlg.value = true;
+      } catch (e) { ElementPlus.ElMessage.error('生成预览失败'); }
+    };
+    const closePreview = () => { previewDlg.value = false; viewLink.value = ''; viewCode.value = ''; };
+    const downloadViewed = () => {
+      if (!window.KFQCard) return;
+      const c = codeExportCanvas(4);
+      const a = document.createElement('a');
+      a.href = c.toDataURL('image/png');
+      a.download = '客服码-' + (viewCode.value || codeValue.value) + '.png';
+      document.body.appendChild(a); a.click(); a.remove();
+    };
+    // 复制「正在查看的那张」二维码图片（对比 copyQrImage：那个固定用当前主码）
+    const copyViewedImage = async () => {
+      try {
+        const c = codeExportCanvas(2);
+        const blob = await new Promise(r => c.toBlob(r, 'image/png'));
+        await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })]);
+        ElementPlus.ElMessage.success('二维码已复制到剪贴板');
+      } catch (e) { ElementPlus.ElMessage.warning('复制失败，请用下载按钮'); }
     };
     const downloadQrImage = () => {
       if (!window.KFQCard) return;
@@ -2330,6 +2363,7 @@ const app = createApp({
       imgZoom, imgRot, imgWheel, downloadImage, copyImage, imgToast,
       editContact, saveContact, contactDlg, editingContact, saveNote, sendBroadcast,
       copy, createLink, renewLink, newCode, delCode, showQr,
+      viewQrOf, viewLink, viewCode, closePreview, downloadViewed, copyViewedImage,
       agentDlg, agentMode, agentForm, openAgentEdit, saveAgent, resetAgentPw, toggleAgent, delAgent,
       createdAgentVisible, createdAgent,
       saveBrand, savePreqOn, saveProfile, changePw, exportCsv, logout,
