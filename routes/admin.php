@@ -54,6 +54,23 @@ function handle_admin_overview(string $method): void
 
 function tenant_out(array $t, ?int $sessions = null): array
 {
+    return tenant_fields($t, $sessions);
+}
+
+/** 这张卡是谁的（发卡机器人开的）：优先 @用户名，没有用户名就用 Telegram ID；
+ *  更早的卡没记 tg_id，就从备注里把当年写进去的 @用户名 抠出来（老数据也能显示） */
+function tenant_tg_user(array $t): string
+{
+    $u = trim((string)($t['tg_username'] ?? ''));
+    if ($u !== '') return '@' . ltrim($u, '@');
+    $id = (int)($t['tg_id'] ?? 0);
+    if ($id > 0) return (string)$id;
+    if (preg_match('/@([A-Za-z0-9_]{3,32})/', (string)($t['remark'] ?? ''), $m)) return '@' . $m[1];
+    return '';
+}
+
+function tenant_fields(array $t, ?int $sessions = null): array
+{
     return [
         'id' => (int)$t['id'], 'kami' => $t['kami'], 'nickname' => $t['nickname'], 'remark' => $t['remark'],
         'status' => $t['status'], 'expires_at' => $t['expires_at'],
@@ -71,12 +88,17 @@ function handle_admin_tenants(string $method): void
     $pdo = db();
 
     if ($method === 'GET') {
+        // v2.72 带上买家的 Telegram 用户名（发卡机器人开出来的卡），没有用户名就用 ID
         $rows = $pdo->query('SELECT t.*, (SELECT COUNT(*) FROM v_sessions s WHERE s.tenant_id = t.id) sessions_cnt,
-            (SELECT COUNT(*) FROM agents a WHERE a.tenant_id = t.id) agents_cnt
-            FROM tenants t ORDER BY t.id DESC')->fetchAll();
+            (SELECT COUNT(*) FROM agents a WHERE a.tenant_id = t.id) agents_cnt,
+            u.username AS tg_username, u.first_name AS tg_name
+            FROM tenants t LEFT JOIN tg_users u ON u.tg_id = t.tg_id
+            ORDER BY t.id DESC')->fetchAll();
         $out = array_map(function ($t) {
             $o = tenant_out($t, (int)$t['sessions_cnt']);
             $o['agents_cnt'] = (int)$t['agents_cnt'];
+            $o['tg_id'] = (int)($t['tg_id'] ?? 0);
+            $o['tg_user'] = tenant_tg_user($t);
             return $o;
         }, $rows);
         json_out($out);

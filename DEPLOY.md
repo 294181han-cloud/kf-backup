@@ -2414,3 +2414,25 @@ AND EXISTS (SELECT 1 FROM messages m WHERE m.session_id = s.id AND m.from_type =
 - 重命名弹窗：标题「重命名」、输入框 `''`、placeholder `原名称：1500`、按钮 `取消/确定` ✅
 - 再次打开备注 → 输入框自动带出「老客户 已报价」；清空保存 → 列表标签消失 ✅
 - 控制台无 JS 报错 ✅
+
+
+### v2.72 变更记录（后台租户列表显示 TG 用户，2026-10-03）
+
+用户："这里加上 tg 用户名 没有用户名的用 id"（截图是后台 → 租户管理 的列表）
+
+1. **`tenants` 加一列 `tg_id BIGINT`**（`index.php` 的 `ensure_upgrade()` 里幂等 ALTER + 建索引），记下这张卡是哪个 Telegram 用户买的。
+2. **发卡机器人开卡时写入**：`tg_deliver_tenant()` 新开卡 INSERT 带 `tg_id`；续费时如果老卡没记过，用
+   `tg_id = IF(tg_id = 0, ?, tg_id)` 补上；测试卡 `tg_trial()` 也带。
+3. **后台列表加「TG 用户」列**（在「名称」和「状态」之间）：
+   `routes/admin.php` 的租户查询 `LEFT JOIN tg_users u ON u.tg_id = t.tg_id`，
+   新增 `tenant_tg_user()`：优先 `@username` → 没有用户名就用 `tg_id` 数字 → 老数据（没记 tg_id 的）
+   再从 `remark` 里正则抠出当年写进去的 `@用户名`，所以历史卡也能显示。
+   前端（`public/admin.html`）有 `@` 时渲染成可点的 `https://t.me/<name>` 链接，没有就显示数字 ID，都没有显示 `—`。
+4. **历史数据回填**：`UPDATE tenants t JOIN tg_users u ON u.username <> '' AND t.remark LIKE CONCAT('%@', u.username) SET t.tg_id = u.tg_id WHERE t.tg_id = 0;`
+   —— 真实用户 `yl444` 领的那张测试卡 `L3W9KVJWSM`（租户 141）已回填成功。
+
+验证（实拍后台）：
+- 表头 = `['卡密','名称','TG 用户','状态','有效期至','周额度 (网页/客服码)','子客服上限','子客服','会话数','最后登录','备注','操作']` ✅
+- 第一行 `L3W9KVJWSM / 测试卡 / @yl444（蓝色可点链接）`，其余没买家的显示 `—` ✅
+- 接口 `/api/admin/tenants` 返回里 `tg_user` 字段：8 条租户里 1 条有值（就是机器人开的那张），其余为空 ✅
+- 控制台无 JS 报错 ✅

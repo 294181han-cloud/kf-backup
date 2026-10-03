@@ -85,6 +85,14 @@
                 <template #default="{row}"><span class="mono" style="font-weight:600;">{{ row.kami }}</span></template>
               </el-table-column>
               <el-table-column prop="nickname" label="名称" width="110"></el-table-column>
+              <el-table-column label="TG 用户" width="140">
+                <template #default="{row}">
+                  <a v-if="row.tg_user && row.tg_user.charAt(0)==='@'" :href="'https://t.me/' + row.tg_user.slice(1)"
+                     target="_blank" rel="noopener" style="color:#165dff;text-decoration:none;">{{ row.tg_user }}</a>
+                  <span v-else-if="row.tg_user" style="color:#4e5969;">{{ row.tg_user }}</span>
+                  <span v-else style="color:#c9cdd4;">—</span>
+                </template>
+              </el-table-column>
               <el-table-column label="状态" width="90">
                 <template #default="{row}">
                   <el-tag v-if="row.status!=='active'" type="danger" size="small">已停用</el-tag>

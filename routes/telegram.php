@@ -325,6 +325,7 @@ function tg_deliver_tenant(array $o): array
 {
     $pdo = db();
     $days = max(1, (int)$o['days']);
+    $tgId = (int)($o['tg_id'] ?? 0);
 
     if ($o['kind'] === 'renew' && $o['renew_kami'] !== '') {
         $st = $pdo->prepare('SELECT * FROM tenants WHERE kami = ?');
@@ -335,8 +336,10 @@ function tg_deliver_tenant(array $o): array
             $base = ($t['expires_at'] && strtotime((string)$t['expires_at']) > time())
                 ? strtotime((string)$t['expires_at']) : time();
             $newExp = date('Y-m-d H:i:s', $base + $days * 86400);
-            $pdo->prepare('UPDATE tenants SET expires_at = ?, status = ?, quota_web = quota_web + ?, quota_app = quota_app + ? WHERE id = ?')
-                ->execute([$newExp, 'active', (int)$o['quota_web'], (int)$o['quota_app'], (int)$t['id']]);
+            // tg_id 为空的老卡顺带补上，后台列表才知道这张卡是谁的
+            $pdo->prepare('UPDATE tenants SET expires_at = ?, status = ?, quota_web = quota_web + ?, quota_app = quota_app + ?,
+                tg_id = IF(tg_id = 0, ?, tg_id) WHERE id = ?')
+                ->execute([$newExp, 'active', (int)$o['quota_web'], (int)$o['quota_app'], $tgId, (int)$t['id']]);
             return [(string)$t['kami'], '', (int)$t['id']];
         }
         // 卡密不存在 → 当成新开处理（下面继续）
@@ -345,11 +348,11 @@ function tg_deliver_tenant(array $o): array
     $kami = gen_kami();
     $password = gen_password();
     $expires = date('Y-m-d H:i:s', time() + $days * 86400);
-    $pdo->prepare('INSERT INTO tenants (kami, password_hash, nickname, remark, expires_at, quota_web, quota_app, max_agents, closed_keep_days, max_sessions)
-        VALUES (?,?,?,?,?,?,?,?,?,?)')
+    $pdo->prepare('INSERT INTO tenants (kami, password_hash, nickname, remark, expires_at, quota_web, quota_app, max_agents, closed_keep_days, max_sessions, tg_id)
+        VALUES (?,?,?,?,?,?,?,?,?,?,?)')
         ->execute([$kami, password_hash($password, PASSWORD_DEFAULT),
             '客服', '发卡机器人 ' . $o['order_no'], $expires,
-            (int)$o['quota_web'], (int)$o['quota_app'], (int)$o['max_agents'], 3, 1000]);
+            (int)$o['quota_web'], (int)$o['quota_app'], (int)$o['max_agents'], 3, 1000, $tgId]);
     return [$kami, $password, (int)$pdo->lastInsertId()];
 }
 
@@ -549,10 +552,10 @@ function tg_trial(int $chat, array $u, array $me, int $mid = 0): void
     $password = gen_password();
     $expires = date('Y-m-d H:i:s', time() + $hours * 3600);
     $nick = mb_substr('测试卡', 0, 64);
-    db()->prepare('INSERT INTO tenants (kami, password_hash, nickname, remark, expires_at, quota_web, quota_app, max_agents, closed_keep_days, max_sessions)
-        VALUES (?,?,?,?,?,?,?,?,?,?)')
+    db()->prepare('INSERT INTO tenants (kami, password_hash, nickname, remark, expires_at, quota_web, quota_app, max_agents, closed_keep_days, max_sessions, tg_id)
+        VALUES (?,?,?,?,?,?,?,?,?,?,?)')
         ->execute([$kami, password_hash($password, PASSWORD_DEFAULT), $nick,
-            '机器人测试卡 @' . (string)($u['username'] ?? $tgId), $expires, 50, 50, 1, 3, 200]);
+            '机器人测试卡 @' . (string)($u['username'] ?? $tgId), $expires, 50, 50, 1, 3, 200, $tgId]);
     $tid = (int)db()->lastInsertId();
     db()->prepare('UPDATE tg_users SET trial_kami = ?, trial_at = ? WHERE tg_id = ?')->execute([$kami, now_dt(), $tgId]);
 
