@@ -21,6 +21,7 @@
         <div class="nav-item" :class="{active: tab==='overview'}" @click="tab='overview'">📊 概览</div>
         <div class="nav-item" :class="{active: tab==='tenants'}" @click="tab='tenants'">👥 租户管理</div>
         <div class="nav-item" :class="{active: tab==='domains'}" @click="tab='domains'">🌐 域名池</div>
+        <div class="nav-item" :class="{active: tab==='nodes'}" @click="tab='nodes'">🖧 节点管理</div>
         <div class="nav-item" :class="{active: tab==='tg'}" @click="tab='tg'">🤖 发卡机器人</div>
         <div class="nav-item" :class="{active: tab==='settings'}" @click="tab='settings'">⚙️ 全局设置</div>
       </div>
@@ -161,6 +162,44 @@
                 </template>
               </el-table-column>
             </el-table>
+          </div>
+        </template>
+
+        <!-- ===================== 节点管理（1+2+n 分域部署） ===================== -->
+        <template v-if="tab==='nodes'">
+          <div class="panel">
+            <div class="panel-title">分控节点</div>
+            <p style="font-size:13px;color:#86909c;margin:0 0 14px;">
+              主站版本 <b class="mono" style="color:#00b42a">{{ mainVersion }}</b>。分控节点由各自服务器的 cron 定时拉码并心跳登记；
+              版本号标红 = 落后于主站，「推送更新」可即时指令该节点拉取（节点未开放 shell_exec 时走 cron 自动更新）。
+            </p>
+            <el-table :data="nodes" stripe>
+              <el-table-column prop="ip" label="节点（IP）" width="150"><template #default="{row}"><span class="mono">{{ row.ip }}</span></template></el-table-column>
+              <el-table-column label="角色" width="110">
+                <template #default="{row}">
+                  <el-tag size="small" :type="row.role === 'agent' ? 'warning' : 'success'">{{ row.role === 'agent' ? '客服入口' : (row.role === 'visitor' ? '访客站点' : (row.role || '未知')) }}</el-tag>
+                </template>
+              </el-table-column>
+              <el-table-column label="版本" width="140">
+                <template #default="{row}">
+                  <span class="mono" :style="{color: row.app_version === mainVersion ? '#00b42a' : '#f53f3f', fontWeight: 600}">{{ row.app_version || '—' }}</span>
+                  <span v-if="row.stale" style="color:#f53f3f;font-size:11px;margin-left:4px;">落后</span>
+                </template>
+              </el-table-column>
+              <el-table-column label="来源" min-width="180"><template #default="{row}"><span class="mono" style="font-size:12px;">{{ row.origin || '—' }}</span></template></el-table-column>
+              <el-table-column label="最后心跳" width="170"><template #default="{row}">{{ row.last_seen ? row.last_seen.slice(0,19).replace('T',' ') : '—' }}</template></el-table-column>
+              <el-table-column label="操作" width="170">
+                <template #default="{row}">
+                  <el-button size="small" type="primary" plain :loading="pushingIp === row.ip" @click="pushNode(row)">推送更新</el-button>
+                  <el-popconfirm title="忽略该节点登记？" @confirm="forgetNode(row)">
+                    <template #reference><el-button size="small" type="danger" plain>忽略</el-button></template>
+                  </el-popconfirm>
+                </template>
+              </el-table-column>
+            </el-table>
+            <div v-if="!nodes.length" style="text-align:center;color:#a0a6ad;font-size:13px;padding:24px 0 6px;">
+              暂无节点登记。分控节点由 node/ 文件夹里的部署脚本配置好后自动出现。
+            </div>
           </div>
         </template>
 
@@ -430,6 +469,6 @@
 <script src="/assets/vendor/vue.global.js?v=2.0.1"></script>
 <script src="/assets/vendor/element-plus.js?v=2.0.1"></script>
 <script src="/assets/api.js?v=2.0.1"></script>
-<script src="/assets/js/admin.js?v=2.4.0"></script>
+<script src="/assets/js/admin.js?v=2.4.1"></script>
 </body>
 </html>

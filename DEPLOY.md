@@ -2505,3 +2505,24 @@ AND EXISTS (SELECT 1 FROM messages m WHERE m.session_id = s.id AND m.from_type =
 - `https://<节点>/api/health` → `"site_role":"agent|visitor"`（角色生效）
 - 客服入口节点：`/visitor.html` → 404、`/api/admin/overview` → 403、登录工作台正常、聊天发图正常（中转上传）
 - 访客站点节点：`/app.html` → 404、`/api/auth/login` → 403、`/` 或防红壳页能进访客聊天、访客发图后客服端可见
+
+## 28. v2.33 变更记录（主控节点管理：分控站点一览 / 版本对账 / 一键推送，2026-10-02）
+
+### 新增：主控「节点管理」页签（admin.html）
+- 分控节点以 **IP 为名**自动登记：节点侧 cron 每次拉码后向主站
+  `/api/internal/heartbeat`（共享 relay_secret 校验）上报角色/版本/来源地址
+- 管理台表格：节点 IP、角色（客服入口/访客站点）、版本号（与主站版本比对，落后标红）、
+  来源、最后心跳时间；可「忽略」清掉失效登记
+- **推送更新**：主控可对任一节点发起 `/api/internal/update` 指令（节点 git pull 拉取最新版本）；
+  节点 PHP 未开放 shell_exec 时返回提示，改由节点 cron 自动拉取（每 5 分钟）
+- 主站版本号统一放在根目录 `version.php`（当前 2.33.0），/api/health 同时返回 site_role + app_version
+
+### 新增：node/ 分控部署文件夹（快速搭建）
+- `config.node.example.php` 节点配置模板 / `node-setup.sh` 一键初始化（拉代码、生成 config、装 cron）
+- `cron-node.sh` 节点定时任务（git pull + 心跳登记） / `README.md` 步骤与安全清单
+
+### 其他
+- selftest.ps1 管理员登录密码与轮换后的新密码同步（此前 90 项连锁失败即为旧密码失效所致）
+
+### 验证
+- 管理台新密码登录 → 「节点管理」页签渲染正常；心跳登记/版本对账/推送指令/忽略接口全链路可用

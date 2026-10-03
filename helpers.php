@@ -509,6 +509,58 @@ function handle_internal_upload(string $method): void
     json_out($r);
 }
 
+/** 统一版本号（version.php；主站与分控节点对版本用） */
+function app_version(): string
+{
+    static $v = null;
+    if ($v === null) {
+        try { $v = (string)(require __DIR__ . '/version.php'); } catch (\Throwable $e) { $v = ''; }
+    }
+    return $v;
+}
+
+/** 分控节点心跳（cron 每次拉码后调用）：登记 IP/角色/版本，主控「节点管理」页展示 */
+function handle_internal_heartbeat(string $method): void
+{
+    if ($method !== 'POST') { json_error('方法不允许', 405); return; }
+    $cfg = config();
+    if (($cfg['site_role'] ?? 'main') !== 'main') json_error('接口不存在', 403);
+    $secret = (string)($cfg['relay_secret'] ?? '');
+    if ($secret === '') json_error('未启用节点登记', 403);
+    $given = (string)input('secret', '');
+    if ($given === '' || !hash_equals($secret, $given)) json_error('无权调用', 403);
+    $ip = (string)input('ip', '');
+    if ($ip === '') $ip = get_client_ip();
+    if (!preg_match('/^[0-9a-fA-F.:]{3,45}$/', $ip)) json_error('IP 格式异常');
+    $role = in_array(($r = (string)input('role', '')), ['agent', 'visitor'], true) ? $r : '';
+    $ver = mb_substr(trim((string)input('app_version', '')), 0, 32);
+    $origin = mb_substr(trim((string)input('origin', '')), 0, 200);
+    $pdo = db();
+    $pdo->prepare('INSERT INTO nodes (ip, role, app_version, origin, first_seen, last_seen)
+                   VALUES (?,?,?,?,NOW(),NOW())
+                   ON DUPLICATE KEY UPDATE role = VALUES(role), app_version = VALUES(app_version),
+                                           origin = VALUES(origin), last_seen = NOW()')
+        ->execute([$ip, $role, $ver, $origin]);
+    json_out(['ok' => true, 'main_version' => app_version()]);
+}
+
+/** 分控节点侧：接收主控推送的更新指令（git pull；PHP 未开放 shell_exec 时提示走 cron） */
+function handle_internal_update(string $method): void
+{
+    if ($method !== 'POST') { json_error('方法不允许', 405); return; }
+    $cfg = config();
+    $secret = (string)($cfg['relay_secret'] ?? '');
+    if ($secret === '') json_error('未启用远程更新', 403);
+    $given = (string)input('secret', '');
+    if ($given === '' || !hash_equals($secret, $given)) json_error('无权调用', 403);
+    if (!function_exists('shell_exec')) {
+        json_out(['ok' => false, 'need_cron' => true, 'error' => '该节点 PHP 未开放 shell_exec，请依赖 cron 自动更新（每 5 分钟）']);
+    }
+    @set_time_limit(120);
+    $out = shell_exec('cd ' . escapeshellarg(__DIR__) . ' && git pull --autostash -q 2>&1');
+    json_out(['ok' => true, 'app_version' => app_version(), 'output' => (string)$out]);
+}
+
 function save_upload(string $data, string $kind, string $filename = ''): array
 {
     $cfg = config();

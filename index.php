@@ -70,6 +70,15 @@ function ensure_upgrade(): void
         try { $pdo->exec("ALTER TABLE v_sessions ADD COLUMN pinned TINYINT NOT NULL DEFAULT 0"); } catch (\Throwable $e) { /* 列已存在 */ }
         try { $pdo->exec("ALTER TABLE v_sessions ADD COLUMN pinned_at DATETIME NULL"); } catch (\Throwable $e) { /* 列已存在 */ }
         try { $pdo->exec("ALTER TABLE v_sessions ADD INDEX idx_tenant_pinned (tenant_id, pinned, last_time)"); } catch (\Throwable $e) { /* 已存在 */ }
+        // v2.33 分域节点登记（主站记录各分控节点：IP 为名，心跳带角色/版本）
+        $pdo->exec("CREATE TABLE IF NOT EXISTS nodes (
+            ip VARCHAR(64) NOT NULL PRIMARY KEY,
+            role VARCHAR(16) NOT NULL DEFAULT '',
+            app_version VARCHAR(32) NOT NULL DEFAULT '',
+            origin VARCHAR(200) NOT NULL DEFAULT '',
+            first_seen DATETIME NULL,
+            last_seen DATETIME NULL
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
         // v2.64 微信红码提醒（每小时巡检脚本写入，工作台弹窗提示后标记 seen）
         $pdo->exec("CREATE TABLE IF NOT EXISTS code_alerts (
             id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
@@ -190,11 +199,11 @@ function site_allow_api(string $uri): bool
         if (str_starts_with($uri, '/api/tenant/')) return true;
         if (str_starts_with($uri, '/api/quick-msgs')) return true;
         if (str_starts_with($uri, '/api/msg/')) return true;
-        return in_array($uri, ['/api/poll', '/api/agents', '/api/upload', '/api/stats/dashboard', '/api/export/sessions', '/api/broadcast/send'], true);
+        return in_array($uri, ['/api/poll', '/api/agents', '/api/upload', '/api/stats/dashboard', '/api/export/sessions', '/api/broadcast/send', '/api/internal/update'], true);
     }
     // visitor
     if (str_starts_with($uri, '/api/visitor/')) return true;
-    return $uri === '/api/gate' || $uri === '/api/poll';
+    return $uri === '/api/gate' || $uri === '/api/poll' || $uri === '/api/internal/update';
 }
 
 /* ---------- 防红中转「空壳页」（v2.59）：/MM-DD/xxxxxx.html?key=… ----------
@@ -240,7 +249,7 @@ foreach (['login.html', 'app.html', 'admin.html', 'visitor.html'] as $page) {
     }
 }
 if ($uri === '/health' || $uri === '/api/health') {
-    json_out(['ok' => true, 'time' => time(), 'version' => '2.0', 'site_role' => site_role()]);
+    json_out(['ok' => true, 'time' => time(), 'version' => '2.0', 'site_role' => site_role(), 'app_version' => app_version()]);
 }
 
 /* ---------- API 路由 ---------- */
@@ -268,6 +277,9 @@ function dispatch_api(string $method, string $uri): void
     if ($uri === '/api/auth/login')    handle_auth_login($method);
     // ---- 上传中转（分节点 → 主站，仅 main 角色开放，共享密钥校验）----
     if ($uri === '/api/internal/upload') handle_internal_upload($method);
+    // ---- 节点心跳（分控 cron → 主站登记）与远程更新指令（主控 → 分控）----
+    if ($uri === '/api/internal/heartbeat') handle_internal_heartbeat($method);
+    if ($uri === '/api/internal/update')    handle_internal_update($method);
     // ---- 发卡机器人 webhook（Telegram 直接 POST，不走登录态，用 secret 校验）----
     if ($uri === '/api/tg/webhook')    handle_tg_webhook($method);
     if ($uri === '/api/auth/me')       handle_auth_me($method);
@@ -341,6 +353,7 @@ function dispatch_api(string $method, string $uri): void
     if ($uri === '/api/admin/domain-pool')       handle_admin_domain_pool($method);
     if (preg_match('#^/api/admin/domain-pool/(\d+)$#', $uri, $m)) handle_admin_domain_pool_id($method, (int)$m[1]);
     if ($uri === '/api/admin/root-domain')       handle_admin_root_domain($method);
+    if ($uri === '/api/admin/nodes')             handle_admin_nodes($method);
     if ($uri === '/api/admin/defaults')          handle_admin_defaults($method);
     // ---- 发卡机器人（平台管理员）----
     if ($uri === '/api/admin/tg')                handle_admin_tg($method);

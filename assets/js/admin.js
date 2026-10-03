@@ -13,7 +13,7 @@ createApp({
     const defVal = reactive({ default_quota_web: 200, default_quota_app: 200, default_max_agents: 5 });
     const pwOld = ref(''); const pwNew = ref('');
 
-    const tabTitle = computed(() => ({ overview: '平台概览', tenants: '租户管理', domains: '域名池', tg: '发卡机器人', settings: '全局设置' }[tab.value]));
+    const tabTitle = computed(() => ({ overview: '平台概览', tenants: '租户管理', domains: '域名池', nodes: '节点管理', tg: '发卡机器人', settings: '全局设置' }[tab.value]));
     const locationOrigin = location.origin;
 
     const barWidth = (v, list) => {
@@ -114,7 +114,33 @@ createApp({
       } catch (e) { ElementPlus.ElMessage.error(e.message); }
     };
     // 打开「发卡机器人」页签时才去拉数据（里面有 Telegram API 调用，别拖慢首屏）
-    Vue.watch(tab, (v) => { if (v === 'tg') loadTg().catch(e => ElementPlus.ElMessage.error(e.message)); });
+    Vue.watch(tab, (v) => {
+      if (v === 'tg') loadTg().catch(e => ElementPlus.ElMessage.error(e.message));
+      if (v === 'nodes') loadNodes().catch(e => ElementPlus.ElMessage.error(e.message));
+    });
+
+    // ===== 节点管理（1+2+n 分域部署） =====
+    const nodes = ref([]);
+    const mainVersion = ref('');
+    const pushingIp = ref('');
+    const loadNodes = async () => {
+      const r = await API.get('/api/admin/nodes');
+      nodes.value = r.nodes || [];
+      mainVersion.value = r.main_version || '';
+    };
+    const pushNode = async (row) => {
+      pushingIp.value = row.ip;
+      try {
+        const r = await API.post('/api/admin/nodes', { action: 'push', ip: row.ip });
+        if (r.need_cron) ElementPlus.ElMessage.warning(r.error || '请依赖节点 cron 自动更新');
+        else { ElementPlus.ElMessage.success('已推送，节点版本 ' + (r.app_version || '')); await loadNodes(); }
+      } catch (e) { ElementPlus.ElMessage.error(e.message); }
+      finally { pushingIp.value = ''; }
+    };
+    const forgetNode = async (row) => {
+      try { await API.post('/api/admin/nodes', { action: 'forget', ip: row.ip }); await loadNodes(); }
+      catch (e) { ElementPlus.ElMessage.error(e.message); }
+    };
 
     // 租户 CRUD
     const dlgVisible = ref(false);
@@ -231,6 +257,7 @@ createApp({
     onMounted(loadAll);
     return {
       tab, tabTitle, booted, me, ov, tenants, domains, newDomain, rootDomain, defVal, pwOld, pwNew,
+      nodes, mainVersion, pushingIp, loadNodes, pushNode, forgetNode,
       tg, tgCfg, tgSaving, tgHooking, tgChecking, saveTg, setTgWebhook, runTgCheck,
       pkgVisible, pkgForm, pkgSaving, openPkg, savePkg, delPkg, tgOrder,
       barWidth, locationOrigin,

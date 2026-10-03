@@ -32,7 +32,7 @@ function ApiDel($url, $token) {
 }
 
 Write-Host "`n========== 0. 清理旧测试数据 ==========" -ForegroundColor Cyan
-$r = ApiPost '/api/auth/login' @{account='admin'; password='123456'}
+$r = ApiPost '/api/auth/login' @{account='admin'; password='bH8nQC3yWY'}
 $admin = $r.token
 Step '管理员登录' ($admin) ($r | ConvertTo-Json -Compress)
 # 快照-恢复模式：只清理本脚本专属测试数据，不动用户真实配置

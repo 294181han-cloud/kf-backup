@@ -320,3 +320,83 @@ function handle_admin_defaults(string $method): void
     }
     json_error('方法不允许', 405);
 }
+
+/* ================= 节点管理（1+2+n 分域部署，v2.33） ================= */
+
+/** 主站向指定分控节点发起 HTTP 调用（curl 优先，stream 兜底） */
+function admin_node_http(string $origin, string $path, array $body): array
+{
+    $cfg = config();
+    $url = rtrim($origin, '/') . $path;
+    $body['secret'] = (string)($cfg['relay_secret'] ?? '');
+    $payload = json_encode($body, JSON_UNESCAPED_UNICODE);
+    $resp = '';
+    $code = 0;
+    $err = '';
+    if (function_exists('curl_init')) {
+        $ch = curl_init($url);
+        curl_setopt_array($ch, [
+            CURLOPT_POST           => true,
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_TIMEOUT        => 60,
+            CURLOPT_HTTPHEADER     => ['Content-Type: application/json'],
+            CURLOPT_POSTFIELDS     => $payload,
+        ]);
+        $resp = curl_exec($ch);
+        $code = (int)curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        $err = curl_error($ch);
+        curl_close($ch);
+    } else {
+        $ctx = stream_context_create(['http' => ['method' => 'POST', 'header' => "Content-Type: application/json\r\n", 'content' => $payload, 'timeout' => 60, 'ignore_errors' => true]]);
+        $resp = @file_get_contents($url, false, $ctx);
+        foreach ($http_response_header ?? [] as $h) {
+            if (preg_match('#^HTTP/\S+\s+(\d{3})#', $h, $m2)) $code = (int)$m2[1];
+        }
+        if ($resp === false) $err = '网络请求失败';
+    }
+    $j = json_decode((string)$resp, true);
+    if ($code !== 200 || !is_array($j)) {
+        return ['ok' => false, 'error' => '节点无响应(' . $code . ') ' . $err];
+    }
+    return $j;
+}
+
+function handle_admin_nodes(string $method): void
+{
+    require_admin_ctx();
+    $pdo = db();
+
+    if ($method === 'GET') {
+        $rows = $pdo->query('SELECT ip, role, app_version, origin, first_seen, last_seen FROM nodes ORDER BY last_seen DESC')->fetchAll();
+        foreach ($rows as &$r) {
+            $r['first_seen'] = dt_to_iso($r['first_seen']);
+            $r['last_seen'] = dt_to_iso($r['last_seen']);
+            $r['stale'] = $r['app_version'] !== '' && $r['app_version'] !== app_version();
+        }
+        unset($r);
+        json_out(['main_version' => app_version(), 'nodes' => $rows]);
+    }
+
+    // 推送更新：主控 → 节点 /api/internal/update（节点 git pull；shell_exec 未开放时提示走 cron）
+    if ($method === 'POST' && (input('action', '') === 'push')) {
+        $ip = trim((string)input('ip', ''));
+        $st = $pdo->prepare('SELECT ip, origin FROM nodes WHERE ip = ?');
+        $st->execute([$ip]);
+        $node = $st->fetch();
+        if (!$node || (string)$node['origin'] === '') json_error('节点不存在或未上报来源地址', 400);
+        $r = admin_node_http((string)$node['origin'], '/api/internal/update', ['action' => 'update']);
+        if (!empty($r['ok']) && isset($r['app_version'])) {
+            $pdo->prepare('UPDATE nodes SET app_version = ? WHERE ip = ?')->execute([(string)$r['app_version'], $ip]);
+        }
+        json_out($r + ['ip' => $ip]);
+    }
+
+    // 忽略（删除）节点登记
+    if ($method === 'POST' && (input('action', '') === 'forget')) {
+        $ip = trim((string)input('ip', ''));
+        $pdo->prepare('DELETE FROM nodes WHERE ip = ?')->execute([$ip]);
+        json_out(['ok' => true]);
+    }
+
+    json_error('方法不允许', 405);
+}
