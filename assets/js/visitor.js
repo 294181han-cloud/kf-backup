@@ -311,6 +311,11 @@ createApp({
     const stopPoll = () => { if (pollTimer) { clearInterval(pollTimer); pollTimer = null; } };
 
     // ---- 发送 ----
+    // v2.57 访客端同理：中文输入法选词时回车是「上屏」，不能当发送
+    const onInputKey = (e) => {
+      if (e.isComposing || e.keyCode === 229) return;
+      if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(); }
+    };
     const send = async () => {
       const text = draft.value.trim();
       const atts = pendingAtts.value.slice();          // v2.43.1：待发附件跟文字一起发
@@ -691,6 +696,7 @@ createApp({
       voiceMode, holding, holdSecs, holdCancel, toggleVoice, startHold, moveHold, endHold,
       toastMsg, SUGGEST, suggest,
       send, pickImage, onImage, fmtTime, scrollBottom, onlineText, isImg, visibleMessages, navTitle, canRecall, recallMine,
+      onInputKey,
       needDaySep, dayText,
       atBottom, onBodyScroll, scrollBottomNow, onDraftInput,
       audioPlaying, audioDur, waveBars, toggleAudio,

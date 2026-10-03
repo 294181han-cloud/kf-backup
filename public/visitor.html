@@ -184,7 +184,7 @@
         <input ref="imgInput" type="file" accept="image/png,image/jpeg,image/gif,image/webp" multiple style="display:none" @change="onImage">
         <textarea class="v-input" ref="inputRef" rows="1" v-model="draft"
           @focus="scrollBottom" placeholder="请输入您的问题…" @input="onDraftInput"
-          @paste="onPaste" @keydown.enter.exact.prevent="send"></textarea>
+          @paste="onPaste" @keydown="onInputKey"></textarea>
         <button class="v-btn" :class="{ready: !!draft.trim() || pendingAtts.length}" :disabled="(!draft.trim() && !pendingAtts.length) || sending" @click="send" title="发送">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12l16-8-6.5 8L20 20z"/></svg>
         </button>
@@ -274,6 +274,6 @@
 </div>
 
 <script src="/assets/vendor/vue.global.js?v=2.0.1"></script>
-<script src="/assets/js/visitor.js?v=2.11.1"></script>
+<script src="/assets/js/visitor.js?v=2.12.0"></script>
 </body>
 </html>

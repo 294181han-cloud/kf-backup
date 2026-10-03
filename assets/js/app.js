@@ -577,6 +577,47 @@ const app = createApp({
         if (!agentOptions.value.length) await loadAgentOptions();
       } catch (e) { ElementPlus.ElMessage.error(e.message); }
     };
+    /* ===== v2.57 到期提醒：剩 5 分钟提示一次，剩 2 分钟弹窗，到期再提醒一次 =====
+       租户（卡密主人）才有 expires_at；子客服没有，直接跳过。
+       每 15 秒对一次表，页面开着就一定会响；打开时就已进入窗口也会立刻提示。 */
+    let expireTimer = null;
+    const expireDone = { at5: false, at2: false, end: false };
+    const startExpireWatch = () => {
+      if (!me.value || me.value.role !== 'tenant' || !me.value.expires_at) return;
+      // Safari 不认 "YYYY-MM-DD HH:mm:ss"，换成斜杠格式
+      const end = new Date(String(me.value.expires_at).replace(/-/g, '/')).getTime();
+      if (!end || isNaN(end)) return;
+      const mins = (left) => Math.max(1, Math.round(left / 60000));
+      const tick = () => {
+        const left = end - Date.now();
+        if (left <= 0) {
+          clearInterval(expireTimer); expireTimer = null;
+          if (!expireDone.end) {
+            expireDone.end = true;
+            ElementPlus.ElMessageBox.alert('账号已到期，工作台将无法继续使用。请联系平台管理员续期。',
+              '⏰ 账号已到期', { confirmButtonText: '知道了', type: 'error' });
+          }
+          return;
+        }
+        // 已经进到 2 分钟窗口了就别再补发 5 分钟那条（比如页面是这时候才打开的）
+        if (left <= 2 * 60 * 1000 && !expireDone.at5) expireDone.at5 = true;
+        if (!expireDone.at5 && left <= 5 * 60 * 1000) {
+          expireDone.at5 = true;
+          ElementPlus.ElNotification({
+            title: '账号即将到期', type: 'warning', duration: 9000, position: 'top-right',
+            message: '还有约 ' + mins(left) + ' 分钟到期，请及时联系平台管理员续期。',
+          });
+        }
+        if (!expireDone.at2 && left <= 2 * 60 * 1000) {
+          expireDone.at2 = true;
+          ElementPlus.ElMessageBox.alert(
+            '账号将在约 ' + mins(left) + ' 分钟后到期。到期后工作台无法登录、访客也无法接入，请尽快联系平台管理员续期。',
+            '⏰ 账号即将到期', { confirmButtonText: '知道了', type: 'warning' });
+        }
+      };
+      tick();
+      expireTimer = setInterval(tick, 15000);
+    };
     const markRead = async (id) => {
       try { await API.post('/api/sessions/' + id + '/read'); const s = sessions.value.find(x => x.id === id); if (s) s.unread = 0; } catch (e) {}
     };
@@ -604,7 +645,14 @@ const app = createApp({
       } catch (e) { ElementPlus.ElMessage.error(e.message); }
       finally { sending.value = false; }
     };
-    const onKey = (e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(); } };
+    /* v2.57 修：中文输入法选词时按回车是「上屏」不是「发送」。
+       原来没判断 isComposing，于是选词时一回车就把还没上屏的字发出去了，
+       紧接着输入法又把这段字写回输入框 —— 用户看到的就是「消息发出去了，输入框里还在」。
+       keyCode 229 是部分安卓/旧浏览器的等价信号。 */
+    const onKey = (e) => {
+      if (e.isComposing || e.keyCode === 229) return;
+      if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(); }
+    };
 
     // 快捷消息（v2.28 改版）：单击 = 直接发送；Ctrl+单击 = 填入输入框（文字+图片均可编辑）
     const pendingAtts = ref([]);   // 待发附件（编辑模式带入的图片，发送时随消息发出）
@@ -2192,6 +2240,7 @@ const app = createApp({
         }
         booted.value = true;
         startPoll();
+        startExpireWatch();   // v2.57 到期提醒（5 分钟提示 / 2 分钟弹窗）
       } catch (e) {
         // 401 时 api.js 已跳转登录页；此处保持加载态不渲染骨架
         if (!String(e.message).includes('登录已失效')) ElementPlus.ElMessage.error(e.message);
@@ -2199,6 +2248,7 @@ const app = createApp({
     });
     onUnmounted(() => {
       stopPoll();
+      if (expireTimer) clearInterval(expireTimer);
       document.removeEventListener('click', onDocClick);
       document.removeEventListener('contextmenu', onDocCtx);
     });
