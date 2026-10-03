@@ -3,13 +3,20 @@ const { createApp, ref, reactive, computed, onMounted, onUnmounted, nextTick, de
 
 /* ---------- 通用 CRUD 表格组件 ---------- */
 const CrudTable = defineComponent({
-  props: { rows: Array, cols: Array, fields: Array, title: String, addText: String, api: String },
+  props: { rows: Array, cols: Array, fields: Array, title: String, addText: String, api: String, io: Boolean },
   emits: ['reload'],
   template: `
   <div class="panel">
     <div class="panel-title" style="justify-content:flex-start;gap:12px;">
       {{ title }}（{{ rows.length }}）
       <el-button size="small" type="primary" @click="open()">{{ addText }}</el-button>
+      <span v-if="io" style="display:inline-flex;gap:6px;align-items:center;margin-left:auto;flex-wrap:wrap;">
+        <span class="muted" style="font-size:12px;">批量：</span>
+        <el-button size="small" :disabled="!rows.length" @click="expJson">导出 JSON</el-button>
+        <el-button size="small" :disabled="!rows.length" @click="expCsv">导出 CSV</el-button>
+        <el-button size="small" type="primary" plain @click="pickImport">从文件导入</el-button>
+        <input ref="impRef" type="file" accept=".json,.csv,.txt" style="display:none" @change="doImport">
+      </span>
     </div>
     <el-table :data="rows" stripe size="default">
       <el-table-column v-for="c in cols" :key="c.k" :label="c.l">
@@ -116,6 +123,137 @@ const CrudTable = defineComponent({
       try { await API.del(props.api + '/' + row.id); ElementPlus.ElMessage.success('已删除'); emit('reload'); }
       catch (e) { ElementPlus.ElMessage.error(e.message); }
     };
-    return { dlg, editId, form, open, save, del, pickImg, onImg, rmImg, setImgRef };
+    /* ===== v2.44 通用导入 / 导出（任何用 crud-table 的页签，加 :io="true" 即可） ===== */
+    const impRef = ref(null);
+    const csvCell = (v) => {
+      const s = String(v == null ? '' : v);
+      return /[",\r\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
+    };
+    const downloadText = (text, mime, filename) => {
+      const url = URL.createObjectURL(new Blob([text], { type: mime + ';charset=utf-8' }));
+      const a = document.createElement('a');
+      a.href = url; a.download = filename;
+      document.body.appendChild(a); a.click(); a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 4000);
+    };
+    const stampName = () => new Date().toISOString().slice(0, 10).replace(/-/g, '');
+    const isAtt = (f) => f.type === 'images';
+    // 导出：JSON 全量（含附件），CSV 只含可读字段（bool 输出 是/否，select 输出中文）
+    const expJson = () => {
+      const rows = props.rows || [];
+      if (!rows.length) { ElementPlus.ElMessage.warning('还没有数据可导出'); return; }
+      const data = { type: 'kfxt-' + (props.api || '').replace(/[^a-z-]/gi, ''), version: 1,
+        exported_at: new Date().toISOString(), count: rows.length, items: rows };
+      downloadText(JSON.stringify(data, null, 2), 'application/json', (props.title || '数据') + '-' + stampName() + '.json');
+      ElementPlus.ElMessage.success('已导出 ' + rows.length + ' 条');
+    };
+    const expCsv = () => {
+      const rows = props.rows || [];
+      const fs = (props.fields || []).filter(f => !isAtt(f));
+      if (!rows.length) { ElementPlus.ElMessage.warning('还没有数据可导出'); return; }
+      const head = fs.map(f => f.label || f.k);
+      const lines = [head.map(csvCell).join(',')];
+      for (const r of rows) {
+        lines.push(fs.map(f => {
+          const v = r[f.k];
+          if (f.type === 'bool') return v ? '是' : '否';
+          if (f.type === 'select') {
+            const o = (f.options || []).find(x => x.v === v);
+            return o ? o.l : (v == null ? '' : v);
+          }
+          return v == null ? '' : v;
+        }).map(csvCell).join(','));
+      }
+      downloadText('\uFEFF' + lines.join('\r\n'), 'text/csv', (props.title || '数据') + '-' + stampName() + '.csv');
+      ElementPlus.ElMessage.success('已导出 ' + rows.length + ' 条');
+    };
+    const pickImport = () => { if (impRef.value) impRef.value.click(); };
+    const csvRows = (text) => {
+      const s = String(text || '').replace(/^\uFEFF/, '');
+      const rows = []; let row = []; let cell = ''; let inQ = false;
+      for (let i = 0; i < s.length; i++) {
+        const c = s[i];
+        if (inQ) {
+          if (c === '"') { if (s[i + 1] === '"') { cell += '"'; i++; } else inQ = false; }
+          else cell += c;
+        } else if (c === '"') inQ = true;
+        else if (c === ',') { row.push(cell); cell = ''; }
+        else if (c === '\n') { row.push(cell); rows.push(row); row = []; cell = ''; }
+        else if (c !== '\r') cell += c;
+      }
+      if (cell !== '' || row.length) { row.push(cell); rows.push(row); }
+      return rows.filter(r => r.some(x => String(x).trim() !== ''));
+    };
+    // 把 CSV 单元格按字段类型还原成接口需要的值
+    const castCell = (f, raw) => {
+      const s = String(raw == null ? '' : raw).trim();
+      if (f.type === 'bool') return ['1', '是', 'true', '启用', 'yes', 'y', 'on', '开'].includes(s.toLowerCase());
+      if (f.type === 'number') return Number(s) || 0;
+      if (f.type === 'select') {
+        const o = (f.options || []).find(x => String(x.v) === s || String(x.l) === s);
+        return o ? o.v : s;
+      }
+      return s;
+    };
+    const doImport = async (ev) => {
+      const file = ev.target.files[0];
+      ev.target.value = '';
+      if (!file) return;
+      const text = await new Promise(res => {
+        const fr = new FileReader();
+        fr.onload = () => res(String(fr.result || ''));
+        fr.readAsText(file, 'utf-8');
+      });
+      const fs = props.fields || [];
+      let items = [];
+      try {
+        const t = text.trim();
+        if (/\.json$/i.test(file.name) || t.startsWith('{') || t.startsWith('[')) {
+          const j = JSON.parse(text);
+          items = Array.isArray(j) ? j : (Array.isArray(j.items) ? j.items : []);
+        } else {
+          const rows = csvRows(text);
+          if (!rows.length) items = [];
+          else {
+            const head = rows[0].map(x => String(x).trim());
+            const keyOf = (h) => {
+              const f = fs.find(x => x.k === h || x.label === h);
+              return f ? f.k : null;
+            };
+            const keys = head.map(keyOf);
+            const hasHeader = keys.some(Boolean);
+            const body = hasHeader ? rows.slice(1) : rows;
+            items = body.map(r => {
+              const o = {};
+              fs.forEach((f, i) => {
+                const col = hasHeader ? keys.indexOf(f.k) : i;
+                if (col >= 0) o[f.k] = castCell(f, r[col]);
+              });
+              return o;
+            });
+          }
+        }
+      } catch (e) { ElementPlus.ElMessage.error('文件解析失败：' + e.message); return; }
+      // 至少要有第一个字段的值，否则这条算空行
+      const firstKey = fs[0] && fs[0].k;
+      items = items.filter(o => o && firstKey && String(o[firstKey] || '').trim() !== '');
+      if (!items.length) {
+        ElementPlus.ElMessage.warning('没解析到有效数据（表格第一列不能为空：' + ((fs[0] || {}).label || '') + '）');
+        return;
+      }
+      try {
+        await ElementPlus.ElMessageBox.confirm(
+          '解析到 ' + items.length + ' 条，会「追加」到现有列表（不删原有的）。确认导入？',
+          '导入' + (props.title || ''), { confirmButtonText: '开始导入', cancelButtonText: '取消' });
+      } catch (e) { return; }
+      let ok = 0, fail = 0;
+      for (const o of items) {
+        try { await API.post(props.api, o); ok++; } catch (e) { fail++; }
+      }
+      emit('reload');
+      ElementPlus.ElMessage.success('导入完成：成功 ' + ok + ' 条' + (fail ? '，失败 ' + fail + ' 条' : ''));
+    };
+    return { dlg, editId, form, open, save, del, pickImg, onImg, rmImg, setImgRef,
+      impRef, expJson, expCsv, pickImport, doImport };
   }
 });

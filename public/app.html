@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>客服工作台</title>
 <link rel="stylesheet" href="/assets/vendor/element-plus.css">
-<link rel="stylesheet" href="/assets/css/app.css?v=3.9.2">
+<link rel="stylesheet" href="/assets/css/app.css?v=3.9.3">
 <script src="/assets/ui/ui-registry.js?v=2.6.0"></script>
 <script src="/assets/ui/ui-loader.js?v=2.6.0" data-ui-cat="auto"></script>
 </head>
@@ -442,20 +442,9 @@
           <p class="muted" style="font-size:11.5px;margin:8px 0 0;">
             聊天框底部「⚡快捷消息」里：<b>单击=直接发送</b>，Ctrl+单击=填到输入框再改；带图片的话术请在下方表格里编辑。
           </p>
-          <!-- v2.44 快捷消息 导入 / 导出 -->
-          <div class="qa-io">
-            <span class="qa-io-lbl">批量处理：</span>
-            <el-button size="small" @click="exportQuick('json')" :disabled="!quickMsgs.length">⬇ 导出全部（JSON）</el-button>
-            <el-button size="small" @click="exportQuick('csv')" :disabled="!quickMsgs.length">⬇ 导出表格（CSV）</el-button>
-            <el-button size="small" type="primary" plain @click="$refs.importQuickInput.click()">⬆ 从文件导入</el-button>
-            <input ref="importQuickInput" type="file" accept=".json,.csv,.txt" style="display:none" @change="importQuick($event)"/>
-            <span class="muted" style="font-size:11.5px;">
-              支持 JSON（完整，含附件，可原样搬走）和 CSV（标题/内容/分组/排序，Excel 另存为 CSV 即可）
-            </span>
-          </div>
         </div>
         <crud-table
-          :rows="quickMsgs" :fields="quickFields" title="全部快捷消息" add-text="高级新增（可带图）"
+          :rows="quickMsgs" :fields="quickFields" title="快捷消息" add-text="高级新增（可带图）" :io="true"
           @reload="loadQuick" api="/api/quick-msgs"
           :cols="[{k:'title',l:'标题'},{k:'attachments',l:'图片',imgs:true},{k:'content',l:'内容'},{k:'group_name',l:'分组'}]"></crud-table>
       </div>
@@ -464,7 +453,7 @@
       <div class="content" v-if="tab==='setting' && setTab==='welcome'">
         <crud-table
           :rows="welcomeMsgs" :fields="welcomeFields" title="欢迎语（访客进入时自动发送，按顺序最多 5 条）" add-text="新增欢迎语"
-          @reload="loadWelcome" api="/api/welcome-messages"
+          @reload="loadWelcome" api="/api/welcome-messages" :io="true"
           :cols="[{k:'content',l:'内容'},{k:'attachments',l:'配图',imgs:true},{k:'trig',l:'触发',map:{once:'仅首次',every:'每次进入'}},{k:'enabled',l:'启用',bool:true}]"></crud-table>
       </div>
 
@@ -472,7 +461,7 @@
       <div class="content" v-if="tab==='setting' && setTab==='auto'">
         <crud-table
           :rows="autoReplies" :fields="autoFields" title="自动回复（访客消息包含关键词时自动应答）" add-text="新增规则"
-          @reload="loadAuto" api="/api/auto-reply"
+          @reload="loadAuto" api="/api/auto-reply" :io="true"
           :cols="[{k:'keyword',l:'关键词'},{k:'reply',l:'自动回复内容'},{k:'enabled',l:'启用',bool:true}]"></crud-table>
       </div>
 
@@ -490,7 +479,7 @@
       <div class="content" v-if="tab==='setting' && setTab==='blacklist' && me.role==='tenant'">
         <crud-table
           :rows="blacklist" :fields="blFields" title="IP 黑名单（仅作用于您的访客）" add-text="添加 IP"
-          @reload="loadBlacklist" api="/api/ip-blacklist"
+          @reload="loadBlacklist" api="/api/ip-blacklist" :io="true"
           :cols="[{k:'ip',l:'IP'},{k:'reason',l:'原因'}]"></crud-table>
       </div>
 
@@ -1374,8 +1363,8 @@
 <script src="/assets/vendor/qrcode.min.js?v=2.0.1"></script>
 <script src="/assets/qr-poster.js?v=2.1.03"></script>
 <script src="/assets/api.js?v=2.0.1"></script>
-<script src="/assets/js/app-components.js?v=2.2.0"></script>
-<script src="/assets/js/app.js?v=3.5.0"></script>
+<script src="/assets/js/app-components.js?v=2.3.0"></script>
+<script src="/assets/js/app.js?v=3.5.1"></script>
 <script src="/assets/js/app-boot.js?v=2.1.1"></script>
 </body>
 </html>
