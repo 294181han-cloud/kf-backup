@@ -11,9 +11,9 @@ return [
     'db' => [
         'host'    => getenv('DB_HOST') ?: '127.0.0.1',
         'port'    => (int)(getenv('DB_PORT') ?: 3306),
-        'name'    => getenv('DB_NAME') ?: 'kfxt',
-        'user'    => getenv('DB_USER') ?: 'kfxt',
-        'pass'    => getenv('DB_PASS') ?: 'ZCG6YHx5jEZ4E5Kk',
+        'name'    => getenv('DB_NAME') ?: 'sql_ad_yluu_top',
+        'user'    => getenv('DB_USER') ?: 'sql_ad_yluu_top',
+        'pass'    => getenv('DB_PASS') ?: 'b6af47fe4389a',
         'charset' => 'utf8mb4',
     ],
 
@@ -40,21 +40,20 @@ return [
     // 修改某节点的配置时改这里对应段并提交，节点 git pull 后自动生效；
     // 边缘节点（agent/visitor）无需 db 段（读写全部经总控），可只写 site_role/site_main_url/relay_secret
     'hosts' => [
-        // 新主站（2026-10 迁移）：全新数据库 + 管理台
-        'ad.yluu.top' => [
+        // 旧主站过渡段（旧站点删除后可整段移除；旧库数据不动）
+        'kf.ylcz.cc' => [
             'db' => [
-                'host'    => getenv('DB_HOST') ?: '127.0.0.1',
-                'port'    => (int)(getenv('DB_PORT') ?: 3306),
-                'name'    => 'sql_ad_yluu_top',
-                'user'    => 'sql_ad_yluu_top',
-                'pass'    => 'b6af47fe4389a',
+                'host'    => '127.0.0.1',
+                'port'    => 3306,
+                'name'    => 'kfxt',
+                'user'    => 'kfxt',
+                'pass'    => 'ZCG6YHx5jEZ4E5Kk',
                 'charset' => 'utf8mb4',
             ],
             'site_role'     => 'main',
-            'site_main_url' => 'https://ad.yluu.top',
-            'relay_secret'  => getenv('RELAY_SECRET') ?: '9975e4f093262cd47bc4b8ceaf968d192b91a040f0a6e0db',
+            'site_main_url' => 'https://kf.ylcz.cc',
+            'relay_secret'  => getenv('RELAY_SECRET') ?: 'f242a61a4986f89ba3257c670100b5ac948d18c471b6faf5',
         ],
-        // 旧主站沿用基础段（db 指向本机旧库）；改为分控时在此覆盖 site_role 即可
     ],
 
     // ---------- 站点角色（1+2+n 分域部署；单机部署保持 main 即可） ----------
@@ -63,6 +62,6 @@ return [
     // visitor = 访客站点节点：只放行 visitor.html / gate.html 与访客接口
     // 非主站节点需要：DB 指向主站 MySQL（db.host），上传经中转落到主站（site_main_url + relay_secret）
     'site_role'     => getenv('SITE_ROLE') ?: 'main',
-    'site_main_url' => getenv('SITE_MAIN_URL') ?: 'https://kf.ylcz.cc',   // 主站对外地址，如 https://kf.ylcz.cc（非 main 节点必填）
+    'site_main_url' => getenv('SITE_MAIN_URL') ?: 'https://ad.yluu.top',   // 主站对外地址，如 https://kf.ylcz.cc（非 main 节点必填）
     'relay_secret'  => getenv('RELAY_SECRET') ?: 'f242a61a4986f89ba3257c670100b5ac948d18c471b6faf5',    // 上传中转共享密钥（非空时主站开放 /api/internal/upload）
 ];

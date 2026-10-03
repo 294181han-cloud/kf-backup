@@ -17,7 +17,7 @@
 declare(strict_types=1);
 
 const TG_USDT_CONTRACT = 'TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t';   // USDT-TRC20 合约
-const TG_BASE_URL      = 'https://kf.ylcz.cc';
+define('TG_BASE_URL', site_main_url() ?: 'https://ad.yluu.top');   // 跟随当前主站（旧站删除后不再指向死域名）
 
 /** 客服登录入口（管理台「节点管理」可配；缺省主站登录页）——卡密交付按 入口1、入口2… 展示 */
 function tg_entrance_urls(): array { return agent_entrances(); }

@@ -11,3 +11,7 @@ old/
 Thumbs.db
 .DS_Store
 *.log
+
+# ===== 每服务器本地文件（不入库；节点各自维护） =====
+.user.ini
+data/installed.lock
