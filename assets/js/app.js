@@ -313,7 +313,7 @@ const app = createApp({
         await API.post('/api/sessions/' + currentId.value + '/messages', { text: q.content || q.title, attachments: (q.attachments || []).length ? q.attachments : undefined });
         const m = await API.get('/api/sessions/' + currentId.value + '/messages?since=' + maxMsgId.value);
         const list = m.messages || [];
-        if (list.length) { msgs.value.push(...list); maxMsgId.value = list[list.length - 1].id; prefetchAudio(list); scrollBottom(); }
+        if (list.length) { msgs.value.push(...list); maxMsgId.value = list[list.length - 1].id; prefetchAudio(list); pinBottom(1200); }
         sendBeep();
         quickDlg.value = false;
       } catch (e) { ElementPlus.ElMessage.error(e.message); }
@@ -424,7 +424,7 @@ const app = createApp({
           // 关键：推进"已拉取到的最大 id"，否则同一条消息每次轮询都被当成新消息（会一直响）
           const lastId = r.messages[r.messages.length - 1].id;
           if (lastId > maxMsgId.value) maxMsgId.value = lastId;
-          scrollBottom();
+    pinBottom(1000);   // v2.58 新消息进来后也持续贴底一会儿（对方发的图会异步撑高）
           if (r.messages.some(m => m.from === 'visitor')) markRead(currentId.value);
         }
       } catch (e) { if (String(e.message).includes('登录已失效')) throw e; }
@@ -482,7 +482,7 @@ const app = createApp({
         const r = await API.get('/api/sessions/' + currentId.value + '/messages');
         msgs.value = r.messages || [];
         maxMsgId.value = msgs.value.length ? msgs.value[msgs.value.length - 1].id : 0;
-        scrollBottom();
+    pinBottom(1400);
         ElementPlus.ElMessage.success('已刷新聊天记录');
       } catch (e) { ElementPlus.ElMessage.error(e.message); }
       finally { refreshing.value = false; }
@@ -523,7 +523,7 @@ const app = createApp({
         const r = await API.post('/api/sessions/' + currentId.value + '/messages', { text, msg_type: 'ask_image' });
         msgs.value.push(r.message);
         maxMsgId.value = r.message.id;
-        scrollBottom();
+        pinBottom(1200);
         sendBeep();
         const s = sessions.value.find(x => x.id === currentId.value);
         if (s) s.lastMsg = r.message.text || '[请求上传图片]';
@@ -540,7 +540,7 @@ const app = createApp({
         const r = await API.post('/api/sessions/' + currentId.value + '/messages', { text, msg_type: 'ask_image' });
         msgs.value.push(r.message);
         maxMsgId.value = r.message.id;
-        scrollBottom();
+      pinBottom(1200);
         sendBeep();
         const s = sessions.value.find(x => x.id === currentId.value);
         if (s) s.lastMsg = r.message.text || '[请求上传图片]';
@@ -555,7 +555,35 @@ const app = createApp({
         { type: 'warning', confirmButtonText: '结束会话', cancelButtonText: '取消' });
     };
 
-    const scrollBottom = () => nextTick(() => { if (chatBody.value) chatBody.value.scrollTop = chatBody.value.scrollHeight; });
+    /* ===== v2.58 修：进会话没有停在最新一条 =====
+       原来只 nextTick 里滚一次。问题是图片/视频是**异步撑高**的：
+       刚渲染时图片高度还是 0，滚到底只是滚到一个很矮的高度；
+       等图片加载完把内容撑高，视图就停在中间了 —— 也就是"没停在最新记录"。
+       现在改成：进会话/发消息后开一个约 1.6 秒的"贴底窗口"，期间持续贴底；
+       另外图片、视频加载完成时，如果还在贴底窗口内（或者本来就在底部附近）再补一次。 */
+    let pinUntil = 0;
+    const scrollBottom = () => nextTick(() => {
+      const el = chatBody.value;
+      if (el) el.scrollTop = el.scrollHeight;
+    });
+    const pinBottom = (ms = 1600) => {
+      pinUntil = Date.now() + ms;
+      scrollBottom();
+      const t0 = Date.now();
+      const step = () => {
+        if (Date.now() - t0 > ms) return;
+        scrollBottom();
+        setTimeout(step, 80);
+      };
+      setTimeout(step, 60);
+    };
+    // 图片/视频加载完成后补滚（只在我们本来就该在底部时才滚，免得把正在翻记录的人拽下来）
+    const onMediaLoad = () => {
+      const el = chatBody.value;
+      if (!el) return;
+      const nearBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 120;
+      if (Date.now() < pinUntil || nearBottom) scrollBottom();
+    };
 
     const openSession = async (id) => {
       currentId.value = id;
@@ -568,7 +596,7 @@ const app = createApp({
         msgs.value = r.messages || [];
         prefetchAudio(msgs.value);
         if (msgs.value.length) maxMsgId.value = msgs.value[msgs.value.length - 1].id;
-        scrollBottom();
+    pinBottom(1800);   // v2.58 进会话：图片/视频异步撑高，必须持续贴底一会儿
         markRead(id);
         // 资料与联系方式
         profile.value = await API.get('/api/sessions/' + id + '/profile');
@@ -638,7 +666,7 @@ const app = createApp({
         replyTo.value = null;
         // v2.53 发完消息不再自动收起快捷栏（用户反馈"每次都要点一次才显示"）；
         // 想收起就点「⚡快捷消息」那个按钮，纯手动。
-        scrollBottom();
+        pinBottom(1400);
         sendBeep();
         const s = sessions.value.find(x => x.id === currentId.value);
         if (s) { s.lastMsg = (text || (atts.length ? '[图片]' : '')).slice(0, 60); s.agent_id = s.agent_id || (me.value.role === 'agent' ? me.value.id : s.agent_id); }
@@ -774,7 +802,7 @@ const app = createApp({
         const r = await API.post('/api/sessions/' + currentId.value + '/messages', { text, attachments: atts });
         msgs.value.push(r.message);
         maxMsgId.value = r.message.id;
-        scrollBottom();
+    pinBottom(1400);
         sendBeep();
         const s = sessions.value.find(x => x.id === currentId.value);
         if (s) s.lastMsg = (text || (atts.length ? '[图片]' : '')).slice(0, 60);
@@ -1032,7 +1060,7 @@ const app = createApp({
           const body = { text: '', msg_type: 'location', attachments: [att] };
           if (replyTo.value) body.reply_to = replyTo.value.id;
           const r = await API.post('/api/sessions/' + currentId.value + '/messages', body);
-          msgs.value.push(r.message); maxMsgId.value = r.message.id; replyTo.value = null; scrollBottom();
+          msgs.value.push(r.message); maxMsgId.value = r.message.id; replyTo.value = null; pinBottom(1400);
         } catch (e) { ElementPlus.ElMessage.error(e.message); }
       };
       const manual = async () => {
@@ -1069,8 +1097,7 @@ const app = createApp({
           const data = await new Promise(res => { const fr = new FileReader(); fr.onload = () => res(fr.result); fr.readAsDataURL(blob); });
           try {
             const up = await API.post('/api/upload', { data, kind: 'audio', filename: 'voice.webm' });
-            const r = await API.post('/api/sessions/' + currentId.value + '/messages', { text: '', attachments: [up] });
-            msgs.value.push(r.message); maxMsgId.value = r.message.id; scrollBottom();
+            XX
           } catch (e) { ElementPlus.ElMessage.error(e.message); }
         };
         recSendFlag = false;
@@ -2256,6 +2283,7 @@ const app = createApp({
     return {
       tab, tabTitle, booted, me, expireText, stats, sessions, sessSearch, filteredSessions, currentId, current,
       msgs, draft, sending, chatBody, viewing, profile, contactList, noteDraft, transferDlg, transferTo, agentOptions,
+      pinBottom, onMediaLoad,
       quickMsgs, showQuick, welcomeMsgs, autoReplies, blacklist, preInq, preqOn, links, agents, brand,
       bcText, bcSending, profileForm, pwOld, pwNew, recording, recSecs, qrVisible, qrData, qrBox,
       posterUrl, posterOpts, downloadPoster, pickPosterLogo, onQrOpen, downloadQrBox,

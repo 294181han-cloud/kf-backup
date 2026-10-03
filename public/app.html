@@ -233,7 +233,7 @@
                     <div class="msg-bubble" v-else :class="{'search-hit': chatSearchOn && chatSearchKw && m.text && m.text.includes(chatSearchKw)}">
                       <span v-if="m.text">{{ m.text }}</span>
                       <template v-for="(a,i) in (m.attachments||[])" :key="i">
-                        <img v-if="a.type==='image'" :src="a.url" @click="viewing=a.url">
+                        <img v-if="a.type==='image'" :src="a.url" @load="onMediaLoad" @click="viewing=a.url">
                         <div v-if="a.type==='audio'" class="voice-bubble" :class="{playing: audioPlaying===a.url}" @click.stop="toggleAudio(a.url)">
                           <span class="vb-play">
                             <svg v-if="audioPlaying!==a.url" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5.5v13l11-6.5z"/></svg>
@@ -248,7 +248,7 @@
                           </button>
                           <div class="vb-asr-text" v-if="asrText[m.id]">{{ asrText[m.id] }}</div>
                         </div>
-                        <video v-if="a.type==='video'" class="vb-video" :src="a.url" controls preload="metadata"></video>
+                        <video v-if="a.type==='video'" class="vb-video" :src="a.url" controls preload="metadata" @loadedmetadata="onMediaLoad"></video>
                         <a v-if="a.type==='file'" class="file-bubble" :href="a.url" target="_blank" rel="noopener" download>
                           <span class="fb-ic">📄</span>
                           <span class="fb-body"><span class="fb-name">{{ a.name || '文件' }}</span><span class="fb-size">{{ fmtSize(a.size) }}</span></span>
@@ -1400,7 +1400,7 @@
 <script src="/assets/qr-poster.js?v=2.1.03"></script>
 <script src="/assets/api.js?v=2.0.1"></script>
 <script src="/assets/js/app-components.js?v=2.4.0"></script>
-<script src="/assets/js/app.js?v=3.9.0"></script>
+<script src="/assets/js/app.js?v=3.10.0"></script>
 <script src="/assets/js/app-boot.js?v=2.1.1"></script>
 </body>
 </html>
