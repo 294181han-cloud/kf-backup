@@ -1388,6 +1388,25 @@ body.dark .loc-bubble .lb-sub { color: #9db3a5; }
 .tools-hint { font-size: 11px; color: #a8b0bd; margin-left: auto; }
 
 /* =====================================================================
+   v2.50 表格拖动排序手柄（快捷消息用）
+   touch-action:none 很关键 —— 否则手机上手指一往下拖，页面先滚起来了
+   ===================================================================== */
+.drag-handle {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 28px; height: 28px; border-radius: 8px;
+  color: #b3bccb; font-size: 17px; line-height: 1;
+  cursor: grab; touch-action: none; user-select: none;
+  -webkit-user-select: none; -webkit-touch-callout: none;
+}
+.drag-handle:hover { background: #f2f5fa; color: var(--theme, #1677ff); }
+.drag-handle:active { cursor: grabbing; background: #e9eef7; }
+body.dark .drag-handle:hover { background: #262c34; }
+body.dark .drag-handle:active { background: #2f3640; }
+.el-table__row.row-dragging > td { background: color-mix(in srgb, var(--theme, #1677ff) 8%, #fff) !important; }
+.el-table__row.row-dragging { box-shadow: 0 6px 18px -8px rgba(16, 24, 40, .35); }
+body.dark .el-table__row.row-dragging > td { background: color-mix(in srgb, var(--theme, #1677ff) 20%, #1e2229) !important; }
+
+/* =====================================================================
    v2.49 手机端长按消息 → 底部操作面板（回复 / 复制 / 多选 / 删除）
    只挂右键菜单在手机上等于没有：iOS 长按不会触发 contextmenu。
    这套样式是全局的（不看宽度），因为长按在任何尺寸的触屏设备上都该能用。

@@ -233,6 +233,18 @@ const app = createApp({
     };
 
     const loadQuick = async () => { try { quickMsgs.value = await API.get('/api/quick-msgs'); } catch (e) {} };
+    // v2.50 拖动排序：表格拖完把新顺序（id 数组）存库，再重新拉一次让聊天窗口的按钮同步
+    const saveQuickOrder = async (ids) => {
+      if (!Array.isArray(ids) || !ids.length) return;
+      try {
+        await API.post('/api/quick-msgs/reorder', { ids });
+        await loadQuick();
+        ElementPlus.ElMessage.success('顺序已保存');
+      } catch (e) {
+        ElementPlus.ElMessage.error(e.message || '保存顺序失败');
+        await loadQuick();   // 失败就回到服务端的真实顺序，避免界面和数据不一致
+      }
+    };
     // 快捷消息：控制台里一行输入直接添加（不用开弹窗）
     const qa = reactive({ title: '', content: '', saving: false });
     const quickAdd = async () => {
@@ -2140,7 +2152,7 @@ const app = createApp({
       agentDlg, agentMode, agentForm, openAgentEdit, saveAgent, resetAgentPw, toggleAgent, delAgent,
       createdAgentVisible, createdAgent,
       saveBrand, savePreqOn, saveProfile, changePw, exportCsv, logout,
-      loadQuick, loadWelcome, loadAuto, loadBlacklist, loadPreInq,
+      loadQuick, saveQuickOrder, loadWelcome, loadAuto, loadBlacklist, loadPreInq,
       refreshing, refreshChat, askUpload,
       askDlg, askForm, ASK_PRESETS, ASK_DEFAULT, openAskDialog, sendAskDialog,
       qa, quickAdd,

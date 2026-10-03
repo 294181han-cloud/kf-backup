@@ -302,6 +302,33 @@ function handle_session_recall(string $method, array $m): void
     json_out(['ok' => true, 'msg_id' => $msgId]);
 }
 
+/* ---------- 快捷消息：拖动排序（v2.50） ----------
+   前端把拖完的顺序（id 数组）发过来，这里重写 sort（10/20/30…），
+   GET 侧按 `sort` ASC, id DESC 返回，所以聊天窗口的快捷按钮顺序跟着变。 */
+function handle_quick_reorder(string $method): void
+{
+    if ($method !== 'POST') { json_error('方法不允许', 405); return; }
+    $ctx = require_workspace();
+    if ($ctx['role'] !== 'tenant') json_error('仅账户主人可调整顺序', 403);
+    $ids = input('ids', []);
+    if (!is_array($ids) || !$ids) json_error('缺少顺序数据', 400);
+    $pdo = db();
+    $st = $pdo->prepare('UPDATE quick_msgs SET `sort` = ? WHERE id = ? AND tenant_id = ?');
+    try {
+        $pdo->beginTransaction();
+        $n = 0;
+        foreach ($ids as $id) {
+            $n += 10;
+            $st->execute([$n, (int)$id, $ctx['tenant_id']]);
+        }
+        $pdo->commit();
+    } catch (\Throwable $e) {
+        if ($pdo->inTransaction()) $pdo->rollBack();
+        json_error('保存顺序失败：' . $e->getMessage(), 500);
+    }
+    json_out(['ok' => true, 'count' => count($ids)]);
+}
+
 /* ---------- 会话置顶 / 取消置顶（v2.43） ---------- */
 function handle_session_pin(string $method, array $m): void
 {
@@ -474,7 +501,8 @@ function handle_upload(string $method): void
 function crud_config(string $name): array
 {
     static $map = [
-        'quick-msgs'       => ['table' => 'quick_msgs', 'fields' => ['title', 'content', 'group_name', 'sort', 'attachments']],
+        // quick-msgs 支持自定义顺序：按 sort 升序（sort 相同再按 id 倒序 = 新加的排前面）
+        'quick-msgs'       => ['table' => 'quick_msgs', 'fields' => ['title', 'content', 'group_name', 'sort', 'attachments'], 'order' => '`sort` ASC, id DESC'],
         'welcome-messages' => ['table' => 'welcome_msgs', 'fields' => ['content', 'delay', 'enabled', 'sort', 'attachments', 'trig']],
         'auto-reply'       => ['table' => 'auto_replies', 'fields' => ['keyword', 'reply', 'enabled']],
         'ip-blacklist'     => ['table' => 'ip_blacklist', 'fields' => ['ip', 'reason'], 'tenant_only' => true],
@@ -515,7 +543,8 @@ function handle_crud(string $method, string $name): void
     $selCols = implode(',', array_map('norm_col', $fields));
 
     if ($method === 'GET') {
-        $st = $pdo->prepare("SELECT id, $selCols FROM $table WHERE tenant_id = ? ORDER BY id DESC");
+        $orderBy = !empty($cfg['order']) ? (string)$cfg['order'] : 'id DESC';
+        $st = $pdo->prepare("SELECT id, $selCols FROM $table WHERE tenant_id = ? ORDER BY $orderBy");
         $st->execute([$tid]);
         json_out(array_map(fn($r) => crud_transform($name, $r), $st->fetchAll()));
     }

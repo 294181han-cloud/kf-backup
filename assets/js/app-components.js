@@ -3,8 +3,8 @@ const { createApp, ref, reactive, computed, onMounted, onUnmounted, nextTick, de
 
 /* ---------- 通用 CRUD 表格组件 ---------- */
 const CrudTable = defineComponent({
-  props: { rows: Array, cols: Array, fields: Array, title: String, addText: String, api: String, io: Boolean },
-  emits: ['reload'],
+  props: { rows: Array, cols: Array, fields: Array, title: String, addText: String, api: String, io: Boolean, sortable: Boolean },
+  emits: ['reload', 'reorder'],
   template: `
   <div class="panel">
     <div class="panel-title" style="justify-content:flex-start;gap:12px;">
@@ -18,7 +18,15 @@ const CrudTable = defineComponent({
         <input ref="impRef" type="file" accept=".json,.csv,.txt" style="display:none" @change="doImport">
       </span>
     </div>
-    <el-table :data="rows" stripe size="default">
+    <el-table :data="local" stripe size="default" :row-class-name="rowCls">
+      <el-table-column v-if="sortable" width="46" label="">
+        <template #default="{ $index }">
+          <span class="drag-handle" title="按住拖动排序"
+                @pointerdown.prevent="onDragDown($index, $event)"
+                @pointermove="onDragMove($event)"
+                @pointerup="onDragUp" @pointercancel="onDragUp">⠿</span>
+        </template>
+      </el-table-column>
       <el-table-column v-for="c in cols" :key="c.k" :label="c.l">
         <template #default="{row}">
           <template v-if="c.bool"><el-tag size="small" :type="row[c.k]?'success':'info'">{{ row[c.k]?'启用':'停用' }}</el-tag></template>
@@ -78,6 +86,46 @@ const CrudTable = defineComponent({
     const dlg = ref(false);
     const editId = ref(0);
     const form = reactive({});
+    /* v2.50 拖动排序：表格用本地副本渲染，拖完再 emit('reorder', ids) 让父级存库 */
+    const local = ref(Array.isArray(props.rows) ? props.rows.slice() : []);
+    let dragging = false;
+    const dragFrom = ref(-1);
+    Vue.watch(() => props.rows, (v) => {
+      if (dragging) return;
+      local.value = Array.isArray(v) ? v.slice() : [];
+    });
+    const rowCls = ({ rowIndex }) => (rowIndex === dragFrom.value ? 'row-dragging' : '');
+    const onDragDown = (i, ev) => {
+      if (!props.sortable) return;
+      dragging = true;
+      dragFrom.value = i;
+      try { ev.target.setPointerCapture(ev.pointerId); } catch (e) {}
+    };
+    const onDragMove = (ev) => {
+      if (!dragging || dragFrom.value < 0) return;
+      const wrap = ev.target.closest('.el-table');
+      if (!wrap) return;
+      const trs = [...wrap.querySelectorAll('.el-table__body tbody tr')];
+      const y = ev.clientY;
+      let to = dragFrom.value;
+      trs.forEach((tr, i) => {
+        const r = tr.getBoundingClientRect();
+        if (y >= r.top && y <= r.bottom) to = i;
+      });
+      if (to !== dragFrom.value && to >= 0 && to < local.value.length) {
+        const arr = local.value.slice();
+        const [it] = arr.splice(dragFrom.value, 1);
+        arr.splice(to, 0, it);
+        local.value = arr;
+        dragFrom.value = to;
+      }
+    };
+    const onDragUp = () => {
+      if (!dragging) return;
+      dragging = false;
+      dragFrom.value = -1;
+      emit('reorder', local.value.map(x => x.id));
+    };
     const imgRefs = {};
     const setImgRef = (k, el) => { if (el) imgRefs[k] = el; };
     const open = (row) => {
@@ -254,6 +302,7 @@ const CrudTable = defineComponent({
       ElementPlus.ElMessage.success('导入完成：成功 ' + ok + ' 条' + (fail ? '，失败 ' + fail + ' 条' : ''));
     };
     return { dlg, editId, form, open, save, del, pickImg, onImg, rmImg, setImgRef,
+      local, rowCls, onDragDown, onDragMove, onDragUp,
       impRef, expJson, expCsv, pickImport, doImport };
   }
 });

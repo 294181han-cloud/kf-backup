@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>客服工作台</title>
 <link rel="stylesheet" href="/assets/vendor/element-plus.css">
-<link rel="stylesheet" href="/assets/css/app.css?v=3.14.0">
+<link rel="stylesheet" href="/assets/css/app.css?v=3.15.0">
 <script src="/assets/ui/ui-registry.js?v=2.8.0"></script>
 <script src="/assets/ui/ui-loader.js?v=2.8.0" data-ui-cat="auto"></script>
 </head>
@@ -475,12 +475,13 @@
             <el-button type="primary" :loading="qa.saving" :disabled="!qa.title.trim()" @click="quickAdd">添加</el-button>
           </div>
           <p class="muted" style="font-size:11.5px;margin:8px 0 0;">
-            聊天框底部「⚡快捷消息」里：<b>单击=直接发送</b>，Ctrl+单击=填到输入框再改；带图片的话术请在下方表格里编辑。
+            聊天框底部「⚡快捷消息」里：<b>单击=直接发送</b>，Ctrl+单击=填到输入框再改；带图片的话术请在下方表格里编辑。<br>
+            <b>调整顺序</b>：在下方表格里按住最左边的 <b>⠿</b> 上下拖动（手机、电脑都能拖），松手即保存——聊天窗口里的按钮顺序会跟着变。
           </p>
         </div>
         <crud-table
-          :rows="quickMsgs" :fields="quickFields" title="快捷消息" add-text="高级新增（可带图）" :io="true"
-          @reload="loadQuick" api="/api/quick-msgs"
+          :rows="quickMsgs" :fields="quickFields" title="快捷消息" add-text="高级新增（可带图）" :io="true" :sortable="true"
+          @reload="loadQuick" @reorder="saveQuickOrder" api="/api/quick-msgs"
           :cols="[{k:'title',l:'标题'},{k:'attachments',l:'图片',imgs:true},{k:'content',l:'内容'},{k:'group_name',l:'分组'}]"></crud-table>
       </div>
 
@@ -1398,8 +1399,8 @@
 <script src="/assets/vendor/qrcode.min.js?v=2.0.1"></script>
 <script src="/assets/qr-poster.js?v=2.1.03"></script>
 <script src="/assets/api.js?v=2.0.1"></script>
-<script src="/assets/js/app-components.js?v=2.3.0"></script>
-<script src="/assets/js/app.js?v=3.6.1"></script>
+<script src="/assets/js/app-components.js?v=2.4.0"></script>
+<script src="/assets/js/app.js?v=3.6.2"></script>
 <script src="/assets/js/app-boot.js?v=2.1.1"></script>
 </body>
 </html>
