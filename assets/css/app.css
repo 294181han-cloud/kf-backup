@@ -1772,3 +1772,12 @@ body.dark .sess-item.checked { background: color-mix(in srgb, var(--theme, #1677
 .sess-multi-bar .smb-btn { min-width: 62px; }
 body.dark .sess-multi-entry { background: #1b1e24; border-color: #2c313a; color: #a9b0bb; }
 body.dark .sess-multi-entry .sme-box { background: color-mix(in srgb, var(--theme, #1677ff) 26%, #1b1e24); color: #9fc7ff; }
+
+/* ===== v2.71 会话备注标签（列表上显示）+ 备注弹窗 ===== */
+.sess-item .note-tag {
+  flex-shrink: 0; font-size: 10.5px; line-height: 16px; padding: 0 5px; border-radius: 5px;
+  background: #fff7e6; color: #b26a00; border: 1px solid #ffe7ba;
+  max-width: 92px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+body.dark .sess-item .note-tag { background: #3a2f1a; color: #f0b45c; border-color: #5a4620; }
+.el-message-box__input .el-textarea__inner { font-size: 14px; }

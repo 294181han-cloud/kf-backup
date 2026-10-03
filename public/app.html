@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>小米客服</title>
 <link rel="stylesheet" href="/assets/vendor/element-plus.css">
-<link rel="stylesheet" href="/assets/css/app.css?v=3.27.0">
+<link rel="stylesheet" href="/assets/css/app.css?v=3.28.0">
 <script src="/assets/ui/ui-registry.js?v=2.8.0"></script>
 <script src="/assets/ui/ui-loader.js?v=2.8.0" data-ui-cat="auto"></script>
 </head>
@@ -17,6 +17,7 @@
   <div class="ctx-menu" v-if="ctxMenu.show" :style="{left: ctxMenu.x + 'px', top: ctxMenu.y + 'px'}" @click.stop>
     <div class="ctx-item" @click="ctxMenuPin">📌 {{ ctxMenu.pinned ? '取消置顶' : '置顶会话' }}<div class="ctx-sub">置顶后一直排在最上面</div></div>
     <div class="ctx-item" @click="ctxMenuUnread">🔴 标为未读<div class="ctx-sub">提醒自己稍后回来看</div></div>
+    <div class="ctx-item" @click="ctxMenuNote">📝 修改备注<div class="ctx-sub">只有自己看得到，会显示在列表上</div></div>
     <div class="ctx-item" @click="ctxMenuBlock">🚫 拉黑访客<div class="ctx-sub">拉黑该 IP，之后进不来也发不了消息</div></div>
     <div class="ctx-divider"></div>
     <div class="ctx-item danger" @click="ctxMenuDelete">🗑️ 删除会话<div class="ctx-sub">彻底删除，腾出会话额度</div></div>
@@ -163,6 +164,7 @@
                 <div class="row1">
                   <span class="pin-ic" v-if="s.pinned" title="已置顶">📌</span>
                   <span class="name">{{ s.name }}</span>
+                  <span class="note-tag" v-if="s.note" :title="'备注：' + s.note">📝 {{ s.note }}</span>
                   <span class="geo-tag" v-if="visitorTag(s)" :class="visitorChnClass(s)" :title="visitorTagFull(s)">{{ visitorTag(s) }}</span>
                   <span class="time">{{ shortTime(s.lastTime) }}</span>
                 </div>
@@ -1475,7 +1477,7 @@
 <script src="/assets/qr-poster.js?v=2.1.03"></script>
 <script src="/assets/api.js?v=2.0.1"></script>
 <script src="/assets/js/app-components.js?v=2.5.0"></script>
-<script src="/assets/js/app.js?v=3.19.0"></script>
+<script src="/assets/js/app.js?v=3.21.0"></script>
 <script src="/assets/js/app-boot.js?v=2.1.1"></script>
 </body>
 </html>

@@ -1257,7 +1257,7 @@ const app = createApp({
       } catch (e) { ElementPlus.ElMessage.error(e.message); }
     };
     // 右键菜单（v2.26）：列表项右键弹出（删除腾额度 / 归档 / 结束）
-    const ctxMenu = reactive({ show: false, x: 0, y: 0, sid: 0, name: '', pinned: 0 });
+    const ctxMenu = reactive({ show: false, x: 0, y: 0, sid: 0, name: '', pinned: 0, note: '' });
 
     // ---------- 多选批量操作（v2.67）----------
     const toggleMulti = () => {
@@ -1298,7 +1298,7 @@ const app = createApp({
       ev.stopPropagation();
       closeMsgMenu(); quickCtx.show = false;
       ctxMenu.x = ev.clientX; ctxMenu.y = ev.clientY;
-      ctxMenu.sid = s.id; ctxMenu.name = s.name; ctxMenu.pinned = s.pinned ? 1 : 0;
+      ctxMenu.sid = s.id; ctxMenu.name = s.name; ctxMenu.pinned = s.pinned ? 1 : 0; ctxMenu.note = s.note || '';
       ctxMenu.show = true;
     };
     // 会话行「⋯」按钮：菜单贴着按钮弹（不是鼠标位置）
@@ -1309,7 +1309,7 @@ const app = createApp({
       const w = 230;
       ctxMenu.x = Math.max(8, Math.min(r.right - w, window.innerWidth - w - 8));
       ctxMenu.y = Math.min(r.bottom + 4, window.innerHeight - 300);
-      ctxMenu.sid = s.id; ctxMenu.name = s.name; ctxMenu.pinned = s.pinned ? 1 : 0;
+      ctxMenu.sid = s.id; ctxMenu.name = s.name; ctxMenu.pinned = s.pinned ? 1 : 0; ctxMenu.note = s.note || '';
       ctxMenu.show = true;
     };
     const closeCtxMenu = () => { ctxMenu.show = false; };
@@ -1334,6 +1334,27 @@ const app = createApp({
         if (s) s.unread = Math.max(1, s.unread || 0);
         await API.post('/api/sessions/' + sid + '/read', { unread: 1 });
         ElementPlus.ElMessage.success('已标为未读');
+      } catch (e) { ElementPlus.ElMessage.error(e.message); }
+    };
+    // v2.71 修改备注（右键 / ⋯ 菜单）：写进 contacts.type='note'，列表上会显示一个小标签
+    const ctxMenuNote = async () => {
+      const sid = ctxMenu.sid, name = ctxMenu.name, old = ctxMenu.note || '';
+      closeCtxMenu();
+      let value;
+      try {
+        ({ value } = await ElementPlus.ElMessageBox.prompt(
+          '给「' + name + '」写个备注（只有你能看到，会显示在会话列表上）',
+          '修改备注',
+          { inputValue: old, inputType: 'textarea', inputPlaceholder: '例如：老客户 / 已报价 / 微信已加',
+            confirmButtonText: '保存', cancelButtonText: '取消', inputErrorMessage: '最多 60 个字' }));
+      } catch (e) { return; }
+      const v = String(value || '').trim().slice(0, 60);
+      try {
+        await API.put('/api/sessions/' + sid + '/contacts/note', { value: v });
+        const s = sessions.value.find(x => x.id === sid);
+        if (s) s.note = v;
+        if (currentId.value === sid && noteDraft) noteDraft.value = v;
+        ElementPlus.ElMessage.success(v ? '备注已保存' : '备注已清空');
       } catch (e) { ElementPlus.ElMessage.error(e.message); }
     };
     const ctxMenuBlock = async () => {
@@ -1471,7 +1492,11 @@ const app = createApp({
     const renameVisitor = async () => {
       if (!currentId.value) return;
       try {
-        const { value } = await ElementPlus.ElMessageBox.prompt('修改访客名称（列表与聊天中将显示新名称）', '重命名', { inputValue: current.value ? current.value.name : '', inputPattern: /\S+/, inputErrorMessage: '名称不能为空' });
+        // v2.71 输入框改成空白——原来预填了旧名字，还得先全选删掉才能改
+        const { value } = await ElementPlus.ElMessageBox.prompt('输入新的访客名称（列表与聊天中将显示新名称）', '重命名',
+          { inputValue: '', inputPlaceholder: current.value ? ('原名称：' + current.value.name) : '请输入新名称',
+            inputPattern: /\S+/, inputErrorMessage: '名称不能为空',
+            confirmButtonText: '确定', cancelButtonText: '取消' });
         const name = value.trim().slice(0, 30);
         if (!name) return;
         await API.put('/api/sessions/' + currentId.value + '/name', { name });
@@ -2553,6 +2578,7 @@ const app = createApp({
       sessMulti, sessChecked, toggleMulti, toggleSessCheck, checkAllSess, bulkSessions,
       ctxMenu, openCtxMenu, openCtxMenuFromBtn, closeCtxMenu, ctxMenuArchive, ctxMenuClose, ctxMenuDelete,
       ctxMenuPin, ctxMenuUnread, ctxMenuBlock,
+      ctxMenuNote,
       replyTo, quoteOf, quoteWho, quoteText, startReply, jumpToMsg, copyMsg, flashId, fmtSize, mapUrl,
       infoOpen,
       msgMenu, openMsgMenu, closeMsgMenu, closeAllMenus, deleteMsg,
