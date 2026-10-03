@@ -19,6 +19,27 @@ declare(strict_types=1);
 const TG_USDT_CONTRACT = 'TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t';   // USDT-TRC20 合约
 const TG_BASE_URL      = 'https://kf.ylcz.cc';
 
+/** 客服登录入口（管理台「节点管理」可配；缺省主站登录页）——卡密交付按 入口1、入口2… 展示 */
+function tg_entrance_urls(): array { return agent_entrances(); }
+function tg_entrance_row(): array
+{
+    $row = [];
+    $i = 1;
+    foreach (tg_entrance_urls() as $u) {
+        $row[] = tg_url('🔗 入口' . $i, $u);
+        $i++;
+        if ($i > 3) break;
+    }
+    return $row ?: [tg_url('🔗 登录', TG_BASE_URL . '/login.html')];
+}
+function tg_entrance_text(): string
+{
+    $out = [];
+    $i = 1;
+    foreach (tg_entrance_urls() as $u) { $out[] = '入口' . $i . '：' . $u; $i++; }
+    return implode("\n", $out) ?: TG_BASE_URL . '/login.html';
+}
+
 /* ==================== 配置 ==================== */
 
 function tg_cfg(): array
@@ -381,7 +402,7 @@ function tg_order_deliver(array $o, string $txid = ''): bool
     if ($txid !== '') $html .= "\n🔗 TXID：<code>" . tg_h(substr($txid, 0, 24)) . "…</code>";
 
     tg_send((int)$o['chat_id'], $html, [
-        [tg_url('🔗 立即登录', TG_BASE_URL . '/login.html')],
+        tg_entrance_row(),
         [tg_btn('📖 使用教程', 'help'), tg_btn('🛒 再买一张', 'buy')],
     ]);
     // 原订单消息改成「已完成」，免得用户再点「我已支付」
@@ -568,7 +589,7 @@ function tg_trial(int $chat, array $u, array $me, int $mid = 0): void
         . "━━━━━━━━━━━━━━━\n"
         . "⚠️ 每个 Telegram 账号只能领一次，到期后无法登录\n"
         . "💡 觉得好用可以直接买正式卡，长期有效、额度更大";
-    $kb = [[tg_url('🔗 立即登录', TG_BASE_URL . '/login.html')],
+    $kb = [tg_entrance_row(),
            [tg_btn('🛒 购买正式卡', 'buy'), tg_btn('📖 使用教程', 'help')]];
     if ($mid > 0) tg_edit($chat, $mid, $html, $kb);
     else tg_send($chat, $html, $kb);
@@ -579,7 +600,7 @@ function tg_help_text(): string
 {
     return "📖 <b>使用教程</b>\n"
         . "━━━━━━━━━━━━━━━\n"
-        . "1️⃣ 拿到卡密和密码后，打开 " . TG_BASE_URL . "/login.html\n"
+        . "1️⃣ 拿到卡密和密码后，从下方登录入口任选其一打开\n"
         . "2️⃣ 用「卡密 + 密码」登录客服工作台\n"
         . "3️⃣ 首次登录建议在「个人设置 → 安全维护」里改掉密码\n"
         . "4️⃣ 进「客服码」生成你的咨询二维码 / 链接，贴到微信、抖音、网站都行\n"
@@ -648,8 +669,8 @@ function tg_mine(int $chat, int $tgId, int $mid = 0): void
                 . "　　📅 " . $expStr . ($left > 0 ? "（剩 {$left} 天）" : "（已到期）") . "\n"
                 . "　　📦 " . tg_h((string)$o['pkg_name']) . "　🧾 " . tg_h((string)$o['order_no']) . "\n";
         }
-        $html .= "\n🔗 登录地址：" . TG_BASE_URL . "/login.html";
-        $kb = [[tg_url('🔗 打开登录页', TG_BASE_URL . '/login.html')],
+        $html .= "\n🔗 登录入口：\n" . tg_entrance_text();
+        $kb = [tg_entrance_row(),
                [tg_btn('♻️ 续费', 'renew'), tg_btn('🛒 再买一张', 'buy')],
                [tg_btn('⬅️ 返回主菜单', 'menu')]];
     }
@@ -753,7 +774,7 @@ function tg_on_update(array $u): void
         if ($data === 'buy')   { tg_cb_answer((string)$cq['id']); tg_buy_menu($chat, '选择套餐', $mid); return; }
         if ($data === 'mine')  { tg_cb_answer((string)$cq['id']); tg_mine($chat, $tgId, $mid); return; }
         if ($data === 'trial') { tg_cb_answer((string)$cq['id']); tg_trial($chat, $from, $me, $mid); return; }
-        if ($data === 'help')  { tg_cb_answer((string)$cq['id']); tg_edit($chat, $mid, tg_help_text(), [[tg_url('🔗 打开登录页', TG_BASE_URL . '/login.html')], [tg_btn('⬅️ 返回主菜单', 'menu')]]); return; }
+        if ($data === 'help')  { tg_cb_answer((string)$cq['id']); tg_edit($chat, $mid, tg_help_text(), [tg_entrance_row(), [tg_btn('⬅️ 返回主菜单', 'menu')]]); return; }
         if ($data === 'support') {
             tg_cb_answer((string)$cq['id']);
             [$html, $kb] = tg_support_view();
@@ -847,7 +868,7 @@ function tg_on_update(array $u): void
     if ($cmd === '/buy')  { tg_buy_menu($chat); return; }
     if ($cmd === '/trial' || $cmd === '/test') { tg_trial($chat, $from, $me); return; }
     if ($cmd === '/my' || $cmd === '/mine') { tg_mine($chat, $tgId); return; }
-    if ($cmd === '/help') { tg_send($chat, tg_help_text(), [[tg_url('🔗 打开登录页', TG_BASE_URL . '/login.html')], [tg_btn('⬅️ 返回主菜单', 'menu')]]); return; }
+    if ($cmd === '/help') { tg_send($chat, tg_help_text(), [tg_entrance_row(), [tg_btn('⬅️ 返回主菜单', 'menu')]]); return; }
     if ($cmd === '/support' || $cmd === '/kf') { [$h, $k] = tg_support_view(); tg_send($chat, $h, $k); return; }
     if ($cmd === '/admin' && tg_is_admin($tgId)) {
         $pdo = db();

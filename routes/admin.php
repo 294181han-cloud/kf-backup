@@ -459,3 +459,25 @@ function handle_admin_gblacklist(string $method): void
     }
     json_error('方法不允许', 405);
 }
+
+/* ---- 客服登录入口（卡密交付文案按 入口1、入口2… 展示，v2.35） ---- */
+function handle_admin_agent_entrances(string $method): void
+{
+    require_admin_ctx();
+    if ($method === 'GET') {
+        json_out(['urls' => agent_entrances()]);
+    }
+    if ($method === 'PUT') {
+        $urls = input('urls', []);
+        if (!is_array($urls)) json_error('参数格式不正确');
+        $clean = [];
+        foreach ($urls as $u) {
+            $u = trim((string)$u);
+            if ($u !== '' && preg_match('#^https?://[a-z0-9.\-]+(:\d+)?#i', $u)) $clean[] = $u;
+        }
+        if (count($clean) > 5) $clean = array_slice($clean, 0, 5);
+        kv_set('agent_entrances', json_encode($clean, JSON_UNESCAPED_UNICODE));
+        json_out(['ok' => true, 'urls' => $clean]);
+    }
+    json_error('方法不允许', 405);
+}

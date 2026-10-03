@@ -2576,3 +2576,36 @@ AND EXISTS (SELECT 1 FROM messages m WHERE m.session_id = s.id AND m.from_type =
 - 主站：selftest + 管理台全功能回归；节点登记/忽略/推送指令/授权码生成作废/黑名单同步接口
   全链路 curl 实测
 - 边缘（待首个真实节点部署后按节点验收清单复核）
+
+## 30. v2.35 变更记录（迁移新主站 ad.yluu.top + 客服登录入口列表 + 开发逻辑文档，2026-10-04）
+
+### 主站迁移（1+2+n 落地第一步）
+- config.php 新增 **hosts 按域名覆盖段**：同一份代码/配置服务所有节点，按访问域名精确套用
+  db / site_role / site_main_url / relay_secret——config() 读取时自动合并
+- `ad.yluu.top`（新主站）：全新空库 sql_ad_yluu_top，首次访问自动建表+种子（管理员 admin/123456），
+  hosts 段已写入其数据库与角色配置（独立 relay_secret）
+- 旧主站 kf.ylcz.cc 基础段原样保留（继续服务存量租户）；后续可改 hosts 段转为分控角色
+- 边缘节点同样在 hosts 段配置（site_role/site_main_url/relay_secret，无需 db 段）——
+  **所有节点的配置都进仓库统一管理**，push 即全网生效，节点本地不再改配置
+
+### 卡密交付文案：客服登录入口列表（入口1、入口2…）
+- 新增 kv 配置 agent_entrances（URL 列表），管理台「节点管理 → 客服登录入口」面板维护
+  （每行一个地址，按顺序显示为 入口1、入口2…；留空回退主站登录页）
+- 展示点：管理台建卡成功弹窗（展示+复制文案）、TG 机器人发卡/测试卡/我的卡/教程/帮助
+  全部改为按入口列表展示（按钮+文本）；入口按钮最多 3 个一行
+
+### install.php 补充：已安装节点的登记模式
+- config.php 已存在的节点（hosts 配置接管后）仍可用授权码向主控完成白名单登记
+  （不改动任何本地文件），无需等待 cron 心跳
+
+### 新增 DEVELOPMENT.md
+- 单仓库多节点的开发/发布逻辑：仓库地图、节点身份、发布与更新流、数据与状态归属、
+  消息同步现状、开发约定——AGENTS.md 已加指引
+
+### 版本
+- version.php → 2.35.0；admin.js ?v= 同步提升；visitor.js ?v= 2.13.1
+
+### 验证
+- ad.yluu.top：/api/health（site_role=main + app_version）、首次访问自动建表种子、admin/123456 登录、
+  入口列表 API
+- kf.ylcz.cc：hosts 合并后基础段回归（selftest + 健康检查）

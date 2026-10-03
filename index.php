@@ -408,6 +408,7 @@ function dispatch_api(string $method, string $uri): void
     if ($uri === '/api/admin/nodes')             handle_admin_nodes($method);
     if ($uri === '/api/admin/node-codes')        handle_admin_node_codes($method);
     if ($uri === '/api/admin/gblacklist')        handle_admin_gblacklist($method);
+    if ($uri === '/api/admin/agent-entrances')   handle_admin_agent_entrances($method);
     if ($uri === '/api/admin/defaults')          handle_admin_defaults($method);
     // ---- 发卡机器人（平台管理员）----
     if ($uri === '/api/admin/tg')                handle_admin_tg($method);

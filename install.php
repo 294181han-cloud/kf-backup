@@ -23,6 +23,28 @@ $checks = null;
 $mainUrl = trim((string)($_POST['main_url'] ?? ''));
 $authCode = strtoupper(trim((string)($_POST['auth_code'] ?? '')));
 $role = (($_POST['role'] ?? 'visitor') === 'agent') ? 'agent' : 'visitor';
+$regResult = '';
+$regError = '';
+
+// 已安装节点：仅做「登记到主控白名单」（授权码 → node-register），不改动任何本地文件
+if ($locked && ($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST' && ($_POST['action'] ?? '') === 'register') {
+    try {
+        $cfg = require __DIR__ . '/config.php';
+        $mainUrl = rtrim((string)($cfg['site_main_url'] ?? ''), '/');
+        if ($mainUrl === '') throw new RuntimeException('节点配置缺少 site_main_url');
+        $authCode = strtoupper(trim((string)($_POST['auth_code'] ?? '')));
+        if ($authCode === '' || !preg_match('/^[A-Z0-9]{8,32}$/', $authCode)) throw new RuntimeException('授权码格式不正确');
+        $origin = ($_SERVER['REQUEST_SCHEME'] ?? 'https') . '://' . ($_SERVER['HTTP_HOST'] ?? '');
+        $role = (($_POST['role'] ?? 'visitor') === 'agent') ? 'agent' : 'visitor';
+        $bundle = i_http($mainUrl . '/api/internal/node-register', [
+            'auth_code' => $authCode, 'role' => $role, 'origin' => $origin,
+        ]);
+        $regResult = empty($bundle['ok']) ? '' : '已登记：' . $origin . '（' . $role . '）';
+        if (empty($bundle['ok'])) throw new RuntimeException((string)($bundle['error'] ?? '登记失败'));
+    } catch (Throwable $e) {
+        $regError = $e->getMessage();
+    }
+}
 
 function i_env_check(): array
 {
@@ -171,8 +193,23 @@ textarea { width: 100%; height: 110px; font-family: Consolas, monospace; font-si
   <div class="locked">
     <div class="big">🔒</div>
     <div style="font-size:16px;font-weight:600;color:#14181f;">本节点已完成安装</div>
-    <div class="hint">检测到 config.php 已存在。如需重装，请先在服务器上删除 config.php 再刷新本页。</div>
+    <div class="hint">检测到 config.php 已存在（配置由仓库统一管理）。如需重装，请先删除 config.php 再刷新。</div>
   </div>
+  <div class="f-label">节点登记（把本节点拉入主控边缘白名单）</div>
+  <?php if ($regResult !== ''): ?><div class="okbox">✅ <?= htmlspecialchars($regResult) ?></div><?php endif; ?>
+  <?php if ($regError !== ''): ?><div class="err"><?= htmlspecialchars($regError) ?></div><?php endif; ?>
+  <form method="post" autocomplete="off">
+    <input type="hidden" name="action" value="register">
+    <div class="f-label">节点角色</div>
+    <select name="role">
+      <option value="visitor" <?= $role === 'visitor' ? 'selected' : '' ?>>访客站点</option>
+      <option value="agent" <?= $role === 'agent' ? 'selected' : '' ?>>客服入口</option>
+    </select>
+    <div class="f-label">节点授权码（主控「节点管理」页生成，一次性）</div>
+    <input type="text" name="auth_code" placeholder="8~32 位字母或数字" value="<?= htmlspecialchars($authCode) ?>" style="letter-spacing:1px;">
+    <button class="btn" type="submit">登记到主控</button>
+  </form>
+  <div class="hint">登记后主控「节点管理」页即可看到本节点；此后由节点 cron 自动心跳与跟随更新。</div>
 <?php elseif ($done): ?>
   <div class="okbox">✅ 安装完成！节点已登记到主控并进入边缘白名单（角色：<?= $role === 'agent' ? '客服入口' : '访客站点' ?>）。</div>
   <div class="f-label">最后两步（nginx 侧）</div>

@@ -202,6 +202,12 @@
             </div>
           </div>
           <div class="panel">
+            <div class="panel-title">客服登录入口（卡密交付文案展示用）</div>
+            <p style="font-size:13px;color:#86909c;margin:0 0 10px;">每行一个地址，按顺序显示为 入口1、入口2…；留空则使用主站登录页。发卡/建卡文案会自动列出全部入口。</p>
+            <el-input type="textarea" :rows="3" v-model="entrancesText" placeholder="https://agent1.yourdomain.com&#10;https://agent2.yourdomain.com" style="max-width:520px;"></el-input>
+            <div style="margin-top:10px;"><el-button type="primary" size="small" @click="saveEntrances">保存入口</el-button></div>
+          </div>
+          <div class="panel">
             <div class="panel-title">节点授权码（网页安装器用，一次性）</div>
             <div style="display:flex;gap:10px;margin-bottom:14px;align-items:center;">
               <el-select v-model="newCodeRole" style="width:150px;">
@@ -490,7 +496,7 @@
     <div style="background:#f7f8fa;border-radius:8px;padding:16px;font-size:16px;line-height:2;">
       卡密：<b class="mono">{{ created.kami }}</b><br>
       密码：<b class="mono">{{ created.password }}</b><br>
-      登录地址：<span class="mono" style="font-size:13px;">{{ locationOrigin }}/login.html</span>
+      登录地址：<span class="mono" style="font-size:13px;">{{ entranceText }}</span>
     </div>
     <div v-if="created.note" style="margin-top:12px;background:#fff8e6;border:1px solid #f5e2b8;border-radius:8px;padding:10px 12px;color:#b26a00;font-size:12.5px;line-height:1.7;">
       ⚠️ {{ created.note }}

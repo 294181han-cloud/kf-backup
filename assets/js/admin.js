@@ -109,7 +109,7 @@ createApp({
       try {
         me.value = await API.me();
         if (me.value.role !== 'admin') { location.href = '/login.html'; return; }
-        await Promise.all([loadOverview(), loadTenants(), loadDomains(), loadSettings()]);
+        await Promise.all([loadOverview(), loadTenants(), loadDomains(), loadSettings(), loadEntrances().catch(() => {})]);
         booted.value = true;
       } catch (e) { ElementPlus.ElMessage.error(e.message); }
     };
@@ -120,6 +120,7 @@ createApp({
         loadNodes().catch(e => ElementPlus.ElMessage.error(e.message));
         loadNodeCodes().catch(e => ElementPlus.ElMessage.error(e.message));
         loadGips().catch(e => ElementPlus.ElMessage.error(e.message));
+        loadEntrances().catch(e => ElementPlus.ElMessage.error(e.message));
       }
     });
 
@@ -127,6 +128,29 @@ createApp({
     const nodes = ref([]);
     const mainVersion = ref('');
     const pushingIp = ref('');
+    // ===== 客服登录入口（卡密交付文案：入口1、入口2…） =====
+    const entrancesText = ref('');
+    const entranceText = computed(() => {
+      const urls = entrancesText.value.split('
+').map(s => s.trim()).filter(Boolean);
+      if (!urls.length) return locationOrigin + '/login.html';
+      return urls.map((u, i) => '入口' + (i + 1) + '：' + u).join('　');
+    });
+    const loadEntrances = async () => {
+      const r = await API.get('/api/admin/agent-entrances');
+      entrancesText.value = (r.urls || []).join('
+');
+    };
+    const saveEntrances = async () => {
+      try {
+        const urls = entrancesText.value.split('
+').map(s => s.trim()).filter(Boolean);
+        const r = await API.put('/api/admin/agent-entrances', { urls });
+        entrancesText.value = (r.urls || []).join('
+');
+        ElementPlus.ElMessage.success('已保存');
+      } catch (e) { ElementPlus.ElMessage.error(e.message); }
+    };
     const nodeCodes = ref([]);
     const newCodeRole = ref('visitor');
     const lastCode = ref('');
@@ -263,7 +287,7 @@ createApp({
       catch (e) { ElementPlus.ElMessage.error(e.message); }
     };
     const copyCreated = () => {
-      const s = `卡密：${created.kami}\n密码：${created.password}\n登录地址：${locationOrigin}/login.html`;
+      const s = `卡密：${created.kami}\n密码：${created.password}\n登录入口：${entranceText.value}`;
       navigator.clipboard && navigator.clipboard.writeText(s);
       ElementPlus.ElMessage.success('已复制');
     };
@@ -307,6 +331,7 @@ createApp({
       nodes, mainVersion, pushingIp, loadNodes, pushNode, forgetNode,
       nodeCodes, newCodeRole, lastCode, genNodeCode, revokeNodeCode,
       gips, newGip, newGipNote, gipVersion, addGip, delGip,
+      entrancesText, entranceText, saveEntrances,
       tg, tgCfg, tgSaving, tgHooking, tgChecking, saveTg, setTgWebhook, runTgCheck,
       pkgVisible, pkgForm, pkgSaving, openPkg, savePkg, delPkg, tgOrder,
       barWidth, locationOrigin,

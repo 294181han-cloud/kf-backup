@@ -36,6 +36,27 @@ return [
     'session_online_secs' => 25,  // 访客最后心跳在 N 秒内视为在线
     'data_dir'            => __DIR__ . '/data',
 
+    // ---------- 分域 hosts 覆盖（同一份代码/配置服务所有节点，按访问域名精确匹配） ----------
+    // 修改某节点的配置时改这里对应段并提交，节点 git pull 后自动生效；
+    // 边缘节点（agent/visitor）无需 db 段（读写全部经总控），可只写 site_role/site_main_url/relay_secret
+    'hosts' => [
+        // 新主站（2026-10 迁移）：全新数据库 + 管理台
+        'ad.yluu.top' => [
+            'db' => [
+                'host'    => getenv('DB_HOST') ?: '127.0.0.1',
+                'port'    => (int)(getenv('DB_PORT') ?: 3306),
+                'name'    => 'sql_ad_yluu_top',
+                'user'    => 'sql_ad_yluu_top',
+                'pass'    => 'b6af47fe4389a',
+                'charset' => 'utf8mb4',
+            ],
+            'site_role'     => 'main',
+            'site_main_url' => 'https://ad.yluu.top',
+            'relay_secret'  => getenv('RELAY_SECRET') ?: '9975e4f093262cd47bc4b8ceaf968d192b91a040f0a6e0db',
+        ],
+        // 旧主站沿用基础段（db 指向本机旧库）；改为分控时在此覆盖 site_role 即可
+    ],
+
     // ---------- 站点角色（1+2+n 分域部署；单机部署保持 main 即可） ----------
     // main    = 全功能主站：数据库在本机、admin.html 管理台、登录页、访客页全部可用（默认）
     // agent   = 客服登录入口节点：只放行 login.html / app.html 与客服-租户相关接口

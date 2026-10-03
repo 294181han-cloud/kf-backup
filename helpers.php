@@ -9,7 +9,16 @@ require_once __DIR__ . '/db.php';
 function config(): array
 {
     static $cfg = null;
-    if ($cfg === null) $cfg = require __DIR__ . '/config.php';
+    if ($cfg === null) {
+        $cfg = require __DIR__ . '/config.php';
+        // 1+2+n 分域部署：同一份代码/配置服务所有节点——按访问域名套用 hosts 覆盖段
+        // （config.php 的 'hosts' 里按域名写 db / site_role / site_main_url / relay_secret 等）
+        $host = strtolower(preg_replace('/:\d+$/', '', $_SERVER['HTTP_HOST'] ?? ''));
+        if ($host !== '' && isset($cfg['hosts'][$host]) && is_array($cfg['hosts'][$host])) {
+            foreach ($cfg['hosts'][$host] as $k => $v) $cfg[$k] = $v;
+        }
+        unset($cfg['hosts']);
+    }
     return $cfg;
 }
 
@@ -520,6 +529,21 @@ function handle_internal_upload(string $method): void
     $main = rtrim((string)($cfg['site_main_url'] ?? ''), '/');
     if ($main !== '' && isset($r['url']) && str_starts_with($r['url'], '/uploads/')) $r['url'] = $main . $r['url'];
     json_out($r);
+}
+
+/** 客服登录入口列表（卡密交付/帮助文案里按 入口1、入口2… 展示；kv 可配，缺省主站登录页） */
+function agent_entrances(): array
+{
+    $list = [];
+    try {
+        $raw = kv_get('agent_entrances', '');
+        if ($raw !== '') {
+            $arr = json_decode($raw, true);
+            if (is_array($arr)) $list = array_values(array_filter(array_map('trim', $arr), fn($u) => is_string($u) && $u !== ''));
+        }
+    } catch (\Throwable $e) {}
+    if (!$list) $list = [site_main_url() . '/login.html'];
+    return $list;
 }
 
 /** 统一版本号（version.php；主站与分控节点对版本用） */
