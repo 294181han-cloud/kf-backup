@@ -2609,3 +2609,24 @@ AND EXISTS (SELECT 1 FROM messages m WHERE m.session_id = s.id AND m.from_type =
 - ad.yluu.top：/api/health（site_role=main + app_version）、首次访问自动建表种子、admin/123456 登录、
   入口列表 API
 - kf.ylcz.cc：hosts 合并后基础段回归（selftest + 健康检查）
+
+## 31. v2.36 变更记录（总控按角色推更新到分控——主控打包/节点应用，2026-10-04）
+
+### 更新通道重构（按用户方案：GitHub → 总控 → 按角色推边缘）
+- 分控节点**不再需要 git / GitHub 访问**：cron 调 node/update-node.php 向总控检查版本，
+  有新版则拉取「更新包」应用（总控按白名单打包代码：assets/public/routes/vendor/node/
+  index.php/helpers.php/db.php/version.php，**config.php 永不下发**，data/uploads 永不覆盖）
+- 主控「节点管理 → 推送更新」改为直接把更新包推给节点（/api/internal/apply，共享密钥校验），
+  不再依赖节点 git/shell_exec
+- 包体约 5.4MB（57 文件），仅版本变化时传输；同版本返回 up_to_date
+- 边缘节点本地 config.php 仅含 site_role / site_main_url / relay_secret（安装器生成，
+  无数据库凭证）——分控被攻破也拿不到主站数据库
+
+### 修复
+- node_bundle_build 路径分隔符转义失误导致 helpers.php 解析错误（主站短暂 500），
+  改用 chr(92) 规避反斜杠字面量
+
+### 验证
+- /api/internal/update：同版本 up_to_date ✓；落后版本返回完整更新包（5.4MB/57 文件、
+  不含 config.php）✓；错误密钥 403 ✓
+- 节点应用流程待首个真实分控部署后按验收清单复核
