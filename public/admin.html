@@ -75,6 +75,7 @@
               <span>租户列表（{{ tenants.length }}）</span>
               <span>
                 <el-button size="small" @click="openGen">随机生成卡密</el-button>
+                <el-button size="small" type="warning" plain @click="openTrial">⚡ 测试卡（20 分钟）</el-button>
                 <el-button type="primary" size="small" @click="openCreate">＋ 创建租户</el-button>
               </span>
             </div>
@@ -235,6 +236,9 @@
       密码：<b class="mono">{{ created.password }}</b><br>
       登录地址：<span class="mono" style="font-size:13px;">{{ locationOrigin }}/login.html</span>
     </div>
+    <div v-if="created.note" style="margin-top:12px;background:#fff8e6;border:1px solid #f5e2b8;border-radius:8px;padding:10px 12px;color:#b26a00;font-size:12.5px;line-height:1.7;">
+      ⚠️ {{ created.note }}
+    </div>
     <template #footer>
       <el-button @click="copyCreated">复制</el-button>
       <el-button type="primary" @click="createdVisible=false">我已保存</el-button>
@@ -256,6 +260,6 @@
 <script src="/assets/vendor/vue.global.js?v=2.0.1"></script>
 <script src="/assets/vendor/element-plus.js?v=2.0.1"></script>
 <script src="/assets/api.js?v=2.0.1"></script>
-<script src="/assets/js/admin.js?v=2.2.0"></script>
+<script src="/assets/js/admin.js?v=2.3.0"></script>
 </body>
 </html>

@@ -43,7 +43,30 @@ createApp({
     const dlgSaving = ref(false);
     const dlg = reactive({ id: 0, kami: '', nickname: '', expires_at: null, quota_web: 200, quota_app: 200, max_agents: 5, closed_keep_days: 3, max_sessions: 1000, remark: '', password: '' });
     const createdVisible = ref(false);
-    const created = reactive({ kami: '', password: '' });
+    const created = reactive({ kami: '', password: '', note: '' });
+    /* v2.56 一键测试卡：20 分钟后自动失效，专门用来验货/演示
+       （卡密、密码都随机生成，额度走平台默认值；到期时间按浏览器本地时间算，和服务器同时区） */
+    const openTrial = async () => {
+      try {
+        await ElementPlus.ElMessageBox.confirm(
+          '立即创建一张 20 分钟后自动失效的测试卡？\n（随机卡密 + 随机密码，额度用平台默认值，到期后无法登录工作台）',
+          '创建测试卡', { confirmButtonText: '创建', cancelButtonText: '取消', type: 'warning' });
+      } catch (e) { return; }
+      const pad = (n) => String(n).padStart(2, '0');
+      const d = new Date(Date.now() + 20 * 60 * 1000);
+      const exp = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+      try {
+        const r = await API.post('/api/admin/tenants', {
+          nickname: '测试卡', remark: '20 分钟测试卡（到期自动失效）', expires_at: exp,
+        });
+        created.kami = r.plain.kami;
+        created.password = r.plain.password;
+        created.note = '这是 20 分钟测试卡：' + exp + ' 到期，到期后无法登录工作台（想延长就在列表里「编辑 → 有效期」改一下）。';
+        createdVisible.value = true;
+        await loadTenants();
+        await loadOverview();
+      } catch (e) { ElementPlus.ElMessage.error(e.message); }
+    };
     const genVisible = ref(false);
     const genPair = ref(null);
 
@@ -65,7 +88,8 @@ createApp({
       try {
         if (dlgMode.value === 'create') {
           const r = await API.post('/api/admin/tenants', dlg);
-          created.kami = r.plain.kami; created.password = r.plain.password;
+        created.kami = r.plain.kami; created.password = r.plain.password;
+        created.note = dlg.expires_at ? ('有效期至 ' + dlg.expires_at + '，到期后无法登录工作台。') : '';
           createdVisible.value = true;
         } else {
           await API.put('/api/admin/tenants/' + dlg.id, dlg);
@@ -130,7 +154,7 @@ createApp({
       tab, tabTitle, booted, me, ov, tenants, domains, newDomain, rootDomain, defVal, pwOld, pwNew,
       barWidth, locationOrigin,
       dlgVisible, dlgMode, dlg, dlgSaving, openCreate, openEdit, saveTenant, toggleTenant, delTenant,
-      createdVisible, created, copyCreated, openGen, genVisible, genPair, doGen, fillGenKami,
+      createdVisible, created, copyCreated, openGen, genVisible, genPair, doGen, fillGenKami, openTrial,
       addDomain, toggleDomain, delDomain, saveRootDomain, saveDefaults, changePw, logout,
     };
   }
