@@ -116,6 +116,17 @@ function ensure_upgrade(): void
             UNIQUE KEY uniq_msg_url (message_id, url),
             KEY idx_tenant (tenant_id)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+        // v2.35 TG 发卡表纳入每请求幂等升级（防首次并发初始化竞态漏建）
+        $pdo->exec("CREATE TABLE IF NOT EXISTS tg_users (
+            tg_id BIGINT NOT NULL PRIMARY KEY,
+            username VARCHAR(64) NOT NULL DEFAULT '',
+            first_name VARCHAR(64) NOT NULL DEFAULT '',
+            state VARCHAR(24) NOT NULL DEFAULT '',
+            trial_kami VARCHAR(32) NOT NULL DEFAULT '',
+            trial_at DATETIME NULL,
+            created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            last_seen DATETIME NULL
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
         // v2.34 分节点网页安装：一次性授权码 + 平台级全局黑名单（边缘本地拦截用）
         $pdo->exec("CREATE TABLE IF NOT EXISTS node_auth_codes (
             code VARCHAR(32) NOT NULL PRIMARY KEY,
