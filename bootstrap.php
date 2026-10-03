@@ -12,7 +12,7 @@
  */
 declare(strict_types=1);
 error_reporting(E_ALL);
-ini_set('display_errors', '0');
+ini_set('display_errors', '1');  // 临时排错
 @set_time_limit(300);
 
 const PROTECTED_PREFIX = ['config.php', 'data/', 'uploads/'];   // 永不写入的路径
