@@ -690,6 +690,61 @@ function lookup_geo(string $ip): string
     return $out;
 }
 
+/** 检测接口配置：kv_store 可覆盖（wxcheck_user / wxcheck_key / wxcheck_url / wxcheck_ttl） */
+function wxcheck_cfg(): array
+{
+    return [
+        // 平台级开关：wxcheck_on=0 时只回报「未开通」，不显示绿色的「正常接待」（接口不可信时避免假绿）
+        'on'   => kv_get('wxcheck_on', '0') === '1',
+        'user' => kv_get('wxcheck_user', ''),
+        'key'  => kv_get('wxcheck_key', ''),
+        'url'  => rtrim(kv_get('wxcheck_url', 'https://api.uouin.com/app'), '/'),
+        'ttl'  => max(60, (int)kv_get('wxcheck_ttl', '300')),
+    ];
+}
+
+/* ================= 微信/QQ 拦截检测（v2.64 抽成公共函数，供 API 与定时巡检共用） =================
+   返回 ['state' => ok|red|off|err, 'tag' => 中文, 'text' => 一句话, 'msg' => 详情]
+   state=off 表示平台没开通/没配账号；err 表示接口异常。
+   注意：**每次调用都会真实请求第三方接口（按次计费）**，调用方自己控制频率。 */
+function wxcheck_run(string $link, string $channel = 'wx'): array
+{
+    $chName = $channel === 'qq' ? 'QQ' : '微信';
+    $cfg = wxcheck_cfg();
+    if (!$cfg['on']) {
+        return ['state' => 'off', 'tag' => '未开通', 'text' => $chName . '检测未开通',
+            'msg' => '平台未开通拦截检测，请联系管理员'];
+    }
+    if ($cfg['user'] === '' || $cfg['key'] === '') {
+        return ['state' => 'off', 'tag' => '未开通', 'text' => $chName . '检测未开通',
+            'msg' => '平台未配置检测接口账号'];
+    }
+    $api = $cfg['url'] . '/' . $channel . '?username=' . urlencode($cfg['user'])
+         . '&key=' . urlencode($cfg['key']) . '&url=' . urlencode($link);
+    $resp = '';
+    if (function_exists('curl_init')) {
+        $ch = curl_init($api);
+        curl_setopt_array($ch, [CURLOPT_RETURNTRANSFER => true, CURLOPT_TIMEOUT => 12, CURLOPT_CONNECTTIMEOUT => 8,
+            CURLOPT_SSL_VERIFYPEER => false, CURLOPT_SSL_VERIFYHOST => 0, CURLOPT_USERAGENT => 'kfxt/2.30']);
+        $resp = (string)curl_exec($ch);
+        curl_close($ch);
+    } else {
+        $resp = (string)@file_get_contents($api);
+    }
+    $j = json_decode($resp, true);
+    if (!is_array($j) || !isset($j['code'])) {
+        return ['state' => 'err', 'tag' => '异常', 'text' => '检测失败', 'msg' => '检测接口无响应'];
+    }
+    $c = (int)$j['code'];
+    $m = trim((string)($j['msg'] ?? ''));
+    if ($c === 1001)     return ['state' => 'ok',  'tag' => '正常', 'text' => $chName . '可正常打开',
+        'msg' => ($m !== '' ? $m : ('该链接在' . $chName . '内未被拦截'))];
+    if ($c === 1002)     return ['state' => 'red', 'tag' => '红', 'text' => '已被' . $chName . '拦截',
+        'msg' => ($m !== '' ? $m : ('该链接在' . $chName . '内已被拦截，建议换码/换域名'))];
+    if ($c === -206)     return ['state' => 'off', 'tag' => '未开通', 'text' => $chName . '检测未开通', 'msg' => $m];
+    return ['state' => 'err', 'tag' => '异常', 'text' => '检测异常', 'msg' => ($c . ' ' . $m)];
+}
+
 /**
  * 地区缓存文件的自清理（v2.63）
  * 这些文件本身 24 小时就过期不用了（见上面的 filemtime 判断），

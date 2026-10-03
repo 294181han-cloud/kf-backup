@@ -3,9 +3,9 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>客服工作台</title>
+<title>小米客服</title>
 <link rel="stylesheet" href="/assets/vendor/element-plus.css">
-<link rel="stylesheet" href="/assets/css/app.css?v=3.23.0">
+<link rel="stylesheet" href="/assets/css/app.css?v=3.24.0">
 <script src="/assets/ui/ui-registry.js?v=2.8.0"></script>
 <script src="/assets/ui/ui-loader.js?v=2.8.0" data-ui-cat="auto"></script>
 </head>
@@ -59,7 +59,7 @@
     <!-- ============ 侧栏导航 ============ -->
     <!-- 手机端点侧栏里任何东西后自动收起抽屉 -->
     <div class="side" @click="mSideOpen = false">
-      <div class="logo">💬 客服工作台</div>
+      <div class="logo"><img class="lg-mi" src="/assets/img/mi-logo.svg" alt=""><span class="lg-text">小米客服</span></div>
       <div class="nav">
         <div class="nav-group" style="padding-top:6px;">工 作</div>
         <div class="nav-item" :class="{active: tab==='work'}" @click="tab='work'; restartPoll()"><span class="nv-ic">💬</span><span class="nv-text">工作台</span><span class="nv-badge" v-if="unreadTotal>0" :title="unreadTotal + ' 条未读消息'">{{ unreadTotal>99 ? '99+' : unreadTotal }}</span></div>
@@ -73,7 +73,7 @@
       </div>
       <div class="me">
         <div class="me-top">
-          <span class="me-ava"><img v-if="meAvatarUrl" :src="meAvatarUrl"><template v-else>{{ me && me.role === 'tenant' ? '👑' : '🎧' }}</template></span>
+          <span class="me-ava"><img v-if="meAvatarUrl" :src="meAvatarUrl"><img v-else src="/assets/img/mi-logo.svg" alt="小米客服"></span>
           <div class="me-id">
             <b>{{ me ? (me.nickname || me.kami || '') : '' }}</b>
             <span class="me-sub mono" v-if="me && me.role==='tenant'">{{ me.kami }} · {{ expireText }}</span>
@@ -145,7 +145,7 @@
                 </div>
                 <div class="row2">
                   <span v-if="s.agent_id>0" class="tag-agent">{{ s.agent_name || '客服' }}</span>
-                  <span class="last">{{ s.lastMsg }}</span>
+                  <span class="last" v-if="sessPreview(s)">{{ sessPreview(s) }}</span>
                   <span class="badge" v-if="s.unread>0">{{ s.unread>99?'99+':s.unread }}</span>
                 </div>
               </div>
@@ -1175,7 +1175,7 @@
             <el-switch v-model="notifyOn" :disabled="!notifySupported" @change="enableNotify"></el-switch>
           </div>
           <p class="muted" style="margin:8px 0 0;font-size:11.5px;line-height:1.7;">
-            开启需要浏览器授权（点开关会弹出"允许通知"）。没开启时也会：<b>有新消息响提示音</b>（声音设置里可分别配置收发音）+ <b>浏览器标题显示未读数</b>如「(3) 客服工作台」。
+            开启需要浏览器授权（点开关会弹出"允许通知"）。没开启时也会：<b>有新消息响提示音</b>（声音设置里可分别配置收发音）+ <b>浏览器标题显示未读数</b>如「(3) 小米客服」。
           </p>
         </div>
         </div>
@@ -1440,8 +1440,8 @@
 <script src="/assets/vendor/qrcode.min.js?v=2.0.1"></script>
 <script src="/assets/qr-poster.js?v=2.1.03"></script>
 <script src="/assets/api.js?v=2.0.1"></script>
-<script src="/assets/js/app-components.js?v=2.4.0"></script>
-<script src="/assets/js/app.js?v=3.16.0"></script>
+<script src="/assets/js/app-components.js?v=2.5.0"></script>
+<script src="/assets/js/app.js?v=3.17.0"></script>
 <script src="/assets/js/app-boot.js?v=2.1.1"></script>
 </body>
 </html>

@@ -232,6 +232,12 @@ const app = createApp({
     };
     const switchSetting = (v) => { setTab.value = v; if (v === 'security') loadSecurityPage(); };
     // 会话列表/会话头：按来访设备/平台给一个图标，比纯文字更好认
+    // v2.65 「等待接入...」是访客刚打开聊天页、还没说话时的占位（visitor.php 建的初始 last_msg），
+    // 列表里不显示它，免得看着像一条系统提示；等他真发了消息，这里自然就有内容了。
+    const sessPreview = (s) => {
+      const t = ((s && s.lastMsg) || '').trim();
+      return t === '等待接入...' ? '' : t;
+    };
     const sessIcon = (s) => {
       const u = String((s && (s.ua || '')) || '') + ' ' + String((s && (s.source || '')) || '');
       if (/MicroMessenger|微信/i.test(u)) return '💬';
@@ -646,6 +652,35 @@ const app = createApp({
       tick();
       expireTimer = setInterval(tick, 15000);
     };
+    /* ===== v2.64 红码提醒：服务端每小时巡检所有客服码，这里轮询并把红的弹窗告诉租户 =====
+       同一批提醒只弹一次（弹完就标记已读）；某条码恢复正常后服务端会清掉未读提醒，
+       所以「红了→修好→又红了」会重新提醒，一直红着则不会每小时骚扰。 */
+    let alertTimer = null;
+    const checkCodeAlerts = async () => {
+      if (!me.value || me.value.role !== 'tenant') return;
+      try {
+        const r = await API.get('/api/tenant/code/alerts');
+        const list = (r && r.alerts) || [];
+        if (!list.length) return;
+        // 弹窗消息要带换行，只能走 HTML（值都转义过，第三方返回的内容也不会变成标签）
+        const esc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+        const detail = list.slice(0, 6).map(a => '· <b>' + esc(a.code) + '</b>' + (a.msg ? ('：' + esc(a.msg)) : '')).join('<br>');
+        let go = false;
+        try {
+          await ElementPlus.ElMessageBox.alert(
+            '<div style="line-height:1.9;">检测到 <b>' + list.length + '</b> 个客服码已被微信拦截（俗称"红了"）：'
+            + '<div style="margin:8px 0;padding:8px 10px;background:#fff8e6;border-radius:8px;font-size:13px;">' + detail
+            + (list.length > 6 ? ('<br>…共 ' + list.length + ' 个') : '') + '</div>'
+            + '建议去「客服码」页点「新码」换一个；<br>如果整批都红了，说明该域名被拦，要换域名。</div>',
+            '⚠️ 有客服码被微信拦截',
+            { confirmButtonText: '去客服码页处理', type: 'warning', dangerouslyUseHTMLString: true });
+          go = true;
+        } catch (e) {}
+        await API.post('/api/tenant/code/alerts', { ids: list.map(a => a.id) });
+        if (go) { tab.value = 'links'; }
+      } catch (e) {}
+    };
+
     const markRead = async (id) => {
       try { await API.post('/api/sessions/' + id + '/read'); const s = sessions.value.find(x => x.id === id); if (s) s.unread = 0; } catch (e) {}
     };
@@ -2252,8 +2287,8 @@ const app = createApp({
     const tickClock = () => { clock.value = new Date().toLocaleString('zh-CN', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit' }); };
     tickClock(); setInterval(tickClock, 1000);
     const unreadTotal = Vue.computed(() => sessions.value.reduce((a, s) => a + (s.unread || 0), 0));
-    // 标题栏提示（页面在后台时最直观）：有未读显示 "(3) 客服工作台"
-    const BASE_TITLE = '客服工作台';
+    // 标题栏提示（页面在后台时最直观）：有未读显示 "(3) 小米客服"
+    const BASE_TITLE = '小米客服';
     const lastTitle = ref('');
     const flashTitle = (n) => {
       const t = n > 0 ? `(${n > 99 ? '99+' : n}) ${BASE_TITLE}` : BASE_TITLE;
@@ -2405,6 +2440,8 @@ const app = createApp({
         booted.value = true;
         startPoll();
         startExpireWatch();   // v2.57 到期提醒（5 分钟提示 / 2 分钟弹窗）
+        checkCodeAlerts();    // v2.64 红码提醒（服务端每小时巡检）
+        alertTimer = setInterval(checkCodeAlerts, 10 * 60 * 1000);
       } catch (e) {
         // 401 时 api.js 已跳转登录页；此处保持加载态不渲染骨架
         if (!String(e.message).includes('登录已失效')) ElementPlus.ElMessage.error(e.message);
@@ -2413,6 +2450,7 @@ const app = createApp({
     onUnmounted(() => {
       stopPoll();
       if (expireTimer) clearInterval(expireTimer);
+      if (alertTimer) clearInterval(alertTimer);
       document.removeEventListener('click', onDocClick);
       document.removeEventListener('contextmenu', onDocCtx);
     });
@@ -2456,7 +2494,7 @@ const app = createApp({
       geoTag, visitorTag, visitorTagFull, visitorChnClass, copyQrImage, downloadQrImage, codeRotateHint, rotateCode, loadHistory, disableLink, saveCodeCfg, meAvatarUrl,
       quickFields, welcomeFields, autoFields, blFields, preqFields,
       shortTime, fmtTime, sourceText, contactLabel, barW, quotaW, trendW, trendDesc, dailyDesc,
-      sessIcon,
+      sessIcon, sessPreview,
       setTab, setGroups, openSetting, switchSetting,
       navGroups,
       audioPlaying, audioDur, waveBars, toggleAudio,

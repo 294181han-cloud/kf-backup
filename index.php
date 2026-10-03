@@ -67,6 +67,18 @@ function ensure_upgrade(): void
         try { $pdo->exec("ALTER TABLE v_sessions ADD COLUMN pinned TINYINT NOT NULL DEFAULT 0"); } catch (\Throwable $e) { /* 列已存在 */ }
         try { $pdo->exec("ALTER TABLE v_sessions ADD COLUMN pinned_at DATETIME NULL"); } catch (\Throwable $e) { /* 列已存在 */ }
         try { $pdo->exec("ALTER TABLE v_sessions ADD INDEX idx_tenant_pinned (tenant_id, pinned, last_time)"); } catch (\Throwable $e) { /* 已存在 */ }
+        // v2.64 微信红码提醒（每小时巡检脚本写入，工作台弹窗提示后标记 seen）
+        $pdo->exec("CREATE TABLE IF NOT EXISTS code_alerts (
+            id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+            tenant_id INT UNSIGNED NOT NULL,
+            code VARCHAR(64) NOT NULL DEFAULT '',
+            link VARCHAR(500) NOT NULL DEFAULT '',
+            msg VARCHAR(500) NOT NULL DEFAULT '',
+            seen TINYINT NOT NULL DEFAULT 0,
+            created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            KEY idx_tenant_seen (tenant_id, seen),
+            KEY idx_code (tenant_id, code)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
         // v2.61 逐条/批量「检测码」的结果缓存（同链接同渠道 5 分钟内不重复扣费）
         $pdo->exec("CREATE TABLE IF NOT EXISTS code_check_cache (
             id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
@@ -261,6 +273,7 @@ function dispatch_api(string $method, string $uri): void
     if ($uri === '/api/tenant/cleanup')          handle_tenant_cleanup($method);
     if ($uri === '/api/tenant/visitors')         handle_tenant_visitors($method);
     if ($uri === '/api/tenant/code/check')       handle_tenant_code_check($method);
+    if ($uri === '/api/tenant/code/alerts')      handle_tenant_code_alerts($method);
 
     // ---- 平台管理 ----
     if ($uri === '/api/admin/overview')          handle_admin_overview($method);

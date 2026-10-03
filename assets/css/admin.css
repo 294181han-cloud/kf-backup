@@ -6,6 +6,8 @@ body { margin: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'P
   display: flex; flex-direction: column; padding-top: 12px;
 }
 .side .logo { font-size: 17px; font-weight: 600; padding: 18px 20px 16px; color: #fff; display: flex; align-items: center; gap: 8px; }
+/* v2.65 平台后台也换成小米客服 logo */
+.side .logo .lg-mi { width: 28px; height: 28px; border-radius: 8px; flex-shrink: 0; display: block; }
 .side .nav { flex: 1; }
 .side .nav-item {
   padding: 12px 20px; cursor: pointer; color: #a9aeb8; font-size: 14px;

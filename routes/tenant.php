@@ -506,6 +506,34 @@ function handle_tenant_link_disable(string $method, array $m): void
     json_out(['ok' => true]);
 }
 
+/* ---------- 红码提醒（v2.64）：每小时巡检脚本写库，工作台轮询取、看完标记已读 ---------- */
+function handle_tenant_code_alerts(string $method): void
+{
+    $ctx = require_workspace();
+    $tid = (int)$ctx['tenant_id'];
+    $pdo = db();
+
+    if ($method === 'GET') {
+        $st = $pdo->prepare('SELECT id, code, link, msg, created_at FROM code_alerts
+            WHERE tenant_id = ? AND seen = 0 ORDER BY id DESC LIMIT 20');
+        $st->execute([$tid]);
+        json_out(['alerts' => $st->fetchAll()]);
+        return;
+    }
+    if ($method === 'POST') {   // 标记已读（带 ids 就只标记这几条，不带就全标）
+        $ids = input('ids', []);
+        if (is_array($ids) && $ids) {
+            $in = implode(',', array_map('intval', $ids));
+            $pdo->exec("UPDATE code_alerts SET seen = 1 WHERE tenant_id = $tid AND id IN ($in)");
+        } else {
+            $pdo->prepare('UPDATE code_alerts SET seen = 1 WHERE tenant_id = ?')->execute([$tid]);
+        }
+        json_out(['ok' => true]);
+        return;
+    }
+    json_error('方法不允许', 405);
+}
+
 /* ---------- 入口链接汇总 ---------- */
 
 function handle_tenant_links(string $method): void
@@ -539,18 +567,7 @@ function handle_tenant_links(string $method): void
 
 /* ---------- 客服码状态检测（第三方「域名拦截检测」接口，按次计费） ---------- */
 
-/** 检测接口配置：kv_store 可覆盖（wxcheck_user / wxcheck_key / wxcheck_url / wxcheck_ttl） */
-function wxcheck_cfg(): array
-{
-    return [
-        // 平台级开关：wxcheck_on=0 时只回报「未开通」，不显示绿色的「正常接待」（接口不可信时避免假绿）
-        'on'   => kv_get('wxcheck_on', '0') === '1',
-        'user' => kv_get('wxcheck_user', ''),
-        'key'  => kv_get('wxcheck_key', ''),
-        'url'  => rtrim(kv_get('wxcheck_url', 'https://api.uouin.com/app'), '/'),
-        'ttl'  => max(60, (int)kv_get('wxcheck_ttl', '300')),
-    ];
-}
+// v2.64 wxcheck_cfg() / wxcheck_run() 已移到 helpers.php，供定时巡检脚本共用
 
 /** 当前生效的客服码链接：优先域名池子域，其次服务码 */
 function tenant_current_link(int $tid): string
@@ -631,33 +648,9 @@ function handle_tenant_code_check(string $method): void
     }
 
     $state = 'err'; $text = '检测失败'; $tag = '异常'; $msg = '';
-    if ($cfg['user'] === '' || $cfg['key'] === '') {
-        $state = 'off'; $text = $chName . '检测未开通'; $tag = '未开通'; $msg = '平台未配置检测接口账号';
-    } else {
-        $api = $cfg['url'] . '/' . $channel . '?username=' . urlencode($cfg['user'])
-             . '&key=' . urlencode($cfg['key']) . '&url=' . urlencode($link);
-        $resp = '';
-        if (function_exists('curl_init')) {
-            $ch = curl_init($api);
-            curl_setopt_array($ch, [CURLOPT_RETURNTRANSFER => true, CURLOPT_TIMEOUT => 12, CURLOPT_CONNECTTIMEOUT => 8,
-                CURLOPT_SSL_VERIFYPEER => false, CURLOPT_SSL_VERIFYHOST => 0, CURLOPT_USERAGENT => 'kfxt/2.30']);
-            $resp = (string)curl_exec($ch);
-            curl_close($ch);
-        } else {
-            $resp = (string)@file_get_contents($api);
-        }
-        $j = json_decode($resp, true);
-        if (!is_array($j) || !isset($j['code'])) {
-            $state = 'err'; $text = '检测失败'; $tag = '异常'; $msg = '检测接口无响应';
-        } else {
-            $c = (int)$j['code'];
-            $m = trim((string)($j['msg'] ?? ''));
-            if ($c === 1001)     { $state = 'ok';  $text = $chName . '可正常打开'; $tag = '正常'; $msg = ($m !== '' ? $m : ('该链接在' . $chName . '内未被拦截')); }
-            elseif ($c === 1002) { $state = 'red'; $text = '已被' . $chName . '拦截'; $tag = '红'; $msg = ($m !== '' ? $m : ('该链接在' . $chName . '内已被拦截，建议换码/换域名')); }
-            elseif ($c === -206) { $state = 'off'; $text = $chName . '检测未开通'; $tag = '未开通'; $msg = $m; }
-            else                 { $state = 'err'; $text = '检测异常';   $tag = '异常';   $msg = ($c . ' ' . $m); }
-        }
-    }
+    // v2.64 检测逻辑抽到 helpers.php 的 wxcheck_run()，API 和每小时巡检脚本共用同一份
+    $res = wxcheck_run($link, $channel);
+    $state = $res['state']; $text = $res['text']; $tag = $res['tag']; $msg = $res['msg'];
     $at = now_dt();
     if ($skipCache) {
         // 指定链接：只作为「上次检测记录」留档（不动主卡那个单一缓存槽），不参与结果返回
