@@ -617,7 +617,7 @@ function node_bundle_build(): array
     });
     $iter = new RecursiveIteratorIterator($filter, RecursiveIteratorIterator::LEAVES_ONLY);
     foreach ($iter as $f) {
-        $path = str_replace('\', '/', substr($f->getPathname(), strlen($base) + 1));
+        $path = str_replace(chr(92), '/', substr($f->getPathname(), strlen($base) + 1));
         $keep = false;
         foreach (node_bundle_prefixes() as $pre) {
             if ($pre === 'node/' && str_starts_with($path, 'node/')) { $keep = str_ends_with($path, 'cron-node.sh'); continue; }
