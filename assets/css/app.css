@@ -1413,6 +1413,19 @@ body.dark .msg-sheet .ms-item:active { background: #262c34; }
 body.dark .msg-sheet .ms-item.ghost { border-top-color: #2b313a; color: #8b95a7; }
 /* iOS 长按会弹系统菜单（拷贝/查询），挡掉它，长按才是我们的操作面板 */
 .msg-row, .msg-bubble { -webkit-touch-callout: none; }
+/* 每条消息右下角（时间那一行）的 ⋯ 按钮：只在触屏/窄屏显示，桌面端不加这个按钮免得乱 */
+.msg-more { display: none; }
+@media (hover: none), (max-width: 900px) {
+  .msg-more {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 24px; height: 24px; margin-left: 6px; vertical-align: middle;
+    border: 1px solid var(--v-line-2, #e3e8f0); border-radius: 50%;
+    background: #fff; color: #8b95a7; font-size: 15px; line-height: 1;
+    cursor: pointer; font-family: inherit; padding: 0;
+  }
+  .msg-more:active { background: #eef1f7; color: var(--theme, #1677ff); border-color: var(--theme, #1677ff); }
+  body.dark .msg-more { background: #262c34; border-color: #333a44; color: #9aa4b5; }
+}
 
 /* =====================================================================
    v2.46 工作台手机端适配（≤900px）

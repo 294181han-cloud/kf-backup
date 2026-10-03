@@ -773,6 +773,11 @@ const app = createApp({
     const closeAllMenus = () => { ctxMenu.show = false; quickCtx.show = false; msgMenu.show = false; msgSheet.show = false; };
     // v2.49 手机端：长按消息弹底部操作面板（iOS 长按不会触发 contextmenu，右键菜单在手机上等于没有）
     const msgSheet = reactive({ show: false, msg: null });
+    const openMsgSheet = (m) => {
+      if (selMode.value || !m) return;
+      msgSheet.msg = m;
+      msgSheet.show = true;
+    };
     let lpTimer = null, lpMoved = false;
     const onMsgTouchStart = (m, ev) => {
       if (selMode.value) return;
@@ -780,8 +785,7 @@ const app = createApp({
       clearTimeout(lpTimer);
       lpTimer = setTimeout(() => {
         if (lpMoved) return;
-        msgSheet.msg = m;
-        msgSheet.show = true;
+        openMsgSheet(m);
         if (navigator.vibrate) { try { navigator.vibrate(15); } catch (e) {} }
       }, 450);
     };
@@ -2105,7 +2109,7 @@ const app = createApp({
       replyTo, quoteOf, quoteWho, quoteText, startReply, jumpToMsg, copyMsg, flashId, fmtSize, mapUrl,
       infoOpen,
       msgMenu, openMsgMenu, closeMsgMenu, closeAllMenus, deleteMsg,
-      msgSheet, onMsgTouchStart, onMsgTouchMove, onMsgTouchEnd,
+      msgSheet, openMsgSheet, onMsgTouchStart, onMsgTouchMove, onMsgTouchEnd,
       selMode, selIds, enterSel, exitSel, toggleSel, selAll, selCopy, selDelete,
       onPaste, sendFile, sendLocation,
       SOUND_OPTS, sndCfg, playSound, saveSnd,

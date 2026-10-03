@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>客服工作台</title>
 <link rel="stylesheet" href="/assets/vendor/element-plus.css">
-<link rel="stylesheet" href="/assets/css/app.css?v=3.13.0">
+<link rel="stylesheet" href="/assets/css/app.css?v=3.14.0">
 <script src="/assets/ui/ui-registry.js?v=2.8.0"></script>
 <script src="/assets/ui/ui-loader.js?v=2.8.0" data-ui-cat="auto"></script>
 </head>
@@ -264,6 +264,8 @@
                       <a v-if="m.from==='agent' && canRecall(m)" class="recall-a" @click="recallMsg(m)">撤回</a>
                       <span v-if="m.from==='agent'" class="read-flag" :class="{read: isRead(m)}">{{ isRead(m) ? '已读' : '未读' }}</span>
                       <span v-if="m.recalled && m.from==='visitor'" class="recall-flag-v">已撤回</span>
+                      <!-- 手机端：点这个 ⋯ 出「回复 / 复制 / 多选 / 删除」（长按同样可以） -->
+                      <button type="button" class="msg-more" :title="'回复 / 复制 / 多选 / 删除'" @click.stop="openMsgSheet(m)">⋯</button>
                     </div>
                   </div>
                 </div>
@@ -1397,7 +1399,7 @@
 <script src="/assets/qr-poster.js?v=2.1.03"></script>
 <script src="/assets/api.js?v=2.0.1"></script>
 <script src="/assets/js/app-components.js?v=2.3.0"></script>
-<script src="/assets/js/app.js?v=3.6.0"></script>
+<script src="/assets/js/app.js?v=3.6.1"></script>
 <script src="/assets/js/app-boot.js?v=2.1.1"></script>
 </body>
 </html>
