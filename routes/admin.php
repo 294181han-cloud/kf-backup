@@ -464,6 +464,19 @@ function handle_admin_gblacklist(string $method): void
     json_error('方法不允许', 405);
 }
 
+/* ---- 分控节点安装器下载（bootstrap.php 单文件，v2.38） ---- */
+function handle_admin_bootstrap_dl(string $method): void
+{
+    require_admin_ctx();
+    $path = __DIR__ . '/bootstrap.php';
+    if (!is_file($path)) json_error('安装器文件不存在', 404);
+    header('Content-Type: application/octet-stream');
+    header('Content-Disposition: attachment; filename="bootstrap.php"');
+    header('Content-Length: ' . filesize($path));
+    readfile($path);
+    exit;
+}
+
 /* ---- 客服登录入口（卡密交付文案按 入口1、入口2… 展示，v2.35） ---- */
 function handle_admin_agent_entrances(string $method): void
 {

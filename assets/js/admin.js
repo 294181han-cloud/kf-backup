@@ -204,6 +204,7 @@ createApp({
       } catch (e) { ElementPlus.ElMessage.error(e.message); }
       finally { pushingIp.value = ''; }
     };
+    const dlBootstrap = () => { location.href = '/api/admin/bootstrap-dl'; };
     const forgetNode = async (row) => {
       try { await API.post('/api/admin/nodes', { action: 'forget', ip: row.ip }); await loadNodes(); }
       catch (e) { ElementPlus.ElMessage.error(e.message); }
@@ -324,7 +325,7 @@ createApp({
     onMounted(loadAll);
     return {
       tab, tabTitle, booted, me, ov, tenants, domains, newDomain, rootDomain, defVal, pwOld, pwNew,
-      nodes, mainVersion, pushingIp, loadNodes, pushNode, forgetNode,
+      nodes, mainVersion, pushingIp, loadNodes, pushNode, forgetNode, dlBootstrap,
       nodeCodes, newCodeRole, lastCode, genNodeCode, revokeNodeCode,
       gips, newGip, newGipNote, gipVersion, addGip, delGip,
       entrancesText, entranceText, saveEntrances,

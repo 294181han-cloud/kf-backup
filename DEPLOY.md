@@ -2660,3 +2660,25 @@ AND EXISTS (SELECT 1 FROM messages m WHERE m.session_id = s.id AND m.from_type =
 ### 验证
 - 新主站：/api/health alive（site_role=main）✓；空库自动初始化 ✓；admin/123456 登录 ✓；安装页自锁 ✓
 - 旧主站：hosts 过渡段保活 ✓
+
+## 33. v2.38 变更记录（分控部署升级：单文件网页安装器 bootstrap.php，2026-10-04）
+
+### 分控部署方式重构（按用户要求：从总控直接获取代码安装，不再用 git）
+- 新增 **bootstrap.php 单文件网页安装器**：新节点服务器只需 nginx + PHP + 这一个文件
+  （主控「节点管理」页可下载），浏览器打开即完成全部部署：
+  环境自检 → 授权码验证（一次性）→ 自动登记节点+入白名单 → **从总控拉取全部代码**（5.4MB 包）
+  → 生成节点配置（无数据库凭证）→ 黑名单同步 → 自删除
+- 双模式：网页向导 / CLI（`php bootstrap.php 主站地址 授权码 agent|visitor`）
+- 移除旧 install.php（功能被 bootstrap.php 完全覆盖）
+- 主控新增 /api/admin/bootstrap-dl（管理员下载安装器文件）
+
+### 更新通道(v2.36)配套
+- 节点更新器 node/update-node.php 已随代码包安装；节点 cron 每 5 分钟
+  从总控拉更新包应用（白名单打包，config.php/data/uploads 永不下发）
+
+### 版本
+- version.php → 2.38.0；admin.js ?v= 同步提升
+
+### 验证
+- 节点注册/更新包/同步接口全链路 curl 实测 ✓（v2.34/v2.36 已验）
+- bootstrap 完整安装流程待首个真实分控节点部署时按页面引导验收

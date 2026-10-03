@@ -168,7 +168,9 @@
         <!-- ===================== 节点管理（1+2+n 分域部署） ===================== -->
         <template v-if="tab==='nodes'">
           <div class="panel">
-            <div class="panel-title">分控节点</div>
+            <div class="panel-title">分控节点
+              <el-button size="small" style="float:right;" @click="dlBootstrap">下载节点安装器 (bootstrap.php)</el-button>
+            </div>
             <p style="font-size:13px;color:#86909c;margin:0 0 14px;">
               主站版本 <b class="mono" style="color:#00b42a">{{ mainVersion }}</b>。分控节点由各自服务器的 cron 定时拉码并心跳登记；
               版本号标红 = 落后于主站，「推送更新」可即时指令该节点拉取（节点未开放 shell_exec 时走 cron 自动更新）。
@@ -522,6 +524,6 @@
 <script src="/assets/vendor/vue.global.js?v=2.0.1"></script>
 <script src="/assets/vendor/element-plus.js?v=2.0.1"></script>
 <script src="/assets/api.js?v=2.0.1"></script>
-<script src="/assets/js/admin.js?v=2.4.4"></script>
+<script src="/assets/js/admin.js?v=2.4.5"></script>
 </body>
 </html>
