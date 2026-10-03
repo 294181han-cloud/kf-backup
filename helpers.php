@@ -546,6 +546,24 @@ function agent_entrances(): array
     return $list;
 }
 
+/** 主控侧：给分控节点的更新包（version 不同才发全量；config.php 永不下发） */
+function handle_internal_update(string $method): void
+{
+    if ($method !== 'POST') { json_error('方法不允许', 405); return; }
+    $cfg = config();
+    if (($cfg['site_role'] ?? 'main') !== 'main') json_error('接口不存在', 403);
+    $secret = (string)($cfg['relay_secret'] ?? '');
+    if ($secret === '') json_error('未启用更新分发', 403);
+    $given = (string)input('secret', '');
+    if ($given === '' || !hash_equals($secret, $given)) json_error('无权调用', 403);
+    $nodeVer = (string)input('app_version', '');
+    $bundle = node_bundle_build();
+    if ($nodeVer === (string)$bundle['version']) {
+        json_out(['ok' => true, 'up_to_date' => true, 'version' => $bundle['version']]);
+    }
+    json_out(['ok' => true, 'version' => $bundle['version']] + $bundle);
+}
+
 /** 统一版本号（version.php；主站与分控节点对版本用） */
 function app_version(): string
 {
@@ -581,8 +599,72 @@ function handle_internal_heartbeat(string $method): void
     json_out(['ok' => true, 'main_version' => app_version()]);
 }
 
-/** 分控节点侧：接收主控推送的更新指令（git pull；PHP 未开放 shell_exec 时提示走 cron） */
-function handle_internal_update(string $method): void
+/** 更新包白名单（分控节点需要的代码路径；config.php/数据/上传/安装器永不下发） */
+function node_bundle_prefixes(): array
+{
+    return ['assets/', 'public/', 'routes/', 'vendor/', 'node/', 'index.php', 'helpers.php', 'db.php', 'version.php'];
+}
+
+/** 主控侧：按白名单打包当前代码（version + files{path:base64}） */
+function node_bundle_build(): array
+{
+    $base = __DIR__;
+    $files = [];
+    $dirIter = new RecursiveDirectoryIterator($base, FilesystemIterator::SKIP_DOTS);
+    $filter = new RecursiveCallbackFilterIterator($dirIter, function ($cur) {
+        if ($cur->isDir()) return !in_array($cur->getFilename(), ['.git', 'data', 'uploads'], true);
+        return true;
+    });
+    $iter = new RecursiveIteratorIterator($filter, RecursiveIteratorIterator::LEAVES_ONLY);
+    foreach ($iter as $f) {
+        $path = str_replace('\', '/', substr($f->getPathname(), strlen($base) + 1));
+        $keep = false;
+        foreach (node_bundle_prefixes() as $pre) {
+            if ($pre === 'node/' && str_starts_with($path, 'node/')) { $keep = str_ends_with($path, 'cron-node.sh'); continue; }
+            if (str_starts_with($path, $pre)) { $keep = true; break; }
+        }
+        if (!$keep) continue;
+        if (str_contains($path, '/.') || str_ends_with($path, '.log')) continue;
+        $files[$path] = base64_encode((string)file_get_contents($f->getPathname()));
+    }
+    ksort($files);
+    return ['version' => app_version(), 'files' => $files];
+}
+
+/** 分控侧：应用更新包（受保护路径永不覆盖；按包清理已移除文件） */
+function apply_node_bundle(array $bundle): array
+{
+    $base = __DIR__;
+    $protected = fn(string $p): bool => $p === 'config.php' || str_starts_with($p, 'data/') || str_starts_with($p, 'uploads/');
+    $files = (array)($bundle['files'] ?? []);
+    if (!$files) throw new RuntimeException('更新包为空');
+    $manifestFile = $base . '/data/node-manifest.json';
+    $applied = is_file($manifestFile) ? (array)json_decode((string)file_get_contents($manifestFile), true) : [];
+    if (!is_dir($base . '/data')) @mkdir($base . '/data', 0755, true);
+    $changed = 0;
+    foreach ($files as $path => $b64) {
+        if ($protected($path)) continue;
+        $full = $base . '/' . $path;
+        if (str_contains($path, '/')) {
+            $d = dirname($full);
+            if (!is_dir($d)) @mkdir($d, 0755, true);
+        }
+        $content = base64_decode((string)$b64, true);
+        if ($content === false || !@file_put_contents($full, $content)) throw new RuntimeException('写入失败: ' . $path);
+        $applied[$path] = 1;
+        $changed++;
+    }
+    // 清理主站已删除、而本节点还在的文件
+    foreach (array_keys($applied) as $old) {
+        if ($protected($old)) continue;
+        if (!isset($files[$old]) && is_file($base . '/' . $old)) { @unlink($base . '/' . $old); unset($applied[$old]); }
+    }
+    @file_put_contents($manifestFile, json_encode(array_keys($applied), JSON_UNESCAPED_UNICODE));
+    return ['ok' => true, 'changed' => $changed, 'app_version' => (string)($bundle['version'] ?? app_version())];
+}
+
+/** 分控节点侧：接收主控推送的更新包（共享密钥校验，受保护路径不覆盖） */
+function handle_internal_apply(string $method): void
 {
     if ($method !== 'POST') { json_error('方法不允许', 405); return; }
     $cfg = config();
@@ -590,12 +672,8 @@ function handle_internal_update(string $method): void
     if ($secret === '') json_error('未启用远程更新', 403);
     $given = (string)input('secret', '');
     if ($given === '' || !hash_equals($secret, $given)) json_error('无权调用', 403);
-    if (!function_exists('shell_exec')) {
-        json_out(['ok' => false, 'need_cron' => true, 'error' => '该节点 PHP 未开放 shell_exec，请依赖 cron 自动更新（每 5 分钟）']);
-    }
-    @set_time_limit(120);
-    $out = shell_exec('cd ' . escapeshellarg(__DIR__) . ' && git pull --autostash -q 2>&1');
-    json_out(['ok' => true, 'app_version' => app_version(), 'output' => (string)$out]);
+    $bundle = (array)input('bundle', []);
+    json_out(apply_node_bundle($bundle));
 }
 
 /* ================= 枢纽模式：内存态 / 白名单 / 黑名单同步（v2.34） ================= */

@@ -377,14 +377,18 @@ function handle_admin_nodes(string $method): void
         json_out(['main_version' => app_version(), 'nodes' => $rows]);
     }
 
-    // 推送更新：主控 → 节点 /api/internal/update（节点 git pull；shell_exec 未开放时提示走 cron）
+    // 推送更新：主控打包代码 → 节点 /api/internal/apply 应用（无需 git/shell）
     if ($method === 'POST' && (input('action', '') === 'push')) {
         $ip = trim((string)input('ip', ''));
-        $st = $pdo->prepare('SELECT ip, origin FROM nodes WHERE ip = ?');
+        $st = $pdo->prepare('SELECT ip, origin, app_version FROM nodes WHERE ip = ?');
         $st->execute([$ip]);
         $node = $st->fetch();
         if (!$node || (string)$node['origin'] === '') json_error('节点不存在或未上报来源地址', 400);
-        $r = admin_node_http((string)$node['origin'], '/api/internal/update', ['action' => 'update']);
+        $bundle = node_bundle_build();
+        if ((string)$node['app_version'] === (string)$bundle['version']) {
+            json_out(['ok' => true, 'up_to_date' => true, 'ip' => $ip, 'version' => $bundle['version']]);
+        }
+        $r = admin_node_http((string)$node['origin'], '/api/internal/apply', ['bundle' => $bundle]);
         if (!empty($r['ok']) && isset($r['app_version'])) {
             $pdo->prepare('UPDATE nodes SET app_version = ? WHERE ip = ?')->execute([(string)$r['app_version'], $ip]);
         }

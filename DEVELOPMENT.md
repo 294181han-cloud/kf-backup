@@ -38,11 +38,14 @@
 
 ## 3. 发布与更新流（推一次，全网跟随）
 
-``开发 → commit → push 到 main →``
-1. 主站 webhook 自动 pull（即时生效，version.php 版本 +1）
-2. 分控节点 cron（每 5 分钟）自动 `git pull` 跟随 + 向主站心跳登记（IP/角色/版本）
-3. 主控「节点管理」页核对：节点版本落后会标红；可点「推送更新」即时指令拉取
+``开发 → commit → push 到 GitHub →``
+1. 总控 webhook 自动 pull（即时生效，version.php 版本 +1）
+2. 分控节点 cron（每 5 分钟）调 node/update-node.php：向总控检查版本 → 拉取更新包应用
+   （总控按白名单打包代码，**config.php 永不下发**——分控无数据库凭证、无 GitHub 访问需求）
+   并向总控心跳登记（IP/角色/版本）
+3. 主控「节点管理」页核对：节点版本落后会标红；可点「推送更新」把更新包直接推给该节点
 4. selftest.ps1（打主站，112 项）回归
+5. 分控配置变更：改 config.php 的 hosts 段提交（全网自动生效）——分控本地不再改配置
 
 > 修改某节点的专属配置（如数据库指向）改 config.php 的 hosts 段提交即可；
 > 若临时本地调试改了 config.php，记得 `git update-index --skip-worktree config.php` 防覆盖。

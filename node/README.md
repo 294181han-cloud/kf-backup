@@ -45,11 +45,12 @@ bash /tmp/kf-node-src/node/node-setup.sh
 2. 浏览器打开 `https://<节点域名>/api/health` 确认 `"site_role":"agent|visitor"`
 3. 主控管理台 → 「节点管理」页签应能看到该节点（IP、角色、版本、心跳时间）
 
-## 更新机制
+## 更新机制（总控分发，节点无需 git/GitHub）
 
-- 节点 cron 每 5 分钟 `git pull` 跟随主站版本 + 心跳登记（版本号自动对账）
-- 主控「节点管理」页看到版本标红的节点，可点「推送更新」即时指令拉取
-  （节点 PHP 未开放 shell_exec 时按钮会提示走 cron，无需处理）
+- 节点 cron 每 5 分钟执行 `node/update-node.php`：向总控检查版本 → 有新版则拉取更新包并应用
+  （更新包不含 config.php / data / uploads，受保护路径永不覆盖）
+- 主控「节点管理」页看到版本标红的节点，可点「推送更新」把更新包直接推给该节点
+- 节点无需访问 GitHub，也无需 git/shell_exec
 
 ## 安全清单
 

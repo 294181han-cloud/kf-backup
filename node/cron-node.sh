@@ -10,8 +10,8 @@ set -u
 SITE_DIR="${SITE_DIR:-$(cd "$(dirname "$0")/.." && pwd)}"
 cd "$SITE_DIR" || exit 1
 
-# 1) 跟随主站更新代码
-git pull --autostash -q 2>&1 | head -3
+# 1) 跟随主站更新（从总控拉更新包并应用，无需 git）
+php "$SITE_DIR/node/update-node.php"
 
 # 2) 心跳登记
 MAIN_URL=$(php -r '$c = require "config.php"; echo rtrim((string)($c["site_main_url"] ?? ""), "/");')

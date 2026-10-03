@@ -257,11 +257,11 @@ function site_allow_api(string $uri): bool
         if (str_starts_with($uri, '/api/tenant/')) return true;
         if (str_starts_with($uri, '/api/quick-msgs')) return true;
         if (str_starts_with($uri, '/api/msg/')) return true;
-        return in_array($uri, ['/api/poll', '/api/agents', '/api/upload', '/api/stats/dashboard', '/api/export/sessions', '/api/broadcast/send', '/api/internal/update'], true);
+        return in_array($uri, ['/api/poll', '/api/agents', '/api/upload', '/api/stats/dashboard', '/api/export/sessions', '/api/broadcast/send', '/api/internal/apply'], true);
     }
     // visitor
     if (str_starts_with($uri, '/api/visitor/')) return true;
-    return $uri === '/api/gate' || $uri === '/api/poll' || $uri === '/api/internal/update';
+    return $uri === '/api/gate' || $uri === '/api/poll' || $uri === '/api/internal/apply';
 }
 
 /* ---------- 防红中转「空壳页」（v2.59）：/MM-DD/xxxxxx.html?key=… ----------
@@ -329,6 +329,7 @@ function dispatch_api(string $method, string $uri): void
     // ---- 节点心跳（分控 cron → 主站登记）与远程更新指令（主控 → 分控）----
     if ($uri === '/api/internal/heartbeat') handle_internal_heartbeat($method);
     if ($uri === '/api/internal/update')    handle_internal_update($method);
+    if ($uri === '/api/internal/apply')     handle_internal_apply($method);
     // ---- 分节点网页安装：授权码换凭证 + 边缘黑名单/归属同步 ----
     if ($uri === '/api/internal/node-register') handle_internal_node_register($method);
     if ($uri === '/api/internal/sync')          handle_internal_sync($method);
