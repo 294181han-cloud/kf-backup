@@ -1754,3 +1754,21 @@ body.dark .sess-item.checked { background: color-mix(in srgb, var(--theme, #1677
   .iv-btn { height: 30px; padding: 0 9px; font-size: 12px; }
   .iv-count { padding: 0 4px; }
 }
+
+/* ===== v2.70 多选入口做成醒目的文字按钮（之前那个小 ☑ 太不起眼） ===== */
+.sess-multi-entry {
+  display: flex; align-items: center; gap: 7px; width: calc(100% - 24px); margin: 2px 12px 8px;
+  padding: 8px 12px; border-radius: 10px; cursor: pointer; text-align: left;
+  border: 1px dashed #c9cdd4; background: #fafbfc; color: #4e5969; font-size: 12.5px; font-weight: 600;
+  transition: .15s;
+}
+.sess-multi-entry:hover { border-color: var(--theme, #1677ff); color: var(--theme, #1677ff); background: color-mix(in srgb, var(--theme, #1677ff) 6%, #fff); }
+.sess-multi-entry .sme-box {
+  flex-shrink: 0; width: 20px; height: 20px; border-radius: 6px; font-size: 13px; line-height: 1;
+  background: color-mix(in srgb, var(--theme, #1677ff) 14%, #fff); color: var(--theme, #1677ff);
+  display: inline-flex; align-items: center; justify-content: center;
+}
+.sess-multi-bar .smb-btns { flex-wrap: wrap; }
+.sess-multi-bar .smb-btn { min-width: 62px; }
+body.dark .sess-multi-entry { background: #1b1e24; border-color: #2c313a; color: #a9b0bb; }
+body.dark .sess-multi-entry .sme-box { background: color-mix(in srgb, var(--theme, #1677ff) 26%, #1b1e24); color: #9fc7ff; }
