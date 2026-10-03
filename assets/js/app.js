@@ -216,6 +216,9 @@ const app = createApp({
     const trendMax = Vue.computed(() => Math.max(1, ...((stats.value && stats.value.trend7) || [])
         .map(d => Math.max(d.count || 0, d.active || 0))));
     const trendW = (v) => Math.round(((Number(v) || 0) / trendMax.value) * 100) + '%';
+    // v2.47.1 图表/明细都按「新日期在上」展示（接口仍按时间正序返回，只在这里倒过来）
+    const trendDesc = Vue.computed(() => ((stats.value && stats.value.trend7) || []).slice().reverse());
+    const dailyDesc = Vue.computed(() => ((stats.value && stats.value.daily) || []).slice().reverse());
 
     // ---------- 数据加载 ----------
     const loadMe = async () => {
@@ -2102,7 +2105,7 @@ const app = createApp({
       cropDlg, cropSrc, cropZoomPct, cropStage, cropStyle, cropImgLoaded, cropDown, cropMove, cropUp, cropWheel, cropClose, openCrop, cropConfirm, avatarPreview,
       geoTag, visitorTag, visitorTagFull, visitorChnClass, copyQrImage, downloadQrImage, codeRotateHint, rotateCode, loadHistory, disableLink, saveCodeCfg, meAvatarUrl,
       quickFields, welcomeFields, autoFields, blFields, preqFields,
-      shortTime, fmtTime, sourceText, contactLabel, barW, quotaW, trendW,
+      shortTime, fmtTime, sourceText, contactLabel, barW, quotaW, trendW, trendDesc, dailyDesc,
       sessIcon,
       setTab, setGroups, openSetting, switchSetting,
       navGroups,

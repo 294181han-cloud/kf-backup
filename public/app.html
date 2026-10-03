@@ -398,7 +398,7 @@
               <i class="lg-act"></i>活跃会话
             </span>
           </div>
-          <div class="bar-row" v-for="d in stats.trend7" :key="d.date">
+          <div class="bar-row" v-for="d in trendDesc" :key="d.date">
             <div class="nm">{{ d.date }}</div>
             <div class="bar bar2">
               <div class="b-new" :style="{width: trendW(d.count)}"></div>
@@ -429,7 +429,7 @@
         </div>
         <div class="panel">
           <div class="panel-title">近 7 天接待明细</div>
-          <el-table :data="stats.daily" size="small" stripe>
+          <el-table :data="dailyDesc" size="small" stripe>
             <el-table-column prop="date" label="日期" width="110"></el-table-column>
             <el-table-column prop="received" label="新会话"></el-table-column>
             <el-table-column prop="active" label="活跃访客"></el-table-column>
@@ -1384,7 +1384,7 @@
 <script src="/assets/qr-poster.js?v=2.1.03"></script>
 <script src="/assets/api.js?v=2.0.1"></script>
 <script src="/assets/js/app-components.js?v=2.3.0"></script>
-<script src="/assets/js/app.js?v=3.5.3"></script>
+<script src="/assets/js/app.js?v=3.5.4"></script>
 <script src="/assets/js/app-boot.js?v=2.1.1"></script>
 </body>
 </html>
