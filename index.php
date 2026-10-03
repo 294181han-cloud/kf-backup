@@ -149,6 +149,11 @@ function serve_static(string $uri): void
 }
 
 if (preg_match('#^/(assets|uploads)/#', $uri)) {
+    // 分域部署：非主站节点的 /uploads 由主站统一存储（新上传为绝对 URL；存量相对路径 302 过去）
+    if (str_starts_with($uri, '/uploads/') && site_role() !== 'main') {
+        $main = site_main_url();
+        if ($main !== '') { header('Location: ' . $main . $uri, true, 302); exit; }
+    }
     serve_static($uri);
 }
 
@@ -163,10 +168,40 @@ function serve_html(string $file): void
     exit;
 }
 
+/* ---------- 站点角色门禁（1+2+n 分域部署）----------
+   main（默认）= 全功能；agent = 客服登录入口（登录页+工作台+客服/租户接口）；
+   visitor = 访客站点（访客页+访客接口）。非白名单路径一律 404/403，不暴露存在。 */
+function site_allow_page(string $file): bool
+{
+    $r = site_role();
+    if ($r === 'main') return true;
+    if ($r === 'agent') return in_array($file, ['login.html', 'app.html'], true);
+    return $file === 'visitor.html' || $file === 'gate.html';
+}
+
+function site_allow_api(string $uri): bool
+{
+    $r = site_role();
+    if ($r === 'main') return true;
+    if ($uri === '/api/health') return true;
+    if ($r === 'agent') {
+        if (str_starts_with($uri, '/api/auth/')) return true;
+        if (str_starts_with($uri, '/api/sessions')) return true;
+        if (str_starts_with($uri, '/api/tenant/')) return true;
+        if (str_starts_with($uri, '/api/quick-msgs')) return true;
+        if (str_starts_with($uri, '/api/msg/')) return true;
+        return in_array($uri, ['/api/poll', '/api/agents', '/api/upload', '/api/stats/dashboard', '/api/export/sessions', '/api/broadcast/send'], true);
+    }
+    // visitor
+    if (str_starts_with($uri, '/api/visitor/')) return true;
+    return $uri === '/api/gate' || $uri === '/api/poll';
+}
+
 /* ---------- 防红中转「空壳页」（v2.59）：/MM-DD/xxxxxx.html?key=… ----------
    看起来就是一个放在日期目录里的普通静态页；文件里没有任何业务内容，
    真实入口由页内脚本拿 key 调 /api/gate 换出来（见 public/gate.html）。 */
 if (preg_match('#^/[0-9]{2}-[0-9]{2}/[A-Za-z0-9]{4,16}\.html$#', $uri)) {
+    if (!site_allow_page('gate.html')) { http_response_code(404); echo 'Not Found'; exit; }
     serve_html('gate.html');
 }
 
@@ -194,15 +229,18 @@ if ($uri === '/' || $uri === '/index.php' || $uri === '/index.html') {
             }
         } catch (\Throwable $e) { /* 查询失败按默认跳转 */ }
     }
-    if ($isVisitorHost) { serve_html('visitor.html'); exit; }
+    if ($isVisitorHost || site_role() === 'visitor') { serve_html('visitor.html'); exit; }
     header('Location: /login.html');
     exit;
 }
 foreach (['login.html', 'app.html', 'admin.html', 'visitor.html'] as $page) {
-    if ($uri === "/$page") { serve_html($page); }
+    if ($uri === "/$page") {
+        if (!site_allow_page($page)) { http_response_code(404); echo 'Not Found'; exit; }
+        serve_html($page);
+    }
 }
 if ($uri === '/health' || $uri === '/api/health') {
-    json_out(['ok' => true, 'time' => time(), 'version' => '2.0']);
+    json_out(['ok' => true, 'time' => time(), 'version' => '2.0', 'site_role' => site_role()]);
 }
 
 /* ---------- API 路由 ---------- */
@@ -228,6 +266,8 @@ function dispatch_api(string $method, string $uri): void
 {
     // ---- 认证 ----
     if ($uri === '/api/auth/login')    handle_auth_login($method);
+    // ---- 上传中转（分节点 → 主站，仅 main 角色开放，共享密钥校验）----
+    if ($uri === '/api/internal/upload') handle_internal_upload($method);
     // ---- 发卡机器人 webhook（Telegram 直接 POST，不走登录态，用 secret 校验）----
     if ($uri === '/api/tg/webhook')    handle_tg_webhook($method);
     if ($uri === '/api/auth/me')       handle_auth_me($method);
@@ -314,11 +354,16 @@ function dispatch_api(string $method, string $uri): void
     // ---- 轮询（客服版需登录；访客版公开） ----
     if ($uri === '/api/poll') {
         $role = (string)input('role', '');
-        if ($role === 'agent') handle_agent_poll($method);
-        else handle_visitor_poll($method);
+        $sr = site_role();
+        if ($sr === 'visitor') { handle_visitor_poll($method); }        // 访客节点只开放访客轮询
+        elseif ($role === 'agent' || $sr === 'agent') { handle_agent_poll($method); }
+        else { handle_visitor_poll($method); }
     }
 
     json_error('接口不存在', 400);
 }
 
-dispatch_api($method, $uri);
+    // ---- 站点角色门禁：非白名单接口直接 403（不暴露存在） ----
+    if (!site_allow_api($uri)) json_error('接口不存在', 403);
+
+    dispatch_api($method, $uri);

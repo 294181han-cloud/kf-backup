@@ -35,4 +35,13 @@ return [
     // ---------- 其他 ----------
     'session_online_secs' => 25,  // 访客最后心跳在 N 秒内视为在线
     'data_dir'            => __DIR__ . '/data',
+
+    // ---------- 站点角色（1+2+n 分域部署；单机部署保持 main 即可） ----------
+    // main    = 全功能主站：数据库在本机、admin.html 管理台、登录页、访客页全部可用（默认）
+    // agent   = 客服登录入口节点：只放行 login.html / app.html 与客服-租户相关接口
+    // visitor = 访客站点节点：只放行 visitor.html / gate.html 与访客接口
+    // 非主站节点需要：DB 指向主站 MySQL（db.host），上传经中转落到主站（site_main_url + relay_secret）
+    'site_role'     => getenv('SITE_ROLE') ?: 'main',
+    'site_main_url' => getenv('SITE_MAIN_URL') ?: '',   // 主站对外地址，如 https://kf.ylcz.cc（非 main 节点必填）
+    'relay_secret'  => getenv('RELAY_SECRET') ?: '',    // 上传中转共享密钥（非空时主站开放 /api/internal/upload）
 ];

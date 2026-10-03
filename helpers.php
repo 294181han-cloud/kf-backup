@@ -437,9 +437,83 @@ function audio_ext_of(string $mime, string $filename): string
     return in_array($extHint, ['mp3','m4a','wav','amr','webm','ogg','aac','3gp','caf'], true) ? $extHint : 'webm';
 }
 
+/* ================= 站点角色（1+2+n 分域部署） ================= */
+
+/** 当前节点角色：main（全功能主站，默认）/ agent（客服登录入口）/ visitor（访客站点） */
+function site_role(): string
+{
+    static $role = null;
+    if ($role === null) {
+        $r = (string)(config()['site_role'] ?? 'main');
+        $role = in_array($r, ['main', 'agent', 'visitor'], true) ? $r : 'main';
+    }
+    return $role;
+}
+
+function site_main_url(): string
+{
+    return rtrim((string)(config()['site_main_url'] ?? ''), '/');
+}
+
+/** 非 main 节点：把上传内容中转到主站 /api/internal/upload，返回含绝对 URL 的结果 */
+function relay_upload_to_main(string $data, string $kind, string $filename): array
+{
+    $cfg = config();
+    $main = rtrim((string)($cfg['site_main_url'] ?? ''), '/');
+    $secret = (string)($cfg['relay_secret'] ?? '');
+    if ($main === '' || $secret === '') throw new \RuntimeException('上传中转未配置（site_main_url / relay_secret）');
+    $body = json_encode(['secret' => $secret, 'data' => $data, 'kind' => $kind, 'filename' => $filename], JSON_UNESCAPED_UNICODE);
+    $resp = '';
+    $code = 0;
+    $err = '';
+    if (function_exists('curl_init')) {
+        $ch = curl_init($main . '/api/internal/upload');
+        curl_setopt_array($ch, [
+            CURLOPT_POST           => true,
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_TIMEOUT        => 30,
+            CURLOPT_HTTPHEADER     => ['Content-Type: application/json'],
+            CURLOPT_POSTFIELDS     => $body,
+        ]);
+        $resp = curl_exec($ch);
+        $code = (int)curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        $err = curl_error($ch);
+        curl_close($ch);
+    } else {
+        $ctx = stream_context_create(['http' => ['method' => 'POST', 'header' => "Content-Type: application/json\r\n", 'content' => $body, 'timeout' => 30, 'ignore_errors' => true]]);
+        $resp = @file_get_contents($main . '/api/internal/upload', false, $ctx);
+        foreach ($http_response_header ?? [] as $h) {
+            if (preg_match('#^HTTP/\S+\s+(\d{3})#', $h, $m2)) $code = (int)$m2[1];
+        }
+        if ($resp === false) $err = '网络请求失败';
+    }
+    if ($code !== 200 || !is_string($resp) || $resp === '') throw new \RuntimeException('上传中转失败(' . $code . ') ' . $err);
+    $j = json_decode($resp, true);
+    if (!is_array($j) || empty($j['url'])) throw new \RuntimeException((string)($j['error'] ?? '上传中转响应异常'));
+    return $j;
+}
+
+/** 主站专用：接收分节点的上传中转（共享 relay_secret 校验；仅 main 角色开放） */
+function handle_internal_upload(string $method): void
+{
+    if ($method !== 'POST') { json_error('方法不允许', 405); return; }
+    $cfg = config();
+    if (($cfg['site_role'] ?? 'main') !== 'main') json_error('接口不存在', 403);
+    $secret = (string)($cfg['relay_secret'] ?? '');
+    if ($secret === '') json_error('未启用上传中转', 403);
+    $given = (string)input('secret', '');
+    if ($given === '' || !hash_equals($secret, $given)) json_error('无权调用', 403);
+    $r = save_upload((string)input('data', ''), (string)input('kind', 'image'), (string)input('filename', ''));
+    $main = rtrim((string)($cfg['site_main_url'] ?? ''), '/');
+    if ($main !== '' && isset($r['url']) && str_starts_with($r['url'], '/uploads/')) $r['url'] = $main . $r['url'];
+    json_out($r);
+}
+
 function save_upload(string $data, string $kind, string $filename = ''): array
 {
     $cfg = config();
+    // 1+2+n：非主站节点把文件中转到主站，返回绝对 URL（保证任意节点可见）
+    if (($cfg['site_role'] ?? 'main') !== 'main') return relay_upload_to_main($data, $kind, $filename);
     $dir = $cfg['upload_dir'];
     if (!is_dir($dir)) mkdir($dir, 0775, true);
 
