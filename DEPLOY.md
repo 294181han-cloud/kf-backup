@@ -2652,6 +2652,11 @@ AND EXISTS (SELECT 1 FROM messages m WHERE m.session_id = s.id AND m.from_type =
 ### 版本
 - version.php → 2.37.0
 
+### 修复（上线后首日报错 Table tg_users doesn't exist）
+- 根因：全新空库首次被多个 PHP 进程并发初始化，TG 建表引导在竞态中失败被静默跳过，
+  后续请求靠重试机制自愈——但用户恰好在自愈前进入了管理台
+- 加固：tg_users 等 4 张 TG 表纳入每请求幂等升级（ensure_upgrade），竞态漏建必定补建
+
 ### 验证
 - 新主站：/api/health alive（site_role=main）✓；空库自动初始化 ✓；admin/123456 登录 ✓；安装页自锁 ✓
 - 旧主站：hosts 过渡段保活 ✓
