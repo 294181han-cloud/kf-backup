@@ -2630,3 +2630,28 @@ AND EXISTS (SELECT 1 FROM messages m WHERE m.session_id = s.id AND m.from_type =
 - /api/internal/update：同版本 up_to_date ✓；落后版本返回完整更新包（5.4MB/57 文件、
   不含 config.php）✓；错误密钥 403 ✓
 - 节点应用流程待首个真实分控部署后按验收清单复核
+
+## 32. v2.37 变更记录（迁移完成：新主站 ad.yluu.top 上线，2026-10-04）
+
+### 根因与修复（新站点全 404）
+- **根因**：仓库内 `.user.ini`（open_basedir=/www/wwwroot/kf.ylcz.cc/:/tmp/）随自动推送
+  落到新服务器——PHP 被限制只能访问一个**新服务器上不存在的旧站路径**，
+  一切需要读文件的请求全部失败（静态资源/nginx 直出不受影响，故此前诊断被干扰）
+- **修复**：.user.ini 移出仓库（每服务器本地文件，加入 .gitignore）；
+  新服务器拉取后该文件自动删除，PHP 恢复。站点根目录重建方法：
+  `open_basedir=/www/wwwroot/ad.yluu.top/:/tmp/`（宝塔「防跨站攻击」开关重开即自动生成）
+- **附带修复**：data/installed.lock 同样移出仓库——此前会随仓库传播导致
+  新服务器的全新空库**跳过初始化**（建表+种子永不执行）；移除后首次访问自动初始化
+  （旧站重跑一次幂等初始化后自重建 lock，不受影响）
+
+### 配置切换
+- config.php 基础段 = 新主站 ad.yluu.top（全新空库 sql_ad_yluu_top / 用户同名 / 管理员 admin+123456 种子）
+- hosts 段保留 kf.ylcz.cc（旧库旧数据，旧站过渡期保活；旧站删除后可整段移除）
+- TG_BASE_URL 改为跟随 site_main_url（旧站删除后 TG 链接不再指向死域名）
+
+### 版本
+- version.php → 2.37.0
+
+### 验证
+- 新主站：/api/health alive（site_role=main）✓；空库自动初始化 ✓；admin/123456 登录 ✓；安装页自锁 ✓
+- 旧主站：hosts 过渡段保活 ✓
