@@ -2436,3 +2436,42 @@ AND EXISTS (SELECT 1 FROM messages m WHERE m.session_id = s.id AND m.from_type =
 - 第一行 `L3W9KVJWSM / 测试卡 / @yl444（蓝色可点链接）`，其余没买家的显示 `—` ✅
 - 接口 `/api/admin/tenants` 返回里 `tg_user` 字段：8 条租户里 1 条有值（就是机器人开的那张），其余为空 ✅
 - 控制台无 JS 报错 ✅
+
+## 27. v2.32 变更记录（站点角色：1 主站 + 2 客服入口 + n 访客站点 分域部署，2026-10-02）
+
+### 背景
+- 网站被 DDoS：访客入口、客服入口、主站（数据库+管理台）混在一个站点上，一打全挂。
+- 目标拓扑：**1 个主站**（MySQL + admin.html 管理台）+ **2 个客服登录入口**（app.html 工作台）
+  + **n 个访客站点**（visitor.html/防红壳页，与既有域名池天然契合——访客链接自带
+  ?key=客服码 / ?t=卡密，不绑定域名，n 个域名可指向同一或不同访客节点）。
+
+### 实现（单代码库 + 站点角色，各节点部署同一份代码，仅 config.php 不同）
+- **config.php 新增**：
+  - `site_role`：main（全功能主站，默认）/ agent（客服登录入口）/ visitor（访客站点）
+  - `site_main_url`：主站对外地址（非主站节点必填，用于上传中转与资源 URL 绝对化）
+  - `relay_secret`：上传中转共享密钥（主站已生成并配置）
+- **index.php 站点门禁**（白名单制，未列路径不暴露存在）：
+  - agent 节点：login.html / app.html + auth、poll(客服)、sessions、tenant、quick-msgs、msg、
+    agents、upload、stats、export、broadcast 接口；其余 404/403
+  - visitor 节点：visitor.html / gate.html 防红壳页 + visitor 系列接口、gate、poll(访客强制分支)、
+    health；其余 404/403
+  - main 节点：一切照旧（单机部署零行为变化）
+- **上传集中化**：非主站节点 save_upload 自动把文件中转到主站 `/api/internal/upload`
+  （共享 relay_secret，hash_equals 校验，curl/file-stream 双实现），返回**绝对 URL**
+  （https://主站/uploads/...），任意节点的页面/接口都能直接引用；
+  存量相对路径 /uploads/... 在非主站节点 302 到主站（兼容历史消息）
+- **跨节点认证**：所有节点连同一个 MySQL（config db.host 指向主站），JWT 密钥存 kv_store
+  同库共享——任一节点签发的 token 全部节点互认，无需跨域传凭证（各节点页面+自身接口同源）
+
+### 节点部署方法（每个节点 = 同一份代码目录 + 各自 config.php）
+1. 主站（1 台）：`site_role='main'`，MySQL 在本机，域名 kf.ylcz.cc（admin 用，勿进域名池）
+2. 客服入口（2 台）：代码同仓库，`db.host` 改主站内网/公网 IP，
+   `site_role='agent'`，`site_main_url='https://kf.ylcz.cc'`，`relay_secret` 同主站
+3. 访客站点（n 台）：同上，`site_role='visitor'`；域名池里加这些域名即可发码
+4. 建议：客服入口域名别公开；主站域名可加 IP 白名单/仅内网+VPN；
+   访客域名套 CDN/WAF（真正的抗 D 第一层在边缘，节点分离是缩小爆炸半径）
+
+### 验证
+- 主站 selftest 112 项全过（main 角色零行为变化）
+- /api/health 返回 site_role=main（各节点巡检用）
+- /api/internal/upload：无密钥 403；带密钥上传成功且返回绝对 URL，文件可访问
