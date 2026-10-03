@@ -2475,3 +2475,33 @@ AND EXISTS (SELECT 1 FROM messages m WHERE m.session_id = s.id AND m.from_type =
 - 主站 selftest 112 项全过（main 角色零行为变化）
 - /api/health 返回 site_role=main（各节点巡检用）
 - /api/internal/upload：无密钥 403；带密钥上传成功且返回绝对 URL，文件可访问
+
+### v2.32 部署实操手册（逐节点）
+
+**主站（已部署，无需动作）**：kf.ylcz.cc 就是主站，`site_role='main'`、relay_secret、site_main_url 均已配置。
+运维要点：MySQL 只允许节点 IP 连接（安全组白名单 3306）；admin 域名不进域名池、不对外公开。
+
+**每个新节点（客服入口 / 访客站点通用流程）**：
+1. 装环境：nginx + PHP 8.4（扩展：pdo_mysql、curl、mbstring、fileinfo、openssl）+ git
+2. 拉代码：`git clone` 本仓库到站点根目录（与主站同一仓库同一分支）
+3. 配置 config.php（节点本地改，改完执行
+   `git update-index --skip-worktree config.php` 让本地配置在后续 git pull 时不被覆盖）：
+   - `db.host` = 主站内网/公网 IP（端口 3306），`db.user`/`db.pass` = 主站授权的账号
+   - `site_role` = `agent`（客服入口）或 `visitor`（访客站点）
+   - `site_main_url` = `https://kf.ylcz.cc`；`relay_secret` = 主站 config.php 里的同款值
+4. 主站 MySQL 授权远程节点（主站执行一次）：
+   ```sql
+   CREATE USER 'kfxt'@'<节点IP>' IDENTIFIED BY '<密码>';
+   GRANT ALL PRIVILEGES ON kfxt.* TO 'kfxt'@'<节点IP>';
+   FLUSH PRIVILEGES;
+   ```
+   同时确认 MySQL `bind-address = 0.0.0.0` 且防火墙/安全组仅对节点 IP 开放 3306
+5. nginx 站点：与主站相同的伪静态（非静态请求 rewrite 到 index.php；assets/uploads 直接命中）
+   + SSL 证书（Let's Encrypt）
+6. DNS：域名 A 记录指向该节点 IP（域名池里开 wildcard 的域名要加 `*.域名` 泛解析）
+7. 管理台把访客域名加进「域名池」（发码才会用到）
+
+**节点验收清单（curl）**：
+- `https://<节点>/api/health` → `"site_role":"agent|visitor"`（角色生效）
+- 客服入口节点：`/visitor.html` → 404、`/api/admin/overview` → 403、登录工作台正常、聊天发图正常（中转上传）
+- 访客站点节点：`/app.html` → 404、`/api/auth/login` → 403、`/` 或防红壳页能进访客聊天、访客发图后客服端可见
