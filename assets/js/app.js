@@ -42,6 +42,40 @@ const app = createApp({
     // 图片查看器（v2.28）：滚轮缩放 / 旋转 / 下载
     const imgZoom = ref(1);
     const imgRot = ref(0);
+    // v2.55 图片查看器：复制到剪贴板 + 一闪而过的提示（默认 0.8 秒）
+    const imgToast = ref('');
+    let imgToastTimer = null;
+    const showImgToast = (t, ms = 800) => {
+      imgToast.value = t;
+      clearTimeout(imgToastTimer);
+      imgToastTimer = setTimeout(() => { imgToast.value = ''; }, ms);
+    };
+    const copyImage = async (url) => {
+      if (!url) return;
+      if (!navigator.clipboard || !window.ClipboardItem) { showImgToast('浏览器不支持复制，请用下载'); return; }
+      try {
+        const blob = await fetch(url).then(r => r.blob());
+        let out = blob;
+        if (blob.type !== 'image/png') {
+          // 剪贴板大多只认 PNG：其它格式先画到 canvas 再转
+          out = await new Promise((res, rej) => {
+            const im = new Image();
+            im.onload = () => {
+              const c = document.createElement('canvas');
+              c.width = im.naturalWidth; c.height = im.naturalHeight;
+              c.getContext('2d').drawImage(im, 0, 0);
+              c.toBlob(b => (b ? res(b) : rej(new Error('转换失败'))), 'image/png');
+            };
+            im.onerror = () => rej(new Error('图片加载失败'));
+            im.src = url;
+          });
+        }
+        await navigator.clipboard.write([new ClipboardItem({ 'image/png': out })]);
+        showImgToast('✅ 已复制图片');
+      } catch (e) {
+        showImgToast('复制失败，请用「下载」');
+      }
+    };
     const imgWheel = (e) => { imgZoom.value = Math.max(0.2, Math.min(6, imgZoom.value + (e.deltaY < 0 ? 0.15 : -0.15))); };
     const downloadImage = (url) => {
       if (!url) return;
@@ -2215,7 +2249,7 @@ const app = createApp({
       openSession, send, onKey, useQuick, sendQuick, quickClick, onImage, startRec, stopRec, closeSession, doTransfer,
       pendingAtts, rmPendingAtt, quickCtx, openQuickCtx, editQuick,
       qDrag, quickDragDown, quickDragMove, quickDragUp, quickMove,
-      imgZoom, imgRot, imgWheel, downloadImage,
+      imgZoom, imgRot, imgWheel, downloadImage, copyImage, imgToast,
       editContact, saveContact, contactDlg, editingContact, saveNote, sendBroadcast,
       copy, createLink, renewLink, newCode, delCode, showQr,
       agentDlg, agentMode, agentForm, openAgentEdit, saveAgent, resetAgentPw, toggleAgent, delAgent,

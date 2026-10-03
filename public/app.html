@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>客服工作台</title>
 <link rel="stylesheet" href="/assets/vendor/element-plus.css">
-<link rel="stylesheet" href="/assets/css/app.css?v=3.19.0">
+<link rel="stylesheet" href="/assets/css/app.css?v=3.20.0">
 <script src="/assets/ui/ui-registry.js?v=2.8.0"></script>
 <script src="/assets/ui/ui-loader.js?v=2.8.0" data-ui-cat="auto"></script>
 </head>
@@ -1377,21 +1377,11 @@
       <span class="iv-btn" title="放大" @click="imgZoom = Math.min(6, imgZoom + 0.2)">＋</span>
       <span class="iv-btn" title="还原" @click="imgZoom = 1; imgRot = 0">⤢</span>
       <span class="iv-btn" title="旋转" @click="imgRot += 90">⟳</span>
+      <span class="iv-btn" title="复制图片" @click="copyImage(viewing)">⧉</span>
       <span class="iv-btn" title="下载" @click="downloadImage(viewing)">⤓</span>
       <span class="iv-btn" title="关闭" @click="viewing=''">✕</span>
     </div>
-  </div>
-
-  <div class="img-viewer" v-if="viewing" @click.self="viewing=''">
-    <img :src="viewing" :style="{ transform: 'scale(' + imgZoom + ') rotate(' + imgRot + 'deg)' }" @wheel.prevent="imgWheel" @click.stop>
-    <div class="iv-tools" @click.stop>
-      <span class="iv-btn" title="缩小" @click="imgZoom = Math.max(0.2, imgZoom - 0.2)">－</span>
-      <span class="iv-btn" title="放大" @click="imgZoom = Math.min(6, imgZoom + 0.2)">＋</span>
-      <span class="iv-btn" title="还原" @click="imgZoom = 1; imgRot = 0">⤢</span>
-      <span class="iv-btn" title="旋转" @click="imgRot += 90">⟳</span>
-      <span class="iv-btn" title="下载" @click="downloadImage(viewing)">⤓</span>
-      <span class="iv-btn" title="关闭" @click="viewing=''">✕</span>
-    </div>
+    <div class="iv-toast" v-if="imgToast">{{ imgToast }}</div>
   </div>
 
   <!-- 联系方式编辑 -->
@@ -1410,7 +1400,7 @@
 <script src="/assets/qr-poster.js?v=2.1.03"></script>
 <script src="/assets/api.js?v=2.0.1"></script>
 <script src="/assets/js/app-components.js?v=2.4.0"></script>
-<script src="/assets/js/app.js?v=3.7.1"></script>
+<script src="/assets/js/app.js?v=3.8.0"></script>
 <script src="/assets/js/app-boot.js?v=2.1.1"></script>
 </body>
 </html>
