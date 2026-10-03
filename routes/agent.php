@@ -65,12 +65,13 @@ function handle_sessions(string $method): void
     $sql = "SELECT s.id, s.agent_id, a.nickname AS agent_name, s.visitor_name AS name, s.visitor_avatar,
         (SELECT value FROM contacts WHERE session_id = s.id AND type = 'note' LIMIT 1) AS note,
         s.ip, s.from_url AS `from`, s.last_msg AS lastMsg, s.last_time AS lastTime, s.unread, s.source, s.geo, s.ua,
+        s.pinned, s.pinned_at,
         s.archived_at, s.closed_at,
         $onlineSql AS status,
         (SELECT COUNT(*) FROM messages WHERE session_id = s.id) AS message_count
         FROM v_sessions s LEFT JOIN agents a ON a.id = s.agent_id AND a.tenant_id = s.tenant_id
         WHERE s.tenant_id = ?" . session_scope_sql($scope) . session_visible_sql($ctx) . "
-        ORDER BY s.last_time DESC LIMIT 500";
+        ORDER BY s.pinned DESC, s.pinned_at DESC, s.last_time DESC LIMIT 500";
     $rows = $pdo->prepare($sql);
     $rows->execute([$ctx['tenant_id']]);
     $out = $rows->fetchAll();
@@ -79,6 +80,7 @@ function handle_sessions(string $method): void
         $r['unread'] = (int)$r['unread'];
         $r['agent_id'] = (int)$r['agent_id'];
         $r['message_count'] = (int)$r['message_count'];
+        $r['pinned'] = (int)($r['pinned'] ?? 0);
         // 访客头像：优先已分配，其次按会话 id 稳定派生（老会话也有头像）
         $r['visitor_avatar'] = visitor_avatar_resolve((int)$r['id'], (string)($r['visitor_avatar'] ?? ''));
         // 访客标签（v2.29）：地区（省市+运营商，如 广东广州 电信）；设备/渠道仅悬停全文用
@@ -134,7 +136,7 @@ function handle_session_messages(string $method, array $m): void
 
     if ($method === 'GET') {
         $since = (int)input('since', 0);
-        $sql = 'SELECT id, session_id, from_type AS `from`, sender_id, sender_name, text, msg_type, attachments, recalled_at, created_at FROM messages WHERE session_id = ?' . ($since > 0 ? ' AND id > ?' : '') . ' ORDER BY id ASC';
+        $sql = 'SELECT id, session_id, from_type AS `from`, sender_id, sender_name, text, msg_type, attachments, reply_to, recalled_at, created_at FROM messages WHERE session_id = ?' . ($since > 0 ? ' AND id > ?' : '') . ' ORDER BY id ASC';
         $st = $pdo->prepare($sql);
         $st->execute($since > 0 ? [$sid, $since] : [$sid]);
         json_out(['messages' => array_map('to_msg', $st->fetchAll())]);
@@ -146,7 +148,7 @@ function handle_session_messages(string $method, array $m): void
         $attachArr = is_array($attachArr) ? $attachArr : [];
         // v2.32：允许指定消息类型（如「请求访客上传图片」卡片）
         $reqType = strtolower(trim((string)input('msg_type', '')));
-        $allowTypes = ['text', 'image', 'audio', 'mixed', 'ask_image'];
+        $allowTypes = ['text', 'image', 'audio', 'video', 'file', 'location', 'mixed', 'ask_image'];
         $reqType = in_array($reqType, $allowTypes, true) ? $reqType : '';
         $isAsk = ($reqType === 'ask_image');
         // 「请求访客上传图片」的默认话术：租户可在「访客策略 → 聊天话术」里自定义（留空则用内置默认）
@@ -162,9 +164,16 @@ function handle_session_messages(string $method, array $m): void
         $msgType = $isAsk ? 'ask_image' : ($reqType !== '' && $reqType !== 'text' ? $reqType : resolve_msg_type($text, $attachArr));
         $attachJson = $attachArr ? json_encode($attachArr, JSON_UNESCAPED_UNICODE) : '';
         $senderName = $ctx['name'] ?: '客服';
+        // v2.43 引用回复：reply_to 指向本会话内被引用的消息 id
+        $replyTo = (int)input('reply_to', 0);
+        if ($replyTo > 0) {
+            $chk = $pdo->prepare('SELECT id FROM messages WHERE id = ? AND session_id = ?');
+            $chk->execute([$replyTo, $sid]);
+            if (!$chk->fetchColumn()) $replyTo = 0;
+        }
 
-        $pdo->prepare("INSERT INTO messages (tenant_id, session_id, from_type, sender_id, sender_name, text, msg_type, attachments, created_at) VALUES (?,?,'agent',?,?,?,?,?,?)")
-            ->execute([$ctx['tenant_id'], $sid, $ctx['id'], $senderName, $text, $msgType, $attachJson, $now]);
+        $pdo->prepare("INSERT INTO messages (tenant_id, session_id, from_type, sender_id, sender_name, text, msg_type, attachments, reply_to, created_at) VALUES (?,?,'agent',?,?,?,?,?,?,?)")
+            ->execute([$ctx['tenant_id'], $sid, $ctx['id'], $senderName, $text, $msgType, $attachJson, $replyTo, $now]);
         $mid = (int)$pdo->lastInsertId();
 
         // 未分配会话：开启自动接手的客服发首条消息时接手
@@ -177,7 +186,8 @@ function handle_session_messages(string $method, array $m): void
             ->execute([msg_summary($text, $attachArr), $now, $sid]);
 
         json_out(['message' => ['id' => $mid, 'from' => 'agent', 'sender_id' => $ctx['id'], 'sender_name' => $senderName,
-            'text' => $text, 'time' => dt_to_iso($now), 'session_id' => $sid, 'msg_type' => $msgType, 'attachments' => $attachArr]]);
+            'text' => $text, 'time' => dt_to_iso($now), 'session_id' => $sid, 'msg_type' => $msgType,
+            'attachments' => $attachArr, 'reply_to' => $replyTo]]);
     }
 
     json_error('方法不允许', 405);
@@ -261,8 +271,13 @@ function handle_session_read(string $method, array $m): void
     $sid = (int)$m[1];
     $ctx = require_workspace();
     session_of($ctx, $sid);
+    // v2.43：unread=1 时反向「标为未读」（自己记个待办，不是访客真发了消息）
+    if ((int)input('unread', 0) === 1) {
+        db()->prepare('UPDATE v_sessions SET unread = GREATEST(1, unread) WHERE id = ?')->execute([$sid]);
+        json_out(['ok' => true, 'unread' => 1]);
+    }
     db()->prepare('UPDATE v_sessions SET unread = 0 WHERE id = ?')->execute([$sid]);
-    json_out(['ok' => true]);
+    json_out(['ok' => true, 'unread' => 0]);
 }
 
 /* ---------- 撤回消息（2 分钟内自己的消息） ---------- */
@@ -285,6 +300,57 @@ function handle_session_recall(string $method, array $m): void
     db()->prepare('UPDATE messages SET recalled_at = ?, text = ?, attachments = ? WHERE id = ?')
         ->execute([now_dt(), '消息已撤回', '', $msgId]);
     json_out(['ok' => true, 'msg_id' => $msgId]);
+}
+
+/* ---------- 会话置顶 / 取消置顶（v2.43） ---------- */
+function handle_session_pin(string $method, array $m): void
+{
+    if ($method !== 'POST') { json_error('方法不允许', 405); return; }
+    $sid = (int)$m[1];
+    $ctx = require_workspace();
+    session_of($ctx, $sid);
+    $in = input('pinned', null);
+    $pdo = db();
+    if ($in === null) {
+        $cur = $pdo->prepare('SELECT pinned FROM v_sessions WHERE id = ? AND tenant_id = ?');
+        $cur->execute([$sid, $ctx['tenant_id']]);
+        $pinned = ((int)$cur->fetchColumn() === 1) ? 0 : 1;
+    } else {
+        $pinned = ((int)$in === 1) ? 1 : 0;
+    }
+    $pdo->prepare('UPDATE v_sessions SET pinned = ?, pinned_at = ? WHERE id = ? AND tenant_id = ?')
+        ->execute([$pinned, $pinned ? now_dt() : null, $sid, $ctx['tenant_id']]);
+    json_out(['ok' => true, 'pinned' => $pinned]);
+}
+
+/* ---------- 删除单条消息（v2.43）：租户可删任意消息，子客服只能删自己发的客服消息 ---------- */
+function handle_message_delete(string $method, array $m): void
+{
+    if ($method !== 'POST') { json_error('方法不允许', 405); return; }
+    $sid = (int)$m[1];
+    $mid = (int)$m[2];
+    $ctx = require_workspace();
+    session_of($ctx, $sid);
+    $pdo = db();
+    $st = $pdo->prepare('SELECT id, from_type, sender_id FROM messages WHERE id = ? AND session_id = ? AND tenant_id = ?');
+    $st->execute([$mid, $sid, $ctx['tenant_id']]);
+    $msg = $st->fetch();
+    if (!$msg) json_error('消息不存在或已删除', 400);
+    if ($ctx['role'] !== 'tenant') {
+        $own = ((int)$msg['sender_id'] === (int)$ctx['id']) && $msg['from_type'] === 'agent';
+        if (!$own) json_error('只能删除自己发送的消息', 403);
+    }
+    $pdo->prepare('DELETE FROM messages WHERE id = ? AND session_id = ? AND tenant_id = ?')
+        ->execute([$mid, $sid, $ctx['tenant_id']]);
+    // 引用了这条消息的回复，把引用清掉（避免前端指向不存在的消息）
+    $pdo->prepare('UPDATE messages SET reply_to = 0 WHERE session_id = ? AND reply_to = ?')->execute([$sid, $mid]);
+    // 会话列表的"最近一条"跟着更新
+    $last = $pdo->prepare('SELECT text, msg_type, attachments FROM messages WHERE session_id = ? ORDER BY id DESC LIMIT 1');
+    $last->execute([$sid]);
+    $row = $last->fetch();
+    $summary = $row ? msg_summary((string)$row['text'], parse_attachments($row['attachments'] ?? null)) : '暂无消息';
+    $pdo->prepare('UPDATE v_sessions SET last_msg = ? WHERE id = ?')->execute([$summary, $sid]);
+    json_out(['ok' => true, 'msg_id' => $mid, 'last_msg' => $summary]);
 }
 
 /* ---------- 拉黑该会话访客 IP ---------- */
@@ -757,11 +823,12 @@ function handle_agent_poll(string $method): void
         (SELECT value FROM contacts WHERE session_id = s.id AND type = 'note' LIMIT 1) AS note,
         s.ip, s.from_url AS `from`, s.last_msg AS lastMsg, s.last_time AS lastTime, s.unread, s.source, s.geo, s.ua,
         s.archived_at, s.closed_at,
+        s.pinned, s.pinned_at,
         $onlineSql AS status,
         (SELECT COUNT(*) FROM messages WHERE session_id = s.id) AS message_count
         FROM v_sessions s LEFT JOIN agents a ON a.id = s.agent_id AND a.tenant_id = s.tenant_id
         WHERE s.tenant_id = ?" . session_scope_sql($scope) . session_visible_sql($ctx) . "
-        ORDER BY s.last_time DESC LIMIT 500");
+        ORDER BY s.pinned DESC, s.pinned_at DESC, s.last_time DESC LIMIT 500");
     $st->execute([$ctx['tenant_id']]);
     $sessions = [];
     foreach ($st->fetchAll() as $r) {
@@ -769,6 +836,7 @@ function handle_agent_poll(string $method): void
         $r['unread'] = (int)$r['unread'];
         $r['agent_id'] = (int)$r['agent_id'];
         $r['message_count'] = (int)$r['message_count'];
+        $r['pinned'] = (int)($r['pinned'] ?? 0);
         $r['visitor_avatar'] = visitor_avatar_resolve((int)$r['id'], (string)($r['visitor_avatar'] ?? ''));
         $uaInfo = parse_ua($r['ua'] ?? null);          // 访客标签（设备/渠道保留给悬停全文）
         $r['devTag'] = $uaInfo['dev_tag'];

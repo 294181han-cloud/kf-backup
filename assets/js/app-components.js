@@ -46,12 +46,16 @@ const CrudTable = defineComponent({
           <div v-else-if="f.type==='images'" style="width:100%;">
             <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
               <div v-for="(img, ii) in (form[f.k] || [])" :key="ii" style="position:relative;">
-                <img :src="img.url" style="width:54px;height:54px;object-fit:cover;border-radius:8px;border:1px solid #e5e6eb;display:block;">
+                <img v-if="!img.type || img.type==='image'" :src="img.url" style="width:54px;height:54px;object-fit:cover;border-radius:8px;border:1px solid #e5e6eb;display:block;">
+                <div v-else :title="img.name || ''" style="width:54px;height:54px;border-radius:8px;border:1px solid #e5e6eb;background:#f7f9fc;display:flex;flex-direction:column;align-items:center;justify-content:center;font-size:11px;color:#6b7688;overflow:hidden;">
+                  <span style="font-size:18px;line-height:1.1;">{{ img.type==='video' ? '🎬' : '📄' }}</span>
+                  <span style="max-width:50px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">{{ img.type==='video' ? '视频' : '文件' }}</span>
+                </div>
                 <span @click="rmImg(f.k, ii)" style="position:absolute;top:-7px;right:-7px;width:18px;height:18px;border-radius:50%;background:#f53f3f;color:#fff;text-align:center;line-height:18px;font-size:11px;cursor:pointer;">✕</span>
               </div>
               <button type="button" v-if="(form[f.k] || []).length < (f.max || 3)" @click="pickImg(f.k)" style="width:54px;height:54px;border:1px dashed #c9cdd4;border-radius:8px;background:#fafbfc;font-size:20px;color:#86909c;cursor:pointer;">＋</button>
             </div>
-            <input :ref="el => setImgRef(f.k, el)" type="file" accept="image/png,image/jpeg,image/gif,image/webp" style="display:none" @change="onImg($event, f.k)">
+            <input :ref="el => setImgRef(f.k, el)" type="file" accept="image/*,video/*,.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.zip,.rar,.7z,.txt,.csv,.apk" style="display:none" @change="onImg($event, f.k)">
             <div class="muted" style="font-size:11px;margin-top:5px;">{{ f.tip || '发送该条消息时将附带图片' }}</div>
           </div>
           <el-input v-else v-model="form[f.k]"/>
@@ -85,10 +89,15 @@ const CrudTable = defineComponent({
       const file = ev.target.files[0];
       ev.target.value = '';
       if (!file) return;
-      if (file.size > 5 * 1024 * 1024) { ELEMENT.ElMessage.warning('图片不能超过 5MB'); return; }
+      // v2.43：附件不再只支持图片，视频 / 文件也能挂到快捷消息上
+      const isImg = /^image\//.test(file.type);
+      const isVid = /^video\//.test(file.type);
+      const kind = isImg ? 'image' : (isVid ? 'video' : 'file');
+      const limit = isImg ? 5 * 1024 * 1024 : 20 * 1024 * 1024;
+      if (file.size > limit) { ELEMENT.ElMessage.warning(isImg ? '图片不能超过 5MB' : '视频/文件不能超过 20MB'); return; }
       const data = await new Promise(res => { const fr = new FileReader(); fr.onload = () => res(fr.result); fr.readAsDataURL(file); });
       try {
-        const up = await API.post('/api/upload', { data, kind: 'image', filename: file.name });
+        const up = await API.post('/api/upload', { data, kind, filename: file.name });
         if (!Array.isArray(form[k])) form[k] = [];
         form[k].push(up);
       } catch (e) { ELEMENT.ElMessage.error(e.message); }

@@ -1257,3 +1257,115 @@ body.dark .geo-tag.chn-ali  { background: rgba(22, 119, 255, .24); color: #9fc7f
 body.dark .geo-tag.chn-dy   { background: rgba(254, 44, 85, .22);  color: #ff9db4; }
 body.dark .geo-tag.chn-dt   { background: rgba(20, 118, 254, .24); color: #9fc7ff; }
 body.dark .geo-tag.chn-other { background: #262c34; color: #98a3b4; }
+
+/* =====================================================================
+   v2.43 引用回复 / 消息菜单 / 多选 / 视频·文件·定位（工作台）
+   ===================================================================== */
+.ctx-divider { height: 1px; background: var(--v-line-2, #e8ecf3); margin: 5px 8px; }
+body.dark .ctx-divider { background: #333a44; }
+
+/* 会话行：置顶图钉 + 悬浮「⋯」更多操作 */
+.sess-item { position: relative; }
+.sess-item .pin-ic { font-size: 11px; line-height: 1; flex-shrink: 0; }
+.sess-item.pinned { background: color-mix(in srgb, var(--theme, #1677ff) 5%, #fff); }
+.sess-item.pinned .name { font-weight: 700; }
+.sess-more {
+  position: absolute; right: 6px; top: 50%; transform: translateY(-50%);
+  border: 0; background: rgba(255, 255, 255, .93); color: #8b95a7; width: 24px; height: 24px;
+  border-radius: 8px; cursor: pointer; font-size: 15px; line-height: 1; opacity: 0;
+  transition: opacity .12s, background .12s; box-shadow: 0 1px 4px rgba(0, 0, 0, .08);
+}
+.sess-item:hover .sess-more { opacity: 1; }
+.sess-more:hover { background: #eef1f7; color: var(--theme, #1677ff); }
+body.dark .sess-item.pinned { background: color-mix(in srgb, var(--theme, #1677ff) 14%, #1e2229); }
+body.dark .sess-more { background: #262c34; color: #9aa4b5; }
+body.dark .sess-more:hover { background: #2f3640; color: #9fc7ff; }
+
+/* 引用回复：气泡上方的引用条 */
+.msg-quote {
+  max-width: 100%; display: flex; flex-direction: column; gap: 1px;
+  background: rgba(17, 24, 39, .055); border-left: 2px solid rgba(17, 24, 39, .18);
+  border-radius: 6px; padding: 4px 8px; margin-bottom: 4px; font-size: 11.5px;
+  cursor: pointer; overflow: hidden;
+}
+.msg-quote .mq-who { color: #6b7688; font-weight: 600; }
+.msg-quote .mq-text { color: #4e5969; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.msg-row.mine .msg-quote { background: rgba(0, 0, 0, .06); border-left-color: rgba(0, 0, 0, .2); }
+.msg-row.mine .msg-quote .mq-who, .msg-row.mine .msg-quote .mq-text { color: #2f6b3f; }
+body.dark .msg-quote { background: rgba(255, 255, 255, .07); border-left-color: rgba(255, 255, 255, .25); }
+body.dark .msg-quote .mq-who { color: #c2cad6; }
+body.dark .msg-quote .mq-text { color: #a9b3c2; }
+body.dark .msg-row.mine .msg-quote .mq-who, body.dark .msg-row.mine .msg-quote .mq-text { color: #eafff2; }
+
+/* 点引用条跳到原消息时的闪烁提示 */
+.msg-row.flash .msg-bubble {
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--theme, #1677ff) 38%, transparent);
+  transition: box-shadow .2s;
+}
+
+/* 多选勾选圈 */
+.msg-check {
+  width: 20px; height: 20px; border-radius: 50%; border: 1.5px solid #c6ccd8; background: #fff;
+  flex-shrink: 0; margin-top: 15px; cursor: pointer; color: #fff;
+  display: inline-flex; align-items: center; justify-content: center;
+}
+.msg-check.on { background: var(--theme, #1677ff); border-color: var(--theme, #1677ff); }
+.msg-check svg { width: 12px; height: 12px; }
+body.dark .msg-check { background: #262c34; border-color: #4a545f; }
+
+/* 正在回复谁 */
+.reply-bar {
+  display: flex; align-items: center; gap: 8px; background: #f2f5fa;
+  border-left: 3px solid var(--theme, #1677ff); border-radius: 8px; padding: 6px 10px; margin-bottom: 6px;
+}
+.reply-bar .rb-body { flex: 1; min-width: 0; }
+.reply-bar .rb-who { display: block; font-size: 11.5px; color: var(--theme, #1677ff); font-weight: 600; }
+.reply-bar .rb-text { display: block; font-size: 12px; color: #6b7688; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.reply-bar .rb-x { border: 0; background: transparent; color: #8b95a7; cursor: pointer; font-size: 14px; flex-shrink: 0; }
+.reply-bar .rb-x:hover { color: #e5484d; }
+body.dark .reply-bar { background: #262c34; }
+body.dark .reply-bar .rb-text { color: #a9b3c2; }
+
+/* 多选操作条 */
+.sel-bar { display: flex; align-items: center; gap: 8px; background: #eef2f8; border-radius: 10px; padding: 8px 12px; }
+.sel-bar .sb-n { flex: 1; font-size: 13px; font-weight: 600; color: #46506a; }
+.sel-bar .sb-btn {
+  border: 1px solid var(--v-line-2, #e3e8f0); background: #fff; color: #46506a;
+  border-radius: 8px; padding: 6px 12px; font-size: 12.5px; cursor: pointer; font-family: inherit;
+}
+.sel-bar .sb-btn:hover { border-color: var(--theme, #1677ff); color: var(--theme, #1677ff); }
+.sel-bar .sb-btn.danger { color: #e5484d; border-color: #f4c7c8; }
+.sel-bar .sb-btn.danger:hover { background: #fdeeee; }
+.sel-bar .sb-btn.ghost { color: #98a1b0; }
+body.dark .sel-bar { background: #262c34; }
+body.dark .sel-bar .sb-n { color: #c6ccd8; }
+body.dark .sel-bar .sb-btn { background: #232830; border-color: #333a44; color: #c6ccd8; }
+
+/* 视频 / 文件 / 位置 气泡 */
+.vb-video { display: block; max-width: 260px; border-radius: 10px; margin-top: 2px; background: #000; }
+.file-bubble {
+  display: flex; align-items: center; gap: 10px; background: #f7f9fc; border: 1px solid #e8ecf3;
+  border-radius: 10px; padding: 9px 12px; margin-top: 2px; text-decoration: none; color: inherit; min-width: 190px;
+}
+.file-bubble:hover { border-color: var(--theme, #1677ff); }
+.file-bubble .fb-ic { font-size: 20px; }
+.file-bubble .fb-body { flex: 1; min-width: 0; }
+.file-bubble .fb-name { display: block; font-size: 12.5px; color: #1f2329; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.file-bubble .fb-size { display: block; font-size: 11px; color: #98a1b0; }
+.file-bubble .fb-dl { color: var(--theme, #1677ff); font-weight: 700; }
+.loc-bubble {
+  display: flex; align-items: center; gap: 10px; background: #f3f8f4; border: 1px solid #d9ecdf;
+  border-radius: 10px; padding: 9px 12px; margin-top: 2px; text-decoration: none; color: inherit; min-width: 190px;
+}
+.loc-bubble .lb-ic { font-size: 20px; }
+.loc-bubble .lb-body { flex: 1; min-width: 0; }
+.loc-bubble .lb-name { display: block; font-size: 12.5px; font-weight: 600; color: #1f2329; }
+.loc-bubble .lb-sub { display: block; font-size: 11px; color: #7c8b83; }
+body.dark .file-bubble { background: #232830; border-color: #333a44; }
+body.dark .file-bubble .fb-name { color: #e7eaf0; }
+body.dark .loc-bubble { background: #1e2c24; border-color: #2f4a3a; }
+body.dark .loc-bubble .lb-name { color: #dfe7e2; }
+body.dark .loc-bubble .lb-sub { color: #9db3a5; }
+
+/* 工具条右侧小提示 */
+.tools-hint { font-size: 11px; color: #a8b0bd; margin-left: auto; }

@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
 <meta name="theme-color" content="#1677ff">
 <title>在线咨询</title>
-<link rel="stylesheet" href="/assets/css/visitor.css?v=2.9.0">
+<link rel="stylesheet" href="/assets/css/visitor.css?v=2.10.0">
 </head>
 <body>
 <div id="app">
@@ -68,7 +68,9 @@
 
       <template v-for="(m, mi) in visibleMessages" :key="m.id">
       <div class="day-sep" v-if="needDaySep(mi)"><span>{{ dayText(m.time) }}</span></div>
-      <div class="msg-row" :class="m.from === 'visitor' ? 'visitor' : 'agent'">
+      <div class="msg-row" :id="'vm' + m.id" :class="[m.from === 'visitor' ? 'visitor' : 'agent', {flash: flashId === m.id}]"
+           @touchstart="onMsgTouchStart(m, $event)" @touchend="onMsgTouchEnd" @touchmove="onMsgTouchEnd"
+           @contextmenu.prevent="openActSheet(m)">
         <template v-if="m.recalled">
           <div class="msg-bubble recall-capsule">{{ m.from === 'visitor' ? '你撤回了一条消息' : '对方撤回了一条消息' }}</div>
         </template>
@@ -85,9 +87,24 @@
               <button class="ac-btn" @click="pickImage">上传图片</button>
             </div>
             <div class="msg-bubble" v-else>
+              <!-- 引用回复：显示被引用的那条（点一下跳到原消息） -->
+              <div class="msg-quote" v-if="m.reply_to && quoteOf(m)" @click.stop="jumpTo(m.reply_to)">
+                <span class="mq-who">{{ quoteWho(quoteOf(m)) }}</span>
+                <span class="mq-text">{{ quoteText(quoteOf(m)) }}</span>
+              </div>
               <template v-if="m.text"><template v-for="(seg, si) in linkSegs(m.text)" :key="si"><a v-if="seg.isUrl && linkMode === 'jump'" class="msg-link" :href="seg.t" target="_blank" rel="noopener noreferrer">{{ seg.t }}</a><span v-else-if="seg.isUrl && linkMode === 'copy'" class="msg-link-copy" @click="copyLink(seg.t)">🔗 复制链接</span><template v-else>{{ seg.t }}</template></template></template>
               <template v-for="(a, i) in (m.attachments || [])" :key="i">
                 <img v-if="a.type === 'image'" :src="a.url" @click="viewImage(a.url)">
+                <video v-if="a.type === 'video'" class="vb-video" :src="a.url" controls preload="metadata"></video>
+                <a v-if="a.type === 'file'" class="file-bubble" :href="a.url" target="_blank" rel="noopener" download>
+                  <span class="fb-ic">📄</span>
+                  <span class="fb-body"><span class="fb-name">{{ a.name || '文件' }}</span><span class="fb-size">{{ fmtSize(a.size) }}</span></span>
+                  <span class="fb-dl">↓</span>
+                </a>
+                <a v-if="a.type === 'location'" class="loc-bubble" :href="mapUrl(a)" target="_blank" rel="noopener">
+                  <span class="lb-ic">📍</span>
+                  <span class="lb-body"><span class="lb-name">{{ a.name || '位置' }}</span><span class="lb-sub">点击在地图中查看</span></span>
+                </a>
                 <div v-if="a.type === 'audio'" class="voice-bubble" :class="{playing: audioPlaying===a.url}" @click.stop="toggleAudio(a.url)">
                   <span class="vb-play">
                     <svg v-if="audioPlaying!==a.url" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5.5v13l11-6.5z"/></svg>
@@ -129,8 +146,25 @@
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M6 13l6 6 6-6"/></svg>
     </button>
 
+    <!-- 长按消息 / 右键：回复、复制、撤回 -->
+    <div class="v-sheet-mask" v-if="actSheet.show" @click="actSheet.show = false"></div>
+    <div class="v-sheet" v-if="actSheet.show">
+      <button class="vs-item" @click="startReply(actSheet.msg)">💬 回复</button>
+      <button class="vs-item" @click="copyMsg(actSheet.msg)">📋 复制文字</button>
+      <button class="vs-item danger" v-if="actSheet.msg && actSheet.msg.from === 'visitor' && canRecall(actSheet.msg)" @click="recallMine(actSheet.msg)">↩️ 撤回</button>
+      <button class="vs-item ghost" @click="actSheet.show = false">取消</button>
+    </div>
+
     <template v-if="!ended">
     <div class="v-footer-wrap">
+      <!-- 引用回复：正在回复谁 -->
+      <div class="v-reply-bar" v-if="replyTo">
+        <div class="vr-body">
+          <span class="vr-who">回复 {{ quoteWho(replyTo) }}</span>
+          <span class="vr-text">{{ quoteText(replyTo) }}</span>
+        </div>
+        <button class="vr-x" @click="replyTo = null" title="取消回复">✕</button>
+      </div>
       <div class="v-bar" v-if="!voiceMode">
         <button class="v-icon-btn" @click="toggleVoice" title="切换成按住说话">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0"/><path d="M12 18v3"/></svg>
@@ -141,7 +175,7 @@
         <input ref="imgInput" type="file" accept="image/png,image/jpeg,image/gif,image/webp" style="display:none" @change="onImage">
         <textarea class="v-input" ref="inputRef" rows="1" v-model="draft"
           @focus="scrollBottom" placeholder="请输入您的问题…" @input="onDraftInput"
-          @keydown.enter.exact.prevent="send"></textarea>
+          @paste="onPaste" @keydown.enter.exact.prevent="send"></textarea>
         <button class="v-btn" :class="{ready: !!draft.trim()}" :disabled="!draft.trim() || sending" @click="send" title="发送">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12l16-8-6.5 8L20 20z"/></svg>
         </button>
@@ -231,6 +265,6 @@
 </div>
 
 <script src="/assets/vendor/vue.global.js?v=2.0.1"></script>
-<script src="/assets/js/visitor.js?v=2.10.0"></script>
+<script src="/assets/js/visitor.js?v=2.11.0"></script>
 </body>
 </html>

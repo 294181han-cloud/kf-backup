@@ -401,7 +401,8 @@ function resolve_msg_type(string $text, array $attachments): string
     if (!$attachments) return 'text';
     if ($text === '') {
         $first = $attachments[0]['type'] ?? '';
-        return $first === 'audio' ? 'audio' : 'image';
+        // v2.43：除文字外，语音/图片/视频/文件/位置 各自成一种消息类型
+        return in_array($first, ['audio', 'image', 'video', 'file', 'location'], true) ? $first : 'image';
     }
     return 'mixed';
 }
@@ -411,7 +412,10 @@ function msg_summary(string $text, array $attachArr): string
 {
     if ($text !== '') return mb_substr($text, 0, 60);
     $t = $attachArr[0]['type'] ?? '';
-    return $t === 'audio' ? '[语音]' : '[图片]';
+    return [
+        'audio' => '[语音]', 'image' => '[图片]', 'video' => '[视频]',
+        'file' => '[文件]', 'location' => '[位置]',
+    ][$t] ?? '[图片]';
 }
 
 /* ================= 上传（base64 → 磁盘） ================= */
@@ -448,13 +452,20 @@ function save_upload(string $data, string $kind, string $filename = ''): array
     $buffer = base64_decode($payload, true);
     if ($buffer === false || $buffer === '') throw new \RuntimeException('文件内容为空');
 
-    $maxBytes = $kind === 'audio' ? $cfg['upload_max_audio'] : $cfg['upload_max_image'];
+    // v2.43：新增视频 / 通用文件上传（默认 20MB，可在 config.php 覆盖）
+    $limitImage = (int)($cfg['upload_max_image'] ?? 5 * 1024 * 1024);
+    $limitAudio = (int)($cfg['upload_max_audio'] ?? 10 * 1024 * 1024);
+    $limitMedia = (int)($cfg['upload_max_media'] ?? 20 * 1024 * 1024);
+    $maxBytes = $kind === 'audio' ? $limitAudio : (in_array($kind, ['video', 'file'], true) ? $limitMedia : $limitImage);
     if (strlen($buffer) > $maxBytes) {
-        throw new \RuntimeException($kind === 'audio' ? '语音不能超过 10MB' : '图片不能超过 5MB');
+        $mb = (int)round($maxBytes / 1024 / 1024);
+        $label = $kind === 'audio' ? '语音' : ($kind === 'video' ? '视频' : ($kind === 'file' ? '文件' : '图片'));
+        throw new \RuntimeException($label . '不能超过 ' . $mb . 'MB');
     }
 
     $isImage = (bool)preg_match('#^image/(png|jpe?g|gif|webp)$#i', $mime);
     $isAudio = (bool)preg_match('#^(audio/|video/webm)#i', $mime);
+    $isVideo = (bool)preg_match('#^video/#i', $mime);
 
     // 服务器禁用 shell_exec，语音不做转码，直接保存原始格式（前端选可播格式录制）
     if ($kind === 'image' && $isImage) {
@@ -471,7 +482,45 @@ function save_upload(string $data, string $kind, string $filename = ''): array
         return ['type' => 'audio', 'url' => $cfg['upload_url'] . '/' . $name, 'size' => strlen($buffer)];
     }
 
+    // 视频：只放行常见可播格式，前端用 <video> 直接播
+    if ($kind === 'video' && ($isVideo || preg_match('#^application/octet-stream$#i', $mime))) {
+        $ext = media_ext_of($mime, $filename, ['mp4', 'webm', 'ogg', 'mov', 'm4v'], 'mp4');
+        $name = time() . '-' . bin2hex(random_bytes(4)) . '.' . $ext;
+        if (file_put_contents("$dir/$name", $buffer) === false) throw new \RuntimeException('写入文件失败');
+        return ['type' => 'video', 'url' => $cfg['upload_url'] . '/' . $name, 'size' => strlen($buffer),
+            'name' => $filename !== '' ? $filename : ('视频.' . $ext)];
+    }
+
+    // 通用文件：保留原扩展名（白名单外的扩展名降级为 .bin，避免落可执行脚本）
+    if ($kind === 'file') {
+        $orig = $filename !== '' ? $filename : 'file.bin';
+        $ext = strtolower(pathinfo($orig, PATHINFO_EXTENSION));
+        if (!preg_match('#^[a-z0-9]{1,8}$#', $ext)) $ext = 'bin';
+        $safeExt = [
+            'pdf', 'doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx', 'txt', 'csv', 'zip', 'rar', '7z',
+            'mp3', 'm4a', 'wav', 'mp4', 'mov', 'png', 'jpg', 'jpeg', 'gif', 'webp', 'apk', 'bin',
+        ];
+        if (!in_array($ext, $safeExt, true)) $ext = 'bin';
+        $name = time() . '-' . bin2hex(random_bytes(4)) . '.' . $ext;
+        if (file_put_contents("$dir/$name", $buffer) === false) throw new \RuntimeException('写入文件失败');
+        return ['type' => 'file', 'url' => $cfg['upload_url'] . '/' . $name, 'size' => strlen($buffer), 'name' => $orig];
+    }
+
     throw new \RuntimeException('文件格式不支持：' . ($mime ?: '未知'));
+}
+
+/** 视频/文件的扩展名推断：优先取原文件名，其次 mime 子类型，最后给默认值 */
+function media_ext_of(string $mime, string $filename, array $allow, string $fallback): string
+{
+    $ext = strtolower(pathinfo($filename, PATHINFO_EXTENSION));
+    if (in_array($ext, $allow, true)) return $ext;
+    if (preg_match('#^[a-z]+/([a-z0-9.+\-]+)#i', $mime, $m)) {
+        $sub = strtolower($m[1]);
+        if (in_array($sub, $allow, true)) return $sub;
+        if ($sub === 'quicktime') return 'mov';
+        if ($sub === 'x-matroska') return 'mp4';
+    }
+    return $fallback;
 }
 
 /* ================= IP 归属地（国内库优先 + ip-api 回退，带文件缓存） =================

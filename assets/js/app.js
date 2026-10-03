@@ -533,11 +533,14 @@ const app = createApp({
       if ((!text && !atts.length) || !currentId.value || sending.value) return;
       sending.value = true;
       try {
-        const r = await API.post('/api/sessions/' + currentId.value + '/messages', { text, attachments: atts.length ? atts : undefined });
+        const payload = { text, attachments: atts.length ? atts : undefined };
+        if (replyTo.value) payload.reply_to = replyTo.value.id;   // v2.43 引用回复
+        const r = await API.post('/api/sessions/' + currentId.value + '/messages', payload);
         msgs.value.push(r.message);
         maxMsgId.value = r.message.id;
         draft.value = '';
         pendingAtts.value = [];
+        replyTo.value = null;
         showQuick.value = false;
         scrollBottom();
         sendBeep();
@@ -693,6 +696,173 @@ const app = createApp({
         msgs.value.push(r.message); maxMsgId.value = r.message.id; scrollBottom();
       } catch (e) { ElementPlus.ElMessage.error(e.message); }
     };
+    /* ===== v2.43：引用回复 / 消息菜单 / 多选 / 粘贴发图 / 视频·文件·定位 ===== */
+    const replyTo = ref(null);
+    const flashId = ref(0);
+    const quoteOf = (m) => (m && m.reply_to) ? msgs.value.find(x => x.id === m.reply_to) : null;
+    const quoteWho = (m) => !m ? '' : (m.from === 'agent' ? (m.sender_name || '客服') : ((current.value && current.value.name) || '访客'));
+    const quoteText = (m) => {
+      if (!m) return '';
+      if (m.recalled) return '消息已撤回';
+      const t = (m.text || '').trim();
+      if (t) return t.length > 60 ? t.slice(0, 60) + '…' : t;
+      const a = (m.attachments || [])[0] || {};
+      return { image: '[图片]', audio: '[语音]', video: '[视频]',
+        file: '[文件] ' + (a.name || ''), location: '[位置] ' + (a.name || '') }[a.type] || '[消息]';
+    };
+    const startReply = (m) => {
+      if (!m) return;
+      msgMenu.show = false;
+      replyTo.value = m;
+      const el = document.querySelector('.chat-input textarea');
+      if (el) el.focus();
+    };
+    const jumpToMsg = (id) => {
+      const el = document.getElementById('km' + id);
+      if (!el) { ElementPlus.ElMessage.info('这条消息在更早的记录里'); return; }
+      el.scrollIntoView({ block: 'center', behavior: 'smooth' });
+      flashId.value = id;
+      setTimeout(() => { if (flashId.value === id) flashId.value = 0; }, 1400);
+    };
+    const copyMsg = async (m) => {
+      msgMenu.show = false;
+      const t = (m && m.text) || '';
+      if (!t) { ElementPlus.ElMessage.warning('这条消息没有文字'); return; }
+      try { await navigator.clipboard.writeText(t); ElementPlus.ElMessage.success('已复制'); }
+      catch (e) { ElementPlus.ElMessage.warning('复制失败，请手动选中'); }
+    };
+    const fmtSize = (n) => {
+      const b = Number(n) || 0;
+      if (b < 1024) return b + ' B';
+      if (b < 1024 * 1024) return (b / 1024).toFixed(0) + ' KB';
+      return (b / 1024 / 1024).toFixed(1) + ' MB';
+    };
+    const mapUrl = (a) => {
+      if (a && a.url) return a.url;
+      if (a && a.lat && a.lng) return 'https://uri.amap.com/marker?position=' + a.lng + ',' + a.lat + '&name=' + encodeURIComponent(a.name || '位置');
+      return 'https://uri.amap.com/search?keyword=' + encodeURIComponent((a && a.name) || '');
+    };
+    // --- 消息右键菜单 ---
+    const msgMenu = reactive({ show: false, x: 0, y: 0, msg: null });
+    const openMsgMenu = (m, ev) => {
+      if (selMode.value) return;
+      closeCtxMenu(); quickCtx.show = false;
+      msgMenu.msg = m; msgMenu.x = ev.clientX; msgMenu.y = ev.clientY; msgMenu.show = true;
+    };
+    const closeMsgMenu = () => { msgMenu.show = false; };
+    const deleteMsg = async (m) => {
+      msgMenu.show = false;
+      if (!m) return;
+      try {
+        const r = await API.post('/api/sessions/' + currentId.value + '/messages/' + m.id + '/delete');
+        msgs.value = msgs.value.filter(x => x.id !== m.id);
+        const s = sessions.value.find(x => x.id === currentId.value);
+        if (s && r && r.last_msg) s.lastMsg = r.last_msg;
+        ElementPlus.ElMessage.success('已删除');
+      } catch (e) { ElementPlus.ElMessage.error(e.message); }
+    };
+    // --- 多选 ---
+    const selMode = ref(false);
+    const selIds = ref([]);
+    const enterSel = (m) => { msgMenu.show = false; selMode.value = true; selIds.value = m ? [m.id] : []; };
+    const exitSel = () => { selMode.value = false; selIds.value = []; };
+    const toggleSel = (id) => {
+      const i = selIds.value.indexOf(id);
+      if (i >= 0) selIds.value.splice(i, 1); else selIds.value.push(id);
+    };
+    const selAll = () => { selIds.value = msgs.value.filter(m => m.from !== 'system').map(m => m.id); };
+    const selCopy = async () => {
+      const picked = msgs.value.filter(m => selIds.value.includes(m.id));
+      if (!picked.length) { ElementPlus.ElMessage.warning('还没选消息'); return; }
+      const txt = picked.map(m => quoteWho(m) + '：' + (m.text || quoteText(m))).join('\n');
+      try { await navigator.clipboard.writeText(txt); ElementPlus.ElMessage.success('已复制 ' + picked.length + ' 条'); }
+      catch (e) { ElementPlus.ElMessage.warning('复制失败'); }
+    };
+    const selDelete = async () => {
+      const picked = msgs.value.filter(m => selIds.value.includes(m.id));
+      if (!picked.length) { ElementPlus.ElMessage.warning('还没选消息'); return; }
+      try {
+        await ElementPlus.ElMessageBox.confirm('删除选中的 ' + picked.length + ' 条消息？删除后不可恢复。', '批量删除',
+          { type: 'warning', confirmButtonText: '删除', cancelButtonText: '取消' });
+      } catch (e) { return; }
+      let ok = 0;
+      for (const m of picked) {
+        try { await API.post('/api/sessions/' + currentId.value + '/messages/' + m.id + '/delete'); ok++; } catch (e) {}
+      }
+      const ids = picked.map(m => m.id);
+      msgs.value = msgs.value.filter(x => !ids.includes(x.id));
+      exitSel();
+      ElementPlus.ElMessage.success('已删除 ' + ok + ' 条');
+    };
+    // --- Ctrl+V 粘贴图片直接发 ---
+    const onPaste = async (ev) => {
+      if (!currentId.value) return;
+      const items = (ev.clipboardData && ev.clipboardData.items) || [];
+      const files = [];
+      for (const it of items) { if (it.kind === 'file') { const f = it.getAsFile(); if (f) files.push(f); } }
+      if (!files.length) return;
+      ev.preventDefault();
+      for (const f of files) {
+        if (!/^image\//.test(f.type)) { ElementPlus.ElMessage.warning('只能粘贴图片'); continue; }
+        if (f.size > 5 * 1024 * 1024) { ElementPlus.ElMessage.warning('粘贴的图片不能超过 5MB'); continue; }
+        const data = await new Promise(res => { const fr = new FileReader(); fr.onload = () => res(fr.result); fr.readAsDataURL(f); });
+        try {
+          const up = await API.post('/api/upload', { data, kind: 'image', filename: f.name || 'clipboard.png' });
+          const body = { text: draft.value.trim(), attachments: [up] };
+          if (replyTo.value) body.reply_to = replyTo.value.id;
+          const r = await API.post('/api/sessions/' + currentId.value + '/messages', body);
+          msgs.value.push(r.message); maxMsgId.value = r.message.id;
+          draft.value = ''; replyTo.value = null; scrollBottom();
+        } catch (e) { ElementPlus.ElMessage.error(e.message); }
+      }
+    };
+    // --- 发视频 / 发文件 ---
+    const MAX_UPLOAD_MEDIA = 20 * 1024 * 1024;
+    const sendFile = async (ev, kind) => {
+      const file = ev.target.files[0];
+      ev.target.value = '';
+      if (!file || !currentId.value) return;
+      if (file.size > MAX_UPLOAD_MEDIA) { ElementPlus.ElMessage.warning('文件不能超过 20MB'); return; }
+      const data = await new Promise(res => { const fr = new FileReader(); fr.onload = () => res(fr.result); fr.readAsDataURL(file); });
+      try {
+        const up = await API.post('/api/upload', { data, kind, filename: file.name });
+        const body = { text: '', attachments: [up] };
+        if (replyTo.value) body.reply_to = replyTo.value.id;
+        const r = await API.post('/api/sessions/' + currentId.value + '/messages', body);
+        msgs.value.push(r.message); maxMsgId.value = r.message.id; replyTo.value = null; scrollBottom();
+        const s = sessions.value.find(x => x.id === currentId.value);
+        if (s) s.lastMsg = kind === 'video' ? '[视频]' : '[文件]';
+      } catch (e) { ElementPlus.ElMessage.error(e.message); }
+    };
+    // --- 发定位：能定位就用真实坐标，不能定位就让客服手填地点名 ---
+    const sendLocation = () => {
+      if (!currentId.value) return;
+      const post = async (att) => {
+        try {
+          const body = { text: '', msg_type: 'location', attachments: [att] };
+          if (replyTo.value) body.reply_to = replyTo.value.id;
+          const r = await API.post('/api/sessions/' + currentId.value + '/messages', body);
+          msgs.value.push(r.message); maxMsgId.value = r.message.id; replyTo.value = null; scrollBottom();
+        } catch (e) { ElementPlus.ElMessage.error(e.message); }
+      };
+      const manual = async () => {
+        try {
+          const r = await ElementPlus.ElMessageBox.prompt('浏览器定位不可用，直接填一个地点名称，访客点击会在地图里搜索', '发送位置',
+            { inputPlaceholder: '如：山东省潍坊市奎文区胜利东街 1 号 或 公司名称', confirmButtonText: '发送', cancelButtonText: '取消' });
+          const name = ((r && r.value) || '').trim();
+          if (name) post({ type: 'location', name, lat: '', lng: '' });
+        } catch (e) {}
+      };
+      if (!navigator.geolocation) { manual(); return; }
+      ElementPlus.ElMessage.info('正在获取当前位置…');
+      navigator.geolocation.getCurrentPosition((pos) => {
+        const lat = pos.coords.latitude.toFixed(6);
+        const lng = pos.coords.longitude.toFixed(6);
+        post({ type: 'location', name: '我的位置', lat, lng,
+          url: 'https://uri.amap.com/marker?position=' + lng + ',' + lat + '&name=' + encodeURIComponent('我的位置') });
+      }, manual, { timeout: 8000, enableHighAccuracy: false });
+    };
+
     const startRec = async () => {
       if (!navigator.mediaDevices || !window.MediaRecorder) { ElementPlus.ElMessage.warning('当前浏览器不支持录音'); return false; }
       try {
@@ -792,14 +962,59 @@ const app = createApp({
       } catch (e) { ElementPlus.ElMessage.error(e.message); }
     };
     // 右键菜单（v2.26）：列表项右键弹出（删除腾额度 / 归档 / 结束）
-    const ctxMenu = reactive({ show: false, x: 0, y: 0, sid: 0, name: '' });
+    const ctxMenu = reactive({ show: false, x: 0, y: 0, sid: 0, name: '', pinned: 0 });
     const openCtxMenu = (s, ev) => {
       ev.preventDefault();
+      closeMsgMenu(); quickCtx.show = false;
       ctxMenu.x = ev.clientX; ctxMenu.y = ev.clientY;
-      ctxMenu.sid = s.id; ctxMenu.name = s.name;
+      ctxMenu.sid = s.id; ctxMenu.name = s.name; ctxMenu.pinned = s.pinned ? 1 : 0;
+      ctxMenu.show = true;
+    };
+    // 会话行「⋯」按钮：菜单贴着按钮弹（不是鼠标位置）
+    const openCtxMenuFromBtn = (s, ev) => {
+      ev.preventDefault();
+      closeMsgMenu(); quickCtx.show = false;
+      const r = ev.currentTarget.getBoundingClientRect();
+      const w = 230;
+      ctxMenu.x = Math.max(8, Math.min(r.right - w, window.innerWidth - w - 8));
+      ctxMenu.y = Math.min(r.bottom + 4, window.innerHeight - 300);
+      ctxMenu.sid = s.id; ctxMenu.name = s.name; ctxMenu.pinned = s.pinned ? 1 : 0;
       ctxMenu.show = true;
     };
     const closeCtxMenu = () => { ctxMenu.show = false; };
+    // v2.43 置顶 / 标未读 / 拉黑（会话列表右键 & ⋯ 菜单）
+    const ctxMenuPin = async () => {
+      const sid = ctxMenu.sid, to = ctxMenu.pinned ? 0 : 1;
+      closeCtxMenu();
+      try {
+        const r = await API.post('/api/sessions/' + sid + '/pin', { pinned: to });
+        const s = sessions.value.find(x => x.id === sid);
+        if (s) { s.pinned = r.pinned ? 1 : 0; }
+        sessions.value = sessions.value.slice().sort((a, b) =>
+          (b.pinned ? 1 : 0) - (a.pinned ? 1 : 0) || String(b.lastTime).localeCompare(String(a.lastTime)));
+        ElementPlus.ElMessage.success(r.pinned ? '已置顶' : '已取消置顶');
+      } catch (e) { ElementPlus.ElMessage.error(e.message); }
+    };
+    const ctxMenuUnread = async () => {
+      const sid = ctxMenu.sid;
+      closeCtxMenu();
+      try {
+        const s = sessions.value.find(x => x.id === sid);
+        if (s) s.unread = Math.max(1, s.unread || 0);
+        await API.post('/api/sessions/' + sid + '/read', { unread: 1 });
+        ElementPlus.ElMessage.success('已标为未读');
+      } catch (e) { ElementPlus.ElMessage.error(e.message); }
+    };
+    const ctxMenuBlock = async () => {
+      const sid = ctxMenu.sid, name = ctxMenu.name;
+      closeCtxMenu();
+      try {
+        await ElementPlus.ElMessageBox.confirm('拉黑「' + name + '」的 IP？拉黑后对方无法再进入或发消息。', '拉黑访客',
+          { type: 'warning', confirmButtonText: '拉黑', cancelButtonText: '取消' });
+        await API.post('/api/sessions/' + sid + '/block');
+        ElementPlus.ElMessage.success('已拉黑');
+      } catch (e) { if (e !== 'cancel' && e && e.message) ElementPlus.ElMessage.error(e.message); }
+    };
     const ctxMenuArchive = async () => {
       const sid = ctxMenu.sid; closeCtxMenu();
       try {
@@ -1774,7 +1989,7 @@ const app = createApp({
     const quickFields = [
       { k: 'title', label: '标题' },
       { k: 'content', label: '文字内容', type: 'textarea' },
-      { k: 'attachments', label: '图片', type: 'images', max: 3, tip: '点击按钮直接发送文字与图片，最多 3 张' },
+      { k: 'attachments', label: '附件', type: 'images', max: 3, tip: '点击按钮直接发送文字 + 附件：图片 / 视频 / 文件都行，最多 3 个' },
       { k: 'group_name', label: '分组', def: '通用' },
       { k: 'sort', label: '排序', type: 'number', def: 0 },
     ];
@@ -1850,7 +2065,12 @@ const app = createApp({
       chatSearchOn, chatSearchKw, searchHit, visibleMsgs, canRecall, recallMsg, isRead,
       pol, savePolicy, uploadPolHead, clock, unreadTotal, sessCollapsed,
       sessScope, sessCounts, archiveSession,
-      ctxMenu, openCtxMenu, closeCtxMenu, ctxMenuArchive, ctxMenuClose, ctxMenuDelete,
+      ctxMenu, openCtxMenu, openCtxMenuFromBtn, closeCtxMenu, ctxMenuArchive, ctxMenuClose, ctxMenuDelete,
+      ctxMenuPin, ctxMenuUnread, ctxMenuBlock,
+      replyTo, quoteOf, quoteWho, quoteText, startReply, jumpToMsg, copyMsg, flashId, fmtSize, mapUrl,
+      msgMenu, openMsgMenu, closeMsgMenu, deleteMsg,
+      selMode, selIds, enterSel, exitSel, toggleSel, selAll, selCopy, selDelete,
+      onPaste, sendFile, sendLocation,
       SOUND_OPTS, sndCfg, playSound, saveSnd,
       notifyOn, notifySupported, enableNotify,
       voiceHold, startHoldVoice, moveHoldVoice, endHoldVoice,

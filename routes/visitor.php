@@ -433,7 +433,7 @@ function handle_visitor_messages(string $method): void
     $since = (int)input('since', 0);
     if (!$sid) json_error('缺少 session_id');
     $pdo = db();
-    $sql = 'SELECT id, session_id, from_type AS `from`, sender_name, text, msg_type, attachments, recalled_at, read_at, created_at FROM messages WHERE session_id = ?' . ($since > 0 ? ' AND id > ?' : '') . ' ORDER BY id ASC';
+    $sql = 'SELECT id, session_id, from_type AS `from`, sender_name, text, msg_type, attachments, reply_to, recalled_at, read_at, created_at FROM messages WHERE session_id = ?' . ($since > 0 ? ' AND id > ?' : '') . ' ORDER BY id ASC';
     $st = $pdo->prepare($sql);
     $st->execute($since > 0 ? [$sid, $since] : [$sid]);
     // 访客自己的消息带上「客服是否已读」回执（read_at 由客服端打开会话时写入）
@@ -507,7 +507,7 @@ function handle_visitor_poll(string $method): void
         }
         if ($agentAvatar === '') $agentAvatar = (string)ts_get($tid2, 'brand_avatar', '💬');
     }
-    $st = $pdo->prepare('SELECT id, session_id, from_type AS `from`, sender_name, text, msg_type, attachments, recalled_at, read_at, created_at FROM messages WHERE session_id = ? AND id > ? ORDER BY id ASC');
+    $st = $pdo->prepare('SELECT id, session_id, from_type AS `from`, sender_name, text, msg_type, attachments, reply_to, recalled_at, read_at, created_at FROM messages WHERE session_id = ? AND id > ? ORDER BY id ASC');
     $st->execute([$sid, $sinceMsg]);
     $rows2 = $st->fetchAll();
     $msgs2 = array_map(function ($r) {
@@ -566,14 +566,21 @@ function handle_visitor_send(string $method): void
     $msgType = resolve_msg_type($text, $attachArr);
     $attachJson = $attachArr ? json_encode($attachArr, JSON_UNESCAPED_UNICODE) : '';
     $now = now_dt();
-    $pdo->prepare("INSERT INTO messages (tenant_id, session_id, from_type, text, msg_type, attachments, created_at) VALUES (?,?,'visitor',?,?,?,?)")
-        ->execute([$tid, $sid, $text, $msgType, $attachJson, $now]);
+    // v2.43 引用回复
+    $replyTo = (int)input('reply_to', 0);
+    if ($replyTo > 0) {
+        $chk = $pdo->prepare('SELECT id FROM messages WHERE id = ? AND session_id = ?');
+        $chk->execute([$replyTo, $sid]);
+        if (!$chk->fetchColumn()) $replyTo = 0;
+    }
+    $pdo->prepare("INSERT INTO messages (tenant_id, session_id, from_type, text, msg_type, attachments, reply_to, created_at) VALUES (?,?,'visitor',?,?,?,?,?)")
+        ->execute([$tid, $sid, $text, $msgType, $attachJson, $replyTo, $now]);
     $mid = (int)$pdo->lastInsertId();
     $pdo->prepare('UPDATE v_sessions SET last_msg = ?, last_time = ?, unread = unread + 1, last_online_at = ? WHERE id = ?')
         ->execute([msg_summary($text, $attachArr), $now, $now, $sid]);
 
     $msg = ['id' => $mid, 'from' => 'visitor', 'text' => $text, 'time' => dt_to_iso($now),
-        'session_id' => $sid, 'msg_type' => $msgType, 'attachments' => $attachArr];
+        'session_id' => $sid, 'msg_type' => $msgType, 'attachments' => $attachArr, 'reply_to' => $replyTo];
 
     // 关键词自动回复（以客服身份）
     $autoReply = null;

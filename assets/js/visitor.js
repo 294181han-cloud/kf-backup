@@ -317,11 +317,13 @@ createApp({
       sending.value = true;
       draft.value = '';
       try {
+        const body = { session_id: sessionId.value, text };
+        if (replyTo.value) body.reply_to = replyTo.value.id;   // v2.43 引用回复
         const r = await fetch('/api/visitor/send', {
           method: 'POST', headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ session_id: sessionId.value, text })
+          body: JSON.stringify(body)
         }).then(x => { if (!x.ok) return x.json().then(j => { throw new Error(j.error); }); return x.json(); });
-        if (r.message) { pushMessages([r.message]); if (snd.send_on) playSnd(snd.send_which); }
+        if (r.message) { pushMessages([r.message]); replyTo.value = null; if (snd.send_on) playSnd(snd.send_which); }
         if (r.auto_reply) { pushMessages([r.auto_reply]); }
       } catch (e) {
         draft.value = text;
@@ -331,6 +333,97 @@ createApp({
     };
 
     // ---- 图片 ----
+    /* ===== v2.43 访客端：引用回复 / 长按菜单 / 粘贴图片 ===== */
+    const replyTo = ref(null);
+    const flashId = ref(0);
+    const actSheet = reactive({ show: false, msg: null });
+    const meName = () => (formValues && formValues.nickname) || '访客';
+    const quoteOf = (m) => (m && m.reply_to) ? messages.value.find(x => x.id === m.reply_to) : null;
+    const quoteWho = (m) => !m ? '' : (m.from === 'visitor' ? '我' : (brand.company_name || '客服'));
+    const quoteText = (m) => {
+      if (!m) return '';
+      if (m.recalled) return '消息已撤回';
+      const t = (m.text || '').trim();
+      if (t) return t.length > 50 ? t.slice(0, 50) + '…' : t;
+      const a = (m.attachments || [])[0] || {};
+      return { image: '[图片]', audio: '[语音]', video: '[视频]',
+        file: '[文件] ' + (a.name || ''), location: '[位置] ' + (a.name || '') }[a.type] || '[消息]';
+    };
+    const fmtSize = (n) => {
+      const b = Number(n) || 0;
+      if (b < 1024) return b + ' B';
+      if (b < 1024 * 1024) return (b / 1024).toFixed(0) + ' KB';
+      return (b / 1024 / 1024).toFixed(1) + ' MB';
+    };
+    const mapUrl = (a) => {
+      if (a && a.url) return a.url;
+      if (a && a.lat && a.lng) return 'https://uri.amap.com/marker?position=' + a.lng + ',' + a.lat + '&name=' + encodeURIComponent(a.name || '位置');
+      return 'https://uri.amap.com/search?keyword=' + encodeURIComponent((a && a.name) || '');
+    };
+    const jumpTo = (id) => {
+      const el = document.getElementById('vm' + id);
+      if (!el) { toast('这条消息在更早的记录里'); return; }
+      el.scrollIntoView({ block: 'center', behavior: 'smooth' });
+      flashId.value = id;
+      setTimeout(() => { if (flashId.value === id) flashId.value = 0; }, 1400);
+    };
+    const startReply = (m) => {
+      if (!m) return;
+      actSheet.show = false;
+      replyTo.value = m;
+      const el = inputRef.value;
+      if (el) el.focus();
+    };
+    const openActSheet = (m) => { actSheet.msg = m; actSheet.show = true; };
+    const copyMsg = async (m) => {
+      actSheet.show = false;
+      const t = (m && m.text) || '';
+      if (!t) { toast('这条消息没有文字'); return; }
+      try { await navigator.clipboard.writeText(t); toast('已复制'); } catch (e) { toast('复制失败'); }
+    };
+    // 长按 600ms = 打开操作菜单（移动端没有右键）
+    let lpTimer = null;
+    const onMsgTouchStart = (m, ev) => {
+      clearTimeout(lpTimer);
+      lpTimer = setTimeout(() => { openActSheet(m); }, 600);
+    };
+    const onMsgTouchEnd = () => { clearTimeout(lpTimer); };
+    // Ctrl+V 粘贴图片直接发
+    const onPaste = async (ev) => {
+      if (!sessionId.value) return;
+      const items = (ev.clipboardData && ev.clipboardData.items) || [];
+      const files = [];
+      for (const it of items) { if (it.kind === 'file') { const f = it.getAsFile(); if (f) files.push(f); } }
+      if (!files.length) return;
+      ev.preventDefault();
+      for (const f of files) {
+        if (!/^image\//.test(f.type)) { toast('只能粘贴图片'); continue; }
+        if (f.size > 5 * 1024 * 1024) { toast('图片不能超过 5MB'); continue; }
+        const data = await new Promise(res => { const fr = new FileReader(); fr.onload = () => res(fr.result); fr.readAsDataURL(f); });
+        try {
+          const up = await fetch('/api/visitor/upload', {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ session_id: sessionId.value, data, kind: 'image', filename: f.name || 'clipboard.png' })
+          }).then(x => { if (!x.ok) return x.json().then(j => { throw new Error(j.error); }); return x.json(); });
+          const body = { session_id: sessionId.value, text: draft.value.trim(), attachments: [up] };
+          if (replyTo.value) body.reply_to = replyTo.value.id;
+          const r = await fetch('/api/visitor/send', {
+            method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body)
+          }).then(x => x.json());
+          if (r.message) { pushMessages([r.message]); draft.value = ''; replyTo.value = null; }
+        } catch (e) { toast(e.message || '发送失败'); }
+      }
+    };
+    // 引用回复也要带上 reply_to
+    const sendImageWithReply = async (up) => {
+      const body = { session_id: sessionId.value, text: '', attachments: [up] };
+      if (replyTo.value) body.reply_to = replyTo.value.id;
+      const r = await fetch('/api/visitor/send', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body)
+      }).then(x => x.json());
+      if (r.message) { pushMessages([r.message]); replyTo.value = null; }
+    };
+
     const pickImage = () => imgInput.value && imgInput.value.click();
     const onImage = async (ev) => {
       const file = ev.target.files[0];
@@ -343,11 +436,7 @@ createApp({
           method: 'POST', headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ session_id: sessionId.value, data, kind: 'image', filename: file.name })
         }).then(x => { if (!x.ok) return x.json().then(j => { throw new Error(j.error); }); return x.json(); });
-        const r = await fetch('/api/visitor/send', {
-          method: 'POST', headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ session_id: sessionId.value, text: '', attachments: [up] })
-        }).then(x => x.json());
-        if (r.message) pushMessages([r.message]);
+        await sendImageWithReply(up);
       } catch (e) {
         if (String(e.message).includes('会话已结束')) handleEnded();
         else alert(e.message);
@@ -619,6 +708,8 @@ createApp({
       genCode, codeVerify, verifyGo, slideStart, slideMove, slideEnd, doEnter,
       pubShow, pubTitle, pubContent, linkMode, linkSegs, copyLink, myAvatar,
       ended, handleEnded, restartChat,
+      replyTo, quoteOf, quoteWho, quoteText, fmtSize, mapUrl, jumpTo, startReply,
+      actSheet, openActSheet, copyMsg, onMsgTouchStart, onMsgTouchEnd, onPaste, flashId,
     };
   }
 }).mount('#app');

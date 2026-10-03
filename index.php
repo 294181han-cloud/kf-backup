@@ -62,6 +62,11 @@ function ensure_upgrade(): void
         try { $pdo->exec("ALTER TABLE v_sessions ADD COLUMN closed_at DATETIME NULL"); } catch (\Throwable $e) { /* 列已存在 */ }
         try { $pdo->exec("ALTER TABLE v_sessions ADD COLUMN archived_at DATETIME NULL"); } catch (\Throwable $e) { /* 列已存在 */ }
         try { $pdo->exec("ALTER TABLE v_sessions ADD INDEX idx_status_time (tenant_id, status, last_time)"); } catch (\Throwable $e) { /* 已存在 */ }
+        // v2.43 消息引用回复 + 会话置顶
+        try { $pdo->exec("ALTER TABLE messages ADD COLUMN reply_to INT UNSIGNED NOT NULL DEFAULT 0"); } catch (\Throwable $e) { /* 列已存在 */ }
+        try { $pdo->exec("ALTER TABLE v_sessions ADD COLUMN pinned TINYINT NOT NULL DEFAULT 0"); } catch (\Throwable $e) { /* 列已存在 */ }
+        try { $pdo->exec("ALTER TABLE v_sessions ADD COLUMN pinned_at DATETIME NULL"); } catch (\Throwable $e) { /* 列已存在 */ }
+        try { $pdo->exec("ALTER TABLE v_sessions ADD INDEX idx_tenant_pinned (tenant_id, pinned, last_time)"); } catch (\Throwable $e) { /* 已存在 */ }
         // v2.41 语音转文字缓存（同一条语音只转一次，不重复扣费）
         $pdo->exec("CREATE TABLE IF NOT EXISTS msg_transcripts (
             id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
@@ -207,6 +212,8 @@ function dispatch_api(string $method, string $uri): void
     if (preg_match('#^/api/sessions/(\d+)/transfer$#', $uri, $m))  handle_session_transfer($method, $m);
     if (preg_match('#^/api/sessions/(\d+)/block$#', $uri, $m))   handle_session_block($method, $m);
     if (preg_match('#^/api/sessions/(\d+)/recall$#', $uri, $m))  handle_session_recall($method, $m);
+    if (preg_match('#^/api/sessions/(\d+)/pin$#', $uri, $m))     handle_session_pin($method, $m);
+    if (preg_match('#^/api/sessions/(\d+)/messages/(\d+)/delete$#', $uri, $m)) handle_message_delete($method, $m);
     if (preg_match('#^/api/sessions/(\d+)/contacts(?:/(\w+))?$#', $uri, $m)) handle_session_contacts($method, $m);
     if (preg_match('#^/api/sessions/(\d+)/profile$#', $uri, $m))   handle_session_profile($method, $m);
 

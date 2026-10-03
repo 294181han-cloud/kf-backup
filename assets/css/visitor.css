@@ -751,3 +751,64 @@ body[data-tpl="whatsapp"] .v-bar .v-btn.ready { background: linear-gradient(135d
 @keyframes vbwave { 50% { transform: scaleY(.45); } }
 .vb-sec { font-size: 11.5px; opacity: .72; flex-shrink: 0; min-width: 18px; text-align: right; }
 .msg-bubble:has(.voice-bubble) { padding: 8px 12px; }
+
+/* ===== v2.43 访客端：引用回复 / 长按菜单 / 视频·文件·位置 ===== */
+.v-reply-bar {
+  display: flex; align-items: center; gap: 8px; margin: 0 10px 6px;
+  background: #f2f5fa; border-left: 3px solid var(--theme, #1677ff);
+  border-radius: 10px; padding: 7px 11px;
+}
+.v-reply-bar .vr-body { flex: 1; min-width: 0; }
+.v-reply-bar .vr-who { display: block; font-size: 11.5px; font-weight: 700; color: var(--theme, #1677ff); }
+.v-reply-bar .vr-text { display: block; font-size: 12px; color: #6b7688; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.v-reply-bar .vr-x { border: 0; background: transparent; color: #8b95a7; font-size: 15px; cursor: pointer; flex-shrink: 0; }
+
+.msg-quote {
+  display: flex; flex-direction: column; gap: 1px; max-width: 100%;
+  background: rgba(17, 24, 39, .06); border-left: 2px solid rgba(17, 24, 39, .2);
+  border-radius: 6px; padding: 4px 8px; margin-bottom: 5px; font-size: 11.5px; cursor: pointer;
+}
+.msg-quote .mq-who { font-weight: 700; color: #6b7688; }
+.msg-quote .mq-text { color: #4e5969; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.msg-row.agent .msg-quote { background: rgba(255, 255, 255, .7); }
+.msg-row.flash .msg-bubble { box-shadow: 0 0 0 3px color-mix(in srgb, var(--theme, #1677ff) 40%, transparent); }
+
+.vb-video { display: block; max-width: 220px; border-radius: 12px; margin-top: 2px; background: #000; }
+.file-bubble, .loc-bubble {
+  display: flex; align-items: center; gap: 10px; border-radius: 12px; padding: 10px 12px;
+  margin-top: 2px; text-decoration: none; color: inherit; min-width: 172px;
+}
+.file-bubble { background: #f7f9fc; border: 1px solid #e8ecf3; }
+.loc-bubble { background: #f3f8f4; border: 1px solid #d9ecdf; }
+.file-bubble .fb-ic, .loc-bubble .lb-ic { font-size: 20px; }
+.file-bubble .fb-body, .loc-bubble .lb-body { flex: 1; min-width: 0; }
+.file-bubble .fb-name { display: block; font-size: 13px; color: #1f2329; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.file-bubble .fb-size { display: block; font-size: 11px; color: #98a1b0; }
+.file-bubble .fb-dl { color: var(--theme, #1677ff); font-weight: 700; }
+.loc-bubble .lb-name { display: block; font-size: 13px; font-weight: 600; color: #1f2329; }
+.loc-bubble .lb-sub { display: block; font-size: 11px; color: #7c8b83; }
+
+.v-sheet-mask { position: fixed; inset: 0; background: rgba(8, 10, 14, .38); z-index: 60; }
+.v-sheet {
+  position: fixed; left: 0; right: 0; bottom: 0; z-index: 61; padding: 8px 10px calc(10px + env(safe-area-inset-bottom));
+  background: #fff; border-radius: 16px 16px 0 0; box-shadow: 0 -8px 30px rgba(16, 24, 40, .18);
+}
+.v-sheet .vs-item {
+  display: block; width: 100%; border: 0; background: transparent; color: #1f2329;
+  text-align: center; font-size: 15px; padding: 14px 10px; border-radius: 10px; cursor: pointer; font-family: inherit;
+}
+.v-sheet .vs-item:hover { background: #f4f6fa; }
+.v-sheet .vs-item.danger { color: #e5484d; }
+.v-sheet .vs-item.ghost { color: #8b95a7; border-top: 1px solid #eef1f5; border-radius: 0; margin-top: 4px; }
+body.dark .v-reply-bar { background: #262c34; }
+body.dark .v-reply-bar .vr-text { color: #a9b3c2; }
+body.dark .msg-quote { background: rgba(255, 255, 255, .08); border-left-color: rgba(255, 255, 255, .25); }
+body.dark .msg-quote .mq-who, body.dark .msg-quote .mq-text { color: #c2cad6; }
+body.dark .file-bubble { background: #232830; border-color: #333a44; }
+body.dark .file-bubble .fb-name { color: #e7eaf0; }
+body.dark .loc-bubble { background: #1e2c24; border-color: #2f4a3a; }
+body.dark .loc-bubble .lb-name { color: #dfe7e2; }
+body.dark .v-sheet { background: #1e2229; }
+body.dark .v-sheet .vs-item { color: #e7eaf0; }
+body.dark .v-sheet .vs-item:hover { background: #262c34; }
+body.dark .v-sheet .vs-item.ghost { border-top-color: #2b313a; color: #8b95a7; }
