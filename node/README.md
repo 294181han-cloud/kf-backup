@@ -12,13 +12,26 @@
 | `cron-node.sh` | 定时任务本体：git pull 跟随主站 + 向主站心跳登记 |
 | `README.md` | 本文件 |
 
-## 快速开始（新节点服务器上）
+## 快速开始（新节点服务器上）——网页安装器（推荐）
 
 前置：nginx + PHP 8.4（php-cli、curl、pdo_mysql、mbstring、fileinfo）+ git；
-主站 MySQL 已对该节点 IP 授权（3306）；主站 config.php 里的 `relay_secret` 已知。
+主站 MySQL 已对该节点 IP 授权（3306）；主控管理台已生成节点授权码（一次性）。
 
 ```bash
-git clone https://github.com/devninawallace/kf.git /tmp/kf-node-src
+git clone https://github.com/devninawallace/kf.git /www/wwwroot/kf-node
+```
+
+然后浏览器打开 `https://<节点域名>/install.php`：
+
+1. 环境自检（PHP / curl / git / 目录可写）
+2. 填 主站地址 + 节点授权码，选择角色（访客站点 / 客服入口）
+3. 安装器向总控验证授权码（一次性，用后即焚）→ 自动登记节点 + 拉入边缘白名单
+   → 生成 config.php（**边缘节点不含数据库凭证**）→ 首次黑名单同步 → 自锁
+4. 按安装页给出的 nginx 片段配置 /api/ 反代到总控，crontab 加黑名单同步行
+
+## 快速开始（无头安装，备选）
+
+```bash
 SITE_DIR=/www/wwwroot/kf-agent1 \
 SITE_ORIGIN=https://agent1.yourdomain.com \
 DB_HOST=<主站IP> DB_PASS=<数据库密码> \

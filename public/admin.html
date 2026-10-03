@@ -201,6 +201,53 @@
               暂无节点登记。分控节点由 node/ 文件夹里的部署脚本配置好后自动出现。
             </div>
           </div>
+          <div class="panel">
+            <div class="panel-title">节点授权码（网页安装器用，一次性）</div>
+            <div style="display:flex;gap:10px;margin-bottom:14px;align-items:center;">
+              <el-select v-model="newCodeRole" style="width:150px;">
+                <el-option label="访客站点" value="visitor"></el-option>
+                <el-option label="客服入口" value="agent"></el-option>
+              </el-select>
+              <el-button type="primary" @click="genNodeCode">生成授权码</el-button>
+              <span v-if="lastCode" class="mono" style="font-size:14px;color:#00b42a;">{{ lastCode }}</span>
+            </div>
+            <el-table :data="nodeCodes" stripe size="small" max-height="240">
+              <el-table-column prop="code" label="授权码" width="200"><template #default="{row}"><span class="mono">{{ row.code }}</span></template></el-table-column>
+              <el-table-column label="角色" width="110"><template #default="{row}">{{ row.role === 'agent' ? '客服入口' : (row.role === 'visitor' ? '访客站点' : '通用') }}</template></el-table-column>
+              <el-table-column label="生成时间" width="170"><template #default="{row}">{{ (row.created_at||'').slice(0,19).replace('T',' ') }}</template></el-table-column>
+              <el-table-column label="状态" width="110">
+                <template #default="{row}">
+                  <el-tag v-if="row.used_at" type="info" size="small">已使用</el-tag>
+                  <el-tag v-else type="success" size="small">未使用</el-tag>
+                </template>
+              </el-table-column>
+              <el-table-column label="使用IP" width="140"><template #default="{row}"><span class="mono">{{ row.used_ip || '—' }}</span></template></el-table-column>
+              <el-table-column label="操作" width="100">
+                <template #default="{row}">
+                  <el-button v-if="!row.used_at" size="small" type="danger" plain @click="revokeNodeCode(row)">作废</el-button>
+                </template>
+              </el-table-column>
+            </el-table>
+          </div>
+          <div class="panel">
+            <div class="panel-title">全局黑名单（平台级，边缘节点本地拦截）</div>
+            <div style="display:flex;gap:10px;margin-bottom:14px;">
+              <el-input v-model="newGip" placeholder="IP 地址" style="max-width:200px;" @keyup.enter="addGip"></el-input>
+              <el-input v-model="newGipNote" placeholder="备注（可选）" style="max-width:220px;" @keyup.enter="addGip"></el-input>
+              <el-button type="danger" @click="addGip">拉黑</el-button>
+              <span class="muted" style="font-size:12px;align-self:center;">同步版本 v{{ gipVersion }}</span>
+            </div>
+            <el-table :data="gips" stripe size="small" max-height="240">
+              <el-table-column prop="ip" label="IP" width="160"><template #default="{row}"><span class="mono">{{ row.ip }}</span></template></el-table-column>
+              <el-table-column prop="note" label="备注"></el-table-column>
+              <el-table-column label="时间" width="170"><template #default="{row}">{{ (row.created_at||'').slice(0,19).replace('T',' ') }}</template></el-table-column>
+              <el-table-column label="操作" width="100">
+                <template #default="{row}">
+                  <el-button size="small" @click="delGip(row)">移除</el-button>
+                </template>
+              </el-table-column>
+            </el-table>
+          </div>
         </template>
 
         <!-- ===================== 发卡机器人 ===================== -->
@@ -469,6 +516,6 @@
 <script src="/assets/vendor/vue.global.js?v=2.0.1"></script>
 <script src="/assets/vendor/element-plus.js?v=2.0.1"></script>
 <script src="/assets/api.js?v=2.0.1"></script>
-<script src="/assets/js/admin.js?v=2.4.1"></script>
+<script src="/assets/js/admin.js?v=2.4.2"></script>
 </body>
 </html>

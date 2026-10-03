@@ -311,11 +311,31 @@ createApp({
         }
       } catch (e) {}
     };
+    // 活动门控轮询（1+2+n 枢纽模式）：只在有人访问时轮询——活跃 2.5s，闲置逐步降频，长期闲置暂停，一有操作立即恢复
+    let lastActivity = Date.now();
+    const bumpActivity = () => { lastActivity = Date.now(); if (pollTimer === null && sessionId.value && page.value === 'chat') startPoll(); };
+    const pollGap = () => {
+      if (document.hidden) return 30000;                       // 页面切到后台
+      const idle = Date.now() - lastActivity;
+      if (idle > 10 * 60000) return -1;                        // 长期无操作：暂停轮询（回来即恢复）
+      if (idle > 2 * 60000) return 15000;                      // 闲置 2 分钟
+      if (idle > 30000) return 8000;                           // 闲置 30 秒
+      return 2500;                                             // 活跃
+    };
     const startPoll = () => {
       stopPoll();
-      pollTimer = setInterval(pollOnce, 2500);
+      if (pollGap() === -1) return;
+      const tick = async () => {
+        try { await pollOnce(); } catch (e) {}
+        const gap = pollGap();
+        if (gap === -1 || pollTimer === null) return;          // 暂停或已被 stopPoll
+        pollTimer = setTimeout(tick, gap);
+      };
+      pollTimer = setTimeout(tick, 100);
     };
-    const stopPoll = () => { if (pollTimer) { clearInterval(pollTimer); pollTimer = null; } };
+    const stopPoll = () => { if (pollTimer) { clearTimeout(pollTimer); pollTimer = null; } };
+    ['click', 'keydown', 'touchstart', 'scroll', 'visibilitychange'].forEach(ev =>
+      document.addEventListener(ev, bumpActivity, { passive: true }));
 
     // ---- 发送 ----
     // v2.57 访客端同理：中文输入法选词时回车是「上屏」，不能当发送

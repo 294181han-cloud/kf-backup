@@ -400,3 +400,62 @@ function handle_admin_nodes(string $method): void
 
     json_error('方法不允许', 405);
 }
+
+/* ---- 节点授权码（一次性，分节点网页安装器用，v2.34） ---- */
+function handle_admin_node_codes(string $method): void
+{
+    require_admin_ctx();
+    $pdo = db();
+    if ($method === 'GET') {
+        $rows = $pdo->query('SELECT code, role, created_at, used_at, used_ip FROM node_auth_codes ORDER BY created_at DESC LIMIT 50')->fetchAll();
+        foreach ($rows as &$r) {
+            $r['created_at'] = dt_to_iso($r['created_at']);
+            $r['used_at'] = $r['used_at'] ? dt_to_iso($r['used_at']) : null;
+        }
+        unset($r);
+        json_out(['codes' => $rows]);
+    }
+    if ($method === 'POST') {
+        $action = (string)input('action', 'gen');
+        if ($action === 'gen') {
+            $role = in_array((string)input('role', ''), ['agent', 'visitor'], true) ? (string)input('role', '') : '';
+            $code = 'N' . strtoupper(bin2hex(random_bytes(8)));
+            $pdo->prepare('INSERT INTO node_auth_codes (code, role) VALUES (?,?)')->execute([$code, $role]);
+            json_out(['ok' => true, 'code' => $code, 'role' => $role], 201);
+        }
+        if ($action === 'revoke') {
+            $code = strtoupper(trim((string)input('code', '')));
+            $pdo->prepare('DELETE FROM node_auth_codes WHERE code = ? AND used_ip IS NULL')->execute([$code]);
+            json_out(['ok' => true]);
+        }
+    }
+    json_error('方法不允许', 405);
+}
+
+/* ---- 全局黑名单（平台级，边缘节点本地拦截，v2.34） ---- */
+function handle_admin_gblacklist(string $method): void
+{
+    require_admin_ctx();
+    $pdo = db();
+    if ($method === 'GET') {
+        json_out([
+            'ips' => $pdo->query('SELECT ip, note, created_at FROM global_blacklist ORDER BY created_at DESC LIMIT 500')->fetchAll(),
+            'version' => (int)kv_get('bl_version', '1'),
+        ]);
+    }
+    if ($method === 'POST') {
+        $ip = trim((string)input('ip', ''));
+        if (!filter_var($ip, FILTER_VALIDATE_IP)) json_error('IP 格式不正确');
+        $note = mb_substr(trim((string)input('note', '')), 0, 200);
+        $pdo->prepare('INSERT IGNORE INTO global_blacklist (ip, note) VALUES (?,?)')->execute([$ip, $note]);
+        bl_touch();
+        json_out(['ok' => true]);
+    }
+    if ($method === 'DELETE') {
+        $ip = trim((string)input('ip', ''));
+        $pdo->prepare('DELETE FROM global_blacklist WHERE ip = ?')->execute([$ip]);
+        bl_touch();
+        json_out(['ok' => true]);
+    }
+    json_error('方法不允许', 405);
+}

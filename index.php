@@ -116,14 +116,37 @@ function ensure_upgrade(): void
             UNIQUE KEY uniq_msg_url (message_id, url),
             KEY idx_tenant (tenant_id)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+        // v2.34 分节点网页安装：一次性授权码 + 平台级全局黑名单（边缘本地拦截用）
+        $pdo->exec("CREATE TABLE IF NOT EXISTS node_auth_codes (
+            code VARCHAR(32) NOT NULL PRIMARY KEY,
+            role VARCHAR(16) NOT NULL DEFAULT '',
+            created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            used_at DATETIME NULL,
+            used_ip VARCHAR(64) NULL,
+            KEY idx_used (used_at)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+        $pdo->exec("CREATE TABLE IF NOT EXISTS global_blacklist (
+            ip VARCHAR(64) NOT NULL PRIMARY KEY,
+            note VARCHAR(200) NOT NULL DEFAULT '',
+            created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
     } catch (\Throwable $e) { /* 忽略 */ }
 }
-try { ensure_installed(); } catch (\Throwable $e) { /* 初始化失败由后续请求重试 */ }
-
 $method = $_SERVER['REQUEST_METHOD'] ?? 'GET';
 $uri = parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH) ?: '/';
 $uri = rtrim($uri, '/');
 if ($uri === '') $uri = '/';
+
+/* ---------- 主站：安装/升级（建表 + 种子 + 幂等迁移） ---------- */
+try { ensure_installed(); } catch (\Throwable $e) { /* 初始化失败由后续请求重试 */ }
+try {
+    if (kv_get('tg_schema_v', '') !== '1') {
+        tg_schema();
+        tg_seed_pkgs();
+        kv_set('tg_schema_v', '1');
+        if (kv_get('tg_webhook_secret', '') === '') kv_set('tg_webhook_secret', bin2hex(random_bytes(16)));
+    }
+} catch (\Throwable $e) { /* 忽略：首次请求重试 */ }
 
 /* ---------- 静态资源兜底（正常情况下 Nginx 已直接命中） ---------- */
 function serve_static(string $uri): void
@@ -176,6 +199,41 @@ function serve_html(string $file): void
     readfile($path);
     exit;
 }
+
+/* ---------- 站点角色门禁（1+2+n 分域部署，枢纽模式）----------
+   边缘节点（agent/visitor）不连数据库：页面/静态/门禁本地处理，
+   需要数据的 /api/* 由 nginx 反代到主站；未列路径一律 404/403。 */
+if (site_role() !== 'main') {
+    // 访客/防红壳页（visitor 节点）与登录/工作台（agent 节点）放行；其余页面 404
+    if (preg_match('#^/[0-9]{2}-[0-9]{2}/[A-Za-z0-9]{4,16}\.html$#', $uri)) {
+        if (site_role() !== 'visitor') { http_response_code(404); echo 'Not Found'; exit; }
+        serve_html('gate.html');
+    }
+    foreach (['login.html', 'app.html', 'admin.html', 'visitor.html'] as $page) {
+        if ($uri === "/$page") {
+            if (!site_allow_page($page)) { http_response_code(404); echo 'Not Found'; exit; }
+            serve_html($page);
+        }
+    }
+    if ($uri === '/') {
+        if (site_role() === 'visitor') { serve_html('visitor.html'); exit; }
+        header('Location: /login.html');
+        exit;
+    }
+    // 健康检查任何节点都可用（含角色/版本，供巡检）
+    if ($uri === '/health' || $uri === '/api/health') {
+        json_out(['ok' => true, 'time' => time(), 'version' => '2.0', 'site_role' => site_role(), 'app_version' => app_version(), 'apcu' => mem_ok()]);
+    }
+    // 访客节点本地拦截全局黑名单（租户级黑名单由主站接口自行校验）
+    if (site_role() === 'visitor' && str_starts_with($uri, '/api/') && edge_ip_blocked()) {
+        json_error('您的访问受限', 403);
+    }
+    // 其余 /api/* 交给 nginx 反代到主站（见 node/README.md）；PHP 兜底 404
+    http_response_code(404);
+    echo 'Not Found';
+    exit;
+}
+
 
 /* ---------- 站点角色门禁（1+2+n 分域部署）----------
    main（默认）= 全功能；agent = 客服登录入口（登录页+工作台+客服/租户接口）；
@@ -249,7 +307,7 @@ foreach (['login.html', 'app.html', 'admin.html', 'visitor.html'] as $page) {
     }
 }
 if ($uri === '/health' || $uri === '/api/health') {
-    json_out(['ok' => true, 'time' => time(), 'version' => '2.0', 'site_role' => site_role(), 'app_version' => app_version()]);
+    json_out(['ok' => true, 'time' => time(), 'version' => '2.0', 'site_role' => site_role(), 'app_version' => app_version(), 'apcu' => mem_ok()]);
 }
 
 /* ---------- API 路由 ---------- */
@@ -262,15 +320,6 @@ require_once __DIR__ . '/routes/telegram.php';
 require_once __DIR__ . '/routes/tgadmin.php';
 
 /* 发卡机器人：建表 + 首次灌默认套餐（只跑一次，避免每请求都查） */
-try {
-    if (kv_get('tg_schema_v', '') !== '1') {
-        tg_schema();
-        tg_seed_pkgs();
-        kv_set('tg_schema_v', '1');
-        if (kv_get('tg_webhook_secret', '') === '') kv_set('tg_webhook_secret', bin2hex(random_bytes(16)));
-    }
-} catch (\Throwable $e) { /* 忽略：首次请求重试 */ }
-
 function dispatch_api(string $method, string $uri): void
 {
     // ---- 认证 ----
@@ -280,6 +329,9 @@ function dispatch_api(string $method, string $uri): void
     // ---- 节点心跳（分控 cron → 主站登记）与远程更新指令（主控 → 分控）----
     if ($uri === '/api/internal/heartbeat') handle_internal_heartbeat($method);
     if ($uri === '/api/internal/update')    handle_internal_update($method);
+    // ---- 分节点网页安装：授权码换凭证 + 边缘黑名单/归属同步 ----
+    if ($uri === '/api/internal/node-register') handle_internal_node_register($method);
+    if ($uri === '/api/internal/sync')          handle_internal_sync($method);
     // ---- 发卡机器人 webhook（Telegram 直接 POST，不走登录态，用 secret 校验）----
     if ($uri === '/api/tg/webhook')    handle_tg_webhook($method);
     if ($uri === '/api/auth/me')       handle_auth_me($method);
@@ -354,6 +406,8 @@ function dispatch_api(string $method, string $uri): void
     if (preg_match('#^/api/admin/domain-pool/(\d+)$#', $uri, $m)) handle_admin_domain_pool_id($method, (int)$m[1]);
     if ($uri === '/api/admin/root-domain')       handle_admin_root_domain($method);
     if ($uri === '/api/admin/nodes')             handle_admin_nodes($method);
+    if ($uri === '/api/admin/node-codes')        handle_admin_node_codes($method);
+    if ($uri === '/api/admin/gblacklist')        handle_admin_gblacklist($method);
     if ($uri === '/api/admin/defaults')          handle_admin_defaults($method);
     // ---- 发卡机器人（平台管理员）----
     if ($uri === '/api/admin/tg')                handle_admin_tg($method);

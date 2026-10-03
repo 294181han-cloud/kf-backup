@@ -647,6 +647,7 @@ function handle_crud(string $method, string $name): void
         $pdo->prepare("INSERT INTO $table (tenant_id, $insCols) VALUES (?," . str_repeat('?,', count($cols) - 1) . '?)')
             ->execute(array_merge([$tid], $vals));
         $id = (int)$pdo->lastInsertId();
+        if ($name === 'ip-blacklist') bl_touch();
         $st = $pdo->prepare("SELECT id, $selCols FROM $table WHERE id = ?");
         $st->execute([$id]);
         json_out(crud_transform($name, $st->fetch()), 201);
@@ -688,12 +689,14 @@ function handle_crud_id(string $method, string $name, int $id): void
         $pdo->prepare("UPDATE $table SET $setstr WHERE id = ? AND tenant_id = ?")->execute($vals);
         $st = $pdo->prepare("SELECT id, $selCols FROM $table WHERE id = ? AND tenant_id = ?");
         $st->execute([$id, $tid]);
+        if ($name === 'ip-blacklist') bl_touch();
         json_out(crud_transform($name, $st->fetch()));
     }
 
     if ($method === 'DELETE') {
         $st = $pdo->prepare("DELETE FROM $table WHERE id = ? AND tenant_id = ?");
         $st->execute([$id, $tid]);
+        if ($name === 'ip-blacklist') bl_touch();
         json_out(['ok' => true]);
     }
 
@@ -935,6 +938,8 @@ function handle_agent_poll(string $method): void
     if ($method !== 'GET') { json_error('方法不允许', 405); return; }
     $ctx = require_workspace();
     $pdo = db();
+    presence_touch('a:' . $ctx['id']);      // 在线状态随轮询刷新（内存只留在线的，停活由清理逻辑删除）
+    presence_prune();                        // 惰性清理：超过窗口未活动的直接从内存删除
     $cfg = config();
     // 已结束会话自动清理（懒执行；closed_keep_days=0 永久保留）
     try { cleanup_closed_sessions($ctx['tenant_id']); } catch (\Throwable $e) {}
@@ -968,6 +973,14 @@ function handle_agent_poll(string $method): void
         $r['region'] = geo_region($r['geo'] ?? null);   // v2.29：列表主标签=地区（省市+运营商）
         unset($r['ua']);
         $sessions[] = $r;
+    }
+    // 枢纽模式：总控内存在线表优先（边缘节点的轮询也会经过总控）；未启用时前端自动回退 DB 判定
+    if (mem_ok()) {
+        $pres = presence_all();
+        foreach ($sessions as &$rowS) {
+            $rowS['mem_online'] = isset($pres['v:' . (int)$rowS['id']]);
+        }
+        unset($rowS);
     }
     // 各分区计数（tab 徽标 + 未读提示）
     $vis = session_visible_sql($ctx) . session_spoken_sql();

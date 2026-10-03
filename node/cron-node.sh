@@ -28,4 +28,11 @@ curl -fsS -m 15 -X POST "$MAIN_URL/api/internal/heartbeat" \
   -H "Content-Type: application/json" \
   -d "{\"secret\":\"$SECRET\",\"role\":\"$ROLE\",\"app_version\":\"$VER\",\"origin\":\"$SITE_ORIGIN\"}" \
   || echo "$(date '+%F %T') 心跳失败"
-echo "$(date '+%F %T') 心跳完成 ver=$VER role=$ROLE"
+
+# 黑名单/归属同步（边缘本地拦截用）——总控返回全量，落到 data/blcache.json
+curl -fsS -m 15 -X POST "$MAIN_URL/api/internal/sync" \
+  -H "Content-Type: application/json" \
+  -d "{\"secret\":\"$SECRET\"}" \
+  -o "$SITE_DIR/data/blcache.json" \
+  || echo "$(date '+%F %T') 黑名单同步失败"
+echo "$(date '+%F %T') 心跳+同步完成 ver=$VER role=$ROLE"

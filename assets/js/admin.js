@@ -116,17 +116,64 @@ createApp({
     // 打开「发卡机器人」页签时才去拉数据（里面有 Telegram API 调用，别拖慢首屏）
     Vue.watch(tab, (v) => {
       if (v === 'tg') loadTg().catch(e => ElementPlus.ElMessage.error(e.message));
-      if (v === 'nodes') loadNodes().catch(e => ElementPlus.ElMessage.error(e.message));
+      if (v === 'nodes') {
+        loadNodes().catch(e => ElementPlus.ElMessage.error(e.message));
+        loadNodeCodes().catch(e => ElementPlus.ElMessage.error(e.message));
+        loadGips().catch(e => ElementPlus.ElMessage.error(e.message));
+      }
     });
 
     // ===== 节点管理（1+2+n 分域部署） =====
     const nodes = ref([]);
     const mainVersion = ref('');
     const pushingIp = ref('');
+    const nodeCodes = ref([]);
+    const newCodeRole = ref('visitor');
+    const lastCode = ref('');
+    const gips = ref([]);
+    const newGip = ref('');
+    const newGipNote = ref('');
+    const gipVersion = ref(0);
     const loadNodes = async () => {
       const r = await API.get('/api/admin/nodes');
       nodes.value = r.nodes || [];
       mainVersion.value = r.main_version || '';
+    };
+    const loadNodeCodes = async () => {
+      const r = await API.get('/api/admin/node-codes');
+      nodeCodes.value = r.codes || [];
+    };
+    const genNodeCode = async () => {
+      try {
+        const r = await API.post('/api/admin/node-codes', { action: 'gen', role: newCodeRole.value });
+        lastCode.value = r.code;
+        await loadNodeCodes();
+      } catch (e) { ElementPlus.ElMessage.error(e.message); }
+    };
+    const revokeNodeCode = async (row) => {
+      try {
+        await API.post('/api/admin/node-codes', { action: 'revoke', code: row.code });
+        await loadNodeCodes();
+      } catch (e) { ElementPlus.ElMessage.error(e.message); }
+    };
+    const loadGips = async () => {
+      const r = await API.get('/api/admin/gblacklist');
+      gips.value = r.ips || [];
+      gipVersion.value = r.version || 0;
+    };
+    const addGip = async () => {
+      if (!newGip.value.trim()) return;
+      try {
+        await API.post('/api/admin/gblacklist', { ip: newGip.value.trim(), note: newGipNote.value.trim() });
+        newGip.value = ''; newGipNote.value = '';
+        await loadGips();
+      } catch (e) { ElementPlus.ElMessage.error(e.message); }
+    };
+    const delGip = async (row) => {
+      try {
+        await API.del('/api/admin/gblacklist?ip=' + encodeURIComponent(row.ip));
+        await loadGips();
+      } catch (e) { ElementPlus.ElMessage.error(e.message); }
     };
     const pushNode = async (row) => {
       pushingIp.value = row.ip;
@@ -258,6 +305,8 @@ createApp({
     return {
       tab, tabTitle, booted, me, ov, tenants, domains, newDomain, rootDomain, defVal, pwOld, pwNew,
       nodes, mainVersion, pushingIp, loadNodes, pushNode, forgetNode,
+      nodeCodes, newCodeRole, lastCode, genNodeCode, revokeNodeCode,
+      gips, newGip, newGipNote, gipVersion, addGip, delGip,
       tg, tgCfg, tgSaving, tgHooking, tgChecking, saveTg, setTgWebhook, runTgCheck,
       pkgVisible, pkgForm, pkgSaving, openPkg, savePkg, delPkg, tgOrder,
       barWidth, locationOrigin,

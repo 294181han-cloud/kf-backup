@@ -473,6 +473,7 @@ function handle_visitor_poll(string $method): void
     $sinceMsg = (int)input('sinceMsg', 0);
     if (!$sid) json_out(['messages' => [], 'now' => time()]);
     $pdo = db();
+    presence_touch('v:' . $sid);   // 在线状态随请求刷新；停活由总控清理删除，内存只留在线的
     // 心跳：仅更新本人会话
     $pdo->prepare('UPDATE v_sessions SET last_online_at = ? WHERE id = ?')->execute([now_dt(), $sid]);
     // 已读回执：访客在线即视为已读客服消息

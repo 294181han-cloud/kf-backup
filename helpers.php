@@ -247,12 +247,25 @@ function login_fail_clear(string $ip): void
 
 function get_client_ip(): string
 {
-    $ip = $_SERVER['HTTP_X_FORWARDED_FOR'] ?? '';
-    if ($ip) $ip = explode(',', $ip)[0];
-    $ip = trim($ip ?: ($_SERVER['REMOTE_ADDR'] ?? ''));
-    if ($ip === '::1') $ip = '127.0.0.1';
-    if (str_starts_with($ip, '::ffff:')) $ip = substr($ip, 7);
-    return $ip ?: '127.0.0.1';
+    $norm = function (string $ip): string {
+        if ($ip === '::1') return '127.0.0.1';
+        if (str_starts_with($ip, '::ffff:')) return substr($ip, 7);
+        return $ip;
+    };
+    $remote = $norm($_SERVER['REMOTE_ADDR'] ?? '');
+    // 可信代理：本机 nginx（127.0.0.1）+ 已登记分控节点（总控角色）
+    $trusted = site_role() === 'main' ? array_merge(['127.0.0.1', '::1'], trusted_edge_ips()) : [];
+    if (in_array($remote, $trusted, true)) {
+        // 从右往左跳过可信代理，第一个非可信 IP 即真实来源（客户端伪造的 XFF 头会被自动忽略）
+        $xff = array_map('trim', array_reverse(explode(',', $_SERVER['HTTP_X_FORWARDED_FOR'] ?? '')));
+        foreach ($xff as $cand) {
+            $cand = $norm($cand);
+            if ($cand === '') continue;
+            if (in_array($cand, $trusted, true)) continue;
+            if (filter_var($cand, FILTER_VALIDATE_IP)) return $cand;
+        }
+    }
+    return $remote ?: '127.0.0.1';
 }
 
 function is_ip_blocked(int $tenantId, string $ip): bool
@@ -560,6 +573,120 @@ function handle_internal_update(string $method): void
     $out = shell_exec('cd ' . escapeshellarg(__DIR__) . ' && git pull --autostash -q 2>&1');
     json_out(['ok' => true, 'app_version' => app_version(), 'output' => (string)$out]);
 }
+
+/* ================= 枢纽模式：内存态 / 白名单 / 黑名单同步（v2.34） ================= */
+
+/** 总控内存能力探测（APCu 可用时才启用内存态：在线表 / 消息缓存）；不可用则自动退回数据库路径 */
+function mem_ok(): bool
+{
+    static $ok = null;
+    if ($ok === null) $ok = function_exists('apcu_enabled') && @apcu_enabled();
+    return $ok;
+}
+function mem_get(string $k) { $v = null; if (mem_ok()) { $hit = false; $v = apcu_fetch($k, $hit); if (!$hit) $v = null; } return $v; }
+function mem_set(string $k, $v, int $ttl = 0): bool { return mem_ok() ? apcu_store($k, $v, $ttl) : false; }
+function mem_del(string $k): void { if (mem_ok()) apcu_delete($k); }
+
+/** 在线状态：只记在线的（key => {node, since}）；下线/超时即删，不占内存 */
+function presence_touch(string $key): void
+{
+    if (!mem_ok() || $key === '') return;
+    $p = mem_get('presence') ?: [];
+    $p[$key] = ['node' => $_SERVER['REMOTE_ADDR'] ?? '', 'since' => time()];
+    if (count($p) > 5000) { // 硬上限保护
+        $now = time();
+        $p = array_filter($p, fn($e) => ($now - (int)($e['since'] ?? 0)) <= 75);
+    }
+    mem_set('presence', $p, 600);
+}
+function presence_off(string $key): void { $p = mem_get('presence') ?: []; if (isset($p[$key])) { unset($p[$key]); mem_set('presence', $p, 600); } }
+function presence_prune(int $maxAgeSecs = 75): void
+{
+    if (!mem_ok()) return;
+    $p = mem_get('presence') ?: [];
+    $now = time();
+    $p2 = array_filter($p, fn($e) => ($now - (int)($e['since'] ?? 0)) <= $maxAgeSecs);
+    if (count($p2) !== count($p)) mem_set('presence', $p2, 600);
+}
+function presence_all(): array { return mem_ok() ? (array)(mem_get('presence') ?: []) : []; }
+
+/** 主控信任的分控边缘 IP 白名单（节点登记表；边缘转发的访客真实 IP 只信任这些来源） */
+function trusted_edge_ips(): array
+{
+    static $ips = null;
+    if ($ips === null) {
+        $ips = [];
+        try {
+            $rows = db()->query('SELECT ip FROM nodes')->fetchAll(PDO::FETCH_COLUMN);
+            $ips = array_map('strval', $rows);
+        } catch (\Throwable $e) { $ips = []; }
+    }
+    return $ips;
+}
+
+/** 节点授权码：校验并一次性消费（used_at/used_ip 落库），登记节点并返回节点凭证包 */
+function handle_internal_node_register(string $method): void
+{
+    if ($method !== 'POST') { json_error('方法不允许', 405); return; }
+    $cfg = config();
+    if (($cfg['site_role'] ?? 'main') !== 'main') json_error('接口不存在', 403);
+    $code = strtoupper(trim((string)input('auth_code', '')));
+    if (!preg_match('/^[A-Z0-9]{8,32}$/', $code)) json_error('授权码格式不正确');
+    $pdo = db();
+    $st = $pdo->prepare('SELECT role, used_ip FROM node_auth_codes WHERE code = ? LIMIT 1');
+    $st->execute([$code]);
+    $row = $st->fetch();
+    if (!$row) json_error('授权码不存在');
+    if (!empty($row['used_ip'])) json_error('授权码已被使用');
+    $nodeIp = get_client_ip();
+    $role = in_array(($rr = (string)input('role', $row['role'])), ['agent', 'visitor'], true) ? $rr : 'agent';
+    $origin = mb_substr(trim((string)input('origin', '')), 0, 200);
+    $pdo->prepare('UPDATE node_auth_codes SET used_at = NOW(), used_ip = ? WHERE code = ?')->execute([$nodeIp, $code]);
+    $pdo->prepare('INSERT INTO nodes (ip, role, app_version, origin, first_seen, last_seen)
+                   VALUES (?,?,?,?,NOW(),NOW())
+                   ON DUPLICATE KEY UPDATE role = VALUES(role), origin = VALUES(origin), last_seen = NOW()')
+        ->execute([$nodeIp, $role, app_version(), $origin]);
+    json_out([
+        'ok'          => true,
+        'role'        => $role,
+        'main_url'    => site_main_url(),
+        'relay_secret'=> (string)($cfg['relay_secret'] ?? ''),
+        'app_version' => app_version(),
+    ]);
+}
+
+/** 边缘同步：全局黑名单 + 租户黑名单 + 码/卡密归属（供边缘本地拦截） */
+function handle_internal_sync(string $method): void
+{
+    if ($method !== 'GET' && $method !== 'POST') { json_error('方法不允许', 405); return; }
+    $cfg = config();
+    if (($cfg['site_role'] ?? 'main') !== 'main') json_error('接口不存在', 403);
+    $secret = (string)($cfg['relay_secret'] ?? '');
+    if ($secret === '') json_error('未启用同步', 403);
+    $given = (string)input('secret', '');
+    if ($given === '' || !hash_equals($secret, $given)) json_error('无权调用', 403);
+    $pdo = db();
+    $global = $pdo->query('SELECT ip, note FROM global_blacklist')->fetchAll();
+    $rows = $pdo->query('SELECT tenant_id, ip FROM ip_blacklist')->fetchAll();
+    $tenants = [];
+    foreach ($rows as $r2) $tenants[(int)$r2['tenant_id']][] = $r2['ip'];
+    $kamiMap = $pdo->query('SELECT id, kami FROM tenants')->fetchAll();
+    $kamiById = [];
+    foreach ($kamiMap as $k) $kamiById[(int)$k['id']] = (string)$k['kami'];
+    $codeMap = $pdo->query("SELECT code, tenant_id FROM service_codes")->fetchAll();
+    $codeTid = [];
+    foreach ($codeMap as $c) $codeTid[(string)$c['code']] = (int)$c['tenant_id'];
+    json_out([
+        'bl_version' => (int)kv_get('bl_version', '1'),
+        'global'     => $global,
+        'tenants'    => $tenants,   // {tenant_id: [ip,...]}
+        'kamiById'   => $kamiById,  // {tenant_id: 卡密}（边缘用 ?t=卡密 反查）
+        'codeTid'    => $codeTid,   // {客服码: tenant_id}（边缘用 ?key= 反查）
+    ]);
+}
+
+/** 黑名单版本号 +1（任何黑名单写操作后调用，边缘据此感知变化） */
+function bl_touch(): void { kv_set('bl_version', (string)time()); }
 
 function save_upload(string $data, string $kind, string $filename = ''): array
 {
