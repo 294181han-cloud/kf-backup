@@ -28,7 +28,7 @@ $role = (string)($_POST['role'] ?? ($_SERVER['argv'][3] ?? 'visitor'));
 $role = $role === 'agent' ? 'agent' : 'visitor';
 $origin = ($_SERVER['REQUEST_SCHEME'] ?? 'https') . '://' . ($_SERVER['HTTP_HOST'] ?? '');
 $nginxSnippet = '';
-        $cronLine = "*/5 * * * * php " . __DIR__ . "/node/update-node.php && curl -fsS -m 20 -X POST {$mainUrl}/api/internal/sync -H 'Content-Type: application/json' -d '{\"secret\":\"$relaySecret\"}' -o " . __DIR__ . "/data/blcache.json";
+        $cronLine = '';   // 零 cron 设计：更新/同步随流量自动进行，无需定时任务
 
 function http_post_json(string $url, array $body): array
 {
@@ -159,7 +159,7 @@ if (($isCli || ($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') && !$installed 
         @file_put_contents(__DIR__ . '/nginx-edge.conf', "# /api/ 反代到总控 + 伪静态（整段加入本站点 server 块，替换原 location /）\n" . $nginxSnippet . "\n");
         // PHP 环境加固（open_basedir 指向本站点）
         @file_put_contents(__DIR__ . '/.user.ini', "open_basedir=" . __DIR__ . ":/tmp/\n");
-        $cronLine = "*/5 * * * * php " . __DIR__ . "/node/update-node.php && curl -fsS -m 20 -X POST {$mainUrl}/api/internal/sync -H 'Content-Type: application/json' -d '{\"secret\":\"$relaySecret\"}' -o " . __DIR__ . "/data/blcache.json";
+        $cronLine = '';   // 零 cron 设计：更新/同步随流量自动进行，无需定时任务
         $step = 'done';
         $results[] = '✓ 安装器自删除';
         if (!$isCli) { @unlink(__FILE__); }
@@ -224,15 +224,13 @@ textarea { width: 100%; height: 110px; font-family: Consolas, monospace; font-si
   <div class="locked">
     <div class="big">🔒</div>
     <div style="font-size:16px;font-weight:600;color:#14181f;">本节点已完成安装</div>
-    <div class="hint">检测到 config.php 已存在。后续更新由节点 cron 自动从总控拉取；如需重装请先删除 config.php。</div>
+    <div class="hint">检测到 config.php 已存在。后续更新随流量自动从总控拉取；如需重装请先删除 config.php。</div>
   </div>
 <?php elseif ($step === 'done'): ?>
   <div class="okbox">✅ 安装完成！节点已登记到主控并进入边缘白名单（角色：<?= $role === 'agent' ? '客服入口' : '访客站点' ?>，代码 v<?= htmlspecialchars($codeBundle['version'] ?? '') ?>）。</div>
   <div class="log"><?php foreach ($results as $r) echo htmlspecialchars($r) . '<br>'; ?></div>
   <div class="f-label">nginx 配置（/api/ 反代到总控）</div>
   <textarea readonly onclick="this.select()"><?= htmlspecialchars($nginxSnippet) ?></textarea>
-  <div class="f-label">黑名单同步 cron（crontab -e 添加）</div>
-  <textarea readonly onclick="this.select()"><?= htmlspecialchars($cronLine) ?></textarea>
   <div class="hint">完成后访问 <span class="mono">/api/health</span> 验收（site_role 应为 <?= $role ?>）。主控「节点管理」页已能看到本节点。</div>
 <?php elseif ($step === 'error'): ?>
   <?php if ($error !== ''): ?><div class="err"><?= htmlspecialchars($error) ?></div><?php endif; ?>

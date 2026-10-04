@@ -2698,3 +2698,10 @@ AND EXISTS (SELECT 1 FROM messages m WHERE m.session_id = s.id AND m.from_type =
    → 登记时版本记空（按落后处理）；节点更新器 node/update-node.php 重写为**自包含**
    （不依赖节点旧代码，含独立应用逻辑），从总控拉包原子应用（临时文件+rename，
    防止覆盖执行中脚本导致 500）
+
+## 35. v2.41 变更记录（开发与更新规范重写为权威文档 DEVELOPMENT.md，2026-10-04）
+- DEVELOPMENT.md 全面重写：架构图 / 仓库地图 / hosts 节点身份 / **打包器白名单精确清单与排除项** /
+  双推送通道（边缘自维护 + 主控手动推送）/ bootstrap 部署流程 / 数据归属 / 排错速查——
+  此前分散在 DEPLOY v2.32~v2.40 各节的机制描述以此为准
+- bootstrap.php 完成页清理：移除过时的 cron 行展示（零 cron 设计下多余，且引用了
+  不在更新包内的 update-node.php）；锁定页措辞对齐
