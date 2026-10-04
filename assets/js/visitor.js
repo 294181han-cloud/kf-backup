@@ -198,6 +198,10 @@ createApp({
               storeToken(r.visitor_token);
               page.value = 'chat';
               await loadHistory();
+              // v2.53 修 bug：这条「恢复已有会话」的分支原来**完全不调欢迎语接口**，
+              // 于是"客服结束会话后访客重新进来 / 换设备后重新扫码"这类新建的会话就收不到欢迎语。
+              // 服务端本身按 welcome_sent 做了幂等（trig=once 不会重发），这里可以放心调。
+              await sendWelcome({});
               startPoll();
               return;
             }
@@ -230,6 +234,18 @@ createApp({
       }
     };
 
+    /* v2.53 抽出来公用：两条进入路径（恢复旧会话 / 新建会话）都要发欢迎语，
+       服务端按 welcome_sent 幂等，同一会话只会发一次（trig=once）。 */
+    const sendWelcome = async (extra) => {
+      if (!sessionId.value) return;
+      try {
+        await fetch((window.KF_API_BASE||'') + '/api/visitor/welcome', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ session_id: sessionId.value, name: (extra && extra.name) || '' })
+        });
+      } catch (e) {}
+    };
+
     const startSession = async (extra) => {
       const p = { ...params(), ...extra, from_url: document.referrer || '直接访问' };
       const vt = loadToken();
@@ -247,12 +263,7 @@ createApp({
       page.value = 'chat';
       await loadHistory();
       // 欢迎语
-      try {
-        await fetch((window.KF_API_BASE||'') + '/api/visitor/welcome', {
-          method: 'POST', headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ session_id: sessionId.value, name: extra.name || '' })
-        });
-      } catch (e) {}
+      await sendWelcome(extra);
       await pollOnce();
       startPoll();
     };
