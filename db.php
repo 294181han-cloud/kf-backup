@@ -12,7 +12,10 @@ function db(): PDO
     static $pdo = null;
     if ($pdo instanceof PDO) return $pdo;
 
-    $cfg = require __DIR__ . '/config.php';
+    /* v2.48.3 修 bug：这里原来直接 require config.php，**绕过了按域名的 hosts 覆盖**，
+       导致「基础段指向别的库」的节点（如旧站 kf.ylcz.cc 基础段是新库、靠 hosts 覆盖回本地 kfxt）
+       所有数据库操作全部 Access denied。统一走 config()，分域部署才真正生效。 */
+    $cfg = function_exists('config') ? config() : require __DIR__ . '/config.php';
     $d = $cfg['db'];
     $dsn = sprintf('mysql:host=%s;port=%d;dbname=%s;charset=%s', $d['host'], $d['port'], $d['name'], $d['charset']);
     $pdo = new PDO($dsn, $d['user'], $d['pass'], [

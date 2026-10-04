@@ -2920,3 +2920,33 @@ cron 是 CLI 跑的、没有 Host 头 → 用不到 hosts 覆盖 → 拿基础�
 
 > 排错备忘：凡是「CLI 跑站点脚本」都拿不到 HTTP_HOST，`hosts` 按域名覆盖不生效，只能用 `config.php` 的基础段。
 > 迁移后如果有脚本还指着旧目录，就会撞上这种"库名对、机器不对"的 1045。
+
+
+## v2.48.3 变更记录（旧站工作台报 1045 的真凶：db() 绕过了按域名覆盖，2026-10-04）
+
+用户截图：`kf.ylcz.cc/app.html` 页面弹出 `服务器错误: SQLSTATE[HY000] [1045] Access denied for user 'sql_ad_yluu_top'@'localhost'`。
+（上一节 v2.48.2 只处理了 cron 刷日志，**页面本身也是坏的**，这里才是根因。）
+
+**根因**：`db.php` 里的 `db()` 直接读原始配置文件：
+```php
+$cfg = require __DIR__ . '/config.php';   // ← 绕过了 config() 的 hosts 覆盖
+$d = $cfg['db'];
+```
+而分域部署的所有覆盖都在 `helpers.php` 的 `config()` 里做（按 `HTTP_HOST` 命中 `config.php` 的 `hosts` 段再合并）。
+于是「基础段不是本机库」的节点必然全挂 —— 旧站 `kf.ylcz.cc` 正是这种：
+基础段是主站库 `sql_ad_yluu_top`，靠 `hosts['kf.ylcz.cc']` 覆盖回本机 `kfxt`；db() 一绕过覆盖，
+就拿主站库名去连**本机 MySQL** → 没有这个用户 → 每一个涉及数据库的接口都 1045。
+
+（主站 ad.yluu.top 基础段本来就对，所以只有它没事，问题被掩盖了两周。）
+
+**修法**（`db.php`）：
+```php
+$cfg = function_exists('config') ? config() : require __DIR__ . '/config.php';
+```
+统一走 `config()`；极端情况下（单独 require db.php、helpers 未加载）仍能回退到原始文件。
+
+**实测（老服务器 kf.ylcz.cc）**
+- `POST /api/auth/login` → 修复前 `{"error":"服务器错误: SQLSTATE...1045"}`；修复后 `{"error":"卡密不存在"}`（正常业务错误 = 库通了）✅
+- Playwright 打开 `https://kf.ylcz.cc/app.html`（租户 133 令牌）：**会话列表正常加载**、页面无「服务器错误」弹窗、无 4xx/5xx ✅
+
+版本：`version.php` 2.48.2 → **2.48.3**（db.php 在分控更新包白名单里，推一次全网生效）
