@@ -678,6 +678,101 @@ function handle_internal_apply(string $method): void
 
 /* ================= 枢纽模式：内存态 / 白名单 / 黑名单同步（v2.34） ================= */
 
+/** 边缘节点惰性维护（每 5 分钟一次，随流量触发，无需 cron）：
+ *  1) 向总控检查版本并应用更新包（self-update）  2) 黑名单/归属同步落到 data/blcache.json
+ *  3) 向总控登记节点（IP+角色，边缘自动入节点管理列表） */
+function edge_maintenance(): void
+{
+    $lockFile = __DIR__ . '/data/edge-maint.lock';
+    $now = time();
+    if (is_file($lockFile) && ($now - (int)file_get_contents($lockFile)) < 290) return; // 5 分钟节流
+    @file_put_contents($lockFile, (string)$now);
+    $cfg = config();
+    $main = rtrim((string)($cfg['site_main_url'] ?? ''), '/');
+    $secret = (string)($cfg['relay_secret'] ?? '');
+    if ($main === '' || $secret === '') return;
+    $post = function (string $path, array $body): array {
+        $payload = json_encode($body, JSON_UNESCAPED_UNICODE);
+        if (function_exists('curl_init')) {
+            $ch = curl_init($path);
+            curl_setopt_array($ch, [CURLOPT_POST => true, CURLOPT_RETURNTRANSFER => true, CURLOPT_TIMEOUT => 60,
+                CURLOPT_HTTPHEADER => ['Content-Type: application/json'], CURLOPT_POSTFIELDS => $payload]);
+            $resp = curl_exec($ch);
+            curl_close($ch);
+        } else {
+            $ctx = stream_context_create(['http' => ['method' => 'POST', 'header' => "Content-Type: application/json
+", 'content' => $payload, 'timeout' => 60, 'ignore_errors' => true]]);
+            $resp = @file_get_contents($path, false, $ctx);
+        }
+        $j = json_decode((string)$resp, true);
+        return is_array($j) ? $j : [];
+    };
+    // 1) 更新检查（总控版本不同 → 返回更新包并应用）
+    try {
+        $j = $post($main . '/api/internal/update', ['secret' => $secret, 'app_version' => app_version(), 'role' => ($cfg['site_role'] ?? '')]);
+        if (!empty($j['files'])) apply_node_bundle($j);
+    } catch (\Throwable $e) { /* 静默：下轮重试 */ }
+    // 2) 黑名单同步
+    try {
+        $j = $post($main . '/api/internal/sync', ['secret' => $secret]);
+        if (isset($j['bl_version'])) @file_put_contents(__DIR__ . '/data/blcache.json', json_encode($j, JSON_UNESCAPED_UNICODE));
+    } catch (\Throwable $e) { /* 静默 */ }
+    // 3) 节点登记（IP+角色，幂等）
+    try {
+        $origin = ($_SERVER['REQUEST_SCHEME'] ?? 'https') . '://' . ($_SERVER['HTTP_HOST'] ?? '');
+        $post($main . '/api/internal/heartbeat', ['secret' => $secret, 'role' => ($cfg['site_role'] ?? ''), 'app_version' => app_version(), 'origin' => $origin, 'ip' => '']);
+    } catch (\Throwable $e) { /* 静默 */ }
+}
+
+/** 边缘本地黑名单拦截：读 data/blcache.json（总控同步），全局 + 当前租户 双层判定 */
+function edge_ip_blocked(): bool
+{
+    $file = __DIR__ . '/data/blcache.json';
+    if (!is_file($file)) return false;
+    $j = json_decode((string)file_get_contents($file), true);
+    if (!is_array($j)) return false;
+    $ip = get_client_ip();
+    if ($ip === '' ) return false;
+    foreach ((array)($j['global'] ?? []) as $g) {
+        if ((string)($g['ip'] ?? '') === $ip) return true;
+    }
+    // 当前租户：?t=卡密 或 ?key=客服码 反查 tenant_id
+    $tid = 0;
+    $qs = $_GET;
+    if (!empty($qs['t']) && isset($j['kamiById'])) {
+        foreach ((array)$j['kamiById'] as $tidK => $kami) { if ((string)$kami === (string)$qs['t']) { $tid = (int)$tidK; break; } }
+    } elseif (!empty($qs['key']) && isset($j['codeTid'])) {
+        $tid = (int)($j['codeTid'][(string)$qs['key']] ?? 0);
+    }
+    if (!$tid) return false;
+    return in_array($ip, (array)($j['tenants'][$tid] ?? []), true);
+}
+
+/** 主控侧：识别带 X-Edge-Secret 的分控反代请求——自动登记/刷新节点（IP+角色） */
+function edge_touch_from_headers(): void
+{
+    static $done = false;
+    if ($done) return;
+    $done = true;
+    $cfg = config();
+    if (($cfg['site_role'] ?? 'main') !== 'main') return;
+    $secret = (string)($cfg['relay_secret'] ?? '');
+    if ($secret === '') return;
+    $given = (string)($_SERVER['HTTP_X_EDGE_SECRET'] ?? '');
+    if ($given === '' || !hash_equals($secret, $given)) return;
+    $remote = $_SERVER['REMOTE_ADDR'] ?? '';
+    if (!filter_var($remote, FILTER_VALIDATE_IP)) return;
+    $role = in_array(($r = (string)($_SERVER['HTTP_X_EDGE_ROLE'] ?? '')), ['agent', 'visitor'], true) ? $r : '';
+    $origin = mb_substr(trim((string)($_SERVER['HTTP_X_EDGE_ORIGIN'] ?? '')), 0, 200);
+    try {
+        db()->prepare('INSERT INTO nodes (ip, role, app_version, origin, first_seen, last_seen)
+                       VALUES (?,?,?,?,NOW(),NOW())
+                       ON DUPLICATE KEY UPDATE app_version = VALUES(app_version),
+                                               origin = VALUES(origin), last_seen = NOW()')
+            ->execute([$remote, $role, app_version(), $origin]);
+    } catch (\Throwable $e) { /* 登记失败不影响请求 */ }
+}
+
 /** 总控内存能力探测（APCu 可用时才启用内存态：在线表 / 消息缓存）；不可用则自动退回数据库路径 */
 function mem_ok(): bool
 {

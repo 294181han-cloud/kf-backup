@@ -28,7 +28,7 @@ $role = (string)($_POST['role'] ?? ($_SERVER['argv'][3] ?? 'visitor'));
 $role = $role === 'agent' ? 'agent' : 'visitor';
 $origin = ($_SERVER['REQUEST_SCHEME'] ?? 'https') . '://' . ($_SERVER['HTTP_HOST'] ?? '');
 $nginxSnippet = '';
-$cronLine = '';
+        $cronLine = "*/5 * * * * php " . __DIR__ . "/node/update-node.php && curl -fsS -m 20 -X POST {$mainUrl}/api/internal/sync -H 'Content-Type: application/json' -d '{\"secret\":\"$relaySecret\"}' -o " . __DIR__ . "/data/blcache.json";
 
 function http_post_json(string $url, array $body): array
 {
@@ -142,12 +142,23 @@ if (($isCli || ($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') && !$installed 
         } catch (Throwable $e) { $results[] = '⚠ 黑名单同步暂失败（cron 会自动重试）'; }
 
         $host = parse_url($mainUrl, PHP_URL_HOST) ?: '主站域名';
-        $nginxSnippet = "location /api/ {\n"
+        $edgeSecret = $relaySecret;
+        $nginxSnippet = "location / {\n"
+            . "    if (!-e $request_filename) { rewrite ^(.*)$ /index.php?s=$1 last; break; }\n"
+            . "}\n"
+            . "location /api/ {\n"
             . "    proxy_pass {$mainUrl}/api/;\n"
             . "    proxy_set_header Host {$host};\n"
-            . "    proxy_set_header X-Forwarded-For \$remote_addr;\n"
+            . "    proxy_set_header X-Forwarded-For $remote_addr;\n"
+            . "    proxy_set_header X-Edge-Secret {$edgeSecret};\n"
+            . "    proxy_set_header X-Edge-Role {$role};\n"
+            . "    proxy_set_header X-Edge-Origin {$origin};\n"
             . "    proxy_ssl_server_name on;\n"
             . "}";
+        // 直接写成文件：粘贴伪静态时打开 nginx-edge.conf 复制整段即可
+        @file_put_contents(__DIR__ . '/nginx-edge.conf', "# /api/ 反代到总控 + 伪静态（整段加入本站点 server 块，替换原 location /）\n" . $nginxSnippet . "\n");
+        // PHP 环境加固（open_basedir 指向本站点）
+        @file_put_contents(__DIR__ . '/.user.ini', "open_basedir=" . __DIR__ . ":/tmp/\n");
         $cronLine = "*/5 * * * * php " . __DIR__ . "/node/update-node.php && curl -fsS -m 20 -X POST {$mainUrl}/api/internal/sync -H 'Content-Type: application/json' -d '{\"secret\":\"$relaySecret\"}' -o " . __DIR__ . "/data/blcache.json";
         $step = 'done';
         $results[] = '✓ 安装器自删除';

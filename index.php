@@ -217,6 +217,7 @@ function serve_html(string $file): void
    边缘节点（agent/visitor）不连数据库：页面/静态/门禁本地处理，
    需要数据的 /api/* 由 nginx 反代到主站；未列路径一律 404/403。 */
 if (site_role() !== 'main') {
+    edge_maintenance();   // 边缘惰性自维护（每 5 分钟）：自更新 + 黑名单同步 + 节点登记，无需 cron
     // 访客/防红壳页（visitor 节点）与登录/工作台（agent 节点）放行；其余页面 404
     if (preg_match('#^/[0-9]{2}-[0-9]{2}/[A-Za-z0-9]{4,16}\.html$#', $uri)) {
         if (site_role() !== 'visitor') { http_response_code(404); echo 'Not Found'; exit; }
@@ -335,6 +336,7 @@ require_once __DIR__ . '/routes/tgadmin.php';
 /* 发卡机器人：建表 + 首次灌默认套餐（只跑一次，避免每请求都查） */
 function dispatch_api(string $method, string $uri): void
 {
+    edge_touch_from_headers();   // 分控反代请求：带 X-Edge-Secret 的自动登记/刷新节点
     // ---- 认证 ----
     if ($uri === '/api/auth/login')    handle_auth_login($method);
     // ---- 上传中转（分节点 → 主站，仅 main 角色开放，共享密钥校验）----
