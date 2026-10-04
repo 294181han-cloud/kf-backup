@@ -726,6 +726,7 @@ const app = createApp({
       maxMsgId.value = 0;
       profile.value = null;
       infoOpen.value = false;   // v2.46 手机端：切会话时收起访客信息抽屉
+      chMore.value = false;     // v2.60 手机端：切会话时收起「更多」面板
       chatAtBottom.value = true;   // v2.52 换会话时先当作在底部
       try {
         const r = await API.get('/api/sessions/' + id + '/messages');
@@ -851,6 +852,7 @@ const app = createApp({
         msgs.value.push(r.message);
         maxMsgId.value = r.message.id;
         draft.value = '';
+        resetTaHeight();
         pendingAtts.value = [];
         // v2.55 发完把该会话的草稿槽也清掉，切回来是干净的
         draftBox[currentId.value] = '';
@@ -872,6 +874,18 @@ const app = createApp({
     const onKey = (e) => {
       if (e.isComposing || e.keyCode === 229) return;
       if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(); }
+    };
+    /* v2.60 手机端：输入框随内容长高（最多 ~5 行），不用在里面滚来滚去找字。
+       只在手机端生效，电脑端保持原来的固定高度。 */
+    const autoGrowTa = (ev) => {
+      const el = ev && ev.target;
+      if (!el || document.documentElement.getAttribute('data-ui-cat') !== 'mobile') return;
+      el.style.height = 'auto';
+      el.style.height = Math.min(132, Math.max(44, el.scrollHeight)) + 'px';
+    };
+    const resetTaHeight = () => {
+      const el = document.querySelector('.chat-input textarea');
+      if (el) el.style.height = '';
     };
 
     // 快捷消息（v2.28 改版）：单击 = 直接发送；Ctrl+单击 = 填入输入框（文字+图片均可编辑）
@@ -1202,6 +1216,36 @@ const app = createApp({
     };
     const onMsgTouchMove = () => { lpMoved = true; clearTimeout(lpTimer); };
     const onMsgTouchEnd = () => { lpMoved = true; clearTimeout(lpTimer); };
+
+    /* v2.60 手机端：聊天头部的「⋯ 更多」底部面板。
+       原来手机上 6 个操作按钮要占两行（把消息区挤掉三分之一），现在只留「资料 + ⋯」两个，
+       归档 / 转接 / 结束 / 拉黑 / 搜索全部收进这个面板，点一下才出现。 */
+    const chMore = ref(false);
+    const chMoreAction = async (k) => {
+      chMore.value = false;
+      if (k === 'search') { chatSearchOn.value = !chatSearchOn.value; return; }
+      if (k === 'block') {
+        try {
+          await ElementPlus.ElMessageBox.confirm(
+            '拉黑「' + ((current.value && current.value.name) || '该访客') + '」的 IP？拉黑后对方无法再进入或发消息。',
+            '拉黑访客', { type: 'warning', confirmButtonText: '拉黑', cancelButtonText: '取消' });
+          await blockSession();
+        } catch (e) {}
+        return;
+      }
+      if (k === 'archive') { await archiveSession(true); return; }
+      if (k === 'unarchive') { await archiveSession(false); return; }
+      if (k === 'transfer') { transferDlg.value = true; return; }
+      if (k === 'close') {
+        try {
+          await ElementPlus.ElMessageBox.confirm(
+            '结束会话后，访客端聊天记录将清除，访客将无法继续在此会话发送消息。确认结束？',
+            '结束会话', { type: 'warning', confirmButtonText: '结束会话', cancelButtonText: '取消' });
+          await closeSession();
+        } catch (e) {}
+        return;
+      }
+    };
     const deleteMsg = async (m) => {
       msgMenu.show = false; msgSheet.show = false;
       if (!m) return;
@@ -2782,6 +2826,7 @@ const app = createApp({
       msgMenu, openMsgMenu, closeMsgMenu, closeAllMenus, deleteMsg,
       canEdit, editMsg,
       msgSheet, openMsgSheet, onMsgTouchStart, onMsgTouchMove, onMsgTouchEnd,
+      chMore, chMoreAction,
       selMode, selIds, enterSel, exitSel, toggleSel, selAll, selCopy, selDelete,
       onPaste, sendFile, sendLocation,
       SOUND_OPTS, sndCfg, playSound, saveSnd,
@@ -2806,6 +2851,7 @@ const app = createApp({
       audioPlaying, audioDur, waveBars, toggleAudio,
       asrText, asrBusy, transcribe,
       openSession, send, onKey, useQuick, sendQuick, quickClick, onImage, startRec, stopRec, closeSession, doTransfer,
+      autoGrowTa,
       pendingAtts, rmPendingAtt, quickCtx, openQuickCtx, editQuick,
       qDrag, quickDragDown, quickDragMove, quickDragUp, quickMove,
       imgZoom, imgRot, imgWheel, downloadImage, copyImage, imgToast,

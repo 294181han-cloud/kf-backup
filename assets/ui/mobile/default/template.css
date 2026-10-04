@@ -178,3 +178,121 @@ html[data-ui-cat="mobile"][data-ui-template="default"] .code-body { flex-directi
 html[data-ui-cat="mobile"][data-ui-template="default"] .code-img-panel,
 html[data-ui-cat="mobile"][data-ui-template="default"] .code-set-panel { min-width: 0; }
 html[data-ui-cat="mobile"][data-ui-template="default"] .img-viewer img { max-width: 100vw; max-height: 86vh; }
+
+/* =====================================================================
+   v2.60 手机端重做（用户反馈「手机端还是不太好操作」）
+   目标：聊天区尽量大、输入框永远在屏幕里、头部不再占掉三分之一。
+   实测基线（iPhone 13，390×664 可视区）：
+     改前 头部≈180px（6 个按钮换两行）+ 底部≈300px（快捷栏两行 + 工具栏 + 输入框 + 独立发送键）
+     改后 头部≈52px（头像+名字一行、右侧只有「资料 / ⋯」）+ 底部≈150px（快捷栏一行横滑 + 输入框与发送键并排）
+   ===================================================================== */
+
+/* 手机端要显示「只在手机出现」的元素（👤资料 / ⋯更多 / ⚙快捷消息设置） */
+html[data-ui-cat="mobile"] .m-only { display: inline-flex !important; }
+
+/* ---------- ① 聊天头部：头像 + 名字/渠道一行，右上只留两个小按钮 ---------- */
+html[data-ui-cat="mobile"][data-ui-template="default"] .chat-head {
+  flex-wrap: nowrap; align-items: center; gap: 8px; row-gap: 0; padding: 7px 10px;
+}
+html[data-ui-cat="mobile"][data-ui-template="default"] .chat-head .ch-ava {
+  width: 34px; height: 34px; font-size: 17px; border-radius: 10px;
+}
+html[data-ui-cat="mobile"][data-ui-template="default"] .chat-head .ch-info {
+  flex: 1 1 auto; order: 0; min-width: 0; display: flex; flex-direction: column; gap: 2px;
+}
+html[data-ui-cat="mobile"][data-ui-template="default"] .chat-head .ch-top { flex-wrap: nowrap; gap: 6px; row-gap: 0; }
+html[data-ui-cat="mobile"][data-ui-template="default"] .chat-head .ch-top .name {
+  flex: 1 1 auto; min-width: 0; max-width: none; font-size: 15px; line-height: 1.25;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+html[data-ui-cat="mobile"][data-ui-template="default"] .chat-head .ch-sub {
+  flex-wrap: nowrap; overflow-x: auto; overflow-y: hidden; row-gap: 0; padding-bottom: 0;
+  scrollbar-width: none; -ms-overflow-style: none;
+}
+html[data-ui-cat="mobile"][data-ui-template="default"] .chat-head .ch-sub::-webkit-scrollbar { height: 0; display: none; }
+html[data-ui-cat="mobile"][data-ui-template="default"] .chat-head-btns {
+  flex: 0 0 auto; order: 0; flex-wrap: nowrap; gap: 6px; margin-left: 0; overflow: visible; padding-bottom: 0;
+}
+html[data-ui-cat="mobile"][data-ui-template="default"] .chat-head-btns .m-hide-btn { display: none !important; }
+html[data-ui-cat="mobile"][data-ui-template="default"] .chat-head-btns .cbtn { padding: 5px 8px; }
+html[data-ui-cat="mobile"][data-ui-template="default"] .chat-search { padding: 6px 10px; }
+
+/* ---------- ② 输入区：快捷栏一行横滑 + 输入框和发送键并排 ---------- */
+html[data-ui-cat="mobile"][data-ui-template="default"] .chat-body { padding: 10px 10px 12px; }
+html[data-ui-cat="mobile"][data-ui-template="default"] .chat-input {
+  padding: 6px 10px calc(8px + env(safe-area-inset-bottom));
+}
+/* 手机上不再需要「快捷消息 / 设置」这排开关：快捷条常显，设置挪到工具栏的 ⚙ */
+html[data-ui-cat="mobile"][data-ui-template="default"] .quick-toggle-row { display: none; }
+html[data-ui-cat="mobile"][data-ui-template="default"] .quick-bar {
+  max-height: none; opacity: 1; margin-bottom: 6px; overflow: visible;
+}
+html[data-ui-cat="mobile"][data-ui-template="default"] .quick-bar .quick-scroll {
+  flex-wrap: nowrap; overflow-x: auto; overflow-y: hidden; row-gap: 0; gap: 6px;
+  -webkit-overflow-scrolling: touch; scrollbar-width: none; -ms-overflow-style: none;
+}
+html[data-ui-cat="mobile"][data-ui-template="default"] .quick-bar .quick-scroll::-webkit-scrollbar { height: 0; display: none; }
+/* 一行横滑就没法再用手势排序了（排序改到「设置 → 快捷消息」里拖动） */
+html[data-ui-cat="mobile"][data-ui-template="default"] .quick-scroll .quick-btn {
+  touch-action: pan-x; opacity: 1; transform: none; padding: 6px 12px; font-size: 12.5px;
+}
+html[data-ui-cat="mobile"][data-ui-template="default"] .chat-tools {
+  gap: 12px; margin-bottom: 6px !important; overflow-x: auto; scrollbar-width: none; -ms-overflow-style: none;
+}
+html[data-ui-cat="mobile"][data-ui-template="default"] .chat-tools::-webkit-scrollbar { height: 0; display: none; }
+html[data-ui-cat="mobile"][data-ui-template="default"] .tool-btn { width: 30px; height: 30px; flex-shrink: 0; }
+html[data-ui-cat="mobile"][data-ui-template="default"] .tool-btn svg { width: 19px; height: 19px; }
+/* 输入框 + 发送键一行（原来发送键独占一行，白吃掉 50px 高度） */
+html[data-ui-cat="mobile"][data-ui-template="default"] .ci-row { display: flex; align-items: flex-end; gap: 8px; }
+html[data-ui-cat="mobile"][data-ui-template="default"] .ci-row textarea {
+  flex: 1 1 auto; min-width: 0; width: auto; height: 44px; min-height: 44px; max-height: 132px;
+  padding: 11px 12px; border: 1px solid var(--line); border-radius: 12px;
+  background: var(--bg); font-size: 16px; line-height: 1.4; box-sizing: border-box; overflow-y: auto;
+}
+html[data-ui-cat="mobile"][data-ui-template="default"] .ci-row .send-btn {
+  flex: 0 0 auto; width: 44px; height: 44px; min-width: 44px; margin: 0; padding: 0;
+  border-radius: 50%; display: inline-flex; align-items: center; justify-content: center;
+  box-shadow: 0 5px 14px -7px color-mix(in srgb, var(--theme, #1677ff) 75%, transparent);
+}
+html[data-ui-cat="mobile"][data-ui-template="default"] .ci-row .send-btn .sb-ic { display: block; width: 19px; height: 19px; }
+html[data-ui-cat="mobile"][data-ui-template="default"] .ci-row .send-btn .sb-t { display: none; }
+html[data-ui-cat="mobile"][data-ui-template="default"] body:not(.dark) .ci-row textarea {
+  background: var(--bg); border-color: var(--line);
+}
+
+/* ---------- ③ 会话列表：⋯ 让出位置（原来压在时间上）；多选入口收窄 ---------- */
+html[data-ui-cat="mobile"][data-ui-template="default"] .sess-item { padding: 10px 42px 10px 10px; gap: 10px; }
+html[data-ui-cat="mobile"][data-ui-template="default"] .sess-more { right: 8px; }
+html[data-ui-cat="mobile"][data-ui-template="default"] .sess-col .search { padding: 8px 10px; }
+html[data-ui-cat="mobile"][data-ui-template="default"] .sess-scope-tabs { padding: 6px 10px 0; }
+html[data-ui-cat="mobile"][data-ui-template="default"] .scope-tab { padding: 7px 4px 9px; }
+html[data-ui-cat="mobile"][data-ui-template="default"] .sess-list { padding: 6px 8px 12px; }
+html[data-ui-cat="mobile"][data-ui-template="default"] .sess-multi-entry {
+  margin: 2px 10px 6px; padding: 7px 10px; width: calc(100% - 20px); font-size: 12px;
+}
+
+/* ---------- ④ 设置页子导航：改成顶部横向滑动条 ----------
+   原来是 position:absolute 的 216px 竖栏，手机上会直接盖住右侧内容（用户反馈"设置页没法用"）。 */
+html[data-ui-cat="mobile"][data-ui-template="default"] .main.has-setmenu .set-menu {
+  position: static; top: auto; bottom: auto; left: auto; width: auto; flex-shrink: 0;
+  display: flex; align-items: center; gap: 6px; padding: 8px 10px;
+  border-right: 0; border-bottom: 1px solid var(--line);
+  overflow-x: auto; overflow-y: hidden; scrollbar-width: none; -ms-overflow-style: none;
+}
+html[data-ui-cat="mobile"][data-ui-template="default"] .main.has-setmenu .set-menu::-webkit-scrollbar { height: 0; display: none; }
+html[data-ui-cat="mobile"][data-ui-template="default"] .main.has-setmenu .set-menu .sm-group {
+  display: flex; align-items: center; gap: 6px; margin: 0;
+}
+html[data-ui-cat="mobile"][data-ui-template="default"] .main.has-setmenu .set-menu .sm-gt { display: none; }
+html[data-ui-cat="mobile"][data-ui-template="default"] .main.has-setmenu .set-menu .sm-item {
+  width: auto; flex-shrink: 0; white-space: nowrap; gap: 6px;
+  padding: 7px 12px; font-size: 12.5px; border-radius: 999px; background: var(--bg);
+}
+html[data-ui-cat="mobile"][data-ui-template="default"] .main.has-setmenu .set-menu .sm-item .sm-n { overflow: visible; }
+html[data-ui-cat="mobile"][data-ui-template="default"] .main.has-setmenu .set-menu .sm-item.on {
+  background: var(--theme-grad, linear-gradient(135deg, #1677ff, #4d9bff)); color: #fff;
+}
+html[data-ui-cat="mobile"][data-ui-template="default"] .main.has-setmenu .content { margin-left: 0; padding: 10px; }
+
+/* ---------- ⑤ 回到底部按钮：跟着矮下来的输入区一起下移 ---------- */
+html[data-ui-cat="mobile"][data-ui-template="default"] .chat-tobottom { bottom: 116px; }

@@ -190,6 +190,10 @@ body.dark .tool-btn:hover { color: var(--theme, #69b1ff); }
 .quick-toggle-btn.on { background: #464649ad; color: #fff; border-color: transparent; }
 .send-btn { background: #1677ff; color: #fff; border: none; border-radius: 6px; padding: 7px 22px; font-size: 14px; cursor: pointer; margin-left: auto; }
 .send-btn:disabled { opacity: .5; }
+/* v2.60 输入框 + 发送键的包裹层：电脑端 display:contents 保持原样，手机端才并成一行 */
+.ci-row { display: contents; }
+.ci-row .send-btn { margin-top: 6px; }
+.ci-row .send-btn .sb-ic { display: none; width: 18px; height: 18px; }
 
 .info-col { width: 300px; min-width: 240px; background: #fff; border-left: 1px solid #e5e6eb; overflow-y: auto; flex-shrink: 0; padding: 16px; }
 .info-col h4 { font-size: 13px; color: #86909c; margin: 16px 0 8px; font-weight: normal; }
