@@ -1240,7 +1240,8 @@ function wxcheck_cfg(): array
 {
     return [
         // 平台级开关：wxcheck_on=0 时只回报「未开通」，不显示绿色的「正常接待」（接口不可信时避免假绿）
-        'on'   => kv_get('wxcheck_on', '0') === '1',
+        // v2.47 起默认开启（用米人免费接口，不需要账号；要关就写 kv wxcheck_on=0）
+        'on'   => kv_get('wxcheck_on', '1') !== '0',
         // v2.47 检测通道：mir6 = 米人免费接口（只要 url，不用账号）／uouin = 原来的付费接口（要账号密钥）
         'provider' => kv_get('wxcheck_provider', 'mir6') === 'uouin' ? 'uouin' : 'mir6',
         'user' => kv_get('wxcheck_user', ''),

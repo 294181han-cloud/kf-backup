@@ -2823,3 +2823,27 @@ app.css / admin.css / visitor.css 统一加：最后一列 `.cell` 用 flex 居�
 - 每小时红码巡检 `php bin/check_codes.php`：`共 6 个码 → 正常 6、红 0、异常/未开通 0` ✅
 
 版本：`version.php` 2.46.0 → **2.47.0**
+
+
+## v2.48 变更记录（修「复制图片失败」+ 检测不再要开关，2026-10-04）
+
+**① 复制图片一直失败（真 bug）** —— 现象：点图片查看器里的「复制」大概率弹「复制失败，请用『下载』」。
+
+原因：v2.42 起上传文件一律**绝对地址**（总控 `https://ad.yluu.top/uploads/...`），
+但工作台经常开在**边缘域名**上（如 `123.xiaomiyun.vip`）——图片就是**跨域**资源，而总控 `/uploads/` 没给 CORS 头，
+浏览器直接拦掉 `fetch`；就算取到了，JPEG 走 canvas 转 PNG 时缺 `crossOrigin` 会**污染画布**，`toBlob` 照样抛错。
+
+两处一起修：
+- **总控 nginx**（不在仓库里，改的是服务器）：新增 `/www/server/panel/vhost/nginx/extension/ad.yluu.top/uploads-cors.conf`，
+  给 `^/uploads/` 加 `Access-Control-Allow-Origin: *` / `Allow-Methods: GET,HEAD,OPTIONS` / `Max-Age: 86400` + `expires 30d`。
+  放在宝塔的 `extension/` 目录里，面板改站点配置不会覆盖它。实测响应头已带 `access-control-allow-origin: *`。
+- **前端** `assets/js/app.js` 的 `copyImage()`：`fetch` 显式 `{mode:'cors', credentials:'omit'}` 并判 `r.ok`；
+  转 PNG 时补 `im.crossOrigin='anonymous'`（否则跨域图污染 canvas）；失败提示按原因区分
+  （剪贴板权限 / 跨域取图 / 其它），不再是笼统一句「复制失败」。
+
+**② 检测不再要开关** —— 用户："直接用 mir6 就行 后台不需要开关"：
+- 撤掉刚加的「全局设置 → 微信拦截检测」面板（`public/admin.html` 删 41 行、`assets/js/admin.js` 删 32 行）；
+- `wxcheck_cfg()` 的 `on` 默认改为**开**（`kv wxcheck_on` 只有显式写 `0` 才关闭），通道默认 `mir6`；
+- 后台仍保留 `GET/POST /api/admin/wxcheck`（含 `{test:1,link}` 试检测）——只是界面上不放了，排查时能直接 curl。
+
+版本：`version.php` 2.47.0 → **2.48.0**；`app.js?v=3.25.0`

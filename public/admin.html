@@ -424,47 +424,6 @@
         <!-- ===================== 全局设置 ===================== -->
         <template v-if="tab==='settings'">
           <div class="panel">
-            <div class="panel-title" style="display:flex;justify-content:space-between;align-items:center;">
-              <span>微信拦截检测（客服码「红了」判定）</span>
-              <el-tag :type="wxc.on ? 'success' : 'info'" size="small">{{ wxc.on ? '已开通' : '未开通' }}</el-tag>
-            </div>
-            <p style="font-size:13px;color:#86909c;margin:0 0 14px;">
-              租户「客服码 → 立即检测」和每小时红码巡检都走这里。米人是免费的（不用账号），原来那套按次付费。
-            </p>
-            <el-form label-width="140px" style="max-width:680px;">
-              <el-form-item label="启用检测"><el-switch v-model="wxc.on"></el-switch></el-form-item>
-              <el-form-item label="检测通道">
-                <el-radio-group v-model="wxc.provider">
-                  <el-radio-button label="mir6">米人（免费）</el-radio-button>
-                  <el-radio-button label="uouin">付费接口</el-radio-button>
-                </el-radio-group>
-              </el-form-item>
-              <el-form-item label="米人接口地址">
-                <el-input v-model="wxc.mir6" placeholder="https://api.mir6.com/api/wxurl"></el-input>
-              </el-form-item>
-              <template v-if="wxc.provider==='uouin'">
-                <el-form-item label="付费接口地址"><el-input v-model="wxc.uouin" placeholder="https://api.uouin.com/app"></el-input></el-form-item>
-                <el-form-item label="付费账号"><el-input v-model="wxc.user" placeholder="用户名"></el-input></el-form-item>
-                <el-form-item label="付费密钥"><el-input v-model="wxc.key" :placeholder="wxc.key_set ? '已配置（留空＝不修改）' : '接口 key'" show-password></el-input></el-form-item>
-              </template>
-              <el-form-item>
-                <el-button type="primary" :loading="wxcSaving" @click="saveWxc">保存</el-button>
-              </el-form-item>
-            </el-form>
-            <div style="background:#f7f8fa;border-radius:8px;padding:12px 14px;">
-              <div style="font-size:12.5px;color:#4e5969;margin-bottom:8px;">拿一个链接试一下（不会改动任何数据）：</div>
-              <div style="display:flex;gap:8px;max-width:640px;">
-                <el-input v-model="wxcTestLink" placeholder="https://你的客服码链接"></el-input>
-                <el-button :loading="wxcTesting" @click="testWxc">立即测试</el-button>
-              </div>
-              <div v-if="wxcTestResult" style="margin-top:10px;font-size:13px;line-height:1.9;">
-                结果：<b :style="{color: wxcTestResult.state==='ok' ? '#00b42a' : (wxcTestResult.state==='red' ? '#f53f3f' : '#ff7d00')}">
-                  {{ wxcTestResult.tag }} · {{ wxcTestResult.text }}</b><br>
-                <span style="color:#86909c;">{{ wxcTestResult.msg }}</span>
-              </div>
-            </div>
-          </div>
-          <div class="panel">
             <div class="panel-title">主域名（专属链接用）</div>
             <p style="font-size:13px;color:#86909c;margin:0 0 14px;">
               租户的「专属链接」形如 https://子域.主域名/visitor.html。需将该主域名做泛解析（*.主域名 → 本服务器）。

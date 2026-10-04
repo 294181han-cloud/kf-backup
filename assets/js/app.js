@@ -54,17 +54,24 @@ const app = createApp({
       if (!url) return;
       if (!navigator.clipboard || !window.ClipboardItem) { showImgToast('浏览器不支持复制，请用下载'); return; }
       try {
-        const blob = await fetch(url).then(r => r.blob());
+        // v2.48 图片在总控（绝对地址）、工作台可能在边缘域名上 → 必须走 CORS 才读得到
+        // （总控 nginx 已给 /uploads/ 加了 Access-Control-Allow-Origin）
+        const blob = await fetch(url, { mode: 'cors', credentials: 'omit' }).then(r => {
+          if (!r.ok) throw new Error('取图失败 ' + r.status);
+          return r.blob();
+        });
         let out = blob;
         if (blob.type !== 'image/png') {
           // 剪贴板大多只认 PNG：其它格式先画到 canvas 再转
           out = await new Promise((res, rej) => {
             const im = new Image();
+            im.crossOrigin = 'anonymous';   // 不加这句跨域图会污染 canvas，toBlob 直接报错
             im.onload = () => {
               const c = document.createElement('canvas');
               c.width = im.naturalWidth; c.height = im.naturalHeight;
               c.getContext('2d').drawImage(im, 0, 0);
-              c.toBlob(b => (b ? res(b) : rej(new Error('转换失败'))), 'image/png');
+              try { c.toBlob(b => (b ? res(b) : rej(new Error('转换失败'))), 'image/png'); }
+              catch (err) { rej(err); }
             };
             im.onerror = () => rej(new Error('图片加载失败'));
             im.src = url;
@@ -73,7 +80,10 @@ const app = createApp({
         await navigator.clipboard.write([new ClipboardItem({ 'image/png': out })]);
         showImgToast('✅ 已复制图片');
       } catch (e) {
-        showImgToast('复制失败，请用「下载」');
+        // 浏览器不支持的场景（如 Safari 旧版 / 非 https）明确提示，别让人以为是图坏了
+        const why = String((e && e.message) || '');
+        showImgToast(/权限|denied|NotAllowed/i.test(why) ? '浏览器没给剪贴板权限，请用「下载」'
+          : (/取图失败|load|CORS/i.test(why) ? '图片跨域取不到，请用「下载」' : '复制失败，请用「下载」'));
       }
     };
     const imgWheel = (e) => { imgZoom.value = Math.max(0.2, Math.min(6, imgZoom.value + (e.deltaY < 0 ? 0.15 : -0.15))); };
