@@ -414,6 +414,7 @@ function to_msg(array $r): array
     $r['attachments'] = parse_attachments($r['attachments'] ?? null);
     $r['time'] = dt_to_iso($r['created_at'] ?? null);
     if (!empty($r['recalled_at'])) $r['recalled'] = true;
+    if (!empty($r['edited_at'])) $r['edited'] = true;   // v2.56 编辑过的消息（前端显示「已编辑」）
     unset($r['created_at'], $r['recalled_at'], $r['read_at'], $r['tenant_id']);
     return $r;
 }

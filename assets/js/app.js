@@ -523,6 +523,11 @@ const app = createApp({
           const rset = new Set(r.recalledIds);
           msgs.value.forEach(m => { if (rset.has(m.id)) { m.recalled = true; m.recalledByVisitor = m.from === 'visitor'; } });
         }
+        // v2.56 编辑同步：对方（或同租户别的客服）改过的消息，把本地文字也换掉
+        if (Array.isArray(r.editedMsgs) && r.editedMsgs.length) {
+          const emap = new Map(r.editedMsgs.map(x => [Number(x.id), String(x.text || '')]));
+          msgs.value.forEach(m => { if (emap.has(m.id)) { m.text = emap.get(m.id); m.edited = true; } });
+        }
         // 提示音只在"来了还没读的新消息"时响：
         // ① 未读总数增加（别的会话来了新消息）；② 页面切到后台时当前会话来了新消息。
         // 当前正在看的会话消息会立刻标记已读，不再重复响。
@@ -1170,6 +1175,30 @@ const app = createApp({
         const s = sessions.value.find(x => x.id === currentId.value);
         if (s && r && r.last_msg) s.lastMsg = r.last_msg;
         ElementPlus.ElMessage.success('已删除');
+      } catch (e) { ElementPlus.ElMessage.error(e.message); }
+    };
+    // --- v2.56 编辑消息：只有「自己发的纯文字、且没撤回」的能改 ---
+    const canEdit = (m) => !!(m && m.from === 'agent' && !m.recalled && (m.msg_type || 'text') === 'text' && !(m.attachments || []).length);
+    const editMsg = async (m) => {
+      msgMenu.show = false; msgSheet.show = false;
+      if (!m || !currentId.value) return;
+      let value;
+      try {
+        ({ value } = await ElementPlus.ElMessageBox.prompt(
+          '改完对方那边也会同步变成新内容，消息下方会标「已编辑」', '编辑消息',
+          { inputValue: m.text || '', inputType: 'textarea', inputPlaceholder: '输入新的内容',
+            confirmButtonText: '保存', cancelButtonText: '取消',
+            inputValidator: (v) => (String(v || '').trim() !== '' || '内容不能为空') }));
+      } catch (e) { return; }
+      const text = String(value || '').trim();
+      if (!text || text === m.text) return;
+      try {
+        const r = await API.post('/api/sessions/' + currentId.value + '/messages/' + m.id + '/edit', { text: text });
+        m.text = r.text || text;
+        m.edited = true;
+        const s = sessions.value.find(x => x.id === currentId.value);
+        if (s) s.lastMsg = text.slice(0, 60);
+        ElementPlus.ElMessage.success('已修改');
       } catch (e) { ElementPlus.ElMessage.error(e.message); }
     };
     // --- 多选 ---
@@ -2714,6 +2743,7 @@ const app = createApp({
       replyTo, quoteOf, quoteWho, quoteText, startReply, jumpToMsg, copyMsg, flashId, fmtSize, mapUrl,
       infoOpen,
       msgMenu, openMsgMenu, closeMsgMenu, closeAllMenus, deleteMsg,
+      canEdit, editMsg,
       msgSheet, openMsgSheet, onMsgTouchStart, onMsgTouchMove, onMsgTouchEnd,
       selMode, selIds, enterSel, exitSel, toggleSel, selAll, selCopy, selDelete,
       onPaste, sendFile, sendLocation,

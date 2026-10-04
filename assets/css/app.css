@@ -1866,3 +1866,8 @@ body.dark .chat-tobottom { background: rgba(32,36,44,.96); border-color: #333a44
 @media (max-width: 900px) {
   .chat-tobottom { right: 12px; bottom: 150px; padding: 6px 12px; font-size: 12px; }
 }
+
+/* ===== v2.56 消息「已编辑」角标 ===== */
+.msg-edited { display: inline-block; font-size: 10.5px; color: #a0a6ad; margin-left: 6px; vertical-align: 1px; }
+.msg-row.mine .msg-edited { color: rgba(0,0,0,.35); }
+body.dark .msg-edited { color: #7f8791; }

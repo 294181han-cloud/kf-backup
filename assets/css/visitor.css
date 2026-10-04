@@ -869,3 +869,6 @@ body.dark .v-pending .vp-tip { color: #98a3b4; }
 .el-table th.el-table__cell:last-child .cell,
 .el-table td.el-table__cell:last-child .cell { display: flex; align-items: center; gap: 8px; flex-wrap: nowrap; }
 .el-table td.el-table__cell:last-child .cell > * { margin-left: 0 !important; flex-shrink: 0; }
+
+/* ===== v2.56 消息「已编辑」角标 ===== */
+.msg-edited { display: inline-block; font-size: 10.5px; color: #a0a6ad; margin-left: 6px; vertical-align: 1px; }

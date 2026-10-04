@@ -144,7 +144,7 @@ function handle_session_messages(string $method, array $m): void
 
     if ($method === 'GET') {
         $since = (int)input('since', 0);
-        $sql = 'SELECT id, session_id, from_type AS `from`, sender_id, sender_name, text, msg_type, attachments, reply_to, recalled_at, created_at FROM messages WHERE session_id = ?' . ($since > 0 ? ' AND id > ?' : '') . ' ORDER BY id ASC';
+        $sql = 'SELECT id, session_id, from_type AS `from`, sender_id, sender_name, text, msg_type, attachments, reply_to, recalled_at, edited_at, created_at FROM messages WHERE session_id = ?' . ($since > 0 ? ' AND id > ?' : '') . ' ORDER BY id ASC';
         $st = $pdo->prepare($sql);
         $st->execute($since > 0 ? [$sid, $since] : [$sid]);
         json_out(['messages' => array_map('to_msg', $st->fetchAll())]);
@@ -385,6 +385,31 @@ function handle_session_recall(string $method, array $m): void
     db()->prepare('UPDATE messages SET recalled_at = ?, text = ?, attachments = ? WHERE id = ?')
         ->execute([now_dt(), '消息已撤回', '', $msgId]);
     json_out(['ok' => true, 'msg_id' => $msgId]);
+}
+
+/* ---------- 编辑自己发的客服消息（v2.56）----------
+   只能改「自己发的纯文字消息」；写 edited_at，双方轮询会把新文字同步过去并显示「已编辑」。 */
+function handle_message_edit(string $method, array $m): void
+{
+    if ($method !== 'POST') { json_error('方法不允许', 405); return; }
+    $sid = (int)$m[1];
+    $msgId = (int)$m[2];
+    $ctx = require_workspace();
+    session_of($ctx, $sid);
+    $text = trim((string)input('text', ''));
+    if ($text === '') json_error('内容不能为空');
+    if (mb_strlen($text) > 2000) json_error('内容太长了（最多 2000 字）');
+    $st = db()->prepare('SELECT * FROM messages WHERE id = ? AND session_id = ? AND tenant_id = ?');
+    $st->execute([$msgId, $sid, $ctx['tenant_id']]);
+    $msg = $st->fetch();
+    if (!$msg) json_error('消息不存在', 400);
+    if ($msg['recalled_at']) json_error('已撤回的消息不能编辑', 403);
+    $own = $ctx['role'] === 'tenant' || (int)$msg['sender_id'] === (int)$ctx['id'];
+    if (!$own || $msg['from_type'] !== 'agent') json_error('只能编辑自己发送的客服消息', 403);
+    if (($msg['msg_type'] ?? 'text') !== 'text') json_error('只能编辑纯文字消息', 403);
+    $now = now_dt();
+    db()->prepare('UPDATE messages SET text = ?, edited_at = ? WHERE id = ?')->execute([$text, $now, $msgId]);
+    json_out(['ok' => true, 'msg_id' => $msgId, 'text' => $text, 'edited_at' => dt_to_iso($now)]);
 }
 
 /* ---------- 快捷消息：拖动排序（v2.50） ----------
@@ -1004,6 +1029,7 @@ function handle_agent_poll(string $method): void
     $msgs = [];
     $readUpto = 0;
     $recalledIds = [];
+    $editedMsgs = [];
     $session = (int)input('session', 0);
     $sinceMsg = (int)input('sinceMsg', 0);
     if ($session) {
@@ -1014,10 +1040,14 @@ function handle_agent_poll(string $method): void
         $rc2 = $pdo->prepare('SELECT id FROM messages WHERE session_id = ? AND recalled_at IS NOT NULL AND recalled_at >= DATE_SUB(NOW(), INTERVAL 10 MINUTE)');
         $rc2->execute([$session]);
         $recalledIds = array_map('intval', $rc2->fetchAll(PDO::FETCH_COLUMN));
+        // v2.56 编辑同步：最近 10 分钟被编辑过的消息（id + 新文字）
+        $ed2 = $pdo->prepare('SELECT id, text FROM messages WHERE session_id = ? AND edited_at IS NOT NULL AND edited_at >= DATE_SUB(NOW(), INTERVAL 10 MINUTE)');
+        $ed2->execute([$session]);
+        $editedMsgs = array_map(fn($r) => ['id' => (int)$r['id'], 'text' => (string)$r['text']], $ed2->fetchAll());
     }
     if ($session && $sinceMsg > 0) {
         session_of($ctx, $session); // 越权检查
-        $st = $pdo->prepare('SELECT id, session_id, from_type AS `from`, sender_id, sender_name, text, msg_type, attachments, recalled_at, created_at FROM messages WHERE session_id = ? AND id > ? ORDER BY id ASC');
+        $st = $pdo->prepare('SELECT id, session_id, from_type AS `from`, sender_id, sender_name, text, msg_type, attachments, recalled_at, edited_at, created_at FROM messages WHERE session_id = ? AND id > ? ORDER BY id ASC');
         $st->execute([$session, $sinceMsg]);
         $msgs = array_map('to_msg', $st->fetchAll());
     }
@@ -1039,5 +1069,5 @@ function handle_agent_poll(string $method): void
             }
         }
     } catch (\Throwable $e) { /* 地理补查失败不影响轮询 */ }
-    json_out(['sessions' => $sessions, 'messages' => $msgs, 'readUpto' => $readUpto, 'recalledIds' => $recalledIds, 'now' => time(), 'counts' => $counts]);
+    json_out(['sessions' => $sessions, 'messages' => $msgs, 'readUpto' => $readUpto, 'recalledIds' => $recalledIds, 'editedMsgs' => $editedMsgs, 'now' => time(), 'counts' => $counts]);
 }

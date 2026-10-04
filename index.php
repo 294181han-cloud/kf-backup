@@ -62,6 +62,8 @@ function ensure_upgrade(): void
         // v2.72 发卡机器人开出来的卡：记下买家的 Telegram ID（后台租户列表要显示 TG 用户名）
         try { $pdo->exec("ALTER TABLE tenants ADD COLUMN tg_id BIGINT NOT NULL DEFAULT 0"); } catch (\Throwable $e) { /* 列已存在 */ }
         try { $pdo->exec("ALTER TABLE tenants ADD INDEX idx_tg (tg_id)"); } catch (\Throwable $e) { /* 已存在 */ }
+        // v2.56 消息可编辑：记下编辑时间（前端据此显示「已编辑」并双向同步）
+        try { $pdo->exec("ALTER TABLE messages ADD COLUMN edited_at DATETIME NULL"); } catch (\Throwable $e) { /* 列已存在 */ }
         try { $pdo->exec("ALTER TABLE v_sessions ADD COLUMN closed_at DATETIME NULL"); } catch (\Throwable $e) { /* 列已存在 */ }
         try { $pdo->exec("ALTER TABLE v_sessions ADD COLUMN archived_at DATETIME NULL"); } catch (\Throwable $e) { /* 列已存在 */ }
         try { $pdo->exec("ALTER TABLE v_sessions ADD INDEX idx_status_time (tenant_id, status, last_time)"); } catch (\Throwable $e) { /* 已存在 */ }
@@ -422,6 +424,7 @@ function dispatch_api(string $method, string $uri): void
     if (preg_match('#^/api/sessions/(\d+)/transfer$#', $uri, $m))  handle_session_transfer($method, $m);
     if (preg_match('#^/api/sessions/(\d+)/block$#', $uri, $m))   handle_session_block($method, $m);
     if (preg_match('#^/api/sessions/(\d+)/recall$#', $uri, $m))  handle_session_recall($method, $m);
+    if (preg_match('#^/api/sessions/(\d+)/messages/(\d+)/edit$#', $uri, $m)) handle_message_edit($method, $m);
     if (preg_match('#^/api/sessions/(\d+)/pin$#', $uri, $m))     handle_session_pin($method, $m);
     if ($uri === '/api/quick-msgs/reorder')                       handle_quick_reorder($method);
     if (preg_match('#^/api/sessions/(\d+)/messages/(\d+)/delete$#', $uri, $m)) handle_message_delete($method, $m);

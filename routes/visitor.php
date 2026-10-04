@@ -450,7 +450,7 @@ function handle_visitor_messages(string $method): void
     $since = (int)input('since', 0);
     if (!$sid) json_error('缺少 session_id');
     $pdo = db();
-    $sql = 'SELECT id, session_id, from_type AS `from`, sender_name, text, msg_type, attachments, reply_to, recalled_at, read_at, created_at FROM messages WHERE session_id = ?' . ($since > 0 ? ' AND id > ?' : '') . ' ORDER BY id ASC';
+    $sql = 'SELECT id, session_id, from_type AS `from`, sender_name, text, msg_type, attachments, reply_to, recalled_at, edited_at, read_at, created_at FROM messages WHERE session_id = ?' . ($since > 0 ? ' AND id > ?' : '') . ' ORDER BY id ASC';
     $st = $pdo->prepare($sql);
     $st->execute($since > 0 ? [$sid, $since] : [$sid]);
     // 访客自己的消息带上「客服是否已读」回执（read_at 由客服端打开会话时写入）
@@ -507,6 +507,10 @@ function handle_visitor_poll(string $method): void
     $rc = $pdo->prepare('SELECT id FROM messages WHERE session_id = ? AND recalled_at IS NOT NULL AND recalled_at >= DATE_SUB(NOW(), INTERVAL 10 MINUTE)');
     $rc->execute([$sid]);
     $recalledIds = array_map('intval', $rc->fetchAll(PDO::FETCH_COLUMN));
+    // v2.56 编辑同步：最近 10 分钟被编辑过的消息（id + 新文字）
+    $ed = $pdo->prepare('SELECT id, text FROM messages WHERE session_id = ? AND edited_at IS NOT NULL AND edited_at >= DATE_SUB(NOW(), INTERVAL 10 MINUTE)');
+    $ed->execute([$sid]);
+    $editedMsgs = array_map(fn($r) => ['id' => (int)$r['id'], 'text' => (string)$r['text']], $ed->fetchAll());
     // 接待客服头像：仅认图片头像（http// 或 /uploads 开头）；表情占位视为未设置，继续回退；
     // 租户开关 agent_avatar_on 关闭时直接使用品牌头像
     $agentAvatar = '';
@@ -533,7 +537,7 @@ function handle_visitor_poll(string $method): void
         }
         if ($agentAvatar === '') $agentAvatar = (string)ts_get($tid2, 'brand_avatar', '💬');
     }
-    $st = $pdo->prepare('SELECT id, session_id, from_type AS `from`, sender_name, text, msg_type, attachments, reply_to, recalled_at, read_at, created_at FROM messages WHERE session_id = ? AND id > ? ORDER BY id ASC');
+    $st = $pdo->prepare('SELECT id, session_id, from_type AS `from`, sender_name, text, msg_type, attachments, reply_to, recalled_at, edited_at, read_at, created_at FROM messages WHERE session_id = ? AND id > ? ORDER BY id ASC');
     $st->execute([$sid, $sinceMsg]);
     $rows2 = $st->fetchAll();
     $msgs2 = array_map(function ($r) {
@@ -541,7 +545,7 @@ function handle_visitor_poll(string $method): void
         if (($m['from'] ?? '') === 'visitor') $m['read'] = !empty($r['read_at']);
         return $m;
     }, $rows2);
-    json_out(['messages' => $msgs2, 'recalledIds' => $recalledIds,
+    json_out(['messages' => $msgs2, 'recalledIds' => $recalledIds, 'editedMsgs' => $editedMsgs,
         'agent_avatar' => $agentAvatar, 'session_status' => $sessStatus, 'now' => time()]);
 }
 /* ---------- POST /api/visitor/send ---------- */

@@ -320,6 +320,11 @@ createApp({
           const set = new Set(r.recalledIds);
           messages.value.forEach(m => { if (set.has(m.id)) m.recalled = true; });
         }
+        // v2.56 客服改过消息：把本地这条的文字也换成新的，并标「已编辑」
+        if (Array.isArray(r.editedMsgs) && r.editedMsgs.length) {
+          const emap = new Map(r.editedMsgs.map(x => [Number(x.id), String(x.text || '')]));
+          messages.value.forEach(m => { if (emap.has(m.id)) { m.text = emap.get(m.id); m.edited = true; } });
+        }
       } catch (e) {}
     };
     // 活动门控轮询（1+2+n 枢纽模式）：只在有人访问时轮询——活跃 2.5s，闲置逐步降频，长期闲置暂停，一有操作立即恢复

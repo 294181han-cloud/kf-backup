@@ -7,7 +7,7 @@
 <link rel="icon" href="/assets/img/mi-logo.png">
 <link rel="apple-touch-icon" href="/assets/img/mi-logo.png">
 <link rel="stylesheet" href="/assets/vendor/element-plus.css">
-<link rel="stylesheet" href="/assets/css/app.css?v=3.32.0">
+<link rel="stylesheet" href="/assets/css/app.css?v=3.33.0">
 <script src="/assets/ui/ui-registry.js?v=2.8.0"></script>
 <script src="/assets/ui/ui-loader.js?v=2.8.0" data-ui-cat="auto"></script>
 </head>
@@ -31,6 +31,7 @@
   <div class="ctx-menu" v-if="msgMenu.show" :style="{left: msgMenu.x + 'px', top: msgMenu.y + 'px'}" @click.stop>
     <div class="ctx-item" @click="startReply(msgMenu.msg)">💬 回复<div class="ctx-sub">引用这条消息</div></div>
     <div class="ctx-item" @click="copyMsg(msgMenu.msg)">📋 复制文字</div>
+    <div class="ctx-item" v-if="canEdit(msgMenu.msg)" @click="editMsg(msgMenu.msg)">✏️ 编辑这条<div class="ctx-sub">改完对方那边也会跟着变</div></div>
     <div class="ctx-item" @click="enterSel(msgMenu.msg)">☑️ 多选<div class="ctx-sub">批量删除 / 复制</div></div>
     <div class="ctx-divider"></div>
     <div class="ctx-item danger" @click="deleteMsg(msgMenu.msg)">🗑️ 删除这条<div class="ctx-sub">不可恢复</div></div>
@@ -41,6 +42,7 @@
   <div class="msg-sheet" v-if="msgSheet.show">
     <button type="button" class="ms-item" @click="startReply(msgSheet.msg)">💬 回复</button>
     <button type="button" class="ms-item" @click="copyMsg(msgSheet.msg)">📋 复制文字</button>
+    <button type="button" class="ms-item" v-if="canEdit(msgSheet.msg)" @click="editMsg(msgSheet.msg)">✏️ 编辑这条</button>
     <button type="button" class="ms-item" @click="enterSel(msgSheet.msg)">☑️ 多选</button>
     <button type="button" class="ms-item danger" @click="deleteMsg(msgSheet.msg)">🗑️ 删除这条</button>
     <button type="button" class="ms-item ghost" @click="msgSheet.show = false">取消</button>
@@ -263,6 +265,7 @@
                         <img v-for="(a,ii) in imgsOf(m)" :key="'i'+ii" :src="a.url" @load="onMediaLoad" @click="viewing=a.url">
                       </div>
                       <span v-if="m.text" class="msg-text">{{ m.text }}</span>
+                      <span class="msg-edited" v-if="m.edited" title="这条消息被编辑过">已编辑</span>
                       <template v-for="(a,i) in (m.attachments||[])" :key="i">
                         <div v-if="a.type==='audio'" class="voice-bubble" :class="{playing: audioPlaying===a.url}" @click.stop="toggleAudio(a.url)">
                           <span class="vb-play">
@@ -1506,7 +1509,7 @@
 <script src="/assets/qr-poster.js?v=2.1.03"></script>
 <script src="/assets/api.js?v=2.0.1"></script>
 <script src="/assets/js/app-components.js?v=2.6.0"></script>
-<script src="/assets/js/app.js?v=3.27.0"></script>
+<script src="/assets/js/app.js?v=3.28.0"></script>
 <script src="/assets/js/app-boot.js?v=2.1.1"></script>
 </body>
 </html>
