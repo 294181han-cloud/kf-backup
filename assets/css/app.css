@@ -1850,3 +1850,19 @@ body.dark .qd-thumb img, body.dark .qd-thumb .qd-file, body.dark .qd-addimg { bo
 /* 收起状态：在线聊天这个页签占满整行 */
 .sess-scope-tabs .scope-tab:only-of-type { flex: 1; }
 body.dark .sess-tabs-toggle { background: #1b1e24; border-color: #2c313a; color: #a9b0bb; }
+
+/* ===== v2.52 工作台「回到底部」：往上翻记录时右下角浮一个按钮 ===== */
+.chat-col { position: relative; }
+.chat-tobottom {
+  position: absolute; right: 22px; bottom: 132px; z-index: 6;
+  display: inline-flex; align-items: center; gap: 4px;
+  padding: 7px 14px; border-radius: 999px; cursor: pointer;
+  border: 1px solid #e5e6eb; background: rgba(255,255,255,.96); color: #4e5969;
+  font-size: 12.5px; font-weight: 600; box-shadow: 0 6px 18px -6px rgba(16,40,80,.28);
+  backdrop-filter: blur(6px); transition: .15s;
+}
+.chat-tobottom:hover { color: var(--theme, #1677ff); border-color: var(--theme, #1677ff); transform: translateY(-1px); }
+body.dark .chat-tobottom { background: rgba(32,36,44,.96); border-color: #333a44; color: #c9cdd4; }
+@media (max-width: 900px) {
+  .chat-tobottom { right: 12px; bottom: 150px; padding: 6px 12px; font-size: 12px; }
+}

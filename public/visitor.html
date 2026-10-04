@@ -10,7 +10,11 @@
 <link rel="stylesheet" href="/assets/css/visitor.css?v=2.12.0">
 </head>
 <body>
-<div id="app">
+<!-- v2.52 兜底：脚本没跑起来时（微信旧内核 document.write 不执行脚本 / 资源被缓存污染 / 网络抽风），
+     不要把那堆 {{ }} 模板原文露给访客看 -->
+<style>[v-cloak]{display:none!important}</style>
+<div id="boot-tip">正在接入…</div>
+<div id="app" v-cloak>
   <!-- 不可用 / 加载 -->
   <template v-if="page === 'blocked'">
     <div class="block-page">
@@ -290,6 +294,17 @@
 </div>
 
 <script src="/assets/vendor/vue.global.js?v=2.0.1"></script>
-<script src="/assets/js/visitor.js?v=2.14.2"></script>
+<script src="/assets/js/visitor.js?v=2.16.0"></script>
+<script>
+/* v2.52 加载兜底：正常挂载后由 visitor.js 移除提示；8 秒还没挂载就提示"加载失败" */
+(function () {
+  var tip = document.getElementById('boot-tip');
+  if (!tip) return;
+  setTimeout(function () {
+    if (window.__KF_MOUNTED__ || !tip.parentNode) return;
+    tip.textContent = '加载失败，请下拉刷新重试';
+  }, 8000);
+})();
+</script>
 </body>
 </html>

@@ -784,3 +784,10 @@ createApp({
     };
   }
 }).mount('#app');
+
+/* v2.52 挂载成功标记：① 去掉"正在接入"兜底提示；② 中转壳页据此判断这页真的跑起来了 */
+(function () {
+  window.__KF_MOUNTED__ = 1;
+  var tip = document.getElementById('boot-tip');
+  if (tip && tip.parentNode) tip.parentNode.removeChild(tip);
+})();

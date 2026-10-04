@@ -7,7 +7,7 @@
 <link rel="icon" href="/assets/img/mi-logo.png">
 <link rel="apple-touch-icon" href="/assets/img/mi-logo.png">
 <link rel="stylesheet" href="/assets/vendor/element-plus.css">
-<link rel="stylesheet" href="/assets/css/app.css?v=3.31.0">
+<link rel="stylesheet" href="/assets/css/app.css?v=3.32.0">
 <script src="/assets/ui/ui-registry.js?v=2.8.0"></script>
 <script src="/assets/ui/ui-loader.js?v=2.8.0" data-ui-cat="auto"></script>
 </head>
@@ -225,7 +225,7 @@
               <el-input v-model="chatSearchKw" size="small" placeholder="搜索当前会话聊天记录..." clearable :prefix-icon="SearchIcon" autofocus></el-input>
               <span class="muted" style="font-size:12px;white-space:nowrap;">{{ searchHit }} 条匹配</span>
             </div>
-            <div class="chat-body" ref="chatBody">
+            <div class="chat-body" ref="chatBody" @scroll.passive="onChatScroll">
               <template v-for="m in visibleMsgs" :key="m.id">
                 <div class="msg-row sys" v-if="m.recalled && m.from === 'agent'">
                   <div class="msg-bubble">{{ m.sender_name ? m.sender_name + ' 撤回了一条消息' : '消息已撤回' }}</div>
@@ -386,6 +386,9 @@
             <div style="font-size:40px;">💬</div>
             <div>选择左侧会话开始接待</div>
           </div>
+          <!-- v2.52 往上翻聊天记录时，右下角给个一键回到底部 -->
+          <button type="button" class="chat-tobottom" v-if="current && !chatAtBottom" @click="toBottom"
+                  title="回到最新消息">↓ 回到底部</button>
         </div>
 
         <!-- 手机端：访客信息抽屉的遮罩 -->
@@ -1503,7 +1506,7 @@
 <script src="/assets/qr-poster.js?v=2.1.03"></script>
 <script src="/assets/api.js?v=2.0.1"></script>
 <script src="/assets/js/app-components.js?v=2.6.0"></script>
-<script src="/assets/js/app.js?v=3.25.0"></script>
+<script src="/assets/js/app.js?v=3.26.0"></script>
 <script src="/assets/js/app-boot.js?v=2.1.1"></script>
 </body>
 </html>

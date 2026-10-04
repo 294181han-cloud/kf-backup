@@ -2950,3 +2950,29 @@ $cfg = function_exists('config') ? config() : require __DIR__ . '/config.php';
 - Playwright 打开 `https://kf.ylcz.cc/app.html`（租户 133 令牌）：**会话列表正常加载**、页面无「服务器错误」弹窗、无 4xx/5xx ✅
 
 版本：`version.php` 2.48.2 → **2.48.3**（db.php 在分控更新包白名单里，推一次全网生效）
+
+
+## v2.52 变更记录（工作台「回到底部」+ 访客端裸模板兜底，2026-10-05）
+
+**① 工作台加「↓ 回到底部」**（用户："聊天记录往上翻的时候 底下加个一键回到底部 不用滚轮滚那么久"）
+访客端早就有「回到最新」，工作台只做了自动贴底，翻历史记录后没有回底的入口：
+- `public/app.html`：`.chat-body` 加 `@scroll.passive="onChatScroll"`；`.chat-col` 末尾加一个悬浮按钮（`v-if="current && !chatAtBottom"`）
+- `assets/js/app.js`：新增 `chatAtBottom` / `onChatScroll()`（距底 <90px 视为在底部）/ `toBottom()`（复用 `pinBottom(1200)`）；换会话时重置为"在底部"
+- `assets/css/app.css`：按钮浮在输入区上方右侧，圆角胶囊 + 毛玻璃，深色模式配色，手机端位置微调
+
+实测（总控 ad.yluu.top 工作台，31 条消息的会话）：未滚动时按钮不出现 → 滚到顶部后出现「↓ 回到底部」→ 点击后距底 0px、按钮自动消失 ✅
+
+**② 访客端"裸模板"兜底**（用户截图：手机上打开客服码，看到 `{{ toastMsg }}`、`第 {{ ... }} 张`）
+排查结论：**不是文件问题**——仓库 / 总控 / 访客节点 / HTTP 实际返回四处的 visitor.html、visitor.js、visitor.css **md5 完全一致**。
+是那台手机的微信内核**没把注入的脚本跑起来**（中转壳页是 `document.write` 注入真实页，老 WebView 有概率不执行其中的 `<script>`），
+于是 Vue 从未挂载，`v-if` 不生效、模板原文 `{{ }}` 就直接暴露给访客了。
+
+三道防线：
+1. `public/visitor.html`：`<style>[v-cloak]{display:none!important}</style>` + `<div id="app" v-cloak>` —— **脚本没跑起来就整页隐藏，绝不再露 `{{ }}`**；
+2. 页面外加一个不受 Vue 控制的 `<div id="boot-tip">正在接入…</div>`，8 秒仍未挂载就变成「加载失败，请下拉刷新重试」；
+3. `public/gate.html`：注入后 **3 秒**仍没有 `window.__KF_MOUNTED__` 就 `location.replace` 到真实聊天页（地址栏会暴露真实页，但比让访客看一堆花括号强）；
+   `assets/js/visitor.js` 挂载成功后置 `window.__KF_MOUNTED__=1` 并移除 boot-tip。
+
+> 注意：这一版的 visitor.js / gate.html 是基于同事 v2.50/v2.51（`KF_API_BASE` 静态边缘站支持）之上改的，`KF_API_BASE` 逻辑原样保留。
+
+版本：`version.php` 2.51.0 → **2.52.0**；`app.css?v=3.32.0`、`app.js?v=3.26.0`、`visitor.js?v=2.16.0`

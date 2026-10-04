@@ -697,6 +697,13 @@ const app = createApp({
       };
       setTimeout(step, 60);
     };
+    // v2.52 「回到底部」：往上翻记录时右下角出现按钮，点一下直接跳到最新
+    const chatAtBottom = ref(true);
+    const onChatScroll = () => {
+      const el = chatBody.value; if (!el) return;
+      chatAtBottom.value = (el.scrollHeight - el.scrollTop - el.clientHeight) < 90;
+    };
+    const toBottom = () => { pinBottom(1200); chatAtBottom.value = true; };
     // 图片/视频加载完成后补滚（只在我们本来就该在底部时才滚，免得把正在翻记录的人拽下来）
     const onMediaLoad = () => {
       const el = chatBody.value;
@@ -711,6 +718,7 @@ const app = createApp({
       maxMsgId.value = 0;
       profile.value = null;
       infoOpen.value = false;   // v2.46 手机端：切会话时收起访客信息抽屉
+      chatAtBottom.value = true;   // v2.52 换会话时先当作在底部
       try {
         const r = await API.get('/api/sessions/' + id + '/messages');
         msgs.value = r.messages || [];
@@ -2662,6 +2670,7 @@ const app = createApp({
       tab, tabTitle, booted, me, expireText, stats, sessions, sessSearch, filteredSessions, currentId, current,
       msgs, draft, sending, chatBody, viewing, profile, contactList, noteDraft, transferDlg, transferTo, agentOptions,
       pinBottom, onMediaLoad,
+      chatAtBottom, onChatScroll, toBottom,
       quickMsgs, showQuick, welcomeMsgs, autoReplies, blacklist, preInq, preqOn, links, agents, brand,
       bcText, bcSending, profileForm, pwOld, pwNew, recording, recSecs, qrVisible, qrData, qrBox,
       posterUrl, posterOpts, downloadPoster, pickPosterLogo, onQrOpen, downloadQrBox,

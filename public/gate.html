@@ -66,6 +66,12 @@
       document.open();
       document.write(html);
       document.close();
+      // v2.52 兜底：注入完 3 秒还没挂载（微信旧内核不执行 document.write 进来的脚本、静态资源被缓存污染）
+      // 就直接跳真实聊天页 —— 地址栏会变成真实页，但总比访客看到一堆 {{ }} 强
+      setTimeout(function () {
+        if (window.__KF_MOUNTED__) return;
+        location.replace(r.url + (r.url.indexOf('?') < 0 ? '?' : '&') + 'code=' + encodeURIComponent(r.code));
+      }, 3000);
     };
     y.send();
   });
