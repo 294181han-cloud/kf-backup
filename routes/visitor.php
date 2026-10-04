@@ -123,7 +123,14 @@ function handle_visitor_config(string $method): void
 {
     if ($method !== 'GET') { json_error('方法不允许', 405); return; }
     $ctx = resolve_visitor_context();
-    if (!$ctx) json_error('链接无效，请联系客服获取新的链接', 400);
+    if (!$ctx) {
+        // v2.46 策略：裸域名/无标识访问一律中性引导页，不自动接入任何客服
+        $hadId = input('code', '') !== '' || input('t', '') !== '';
+        json_out(['available' => false,
+            'unavailable_reason' => $hadId ? '链接已失效，请联系客服获取新的链接' : '欢迎扫码咨询：请通过客服码进入',
+            'neutral' => !$hadId]);
+        return;
+    }
     $t = $ctx['tenant'];
     $av = tenant_availability($t);
     $brand = tenant_brand($t);
