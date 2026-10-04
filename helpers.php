@@ -737,7 +737,9 @@ function edge_relay_api(string $uri): void
     foreach ($_SERVER as $k => $v) {
         if (str_starts_with($k, 'HTTP_')) {
             $name = str_replace(' ', '-', ucwords(strtolower(str_replace('_', ' ', substr($k, 5)))));
-            if (in_array($name, ['Host', 'X-Forwarded-For', 'X-Edge-Secret', 'X-Edge-Role', 'X-Edge-Origin'], true)) continue;
+            // 剥离 Host/XFF/X-Edge-* 与逐跳头（Accept-Encoding/Connection 等），避免压缩/连接态错乱
+            if (in_array($name, ['Host', 'X-Forwarded-For', 'X-Edge-Secret', 'X-Edge-Role', 'X-Edge-Origin',
+                'Accept-Encoding', 'Connection', 'Keep-Alive', 'Transfer-Encoding', 'TE', 'Upgrade', 'Content-Length'], true)) continue;
             $headers[] = $name . ': ' . $v;
         }
     }
@@ -882,7 +884,7 @@ function handle_internal_node_register(string $method): void
                    VALUES (?,?,?,?,NOW(),NOW())
                    ON DUPLICATE KEY UPDATE app_version = VALUES(app_version),
                                            origin = VALUES(origin), last_seen = NOW()')
-        ->execute([$nodeIp, $role, app_version(), $origin]);
+        ->execute([$nodeIp, $role, '', $origin]);   // 节点真实版本未知（装完首次同步才知道），记空使总控按落后处理
     json_out([
         'ok'          => true,
         'role'        => $role,
