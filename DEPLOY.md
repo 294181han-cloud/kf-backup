@@ -2847,3 +2847,47 @@ app.css / admin.css / visitor.css 统一加：最后一列 `.cell` 用 flex 居�
 - 后台仍保留 `GET/POST /api/admin/wxcheck`（含 `{test:1,link}` 试检测）——只是界面上不放了，排查时能直接 curl。
 
 版本：`version.php` 2.47.0 → **2.48.0**；`app.js?v=3.25.0`
+
+
+## v2.48.1 变更记录（修「分控节点永远更新不了」+ 边缘站 /api 404，2026-10-04）
+
+排查「复制图片失败」时顺出来的两个更严重的坑（都影响所有分控节点）：
+
+**① 分控节点从第二次更新起必然失败（真 bug，原代码）**
+`apply_node_bundle()` 里读清单：
+```php
+$applied = (array)json_decode(file_get_contents($manifestFile), true);   // ← 问题在这
+...
+foreach (array_keys($applied) as $old) { if ($protected($old)) ... }     // $old 是 0/1/2… 不是路径
+```
+清单文件里存的是 `json_encode(array_keys($applied))`，也就是**路径数组**，解码后键是 `0/1/2…`；
+再 `array_keys()` 得到的就是 int，传给 `$protected(string $p)` 在 `strict_types=1` 下直接
+`TypeError: Argument #1 ($p) must be of type string, int given` → **抛异常 → 整包不落地**。
+因为异常在 `edge_maintenance()` 里被静默 catch，所以表面现象只是"节点一直停在旧版本"，很难发现。
+（实测节点停在 2.46.0，而总控已经 2.48.0。）
+
+修法：读清单后统一归一化成 `路径 => 1` 的映射，兼容旧的数组格式：
+```php
+$raw = json_decode(...);
+foreach ($raw as $k => $v) { $path = is_string($k) ? $k : (is_string($v) ? $v : ''); if ($path !== '') $applied[$path] = 1; }
+```
+
+**② 边缘节点 `/api/` 全 404（纯静态节点缺少 nginx 反代）**
+v2.46 的"静态边缘站"更新包**不含 PHP 根文件**（index.php/helpers.php/…），打包时还会把节点上残留的旧文件删掉。
+但节点原来的 `/api/` 是**靠 index.php 的 PHP 转发兜底**在跑——PHP 一删，`/api/*` 立刻变成 404 页，
+工作台/访客端整站不可用（实测 `https://123.xiaomiyun.vip/api/health` 返回 404 HTML）。
+
+修法（服务器侧，不在仓库里）：给两个边缘站点补 nginx 反代，放在宝塔 `extension/` 目录（面板改站点配置不会覆盖）：
+- `/www/server/panel/vhost/nginx/extension/123.xiaomiyun.vip/api-proxy.conf`（role=agent）
+- `/www/server/panel/vhost/nginx/extension/moupz.cn/api-proxy.conf`（role=visitor）
+内容：`location /api/ { proxy_pass https://ad.yluu.top/api/; Host/X-Edge-* 头 + proxy_ssl_server_name on; }`
+**注意**：节点自带的 `nginx-edge.conf` 里那段 `location /`（rewrite 到 index.php）现在**不能再用了**——
+静态节点没有 index.php，照抄会把静态文件全部打成 404。只需要 `/api/` 这一段。
+
+**修复后实测（老服务器上的两个节点）**
+- 更新器：`apply_node_bundle` 返回 `{"ok":true,"changed":52,"app_version":"2.48.0"}`，两个节点都吃到了 2.48.0 ✅
+- `/api/` 反代：`https://123.xiaomiyun.vip/api/health` 与 `https://45dlzhi6.moupz.cn/api/health` 均返回总控的 JSON ✅
+- 边缘工作台：用租户令牌在 `123.xiaomiyun.vip/app.html` 打开，会话列表正常加载、无失败请求 ✅
+- **图片复制**（本次起因）：在边缘站打开图片点「复制」→ 提示 `✅ 已复制图片`，剪贴板里确实是 `image/png` ✅
+
+版本：`version.php` 2.48.0（前端未变，本次是后端/服务器侧修复）

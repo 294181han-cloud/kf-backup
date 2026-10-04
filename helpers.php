@@ -685,7 +685,18 @@ function apply_node_bundle(array $bundle): array
     $files = (array)($bundle['files'] ?? []);
     if (!$files) throw new RuntimeException('更新包为空');
     $manifestFile = $base . '/data/node-manifest.json';
-    $applied = is_file($manifestFile) ? (array)json_decode((string)file_get_contents($manifestFile), true) : [];
+    /* v2.48 修 bug：清单文件里存的是「路径数组」（json_encode(array_keys(...))），
+       直接 (array)json_decode 得到的键是 0/1/2… 不是路径，下面 array_keys($applied) 就会把 int 当路径传给
+       $protected(string $p) → PHP 8 严格类型下 TypeError → **节点从第二次更新起永远失败**（表现：卡在旧版本、
+       手动「推送更新」报 500）。这里统一归一化成 路径=>1 的映射，兼容旧的数组格式。 */
+    $raw = is_file($manifestFile) ? json_decode((string)file_get_contents($manifestFile), true) : [];
+    $applied = [];
+    if (is_array($raw)) {
+        foreach ($raw as $k => $v) {
+            $path = is_string($k) ? $k : (is_string($v) ? $v : '');
+            if ($path !== '') $applied[$path] = 1;
+        }
+    }
     if (!is_dir($base . '/data')) @mkdir($base . '/data', 0755, true);
     $changed = 0;
     foreach ($files as $path => $b64) {
