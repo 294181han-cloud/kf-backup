@@ -328,7 +328,7 @@ createApp({
       const tick = async () => {
         try { await pollOnce(); } catch (e) {}
         const gap = pollGap();
-        if (gap === -1 || pollTimer === null) return;          // 暂停或已被 stopPoll
+        if (gap === -1) { pollTimer = null; return; }   // 暂停：清句柄，一有操作即恢复
         pollTimer = setTimeout(tick, gap);
       };
       pollTimer = setTimeout(tick, 100);
