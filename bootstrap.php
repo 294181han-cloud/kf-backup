@@ -148,7 +148,7 @@ if (($isCli || ($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') && !$installed 
             . "    proxy_set_header X-Forwarded-For \$remote_addr;\n"
             . "    proxy_ssl_server_name on;\n"
             . "}";
-        $cronLine = "*/5 * * * * curl -fsS -m 20 -X POST {$mainUrl}/api/internal/sync -H 'Content-Type: application/json' -d '{\"secret\":\"$relaySecret\"}' -o " . __DIR__ . "/data/blcache.json";
+        $cronLine = "*/5 * * * * php " . __DIR__ . "/node/update-node.php && curl -fsS -m 20 -X POST {$mainUrl}/api/internal/sync -H 'Content-Type: application/json' -d '{\"secret\":\"$relaySecret\"}' -o " . __DIR__ . "/data/blcache.json";
         $step = 'done';
         $results[] = '✓ 安装器自删除';
         if (!$isCli) { @unlink(__FILE__); }

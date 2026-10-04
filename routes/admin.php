@@ -367,7 +367,7 @@ function handle_admin_nodes(string $method): void
     $pdo = db();
 
     if ($method === 'GET') {
-        $rows = $pdo->query('SELECT ip, role, app_version, origin, first_seen, last_seen FROM nodes ORDER BY last_seen DESC')->fetchAll();
+        $rows = $pdo->query('SELECT ip, role, app_version, origin, first_seen, last_seen FROM nodes ORDER BY last_seen DESC, role ASC')->fetchAll();
         foreach ($rows as &$r) {
             $r['first_seen'] = dt_to_iso($r['first_seen']);
             $r['last_seen'] = dt_to_iso($r['last_seen']);
@@ -380,25 +380,27 @@ function handle_admin_nodes(string $method): void
     // 推送更新：主控打包代码 → 节点 /api/internal/apply 应用（无需 git/shell）
     if ($method === 'POST' && (input('action', '') === 'push')) {
         $ip = trim((string)input('ip', ''));
-        $st = $pdo->prepare('SELECT ip, origin, app_version FROM nodes WHERE ip = ?');
-        $st->execute([$ip]);
+        $role = trim((string)input('role', ''));
+        $st = $pdo->prepare('SELECT ip, role, origin, app_version FROM nodes WHERE ip = ? AND role = ?');
+        $st->execute([$ip, $role]);
         $node = $st->fetch();
         if (!$node || (string)$node['origin'] === '') json_error('节点不存在或未上报来源地址', 400);
         $bundle = node_bundle_build();
         if ((string)$node['app_version'] === (string)$bundle['version']) {
-            json_out(['ok' => true, 'up_to_date' => true, 'ip' => $ip, 'version' => $bundle['version']]);
+            json_out(['ok' => true, 'up_to_date' => true, 'ip' => $ip, 'role' => $role, 'version' => $bundle['version']]);
         }
         $r = admin_node_http((string)$node['origin'], '/api/internal/apply', ['bundle' => $bundle]);
         if (!empty($r['ok']) && isset($r['app_version'])) {
-            $pdo->prepare('UPDATE nodes SET app_version = ? WHERE ip = ?')->execute([(string)$r['app_version'], $ip]);
+            $pdo->prepare('UPDATE nodes SET app_version = ? WHERE ip = ? AND role = ?')->execute([(string)$r['app_version'], $ip, $role]);
         }
-        json_out($r + ['ip' => $ip]);
+        json_out($r + ['ip' => $ip, 'role' => $role]);
     }
 
     // 忽略（删除）节点登记
     if ($method === 'POST' && (input('action', '') === 'forget')) {
         $ip = trim((string)input('ip', ''));
-        $pdo->prepare('DELETE FROM nodes WHERE ip = ?')->execute([$ip]);
+        $role = trim((string)input('role', ''));
+        $pdo->prepare('DELETE FROM nodes WHERE ip = ? AND role = ?')->execute([$ip, $role]);
         json_out(['ok' => true]);
     }
 

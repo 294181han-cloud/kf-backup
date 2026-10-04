@@ -198,7 +198,7 @@ createApp({
     const pushNode = async (row) => {
       pushingIp.value = row.ip;
       try {
-        const r = await API.post('/api/admin/nodes', { action: 'push', ip: row.ip });
+        const r = await API.post('/api/admin/nodes', { action: 'push', ip: row.ip, role: row.role });
         if (r.need_cron) ElementPlus.ElMessage.warning(r.error || '请依赖节点 cron 自动更新');
         else { ElementPlus.ElMessage.success('已推送，节点版本 ' + (r.app_version || '')); await loadNodes(); }
       } catch (e) { ElementPlus.ElMessage.error(e.message); }
@@ -206,7 +206,7 @@ createApp({
     };
     const dlBootstrap = () => { location.href = '/api/admin/bootstrap-dl'; };
     const forgetNode = async (row) => {
-      try { await API.post('/api/admin/nodes', { action: 'forget', ip: row.ip }); await loadNodes(); }
+      try { await API.post('/api/admin/nodes', { action: 'forget', ip: row.ip, role: row.role }); await loadNodes(); }
       catch (e) { ElementPlus.ElMessage.error(e.message); }
     };
 

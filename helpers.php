@@ -593,7 +593,7 @@ function handle_internal_heartbeat(string $method): void
     $pdo = db();
     $pdo->prepare('INSERT INTO nodes (ip, role, app_version, origin, first_seen, last_seen)
                    VALUES (?,?,?,?,NOW(),NOW())
-                   ON DUPLICATE KEY UPDATE role = VALUES(role), app_version = VALUES(app_version),
+                   ON DUPLICATE KEY UPDATE app_version = VALUES(app_version),
                                            origin = VALUES(origin), last_seen = NOW()')
         ->execute([$ip, $role, $ver, $origin]);
     json_out(['ok' => true, 'main_version' => app_version()]);
@@ -746,7 +746,8 @@ function handle_internal_node_register(string $method): void
     $pdo->prepare('UPDATE node_auth_codes SET used_at = NOW(), used_ip = ? WHERE code = ?')->execute([$nodeIp, $code]);
     $pdo->prepare('INSERT INTO nodes (ip, role, app_version, origin, first_seen, last_seen)
                    VALUES (?,?,?,?,NOW(),NOW())
-                   ON DUPLICATE KEY UPDATE role = VALUES(role), origin = VALUES(origin), last_seen = NOW()')
+                   ON DUPLICATE KEY UPDATE app_version = VALUES(app_version),
+                                           origin = VALUES(origin), last_seen = NOW()')
         ->execute([$nodeIp, $role, app_version(), $origin]);
     json_out([
         'ok'          => true,

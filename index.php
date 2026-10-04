@@ -70,15 +70,17 @@ function ensure_upgrade(): void
         try { $pdo->exec("ALTER TABLE v_sessions ADD COLUMN pinned TINYINT NOT NULL DEFAULT 0"); } catch (\Throwable $e) { /* 列已存在 */ }
         try { $pdo->exec("ALTER TABLE v_sessions ADD COLUMN pinned_at DATETIME NULL"); } catch (\Throwable $e) { /* 列已存在 */ }
         try { $pdo->exec("ALTER TABLE v_sessions ADD INDEX idx_tenant_pinned (tenant_id, pinned, last_time)"); } catch (\Throwable $e) { /* 已存在 */ }
-        // v2.33 分域节点登记（主站记录各分控节点：IP 为名，心跳带角色/版本）
+        // v2.33/v2.39 分域节点登记：同一台服务器可同时跑客服入口+访客站点，唯一键 = IP+角色
         $pdo->exec("CREATE TABLE IF NOT EXISTS nodes (
-            ip VARCHAR(64) NOT NULL PRIMARY KEY,
+            ip VARCHAR(64) NOT NULL,
             role VARCHAR(16) NOT NULL DEFAULT '',
             app_version VARCHAR(32) NOT NULL DEFAULT '',
             origin VARCHAR(200) NOT NULL DEFAULT '',
             first_seen DATETIME NULL,
-            last_seen DATETIME NULL
+            last_seen DATETIME NULL,
+            UNIQUE KEY uq_node (ip, role)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+        try { $pdo->exec("ALTER TABLE nodes DROP PRIMARY KEY, ADD UNIQUE KEY uq_node (ip, role)"); } catch (\Throwable $e) { /* 已迁移 */ }
         // v2.64 微信红码提醒（每小时巡检脚本写入，工作台弹窗提示后标记 seen）
         $pdo->exec("CREATE TABLE IF NOT EXISTS code_alerts (
             id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
