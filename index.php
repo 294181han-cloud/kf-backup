@@ -131,7 +131,7 @@ function ensure_upgrade(): void
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
         // v2.43 存量上传引用绝对化（一次性）：相对 /uploads/ 路径在分控节点不可见（枢纽模式）
         try {
-            if (kv_get('upload_abs_migrated', '') !== '1') {
+            if (kv_get('upload_abs_migrated_v2', '') !== '1') {
                 $mainBase = rtrim((string)config()['site_main_url'] ?? '', '/');
                 if ($mainBase !== '') {
                     $rows = $pdo->query("SELECT id, attachments FROM messages WHERE attachments LIKE '%/uploads/%' LIMIT 5000")->fetchAll();
@@ -149,12 +149,12 @@ function ensure_upgrade(): void
                         if ($chg) { $pdo->prepare('UPDATE messages SET attachments = ? WHERE id = ?')
                             ->execute([json_encode($arr, JSON_UNESCAPED_UNICODE), $row['id']]); $fixed++; }
                     }
-                    foreach ([['kv_store', "UPDATE kv_store SET sval = CONCAT('{$mainBase}', sval) WHERE skey IN ('me_avatar','brand_avatar') AND sval LIKE '/uploads/%'"],
+                    foreach ([['tenant_settings', "UPDATE tenant_settings SET sval = CONCAT('{$mainBase}', sval) WHERE skey IN ('me_avatar','brand_avatar') AND sval LIKE '/uploads/%'"],
                               ['v_sessions', "UPDATE v_sessions SET visitor_avatar = CONCAT('{$mainBase}', visitor_avatar) WHERE visitor_avatar LIKE '/uploads/%'"]] as $pair) {
                         $pdo->exec($pair[1]);
                     }
                 }
-                kv_set('upload_abs_migrated', '1');
+                kv_set('upload_abs_migrated_v2', '1');
             }
         } catch (\Throwable $e) { /* 忽略：失败不影响运行 */ }
         // v2.34 分节点网页安装：一次性授权码 + 平台级全局黑名单（边缘本地拦截用）
