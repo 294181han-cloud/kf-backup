@@ -724,6 +724,45 @@ function edge_maintenance(): void
     } catch (\Throwable $e) { /* 静默 */ }
 }
 
+/** 边缘 API 转发兜底：把 /api/* 请求原样转发到总控并回传响应
+ *  （nginx 已配 /api/ 反代时请求到不了这里；未配置时由此兜底，边缘零 nginx 配置也能用） */
+function edge_relay_api(string $uri): void
+{
+    $cfg = config();
+    $main = rtrim((string)($cfg['site_main_url'] ?? ''), '/');
+    if ($main === '') { http_response_code(404); echo 'Not Found'; exit; }
+    $qs = ($_SERVER['QUERY_STRING'] ?? '') !== '' ? '?' . $_SERVER['QUERY_STRING'] : '';
+    $method = $_SERVER['REQUEST_METHOD'] ?? 'GET';
+    $headers = [];
+    foreach ($_SERVER as $k => $v) {
+        if (str_starts_with($k, 'HTTP_')) {
+            $name = str_replace(' ', '-', ucwords(strtolower(str_replace('_', ' ', substr($k, 5)))));
+            if (in_array($name, ['Host', 'X-Forwarded-For', 'X-Edge-Secret', 'X-Edge-Role', 'X-Edge-Origin'], true)) continue;
+            $headers[] = $name . ': ' . $v;
+        }
+    }
+    $headers[] = 'X-Forwarded-For: ' . get_client_ip();
+    $payload = $method !== 'GET' && $method !== 'HEAD' ? file_get_contents('php://input') : null;
+    $ch = curl_init($main . $uri . $qs);
+    curl_setopt_array($ch, [
+        CURLOPT_CUSTOMREQUEST => $method,
+        CURLOPT_RETURNTRANSFER => true,
+        CURLOPT_TIMEOUT => 60,
+        CURLOPT_HTTPHEADER => $headers,
+        CURLOPT_POSTFIELDS => $payload,
+    ]);
+    $resp = curl_exec($ch);
+    $code = (int)curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    $ctype = (string)(curl_getinfo($ch, CURLINFO_CONTENT_TYPE) ?: 'application/json');
+    $err = curl_error($ch);
+    curl_close($ch);
+    if ($resp === false && $err !== '') { http_response_code(502); header('Content-Type: application/json; charset=utf-8'); echo json_encode(['error' => '节点转发失败: ' . $err]); exit; }
+    http_response_code($code);
+    header('Content-Type: ' . $ctype);
+    echo (string)$resp;
+    exit;
+}
+
 /** 边缘本地黑名单拦截：读 data/blcache.json（总控同步），全局 + 当前租户 双层判定 */
 function edge_ip_blocked(): bool
 {

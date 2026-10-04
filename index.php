@@ -242,7 +242,8 @@ if (site_role() !== 'main') {
     if (site_role() === 'visitor' && str_starts_with($uri, '/api/') && edge_ip_blocked()) {
         json_error('您的访问受限', 403);
     }
-    // 其余 /api/* 交给 nginx 反代到主站（见 node/README.md）；PHP 兜底 404
+    // /api/* 优先由 nginx 反代到主站（见 nginx-edge.conf）；未配置时由此处 PHP 兜底转发
+    if (str_starts_with($uri, '/api/')) edge_relay_api($uri);
     http_response_code(404);
     echo 'Not Found';
     exit;
