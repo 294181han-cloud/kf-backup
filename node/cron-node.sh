@@ -10,10 +10,16 @@ set -u
 SITE_DIR="${SITE_DIR:-$(cd "$(dirname "$0")/.." && pwd)}"
 cd "$SITE_DIR" || exit 1
 
-MAIN_URL=$(grep -o "'site_main_url' => '[^']*'" config.php 2>/dev/null | head -1 | sed "s/.*' //; s/'//")
-ROLE=$(grep -o "'site_role' => '[^']*'" config.php 2>/dev/null | head -1 | sed "s/.*' //; s/'//")
-SECRET=$(grep -o "'relay_secret' => '[^']*'" config.php 2>/dev/null | head -1 | sed "s/.*' //; s/'//")
-VER=$(grep -o "return '[0-9.]*'" version.php 2>/dev/null | head -1 | sed "s/return '//; s/'//")
+# v2.52 修 bug：原来用 grep -o + `sed "s/.*' //"` 取值，sed 贪婪匹配会切错
+# （'site_role' => 'visitor' 取出来是 `=> visitor'`），于是请求 URL/角色全是坏的 →
+# 脚本自上线起就没成功更新过一次节点。改成按 key 精确取引号里的内容。
+cfgval() {
+  sed -n "s/.*'$1'[[:space:]]*=>[[:space:]]*'\([^']*\)'.*/\1/p" config.php 2>/dev/null | head -1
+}
+MAIN_URL=$(cfgval site_main_url)
+ROLE=$(cfgval site_role)
+SECRET=$(cfgval relay_secret)
+VER=$(sed -n "s/.*return[[:space:]]*'\([0-9.]*\)'.*/\1/p" version.php 2>/dev/null | head -1)
 REV=$(tr -d '[:space:]' < data/node-codes-rev.txt 2>/dev/null || true)
 
 if [ -z "$MAIN_URL" ] || [ -z "$SECRET" ]; then

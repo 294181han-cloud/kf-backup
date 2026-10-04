@@ -2976,3 +2976,36 @@ $cfg = function_exists('config') ? config() : require __DIR__ . '/config.php';
 > 注意：这一版的 visitor.js / gate.html 是基于同事 v2.50/v2.51（`KF_API_BASE` 静态边缘站支持）之上改的，`KF_API_BASE` 逻辑原样保留。
 
 版本：`version.php` 2.51.0 → **2.52.0**；`app.css?v=3.32.0`、`app.js?v=3.26.0`、`visitor.js?v=2.16.0`
+
+
+## v2.52.1 变更记录（分控节点自动更新脚本从来没生效过，2026-10-05）
+
+排查「访客节点还在跑旧前端」时发现的**又一个真 bug**（比前几个影响更大）：
+
+`node/cron-node.sh` 从 config.php 取值用的是：
+```bash
+ROLE=$(grep -o "'site_role' => '[^']*'" config.php | sed "s/.*' //; s/'//")
+```
+`sed "s/.*' //"` 是**贪婪**匹配，`'site_role' => 'visitor'` 会被切成 `=> visitor'`（`site_main_url` 同理）。
+于是脚本里 `MAIN_URL` 变成 `=> https://ad.yluu.top'`，curl 直接报
+`URL rejected: Malformed input to a URL function`，角色也传成了坏值 → **这个脚本自上线起一次都没成功更新过节点**。
+
+实锤：老服务器上两个节点的 `visitor.js` 还停在 2.14.x，而总控早已 2.51.0；两台节点的 crontab 里也**没有**这条定时任务。
+
+修法：改成按 key 精确取引号内容（允许 `key` 与 `=>` 之间任意空白）：
+```bash
+cfgval() { sed -n "s/.*'$1'[[:space:]]*=>[[:space:]]*'\([^']*\)'.*/\1/p" config.php | head -1; }
+MAIN_URL=$(cfgval site_main_url); ROLE=$(cfgval site_role); SECRET=$(cfgval relay_secret)
+VER=$(sed -n "s/.*return[[:space:]]*'\([0-9.]*\)'.*/\1/p" version.php | head -1)
+```
+
+同时补上缺失的定时任务（老服务器）：
+```
+*/5 * * * * bash /www/wwwroot/123.xiaomiyun.vip/node/cron-node.sh >> /tmp/cron-node-agent.log 2>&1
+*/5 * * * * bash /www/wwwroot/moupz.cn/node/cron-node.sh >> /tmp/cron-node-visitor.log 2>&1
+```
+
+**实测**：手动跑一次 → 两个节点都输出「已应用更新包」，访客节点的 `visitor.js` 从 2.14.x 变成 **2.16.0**、
+`visitor.html` 带上 v2.52 的 `v-cloak` 兜底 ✅
+
+> 结论：之前"节点 5 分钟自动跟随"的承诺其实一直没兑现，全靠人工。现在才真正闭环。
