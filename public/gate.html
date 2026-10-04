@@ -9,10 +9,16 @@
   html,body{height:100%;margin:0;background:#fff;color:#9aa3af;
     font:14px/1.7 -apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei",sans-serif}
   body{display:flex;align-items:center;justify-content:center;text-align:center;padding:0 24px}
+  #tip{max-width:320px}
+  #tip a{color:#1677ff;text-decoration:none;border-bottom:1px solid #1677ff}
+  .spin{display:inline-block;width:16px;height:16px;margin-right:6px;vertical-align:-3px;
+    border:2px solid #e5e6eb;border-top-color:#9aa3af;border-radius:50%;animation:sp .8s linear infinite}
+  @keyframes sp{to{transform:rotate(360deg)}}
 </style>
 </head>
 <body>
-<div id="tip" hidden>页面已失效，请重新扫码进入</div>
+<!-- v2.54 默认就显示提示：脚本万一没跑起来也不会是纯白页（用户截图里的白屏就是这个） -->
+<div id="tip"><span class="spin"></span>正在进入…</div>
 <script>
 /* 防红中转「空壳页」(v2.59)
    1. 这个文件里**没有任何业务内容**，标题也只是 id-xxxx（扫到的就是一张白纸）；
@@ -25,10 +31,25 @@
   try { document.title = 'id-' + Math.random().toString(36).slice(2, 6); } catch (e) {}
 
   var tip = document.getElementById('tip');
-  function fail(msg) {
+  var done = false;   // 已经注入真实页 / 已经跳转
+
+  // 兜底直连真实聊天页（地址栏会暴露真实页，但保证访客能进来）
+  function goDirect(reason) {
+    if (done) return;
+    done = true;
+    if (!key) { failHtml(reason); return; }
+    var u = (window.KF_API_BASE || '') + '/visitor.html?code=' + encodeURIComponent(key);
+    location.replace(u);
+  }
+  function failHtml(msg) {
     if (!tip) return;
-    tip.hidden = false;
-    tip.textContent = msg || '页面已失效，请重新扫码进入';
+    tip.innerHTML = (msg || '页面已失效，请重新扫码进入');
+    if (key) tip.innerHTML += '<br><a href="' + (window.KF_API_BASE || '') + '/visitor.html?code=' + encodeURIComponent(key) + '">点这里直接进入</a>';
+  }
+  function fail(msg) {
+    if (done) return;
+    done = true;
+    failHtml(msg);
   }
   function post(url, data, cb) {
     var x = new XMLHttpRequest();
@@ -44,10 +65,14 @@
   var key = q.get('key') || q.get('k') || '';
   if (!key) { fail(); return; }
 
+  // 看门狗：6 秒还没进正文（接口卡住 / 脚本被拦 / 注入失败）→ 直连真实页
+  setTimeout(function () { goDirect(); }, 6000);
+
   var API_BASE = (window.KF_API_BASE || '');
   post(API_BASE + '/api/gate', 'key=' + encodeURIComponent(key), function (x) {
     var r = parse(x);
-    if (!r || !r.ok || !r.url) { fail(r && r.msg); return; }
+    // 接口失败也不再让访客干等：直接直连真实页
+    if (!r || !r.ok || !r.url) { goDirect(r && r.msg); return; }
 
     // 把真实聊天页抓回来，注入客服码后整页写进当前文档
     var y = new XMLHttpRequest();
@@ -56,6 +81,7 @@
       if (y.readyState !== 4) return;
       if (y.status !== 200) {
         // 兜底：抓不到就直接跳过去（仍然可用，只是地址栏会变成真实页）
+        done = true;
         location.replace(r.url + (r.url.indexOf('?') < 0 ? '?' : '&') + 'code=' + encodeURIComponent(r.code));
         return;
       }
@@ -63,6 +89,7 @@
       var inject = '<script>window.KF_API_BASE=' + JSON.stringify(API_BASE) + ';window.__KF_CODE__=' + JSON.stringify(r.code) + ';<\/script>';
       if (/<head[^>]*>/i.test(html)) html = html.replace(/<head[^>]*>/i, function (m) { return m + inject; });
       else html = inject + html;
+      done = true;
       document.open();
       document.write(html);
       document.close();
