@@ -28,8 +28,17 @@ function resolve_visitor_context(): ?array
     }
 
     // 子域名匹配：sub.rootdomain 或泛解析前缀
+    // 枢纽模式：分控反代来的请求带 X-Original-Host（访客真实访问的域名），
+    // 仅当 X-Edge-Secret 与总控 relay_secret 匹配（可信边缘）时才采信，防伪造
     $host = strtolower($_SERVER['HTTP_HOST'] ?? '');
     $host = preg_replace('/:\d+$/', '', $host);
+    $edgeSecret = (string)(config()['relay_secret'] ?? '');
+    $edgeGiven = (string)($_SERVER['HTTP_X_EDGE_SECRET'] ?? '');
+    if ($edgeSecret !== '' && $edgeGiven !== '' && hash_equals($edgeSecret, $edgeGiven)) {
+        $orig = strtolower((string)($_SERVER['HTTP_X_ORIGINAL_HOST'] ?? ''));
+        $orig = preg_replace('/:\d+$/', '', $orig);
+        if ($orig !== '') $host = $orig;
+    }
     if ($host !== '') {
         $st = $pdo->prepare('SELECT dl.subdomain, tn.* FROM domain_links dl JOIN tenants tn ON tn.id = dl.tenant_id WHERE dl.active = 1');
         $st->execute();

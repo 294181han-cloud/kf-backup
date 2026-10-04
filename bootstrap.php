@@ -153,6 +153,7 @@ if (($isCli || ($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') && !$installed 
             . "    proxy_set_header X-Edge-Secret {$edgeSecret};\n"
             . "    proxy_set_header X-Edge-Role {$role};\n"
             . "    proxy_set_header X-Edge-Origin {$origin};\n"
+            . "    proxy_set_header X-Original-Host $host;\n"
             . "    proxy_ssl_server_name on;\n"
             . "location /uploads/ {\n"
             . "    proxy_pass {$mainUrl}/uploads/;\n"
