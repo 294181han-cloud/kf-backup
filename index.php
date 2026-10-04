@@ -129,6 +129,34 @@ function ensure_upgrade(): void
             created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
             last_seen DATETIME NULL
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+        // v2.43 存量上传引用绝对化（一次性）：相对 /uploads/ 路径在分控节点不可见（枢纽模式）
+        try {
+            if (kv_get('upload_abs_migrated', '') !== '1') {
+                $mainBase = rtrim((string)config()['site_main_url'] ?? '', '/');
+                if ($mainBase !== '') {
+                    $rows = $pdo->query("SELECT id, attachments FROM messages WHERE attachments LIKE '%/uploads/%' LIMIT 5000")->fetchAll();
+                    $fixed = 0;
+                    foreach ($rows as $row) {
+                        $arr = json_decode((string)$row['attachments'], true);
+                        if (!is_array($arr)) continue;
+                        $chg = false;
+                        foreach ($arr as &$at) {
+                            if (!empty($at['url']) && str_starts_with((string)$at['url'], '/uploads/')) {
+                                $at['url'] = $mainBase . (string)$at['url']; $chg = true;
+                            }
+                        }
+                        unset($at);
+                        if ($chg) { $pdo->prepare('UPDATE messages SET attachments = ? WHERE id = ?')
+                            ->execute([json_encode($arr, JSON_UNESCAPED_UNICODE), $row['id']]); $fixed++; }
+                    }
+                    foreach ([['kv_store', "UPDATE kv_store SET sval = CONCAT('{$mainBase}', sval) WHERE skey IN ('me_avatar','brand_avatar') AND sval LIKE '/uploads/%'"],
+                              ['v_sessions', "UPDATE v_sessions SET visitor_avatar = CONCAT('{$mainBase}', visitor_avatar) WHERE visitor_avatar LIKE '/uploads/%'"]] as $pair) {
+                        $pdo->exec($pair[1]);
+                    }
+                }
+                kv_set('upload_abs_migrated', '1');
+            }
+        } catch (\Throwable $e) { /* 忽略：失败不影响运行 */ }
         // v2.34 分节点网页安装：一次性授权码 + 平台级全局黑名单（边缘本地拦截用）
         $pdo->exec("CREATE TABLE IF NOT EXISTS node_auth_codes (
             code VARCHAR(32) NOT NULL PRIMARY KEY,
