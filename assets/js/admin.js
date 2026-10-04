@@ -105,11 +105,40 @@ createApp({
         await loadTg();
       } catch (e) { ElementPlus.ElMessage.error(e.message); }
     };
+    // ---------- 微信拦截检测（v2.47：米人免费 / 原付费可切换）----------
+    const wxc = reactive({ on: false, provider: 'mir6', user: '', key: '', key_set: false,
+                           mir6: 'https://api.mir6.com/api/wxurl', uouin: 'https://api.uouin.com/app' });
+    const wxcSaving = ref(false); const wxcTesting = ref(false);
+    const wxcTestLink = ref(''); const wxcTestResult = ref(null);
+    const loadWxc = async () => {
+      try { Object.assign(wxc, await API.get('/api/admin/wxcheck')); } catch (e) {}
+    };
+    const saveWxc = async () => {
+      wxcSaving.value = true;
+      try {
+        await API.post('/api/admin/wxcheck', {
+          on: wxc.on ? 1 : 0, provider: wxc.provider, user: wxc.user, key: wxc.key,
+          mir6: wxc.mir6, uouin: wxc.uouin,
+        });
+        wxc.key = '';
+        ElementPlus.ElMessage.success('已保存');
+        await loadWxc();
+      } catch (e) { ElementPlus.ElMessage.error(e.message); } finally { wxcSaving.value = false; }
+    };
+    const testWxc = async () => {
+      const link = (wxcTestLink.value || '').trim();
+      if (!/^https?:\/\//i.test(link)) { ElementPlus.ElMessage.warning('请填完整链接，要带 http:// 或 https://'); return; }
+      wxcTesting.value = true; wxcTestResult.value = null;
+      try {
+        const r = await API.post('/api/admin/wxcheck', { test: 1, link: link });
+        wxcTestResult.value = r.result;
+      } catch (e) { ElementPlus.ElMessage.error(e.message); } finally { wxcTesting.value = false; }
+    };
     const loadAll = async () => {
       try {
         me.value = await API.me();
         if (me.value.role !== 'admin') { location.href = '/login.html'; return; }
-        await Promise.all([loadOverview(), loadTenants(), loadDomains(), loadSettings(), loadEntrances().catch(() => {})]);
+        await Promise.all([loadOverview(), loadTenants(), loadDomains(), loadSettings(), loadEntrances().catch(() => {}), loadWxc()]);
         booted.value = true;
       } catch (e) { ElementPlus.ElMessage.error(e.message); }
     };
@@ -331,6 +360,7 @@ createApp({
       entrancesText, entranceText, saveEntrances,
       tg, tgCfg, tgSaving, tgHooking, tgChecking, saveTg, setTgWebhook, runTgCheck,
       pkgVisible, pkgForm, pkgSaving, openPkg, savePkg, delPkg, tgOrder,
+      wxc, wxcSaving, wxcTesting, wxcTestLink, wxcTestResult, saveWxc, testWxc,
       barWidth, locationOrigin,
       dlgVisible, dlgMode, dlg, dlgSaving, openCreate, openEdit, saveTenant, toggleTenant, delTenant,
       createdVisible, created, copyCreated, openGen, genVisible, genPair, doGen, fillGenKami, openTrial,

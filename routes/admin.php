@@ -321,6 +321,40 @@ function handle_admin_defaults(string $method): void
     json_error('方法不允许', 405);
 }
 
+/* ================= 微信拦截检测（v2.47：米人免费接口 / 原付费接口可切换） ================= */
+function handle_admin_wxcheck(string $method): void
+{
+    require_admin_ctx();
+    $cfg = wxcheck_cfg();
+
+    if ($method === 'GET') {
+        json_out([
+            'on' => $cfg['on'], 'provider' => $cfg['provider'],
+            'user' => $cfg['user'], 'key_set' => $cfg['key'] !== '',
+            'mir6' => $cfg['mir6'], 'uouin' => $cfg['url'],
+        ]);
+    }
+    if ($method === 'POST') {
+        // 测试：给一个链接直接返回检测结果（不落库、不动租户状态）
+        if ((string)input('test', '') !== '') {
+            $link = trim((string)input('link', ''));
+            if ($link === '' || !preg_match('#^https?://#i', $link)) json_error('请填完整链接，要带 http:// 或 https://');
+            json_out(['ok' => true, 'result' => wxcheck_run($link, (string)input('channel', 'wx'))]);
+        }
+        if (input('on') !== null) kv_set('wxcheck_on', ((int)input('on') === 1) ? '1' : '0');
+        if (input('provider') !== null) {
+            $p = (string)input('provider');
+            kv_set('wxcheck_provider', $p === 'uouin' ? 'uouin' : 'mir6');
+        }
+        if (input('user') !== null) kv_set('wxcheck_user', trim((string)input('user')));
+        if (input('key') !== null && (string)input('key') !== '') kv_set('wxcheck_key', trim((string)input('key')));
+        if (input('mir6') !== null && trim((string)input('mir6')) !== '') kv_set('wxcheck_mir6_url', trim((string)input('mir6')));
+        if (input('uouin') !== null && trim((string)input('uouin')) !== '') kv_set('wxcheck_url', rtrim(trim((string)input('uouin')), '/'));
+        json_out(['ok' => true]);
+    }
+    json_error('方法不允许', 405);
+}
+
 /* ================= 节点管理（1+2+n 分域部署，v2.33） ================= */
 
 /** 主站向指定分控节点发起 HTTP 调用（curl 优先，stream 兜底） */

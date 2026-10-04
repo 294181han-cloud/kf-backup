@@ -1241,9 +1241,12 @@ function wxcheck_cfg(): array
     return [
         // 平台级开关：wxcheck_on=0 时只回报「未开通」，不显示绿色的「正常接待」（接口不可信时避免假绿）
         'on'   => kv_get('wxcheck_on', '0') === '1',
+        // v2.47 检测通道：mir6 = 米人免费接口（只要 url，不用账号）／uouin = 原来的付费接口（要账号密钥）
+        'provider' => kv_get('wxcheck_provider', 'mir6') === 'uouin' ? 'uouin' : 'mir6',
         'user' => kv_get('wxcheck_user', ''),
         'key'  => kv_get('wxcheck_key', ''),
         'url'  => rtrim(kv_get('wxcheck_url', 'https://api.uouin.com/app'), '/'),
+        'mir6' => rtrim(kv_get('wxcheck_mir6_url', 'https://api.mir6.com/api/wxurl'), '/'),
         'ttl'  => max(60, (int)kv_get('wxcheck_ttl', '300')),
     ];
 }
@@ -1260,6 +1263,41 @@ function wxcheck_run(string $link, string $channel = 'wx'): array
         return ['state' => 'off', 'tag' => '未开通', 'text' => $chName . '检测未开通',
             'msg' => '平台未开通拦截检测，请联系管理员'];
     }
+    // ---- 米人免费接口（v2.47）：GET /api/wxurl?url=… → type=安全网站/危险网站/未知状态 ----
+    if ($cfg['provider'] === 'mir6') {
+        if ($channel !== 'wx') {
+            return ['state' => 'off', 'tag' => '不支持', 'text' => $chName . '检测不支持',
+                'msg' => '米人接口只提供微信拦截检测，QQ 检测请改用付费通道'];
+        }
+        $api = $cfg['mir6'] . '?url=' . urlencode($link);
+        $resp = '';
+        if (function_exists('curl_init')) {
+            $ch = curl_init($api);
+            curl_setopt_array($ch, [CURLOPT_RETURNTRANSFER => true, CURLOPT_TIMEOUT => 12, CURLOPT_CONNECTTIMEOUT => 8,
+                CURLOPT_SSL_VERIFYPEER => false, CURLOPT_SSL_VERIFYHOST => 0, CURLOPT_USERAGENT => 'kfxt/2.47']);
+            $resp = (string)curl_exec($ch);
+            curl_close($ch);
+        } else {
+            $resp = (string)@file_get_contents($api);
+        }
+        $j = json_decode($resp, true);
+        if (!is_array($j) || (int)($j['code'] ?? 0) !== 200) {
+            return ['state' => 'err', 'tag' => '异常', 'text' => '检测失败',
+                'msg' => '检测接口无响应' . (is_array($j) ? ('（' . (string)($j['msg'] ?? '') . '）') : '')];
+        }
+        $type = trim((string)($j['type'] ?? ''));
+        if ($type === '安全网站') {
+            return ['state' => 'ok', 'tag' => '正常', 'text' => $chName . '可正常打开',
+                'msg' => '该链接在' . $chName . '内未被拦截（米人检测）'];
+        }
+        if ($type === '危险网站') {
+            return ['state' => 'red', 'tag' => '红', 'text' => '已被' . $chName . '拦截',
+                'msg' => '该链接在' . $chName . '内已被拦截，建议换码/换域名（米人检测）'];
+        }
+        return ['state' => 'err', 'tag' => '未知', 'text' => '检测结果未知',
+            'msg' => '接口返回：' . ($type !== '' ? $type : '未知状态') . '，建议人工复核'];
+    }
+    // ---- 原有付费通道 ----
     if ($cfg['user'] === '' || $cfg['key'] === '') {
         return ['state' => 'off', 'tag' => '未开通', 'text' => $chName . '检测未开通',
             'msg' => '平台未配置检测接口账号'];

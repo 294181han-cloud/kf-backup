@@ -2800,23 +2800,26 @@ app.css / admin.css / visitor.css 统一加：最后一列 `.cell` 用 flex 居�
 
 版本：`app.css?v=3.31.0`、`app.js?v=3.24.0`
 
-## 37. v2.46 变更记录（访客接入策略：裸域名一律中性引导，2026-10-04）
 
-### 策略变更（用户拍板）
-- **裸域名/无标识访问访客站点**（无 code、无 t、无绑定子域）：一律显示中性引导页
-  （「欢迎扫码咨询：请通过客服码进入」），**不再自动接入任何客服**
-- 移除 resolve_visitor_context 的 service_codes 链接 Host 匹配——域名池域名下挂多租户码时，
-  裸域名访问会随机接入其中一个租户（跨租户泄露），已移除
-- 保留的接入方式（均有明确标识）：?code=客服码、?t=卡密、专属链接子域（domain_links）
-- 「带标识但无效」（如码已作废）→ 提示链接已失效；「无任何标识」→ 中性引导
+## v2.47 变更记录（微信拦截检测接入米人免费接口，2026-10-04）
 
-### 配套：分控反代传访客真实域名
-- 分控 nginx 片段（bootstrap 生成）新增 X-Original-Host：总控按访客**实际访问的域名**解析
-  （仅信任带 X-Edge-Secret 的白名单边缘，防伪造）——域名池域名的解析在分控节点上也正确
+用户给了 [米人 API 微信域名拦截检测](https://api.mir6.com/doc/wxurl.html) 的文档。
 
-### 版本
-- version.php → 2.46.0；visitor.js ?v= 同步提升
+**接口**：`GET https://api.mir6.com/api/wxurl?url=<带协议的链接>` → `{code:200, type:"安全网站"|"危险网站"|"未知状态"}`
+（免费、不用账号；实测响应 0.34s。**只支持微信**，没有 QQ 检测。）
 
-### 验证
-- 裸域名（Host=pf6s6hom.lol）config → 中性引导 ✓；专属链接子域 → 绑定租户 ✓；
-  带码 → 按码解析 ✓；错误密钥 → 不采信 X-Original-Host ✓
+**改动**
+- `helpers.php` 的 `wxcheck_cfg()` 增加 `provider`（`mir6` 默认 / `uouin` 原付费）与 `mir6` 接口地址；
+- `wxcheck_run()` 增加米人分支：`安全网站→ok`、`危险网站→red`、`未知状态→err(未知)`；
+  米人通道下走 QQ 检测会明确回「不支持」而不是假绿；付费通道逻辑原样保留（有账号密钥时仍可用）；
+- `routes/admin.php` 新增 `handle_admin_wxcheck`（`GET` 读配置 / `POST` 保存 / `POST {test:1,link}` 实时试检测），`index.php` 注册 `/api/admin/wxcheck`；
+- `public/admin.html` + `assets/js/admin.js`：全局设置新增「微信拦截检测」面板——
+  启用开关、通道切换（米人免费 / 付费接口）、接口地址、付费账号密钥、以及**拿链接直接试检测**（不落库、不动租户状态）；
+- kv：`wxcheck_on=1`、`wxcheck_provider=mir6`（原平台未开通，租户点检测一直显示「未开通」）。
+
+**验证**
+- 后台接口：读配置 `{on:true, provider:"mir6"}`；测试 `https://www.qq.com` 与自家客服码均返回 `正常 / 微信可正常打开（米人检测）` ✅
+- 租户「客服码 → 立即检测」（`force=1` 实时）：`state:ok、tag:正常、text:微信可正常打开`，再点走 5 分钟缓存 ✅
+- 每小时红码巡检 `php bin/check_codes.php`：`共 6 个码 → 正常 6、红 0、异常/未开通 0` ✅
+
+版本：`version.php` 2.46.0 → **2.47.0**

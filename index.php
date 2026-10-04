@@ -465,6 +465,7 @@ function dispatch_api(string $method, string $uri): void
     if ($uri === '/api/admin/agent-entrances')   handle_admin_agent_entrances($method);
     if ($uri === '/api/admin/bootstrap-dl')      handle_admin_bootstrap_dl($method);
     if ($uri === '/api/admin/defaults')          handle_admin_defaults($method);
+    if ($uri === '/api/admin/wxcheck')           handle_admin_wxcheck($method);
     // ---- 发卡机器人（平台管理员）----
     if ($uri === '/api/admin/tg')                handle_admin_tg($method);
     if ($uri === '/api/admin/tg/save')           handle_admin_tg_save($method);
