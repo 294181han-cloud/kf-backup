@@ -1911,3 +1911,38 @@ body.dark .global-red .gr-t { color: #ff8b8b; }
   .global-red { margin: 8px 10px 0; padding: 9px 12px; flex-wrap: wrap; }
   .global-red .gr-t { font-size: 12.5px; }
 }
+
+/* =====================================================================
+   v2.60 手机端：CRUD 表格 → 卡片列表
+   390px 宽的屏幕上 5 列表格把「内容」列压成一字一行（截图反馈过），
+   手机上直接改成卡片：标题 + 各字段 + 编辑/删除，顺序拖动也保留。
+   电脑端不受影响（.ct-cards 默认 display:none）。
+   ===================================================================== */
+.ct-cards { display: none; }
+@media (max-width: 900px) {
+  .crud-panel > .el-table { display: none; }
+  .ct-cards { display: block; }
+  .ct-card {
+    border: 1px solid #eef1f5; border-radius: 12px; background: #fff;
+    padding: 10px 12px; margin-bottom: 10px;
+  }
+  .ct-card .ctc-head { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; }
+  .ct-card .ctc-title {
+    flex: 1; min-width: 0; font-size: 14px; font-weight: 650; color: #1f2329;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  .ct-card .ctc-ops { display: inline-flex; gap: 6px; flex-shrink: 0; }
+  .ct-card .ctc-row {
+    display: flex; gap: 10px; padding: 5px 0; border-top: 1px dashed #f2f4f8; font-size: 13px;
+  }
+  .ct-card .ctc-k { flex: 0 0 62px; color: #86909c; }
+  .ct-card .ctc-v { flex: 1; min-width: 0; color: #4e5969; word-break: break-word; white-space: pre-wrap; }
+  .ct-card .ctc-img { width: 40px; height: 40px; object-fit: cover; border-radius: 8px; vertical-align: middle; margin-right: 4px; }
+  .ct-card .ctc-drag { cursor: grab; color: #b8c0cc; font-size: 15px; flex-shrink: 0; touch-action: none; background: transparent; }
+  .ct-card .ctc-drag:hover { background: transparent; color: var(--theme, #1677ff); }
+  .ctc-empty { font-size: 13px; padding: 16px 4px; }
+  body.dark .ct-card { background: #1e2229; border-color: #2b313a; }
+  body.dark .ct-card .ctc-title { color: #e7eaf0; }
+  body.dark .ct-card .ctc-row { border-top-color: #262c34; }
+  body.dark .ct-card .ctc-v { color: #c6ccd8; }
+}

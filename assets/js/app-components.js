@@ -6,7 +6,7 @@ const CrudTable = defineComponent({
   props: { rows: Array, cols: Array, fields: Array, title: String, addText: String, api: String, io: Boolean, sortable: Boolean },
   emits: ['reload', 'reorder'],
   template: `
-  <div class="panel">
+  <div class="panel crud-panel">
     <div class="panel-title" style="justify-content:flex-start;gap:12px;">
       {{ title }}（{{ rows.length }}）
       <el-button size="small" type="primary" @click="open()">{{ addText }}</el-button>
@@ -27,7 +27,9 @@ const CrudTable = defineComponent({
                 @pointerup="onDragUp" @pointercancel="onDragUp">⠿</span>
         </template>
       </el-table-column>
-      <el-table-column v-for="c in cols" :key="c.k" :label="c.l">
+      <!-- v2.60 每列给个最小宽度：手机上（390px）原来会把内容列压成「一个字一行」，
+           有了 min-width，el-table 会自动改成横向滚动，表头和内容仍然对齐。 -->
+      <el-table-column v-for="c in cols" :key="c.k" :label="c.l" :min-width="c.min || 96">
         <template #default="{row}">
           <template v-if="c.bool"><el-tag size="small" :type="row[c.k]?'success':'info'">{{ row[c.k]?'启用':'停用' }}</el-tag></template>
           <template v-else-if="c.imgs">
@@ -49,6 +51,40 @@ const CrudTable = defineComponent({
         </template>
       </el-table-column>
     </el-table>
+    <!-- v2.60 手机端：表格换成卡片列表。390px 宽塞 5 列会把「内容」压成一字一行，
+         手机上直接用卡片列出每条话术，编辑/删除按钮跟着卡片走。 -->
+    <div class="ct-cards" v-if="cols.length">
+      <div class="ct-card" v-for="(row, ri) in local" :key="row.id || ri">
+        <div class="ctc-head">
+          <span class="drag-handle ctc-drag" v-if="sortable" title="按住拖动排序"
+                @pointerdown.prevent="onDragDown(ri, $event)"
+                @pointermove="onDragMove($event)"
+                @pointerup="onDragUp" @pointercancel="onDragUp">⠿</span>
+          <span class="ctc-title">{{ row[cols[0].k] || '（空）' }}</span>
+          <span class="ctc-ops">
+            <el-button size="small" @click="open(row)">编辑</el-button>
+            <el-popconfirm title="确认删除？" @confirm="del(row)">
+              <template #reference><el-button size="small" type="danger">删除</el-button></template>
+            </el-popconfirm>
+          </span>
+        </div>
+        <div class="ctc-row" v-for="c in cols.slice(1)" :key="c.k">
+          <span class="ctc-k">{{ c.l }}</span>
+          <span class="ctc-v">
+            <template v-if="c.bool"><el-tag size="small" :type="row[c.k]?'success':'info'">{{ row[c.k]?'启用':'停用' }}</el-tag></template>
+            <template v-else-if="c.imgs">
+              <template v-if="(row[c.k]||[]).length">
+                <img v-for="(im, ii) in row[c.k].slice(0,3)" :key="ii" :src="im.url" class="ctc-img">
+                <span v-if="row[c.k].length > 3" class="muted" style="font-size:11px;">+{{ row[c.k].length - 3 }}</span>
+              </template>
+              <span v-else class="muted">—</span>
+            </template>
+            <template v-else>{{ c.map ? (c.map[row[c.k]] || row[c.k]) : row[c.k] }}</template>
+          </span>
+        </div>
+      </div>
+      <div class="ctc-empty muted" v-if="!local.length">还没有数据，点上面的「{{ addText }}」加一条。</div>
+    </div>
     <el-dialog v-model="dlg" :title="editId ? '编辑' : '新增'" width="440px" @paste.capture="onPasteImgs">
       <el-form label-width="90px">
         <el-form-item v-for="f in fields" :key="f.k" :label="f.label">
@@ -103,9 +139,10 @@ const CrudTable = defineComponent({
     };
     const onDragMove = (ev) => {
       if (!dragging || dragFrom.value < 0) return;
-      const wrap = ev.target.closest('.el-table');
+      // v2.60 电脑端拖表格行，手机端拖卡片：两套 DOM 一起找
+      const wrap = ev.target.closest('.el-table, .ct-cards');
       if (!wrap) return;
-      const trs = [...wrap.querySelectorAll('.el-table__body tbody tr')];
+      const trs = [...wrap.querySelectorAll('.el-table__body tbody tr, .ct-card')];
       const y = ev.clientY;
       let to = dragFrom.value;
       trs.forEach((tr, i) => {

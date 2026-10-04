@@ -887,6 +887,12 @@ const app = createApp({
       const el = document.querySelector('.chat-input textarea');
       if (el) el.style.height = '';
     };
+    /* 手机端输入框只有一行高，原来那句长提示（Enter 发送 / Ctrl+V 粘贴）会被截成两行还看不全，
+       换成短提示；电脑端保留完整说明。 */
+    const taPlaceholder = computed(() => (
+      document.documentElement.getAttribute('data-ui-cat') === 'mobile'
+        ? '输入消息…'
+        : '输入消息，Enter 发送，Shift+Enter 换行；可 Ctrl+V 粘贴图片'));
 
     // 快捷消息（v2.28 改版）：单击 = 直接发送；Ctrl+单击 = 填入输入框（文字+图片均可编辑）
     const pendingAtts = ref([]);   // 待发附件（编辑模式带入的图片，发送时随消息发出）
@@ -2852,6 +2858,7 @@ const app = createApp({
       asrText, asrBusy, transcribe,
       openSession, send, onKey, useQuick, sendQuick, quickClick, onImage, startRec, stopRec, closeSession, doTransfer,
       autoGrowTa,
+      taPlaceholder,
       pendingAtts, rmPendingAtt, quickCtx, openQuickCtx, editQuick,
       qDrag, quickDragDown, quickDragMove, quickDragUp, quickMove,
       imgZoom, imgRot, imgWheel, downloadImage, copyImage, imgToast,

@@ -246,7 +246,7 @@ html[data-ui-cat="mobile"][data-ui-template="default"] .tool-btn svg { width: 19
 html[data-ui-cat="mobile"][data-ui-template="default"] .ci-row { display: flex; align-items: flex-end; gap: 8px; }
 html[data-ui-cat="mobile"][data-ui-template="default"] .ci-row textarea {
   flex: 1 1 auto; min-width: 0; width: auto; height: 44px; min-height: 44px; max-height: 132px;
-  padding: 11px 12px; border: 1px solid var(--line); border-radius: 12px;
+  padding: 9px 12px; border: 1px solid var(--line); border-radius: 12px;
   background: var(--bg); font-size: 16px; line-height: 1.4; box-sizing: border-box; overflow-y: auto;
 }
 html[data-ui-cat="mobile"][data-ui-template="default"] .ci-row .send-btn {
@@ -296,3 +296,10 @@ html[data-ui-cat="mobile"][data-ui-template="default"] .main.has-setmenu .conten
 
 /* ---------- ⑤ 回到底部按钮：跟着矮下来的输入区一起下移 ---------- */
 html[data-ui-cat="mobile"][data-ui-template="default"] .chat-tobottom { bottom: 116px; }
+
+/* ---------- ⑥ 面板标题：手机端让「批量导入导出」单独占一行 ----------
+   原来标题文字被右侧的按钮挤成三行，现在标题一行、按钮一行，看着规整。 */
+html[data-ui-cat="mobile"][data-ui-template="default"] .panel-title { flex-wrap: wrap; row-gap: 8px; }
+html[data-ui-cat="mobile"][data-ui-template="default"] .panel-title > span {
+  margin-left: 0 !important; flex: 1 1 100%;
+}

@@ -7,9 +7,9 @@
 <link rel="icon" href="/assets/img/mi-logo.png">
 <link rel="apple-touch-icon" href="/assets/img/mi-logo.png">
 <link rel="stylesheet" href="/assets/vendor/element-plus.css">
-<link rel="stylesheet" href="/assets/css/app.css?v=3.36.0">
-<script src="/assets/ui/ui-registry.js?v=2.9.0"></script>
-<script src="/assets/ui/ui-loader.js?v=2.9.0" data-ui-cat="auto"></script>
+<link rel="stylesheet" href="/assets/css/app.css?v=3.37.0">
+<script src="/assets/ui/ui-registry.js?v=2.9.1"></script>
+<script src="/assets/ui/ui-loader.js?v=2.9.1" data-ui-cat="auto"></script>
 </head>
 <body>
 <!-- 注意：#app 是挂载容器，写在这里的 @click 不会被绑定（模板取的是它的 innerHTML）。
@@ -406,7 +406,7 @@
               </div>
               <!-- v2.60 输入区：手机端把输入框和发送键并成一行（原来发送键独占一行，白白吃掉半屏高度） -->
               <div class="ci-row">
-                <textarea v-if="!recording && !selMode" v-model="draft" placeholder="输入消息，Enter 发送，Shift+Enter 换行；可 Ctrl+V 粘贴图片" @input="autoGrowTa" @keydown="onKey" @paste="onPaste"></textarea>
+                <textarea v-if="!recording && !selMode" v-model="draft" :placeholder="taPlaceholder" @input="autoGrowTa" @keydown="onKey" @paste="onPaste"></textarea>
                 <button class="send-btn" v-if="!selMode" :disabled="(!draft.trim() && !pendingAtts.length)||sending" @click="send"><svg class="sb-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M4.5 12 20 4.5 15.5 20l-4-6.5-7-1.5z"/></svg><span class="sb-t">发 送</span></button>
               </div>
             </div>
@@ -1484,7 +1484,7 @@
 <script src="/assets/vendor/qrcode.min.js?v=2.0.1"></script>
 <script src="/assets/qr-poster.js?v=2.1.03"></script>
 <script src="/assets/api.js?v=2.0.1"></script>
-<script src="/assets/js/app-components.js?v=2.6.0"></script>
+<script src="/assets/js/app-components.js?v=2.6.2"></script>
 <script src="/assets/js/app.js?v=3.32.0"></script>
 <script src="/assets/js/app-boot.js?v=2.1.1"></script>
 </body>
