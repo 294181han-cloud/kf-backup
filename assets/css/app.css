@@ -1823,3 +1823,17 @@ body.dark .qd-thumb img, body.dark .qd-thumb .qd-file, body.dark .qd-addimg { bo
 }
 .el-table td.el-table__cell:last-child .cell > * { margin-left: 0 !important; flex-shrink: 0; }
 .el-table th.el-table__cell:last-child .cell { justify-content: flex-start; }
+
+/* ===== v2.45 会话列表重排：名字优先，地区标签挪到第二行 ===== */
+.sess-item .row1 { flex-wrap: nowrap; gap: 6px; }
+.sess-item .row1 .name {
+  flex: 1 1 auto; min-width: 0; max-width: none;
+  white-space: normal; word-break: break-word; line-height: 1.32;
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+}
+.sess-item .row1 .time { margin-left: auto; flex-shrink: 0; font-size: 11px; }
+.sess-item .row2 { gap: 6px; }
+.sess-item .row2 .geo-tag { flex-shrink: 0; max-width: 108px; margin-left: 0; vertical-align: middle; }
+.sess-item .row2 .tag-agent { flex-shrink: 0; }
+.sess-item .row2 .last { flex: 1 1 auto; min-width: 0; }
+.sess-item .row2 .badge { flex-shrink: 0; }

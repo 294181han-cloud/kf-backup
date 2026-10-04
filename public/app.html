@@ -7,7 +7,7 @@
 <link rel="icon" href="/assets/img/mi-logo.png">
 <link rel="apple-touch-icon" href="/assets/img/mi-logo.png">
 <link rel="stylesheet" href="/assets/vendor/element-plus.css">
-<link rel="stylesheet" href="/assets/css/app.css?v=3.29.0">
+<link rel="stylesheet" href="/assets/css/app.css?v=3.30.0">
 <script src="/assets/ui/ui-registry.js?v=2.8.0"></script>
 <script src="/assets/ui/ui-loader.js?v=2.8.0" data-ui-cat="auto"></script>
 </head>
@@ -166,10 +166,10 @@
                 <div class="row1">
                   <span class="pin-ic" v-if="s.pinned" title="已置顶">📌</span>
                   <span class="name" :title="s.name">{{ s.name }}</span>
-                  <span class="geo-tag" v-if="visitorTag(s)" :class="visitorChnClass(s)" :title="visitorTagFull(s)">{{ visitorTag(s) }}</span>
-                  <span class="time">{{ shortTime(s.lastTime) }}</span>
+                  <span class="time">{{ sessTime(s.lastTime) }}</span>
                 </div>
                 <div class="row2">
+                  <span class="geo-tag" v-if="visitorTag(s)" :class="visitorChnClass(s)" :title="visitorTagFull(s)">{{ visitorTag(s) }}</span>
                   <span v-if="s.agent_id>0" class="tag-agent">{{ s.agent_name || '客服' }}</span>
                   <span class="last" v-if="sessPreview(s)">{{ sessPreview(s) }}</span>
                   <span class="badge" v-if="s.unread>0">{{ s.unread>99?'99+':s.unread }}</span>
@@ -1501,7 +1501,7 @@
 <script src="/assets/qr-poster.js?v=2.1.03"></script>
 <script src="/assets/api.js?v=2.0.1"></script>
 <script src="/assets/js/app-components.js?v=2.6.0"></script>
-<script src="/assets/js/app.js?v=3.22.0"></script>
+<script src="/assets/js/app.js?v=3.23.0"></script>
 <script src="/assets/js/app-boot.js?v=2.1.1"></script>
 </body>
 </html>

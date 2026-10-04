@@ -246,6 +246,17 @@ const app = createApp({
     });
 
     const shortTime = (t) => { if (!t) return ''; const d = new Date(t); return `${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')} ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`; };
+    /* v2.45 会话列表右上角的时间：今天只显示 14:39、今年显示 10-04、更早才带年份，
+       少占宽度，把地方让给访客名字 */
+    const sessTime = (t) => {
+      if (!t) return '';
+      const d = new Date(t), now = new Date();
+      const hm = `${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
+      const sameDay = d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth() && d.getDate() === now.getDate();
+      if (sameDay) return hm;
+      if (d.getFullYear() === now.getFullYear()) return `${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+      return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+    };
     const fmtTime = shortTime;
     const sourceText = (s) => ({ app: '客服码', web: '网页链接', direct: '直接访问' }[s] || s);
     // 设置页子导航（按角色过滤租户专属项）
@@ -2675,6 +2686,7 @@ const app = createApp({
       geoTag, visitorTag, visitorTagFull, visitorChnClass, copyQrImage, downloadQrImage, codeRotateHint, rotateCode, loadHistory, disableLink, saveCodeCfg, meAvatarUrl,
       quickFields, welcomeFields, autoFields, blFields, preqFields,
       shortTime, fmtTime, sourceText, contactLabel, barW, quotaW, trendW, trendDesc, dailyDesc,
+      sessTime,
       sessIcon, sessPreview,
       setTab, setGroups, openSetting, switchSetting,
       navGroups,
