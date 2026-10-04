@@ -143,23 +143,26 @@ if (($isCli || ($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') && !$installed 
 
         $host = parse_url($mainUrl, PHP_URL_HOST) ?: '主站域名';
         $edgeSecret = $relaySecret;
-        $nginxSnippet = "location / {\n"
-            . "    if (!-e $request_filename) { rewrite ^(.*)$ /index.php?s=$1 last; break; }\n"
-            . "}\n"
-            . "location /api/ {\n"
-            . "    proxy_pass {$mainUrl}/api/;\n"
-            . "    proxy_set_header Host {$host};\n"
-            . "    proxy_set_header X-Forwarded-For $remote_addr;\n"
-            . "    proxy_set_header X-Edge-Secret {$edgeSecret};\n"
-            . "    proxy_set_header X-Edge-Role {$role};\n"
-            . "    proxy_set_header X-Edge-Origin {$origin};\n"
-            . "    proxy_set_header X-Original-Host $host;\n"
-            . "    proxy_ssl_server_name on;\n"
-            . "location /uploads/ {\n"
-            . "    proxy_pass {$mainUrl}/uploads/;\n"
-            . "    proxy_set_header Host {$host};\n"
-            . "}\n"
-            . "}";
+        /* v2.49 重写：原模板用双引号串，nginx 变量（$request_filename/$remote_addr 等）被 PHP
+           插值成空串 → 分站粘贴出去的伪静态直接是坏的（404）；X-Original-Host 还被插成主站域名、
+           /uploads/ 误嵌进 /api/ 块。改单引号拼装：nginx 变量原样保留，PHP 变量只拼安装期常量。
+           try_files 保住 REQUEST_URI，动态路由（含 /MM-DD/ 防红壳页）在分站可用。 */
+        $nginxSnippet = 'location / {' . "\n"
+            . '    try_files $uri $uri/ /index.php?$query_string;' . "\n"
+            . '}' . "\n"
+            . 'location /api/ {' . "\n"
+            . '    proxy_pass ' . $mainUrl . '/api/;' . "\n"
+            . '    proxy_set_header Host ' . $host . ';' . "\n"
+            . '    proxy_set_header X-Forwarded-For $remote_addr;' . "\n"
+            . '    proxy_set_header X-Edge-Secret ' . $edgeSecret . ';' . "\n"
+            . '    proxy_set_header X-Edge-Role ' . $role . ';' . "\n"
+            . '    proxy_set_header X-Original-Host $host;' . "\n"
+            . '    proxy_ssl_server_name on;' . "\n"
+            . '}' . "\n"
+            . 'location /uploads/ {' . "\n"
+            . '    proxy_pass ' . $mainUrl . '/uploads/;' . "\n"
+            . '    proxy_set_header Host ' . $host . ';' . "\n"
+            . '}';
         // 直接写成文件：粘贴伪静态时打开 nginx-edge.conf 复制整段即可
         @file_put_contents(__DIR__ . '/nginx-edge.conf', "# /api/ 反代到总控 + 伪静态（整段加入本站点 server 块，替换原 location /）\n" . $nginxSnippet . "\n");
         // PHP 环境加固（open_basedir 指向本站点）

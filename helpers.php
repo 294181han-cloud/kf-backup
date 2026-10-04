@@ -558,8 +558,13 @@ function handle_internal_update(string $method): void
     if ($given === '' || !hash_equals($secret, $given)) json_error('无权调用', 403);
     $nodeVer = (string)input('app_version', '');
     $role = in_array(($r = (string)input('role', '')), ['agent', 'visitor'], true) ? $r : '';
-    $bundle = node_bundle_build($role);
-    if ($nodeVer === (string)$bundle['version']) {
+    /* v2.49 静态包必须节点显式申请（static=1，纯静态 bash 节点用）；
+       PHP 边缘站（update-node.php / 惰性维护）不发 static → 拿全量包，PHP 才能跟着升级。
+       壳页指纹 codes_rev：发版后新增的客服码壳页也能即时下发，不用等下一次发版。 */
+    $static = (string)input('static', '') === '1';
+    $bundle = node_bundle_build($role, $static);
+    $nodeRev = trim((string)input('codes_rev', ''));
+    if ($nodeVer === (string)$bundle['version'] && (!$static || $nodeRev === (string)($bundle['codes_rev'] ?? ''))) {
         json_out(['ok' => true, 'up_to_date' => true, 'version' => $bundle['version']]);
     }
     // bash 节点（cron-node.sh）：要 tar.gz 包（curl+tar 即可应用，无需 PHP）
@@ -624,12 +629,13 @@ function node_bundle_prefixes(): array
     return ['assets/', 'public/', 'routes/', 'vendor/', 'node/', 'index.php', 'helpers.php', 'db.php', 'version.php'];
 }
 
-/** 主控侧：按白名单打包当前代码（version + files{path:base64}） */
-function node_bundle_build(string $role = ''): array
+/** 主控侧：按白名单打包当前代码（version + files{path:base64}）
+ *  $static=true：纯静态节点包——无 PHP、根路径页副本、客服码壳页落成真实文件（含 codes_rev 指纹） */
+function node_bundle_build(string $role = '', bool $static = false): array
 {
     $base = __DIR__;
     $files = [];
-    $staticMode = in_array($role, ['agent', 'visitor'], true);   // 静态边缘模式：纯静态包（无 PHP）
+    $staticMode = $static;   // v2.49：由节点显式申请，不再按角色隐式开启（防 PHP 边缘站拿到无 PHP 包被清成砖）
     $mainBase = rtrim((string)(config()['site_main_url'] ?? ''), '/');
     $dirIter = new RecursiveDirectoryIterator($base, FilesystemIterator::SKIP_DOTS);
     $filter = new RecursiveCallbackFilterIterator($dirIter, function ($cur) {
@@ -672,9 +678,32 @@ function node_bundle_build(string $role = ''): array
             $rel = str_replace(chr(92), '/', substr($gf, strlen($base) + 1));
             $files[$rel] = base64_encode((string)file_get_contents($gf));
         }
+        /* v2.49 客服码防红壳页落成真实静态文件：静态分站没有 PHP，/MM-DD/xxx.html 动态路由不存在，
+           扫码链接必 404。把所有客服码链接里的壳页路径按 public/gate.html（注入 edge-config）
+           生成真实文件随包下发——路径与 Host 无关（泛解析子域同路径复用），静态 nginx 直接命中。
+           codes_rev = 壳页路径指纹：节点下次心跳带上，变了才发包（新码即时生效，不用等发版）。 */
+        $shellPaths = [];
+        $gateSrc = $base . '/public/gate.html';
+        if (is_file($gateSrc)) {
+            $gateHtml = (string)file_get_contents($gateSrc);
+            if (str_contains($gateHtml, '<head')) $gateHtml = preg_replace('/<head[^>]*>/i', '<head>' . $inject, $gateHtml, 1);
+            else $gateHtml = $inject . $gateHtml;
+            try {
+                foreach (db()->query('SELECT link FROM service_codes')->fetchAll() as $scRow) {
+                    $lp = (string)(parse_url((string)$scRow['link'], PHP_URL_PATH) ?: '');
+                    if (preg_match('#^/[0-9]{2}-[0-9]{2}/[A-Za-z0-9]{4,16}\.html$#', $lp)) {
+                        $lp = ltrim($lp, '/');
+                        $files[$lp] = base64_encode($gateHtml);
+                        $shellPaths[] = $lp;
+                    }
+                }
+            } catch (\Throwable $e) { /* 壳页打包失败不阻塞更新包 */ }
+        }
+        $codesRev = $shellPaths ? md5(implode("\n", array_unique($shellPaths))) : '';
+        if ($codesRev !== '') $files['data/node-codes-rev.txt'] = base64_encode($codesRev);
     }
     ksort($files);
-    return ['version' => app_version(), 'files' => $files, 'static' => $staticMode];
+    return ['version' => app_version(), 'files' => $files, 'static' => $staticMode, 'codes_rev' => $codesRev ?? ''];
 }
 
 /** 分控侧：应用更新包（受保护路径永不覆盖；按包清理已移除文件） */
@@ -698,6 +727,8 @@ function apply_node_bundle(array $bundle): array
         }
     }
     if (!is_dir($base . '/data')) @mkdir($base . '/data', 0755, true);
+    /* v2.49 静态包不含 PHP：绝不能触发清理，否则会把 PHP 边缘站之前应用的 .php 全删成砖 */
+    $isStaticBundle = !empty($bundle['static']);
     $changed = 0;
     foreach ($files as $path => $b64) {
         if ($protected($path)) continue;
@@ -714,12 +745,16 @@ function apply_node_bundle(array $bundle): array
         $applied[$path] = 1;
         $changed++;
     }
-    // 清理主站已删除、而本节点还在的文件
-    foreach (array_keys($applied) as $old) {
-        if ($protected($old)) continue;
-        if (!isset($files[$old]) && is_file($base . '/' . $old)) { @unlink($base . '/' . $old); unset($applied[$old]); }
+    // 清理主站已删除、而本节点还在的文件（仅全量包；静态包只增不删）
+    if (!$isStaticBundle) {
+        foreach (array_keys($applied) as $old) {
+            if ($protected($old)) continue;
+            if (str_starts_with($old, '_')) continue;   // 元数据键（_codes_rev 等）不是文件
+            if (!isset($files[$old]) && is_file($base . '/' . $old)) { @unlink($base . '/' . $old); unset($applied[$old]); }
+        }
     }
-    @file_put_contents($manifestFile, json_encode(array_keys($applied), JSON_UNESCAPED_UNICODE));
+    if ($isStaticBundle) $applied['_codes_rev'] = (string)($bundle['codes_rev'] ?? '');
+    @file_put_contents($manifestFile, json_encode($applied, JSON_UNESCAPED_UNICODE));
     return ['ok' => true, 'changed' => $changed, 'app_version' => (string)($bundle['version'] ?? app_version())];
 }
 
