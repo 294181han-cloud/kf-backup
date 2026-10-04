@@ -617,6 +617,8 @@ createApp({
     };
 
     const viewImage = (url) => { viewing.value = url; imgZoom.value = 1; };
+    // v2.73 一条消息里的图片（多图并排，文字在下面）
+    const imgsOf = (m) => ((m && m.attachments) || []).filter(a => a && (!a.type || a.type === 'image') && a.url);
     /* v2.69 看图：把当前聊天里的图片排一列，能左右翻（键盘 ← → 也行），按钮全部用文字 */
     const imgZoom = ref(1);
     const viewImages = Vue.computed(() => {
@@ -749,6 +751,7 @@ createApp({
       page, blockedTitle, blockedDesc, brand, messages, draft, sending, agentAvatar,
       bodyRef, inputRef, imgInput, viewing, viewImage,
       imgZoom, viewImages, viewIdx, imgGo,
+      imgsOf,
       showForm, formItems, formValues, formSubmitting, submitForm,
       recording, recSecs, startRec, stopRec,
       voiceMode, holding, holdSecs, holdCancel, toggleVoice, startHold, moveHold, endHold,

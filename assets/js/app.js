@@ -321,13 +321,18 @@ const app = createApp({
     };
     // 快捷消息：控制台里一行输入直接添加（不用开弹窗）
     const qa = reactive({ title: '', content: '', saving: false });
-    const quickAdd = async () => {
-      const title = (qa.title || '').trim();
+    // v2.73 修 bug：聊天里的弹窗绑的是 qe，但这里只读 qa，导致「在聊天里设置快捷消息」永远加不进去
+    const quickAdd = async (form) => {
+      // 注意：@click="quickAdd" 会把事件对象传进来，只认「有 title 字段」的表单对象
+      const f = (form && typeof form === 'object' && 'title' in form) ? form : qa;
+      const atts = (f === qe) ? qeImgs.value.slice() : [];
+      const title = (f.title || '').trim();
       if (!title) { ElementPlus.ElMessage.warning('请填写按钮文字'); return; }
       qa.saving = true;
       try {
-        await API.post('/api/quick-msgs', { title, content: (qa.content || '').trim(), group_name: '通用', sort: 0, attachments: [] });
-        qa.title = ''; qa.content = '';
+        await API.post('/api/quick-msgs', { title, content: (f.content || '').trim(), group_name: '通用', sort: 0, attachments: atts });
+        f.title = ''; f.content = '';
+        if (f === qe) qeImgs.value = [];
         await loadQuick();
         ElementPlus.ElMessage.success('已添加，聊天窗口里一点就发');
       } catch (e) { ElementPlus.ElMessage.error(e.message); }
@@ -336,7 +341,52 @@ const app = createApp({
     // 聊天里的「快捷消息 → 设置」弹窗：增删改 + 直接发送，不用离开会话
     const quickDlg = ref(false);
     const qe = reactive({ title: '', content: '' });
-    const openQuickDlg = async () => { quickDlg.value = true; await loadQuick(); };
+    const qeImgs = ref([]);          // 新增那条待发的图片（可直接粘贴）
+    const quickFocus = ref(0);       // 0 = 新增行；>0 = 正在编辑哪一条
+    const quickImgInput = ref(null);
+    let quickImgTarget = 0;
+    const openQuickDlg = async () => { quickDlg.value = true; qeImgs.value = []; quickFocus.value = 0; await loadQuick(); };
+    const quickUpload = async (file) => {
+      const data = await new Promise(res => { const fr = new FileReader(); fr.onload = () => res(fr.result); fr.readAsDataURL(file); });
+      return API.post('/api/upload', { data, kind: 'image', filename: file.name || 'image.png' });
+    };
+    const quickAttachTo = async (target, up) => {
+      if (target === 0) { qeImgs.value.push(up); return; }
+      const q = quickMsgs.value.find(x => x.id === target);
+      if (q) { q.attachments = q.attachments || []; q.attachments.push(up); await quickSave(q); }
+    };
+    const quickPickImg = (q) => {
+      quickImgTarget = q ? q.id : 0;
+      nextTick(() => { if (quickImgInput.value) quickImgInput.value.click(); });
+    };
+    const quickOnImg = async (ev) => {
+      const file = ev.target.files[0]; ev.target.value = '';
+      if (!file) return;
+      if (!/^image\//.test(file.type)) { ElementPlus.ElMessage.warning('只能上传图片'); return; }
+      if (file.size > 5 * 1024 * 1024) { ElementPlus.ElMessage.warning('图片不能超过 5MB'); return; }
+      try { await quickAttachTo(quickImgTarget, await quickUpload(file)); ElementPlus.ElMessage.success('图片已加上'); }
+      catch (e) { ElementPlus.ElMessage.error(e.message); }
+    };
+    // Ctrl+V 粘贴图片：贴到「刚才点过的那一条」上（没点过就是新增那条）
+    const quickPaste = async (ev) => {
+      const items = (ev.clipboardData && ev.clipboardData.items) || [];
+      const files = [];
+      for (const it of items) { if (it.kind === 'file') { const f = it.getAsFile(); if (f && /^image\//.test(f.type)) files.push(f); } }
+      if (!files.length) return;
+      ev.preventDefault();
+      const target = quickFocus.value;
+      let n = 0;
+      for (const f of files) {
+        try { await quickAttachTo(target, await quickUpload(f)); n++; }
+        catch (e) { ElementPlus.ElMessage.error(e.message); }
+      }
+      if (n) ElementPlus.ElMessage.success('已粘贴 ' + n + ' 张图片' + (target === 0 ? '，点「添加」保存这条' : ''));
+    };
+    const quickRmAtt = async (q, i) => {
+      if (!q.attachments) return;
+      q.attachments.splice(i, 1);
+      await quickSave(q);
+    };
     const quickSave = async (q) => {
       try {
         await API.put('/api/quick-msgs/' + q.id, { title: q.title, content: q.content, group_name: q.group_name || '通用', sort: q.sort || 0, attachments: q.attachments || [] });
@@ -959,6 +1009,8 @@ const app = createApp({
 
     // ===== 可见消息（撤回的显示为系统胶囊） =====
     const visibleMsgs = Vue.computed(() => msgs.value);
+    // v2.73 一条消息里的图片（多图并排显示，文字放下面）
+    const imgsOf = (m) => ((m && m.attachments) || []).filter(a => a && (!a.type || a.type === 'image') && a.url);
 
     // 上传一张图并放进「待发区」（不直接发出去），返回是否成功
     const stageImage = async (file) => {
@@ -1336,7 +1388,28 @@ const app = createApp({
         ElementPlus.ElMessage.success('已标为未读');
       } catch (e) { ElementPlus.ElMessage.error(e.message); }
     };
-    // v2.71 修改备注（右键 / ⋯ 菜单）：写进 contacts.type='note'，列表上会显示一个小标签
+    // v2.73 改成「修改名称」（右键 / ⋯ 菜单）= 重命名这条会话的访客
+    const ctxMenuRename = async () => {
+      const sid = ctxMenu.sid, name = ctxMenu.name;
+      closeCtxMenu();
+      let value;
+      try {
+        ({ value } = await ElementPlus.ElMessageBox.prompt(
+          '输入新的访客名称（列表与聊天中将显示新名称）', '修改名称',
+          { inputValue: '', inputPlaceholder: '原名称：' + name, inputPattern: /\S+/,
+            inputErrorMessage: '名称不能为空', confirmButtonText: '确定', cancelButtonText: '取消' }));
+      } catch (e) { return; }
+      const v = String(value || '').trim().slice(0, 30);
+      if (!v) return;
+      try {
+        await API.put('/api/sessions/' + sid + '/name', { name: v });
+        const s = sessions.value.find(x => x.id === sid);
+        if (s) s.name = v;
+        if (currentId.value === sid && profile.value) profile.value.session.name = v;
+        ElementPlus.ElMessage.success('名称已修改');
+      } catch (e) { ElementPlus.ElMessage.error(e.message); }
+    };
+    // 备注改到右侧「访客信息 → 备注」里编辑（ctxMenuNote 保留给旧的引用点）
     const ctxMenuNote = async () => {
       const sid = ctxMenu.sid, name = ctxMenu.name, old = ctxMenu.note || '';
       closeCtxMenu();
@@ -2579,6 +2652,8 @@ const app = createApp({
       ctxMenu, openCtxMenu, openCtxMenuFromBtn, closeCtxMenu, ctxMenuArchive, ctxMenuClose, ctxMenuDelete,
       ctxMenuPin, ctxMenuUnread, ctxMenuBlock,
       ctxMenuNote,
+      ctxMenuRename, imgsOf,
+      qeImgs, quickFocus, quickImgInput, quickPickImg, quickOnImg, quickPaste, quickRmAtt,
       replyTo, quoteOf, quoteWho, quoteText, startReply, jumpToMsg, copyMsg, flashId, fmtSize, mapUrl,
       infoOpen,
       msgMenu, openMsgMenu, closeMsgMenu, closeAllMenus, deleteMsg,

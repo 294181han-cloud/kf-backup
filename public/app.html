@@ -4,8 +4,10 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>小米客服</title>
+<link rel="icon" href="/assets/img/mi-logo.png">
+<link rel="apple-touch-icon" href="/assets/img/mi-logo.png">
 <link rel="stylesheet" href="/assets/vendor/element-plus.css">
-<link rel="stylesheet" href="/assets/css/app.css?v=3.28.0">
+<link rel="stylesheet" href="/assets/css/app.css?v=3.29.0">
 <script src="/assets/ui/ui-registry.js?v=2.8.0"></script>
 <script src="/assets/ui/ui-loader.js?v=2.8.0" data-ui-cat="auto"></script>
 </head>
@@ -17,7 +19,7 @@
   <div class="ctx-menu" v-if="ctxMenu.show" :style="{left: ctxMenu.x + 'px', top: ctxMenu.y + 'px'}" @click.stop>
     <div class="ctx-item" @click="ctxMenuPin">📌 {{ ctxMenu.pinned ? '取消置顶' : '置顶会话' }}<div class="ctx-sub">置顶后一直排在最上面</div></div>
     <div class="ctx-item" @click="ctxMenuUnread">🔴 标为未读<div class="ctx-sub">提醒自己稍后回来看</div></div>
-    <div class="ctx-item" @click="ctxMenuNote">📝 修改备注<div class="ctx-sub">只有自己看得到，会显示在列表上</div></div>
+    <div class="ctx-item" @click="ctxMenuRename">✏️ 修改名称<div class="ctx-sub">换个好认的名字，列表和聊天里都会变</div></div>
     <div class="ctx-item" @click="ctxMenuBlock">🚫 拉黑访客<div class="ctx-sub">拉黑该 IP，之后进不来也发不了消息</div></div>
     <div class="ctx-divider"></div>
     <div class="ctx-item danger" @click="ctxMenuDelete">🗑️ 删除会话<div class="ctx-sub">彻底删除，腾出会话额度</div></div>
@@ -163,8 +165,7 @@
               <div class="sess-body">
                 <div class="row1">
                   <span class="pin-ic" v-if="s.pinned" title="已置顶">📌</span>
-                  <span class="name">{{ s.name }}</span>
-                  <span class="note-tag" v-if="s.note" :title="'备注：' + s.note">📝 {{ s.note }}</span>
+                  <span class="name" :title="s.name">{{ s.name }}</span>
                   <span class="geo-tag" v-if="visitorTag(s)" :class="visitorChnClass(s)" :title="visitorTagFull(s)">{{ visitorTag(s) }}</span>
                   <span class="time">{{ shortTime(s.lastTime) }}</span>
                 </div>
@@ -255,9 +256,12 @@
                       </div>
                     </div>
                     <div class="msg-bubble" v-else :class="{'search-hit': chatSearchOn && chatSearchKw && m.text && m.text.includes(chatSearchKw)}">
-                      <span v-if="m.text">{{ m.text }}</span>
+                      <!-- v2.73 多图并排 + 文字在下面（跟 Telegram 一样） -->
+                      <div class="msg-imgs" v-if="imgsOf(m).length" :class="'n' + Math.min(imgsOf(m).length, 4)">
+                        <img v-for="(a,ii) in imgsOf(m)" :key="'i'+ii" :src="a.url" @load="onMediaLoad" @click="viewing=a.url">
+                      </div>
+                      <span v-if="m.text" class="msg-text">{{ m.text }}</span>
                       <template v-for="(a,i) in (m.attachments||[])" :key="i">
-                        <img v-if="a.type==='image'" :src="a.url" @load="onMediaLoad" @click="viewing=a.url">
                         <div v-if="a.type==='audio'" class="voice-bubble" :class="{playing: audioPlaying===a.url}" @click.stop="toggleAudio(a.url)">
                           <span class="vb-play">
                             <svg v-if="audioPlaying!==a.url" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5.5v13l11-6.5z"/></svg>
@@ -1209,27 +1213,47 @@
   </div>
 
   <!-- ============ 弹窗们 ============ -->
-<el-dialog v-model="quickDlg" title="快捷消息（聊天里一点就发）" width="620px" align-center>
+<el-dialog v-model="quickDlg" title="快捷消息（聊天里一点就发）" width="680px" align-center @paste.capture="quickPaste">
   <div class="qd">
     <div class="qd-add">
-      <el-input v-model="qe.title" placeholder="按钮文字，如：请发送手机号" maxlength="20" style="width:200px;"></el-input>
-      <el-input v-model="qe.content" placeholder="发送内容" maxlength="200" style="flex:1;min-width:200px;" @keyup.enter="quickAdd"></el-input>
-      <el-button type="primary" :loading="qa.saving" :disabled="!qe.title.trim()" @click="quickAdd">添加</el-button>
+      <el-input v-model="qe.title" placeholder="按钮文字，如：请发送手机号" maxlength="20" style="width:200px;" @focus="quickFocus=0"></el-input>
+      <el-input v-model="qe.content" placeholder="发送内容" maxlength="200" style="flex:1;min-width:200px;" @keyup.enter="quickAdd(qe)" @focus="quickFocus=0"></el-input>
+      <el-button type="primary" :loading="qa.saving" :disabled="!qe.title.trim()" @click="quickAdd(qe)">添加</el-button>
+    </div>
+    <div class="qd-atts" v-if="qeImgs.length">
+      <span class="qd-thumb" v-for="(a,i) in qeImgs" :key="'n'+i">
+        <img v-if="!a.type || a.type==='image'" :src="a.url"><span v-else class="qd-file">{{ a.type==='video' ? '🎬' : '📄' }}</span>
+        <i class="qd-x" @click="qeImgs.splice(i,1)">✕</i>
+      </span>
+      <span class="qd-hint">配好图片后点「添加」</span>
     </div>
     <div class="qd-list">
       <div class="qd-row" v-for="q in quickMsgs" :key="q.id">
-        <el-input v-model="q.title" size="small" maxlength="20" style="width:180px;" @change="quickSave(q)"></el-input>
-        <el-input v-model="q.content" size="small" maxlength="200" style="flex:1;min-width:180px;" @change="quickSave(q)"></el-input>
-        <el-button size="small" text type="primary" @click="quickSendNow(q)">发送</el-button>
-        <el-popconfirm title="删除这条快捷消息？" @confirm="quickDel(q)">
-          <template #reference><el-button size="small" text type="danger">删除</el-button></template>
-        </el-popconfirm>
+        <div class="qd-line">
+          <el-input v-model="q.title" size="small" maxlength="20" style="width:180px;" @change="quickSave(q)" @focus="quickFocus=q.id"></el-input>
+          <el-input v-model="q.content" size="small" maxlength="200" style="flex:1;min-width:180px;" @change="quickSave(q)" @focus="quickFocus=q.id"></el-input>
+          <el-button size="small" text type="primary" @click="quickSendNow(q)">发送</el-button>
+          <el-popconfirm title="删除这条快捷消息？" @confirm="quickDel(q)">
+            <template #reference><el-button size="small" text type="danger">删除</el-button></template>
+          </el-popconfirm>
+        </div>
+        <div class="qd-atts">
+          <span class="qd-thumb" v-for="(a,i) in (q.attachments||[])" :key="i">
+            <img v-if="!a.type || a.type==='image'" :src="a.url"><span v-else class="qd-file">{{ a.type==='video' ? '🎬' : '📄' }}</span>
+            <i class="qd-x" @click="quickRmAtt(q,i)">✕</i>
+          </span>
+          <button type="button" class="qd-addimg" @click="quickPickImg(q)">🖼 加图片</button>
+        </div>
       </div>
       <div class="qd-empty" v-if="!quickMsgs.length">还没有快捷消息，上面输入「按钮文字」直接加一条。</div>
     </div>
+    <input ref="quickImgInput" type="file" accept="image/*" style="display:none" @change="quickOnImg">
+    <p class="muted" style="font-size:11.5px;margin:10px 0 0;line-height:1.7;">
+      💡 图片支持 <b>Ctrl+V 直接粘贴</b>：先点一下某一条的输入框再粘贴＝挂到那一条；点「添加」那一行再粘贴＝挂到新的一条。<br>
+      聊天里：单击＝直接发送，Ctrl+单击＝填到输入框。
+    </p>
   </div>
   <template #footer>
-    <span class="muted" style="float:left;font-size:11.5px;line-height:32px;">聊天里单击＝直接发送，Ctrl+单击＝填到输入框</span>
     <el-button size="small" @click="quickDlg=false">关闭</el-button>
   </template>
 </el-dialog>
@@ -1476,8 +1500,8 @@
 <script src="/assets/vendor/qrcode.min.js?v=2.0.1"></script>
 <script src="/assets/qr-poster.js?v=2.1.03"></script>
 <script src="/assets/api.js?v=2.0.1"></script>
-<script src="/assets/js/app-components.js?v=2.5.0"></script>
-<script src="/assets/js/app.js?v=3.21.0"></script>
+<script src="/assets/js/app-components.js?v=2.6.0"></script>
+<script src="/assets/js/app.js?v=3.22.0"></script>
 <script src="/assets/js/app-boot.js?v=2.1.1"></script>
 </body>
 </html>

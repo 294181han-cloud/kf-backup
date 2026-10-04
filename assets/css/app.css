@@ -1781,3 +1781,45 @@ body.dark .sess-multi-entry .sme-box { background: color-mix(in srgb, var(--them
 }
 body.dark .sess-item .note-tag { background: #3a2f1a; color: #f0b45c; border-color: #5a4620; }
 .el-message-box__input .el-textarea__inner { font-size: 14px; }
+
+/* ===== v2.73 ===== */
+
+/* ① 收起会话列表：原来被 min-width:250px 顶着，收起后左边留一条空白 */
+.sess-col.collapsed { width: 30px; min-width: 30px; max-width: 30px; overflow: hidden; }
+.sess-col.collapsed .sess-collapse-btn { right: auto; left: 50%; transform: translateX(-50%); top: 10px; }
+
+/* ② 多图并排 + 文字在下面（Telegram 那种排法） */
+.msg-bubble .msg-imgs { display: grid; gap: 4px; margin: 0 0 2px; max-width: 330px; }
+.msg-bubble .msg-imgs.n1 { grid-template-columns: 1fr; }
+.msg-bubble .msg-imgs.n2 { grid-template-columns: 1fr 1fr; }
+.msg-bubble .msg-imgs.n3 { grid-template-columns: 1fr 1fr 1fr; }
+.msg-bubble .msg-imgs.n4 { grid-template-columns: 1fr 1fr; }
+.msg-bubble .msg-imgs img { width: 100%; height: 104px; object-fit: cover; border-radius: 8px; display: block; margin: 0; cursor: zoom-in; }
+.msg-bubble .msg-imgs.n1 img { height: auto; max-height: 320px; object-fit: contain; background: rgba(0,0,0,.03); }
+.msg-bubble .msg-text { display: block; }
+.msg-bubble .msg-text + .msg-imgs { margin-top: 6px; }
+
+/* ③ 长名字不要被截断：会话头允许换行（最多两行），列表里给名字更多空间 */
+.chat-head .ch-top { flex-wrap: wrap; row-gap: 2px; }
+.chat-head .ch-top .name { max-width: 100%; white-space: normal; word-break: break-word; line-height: 1.3; }
+.sess-item .name { max-width: 100%; }
+
+/* ④ 快捷消息弹窗：图片缩略图 + 加图按钮 */
+.qd-line { display: flex; align-items: center; gap: 8px; }
+.qd-atts { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin: 6px 0 2px 0; min-height: 0; }
+.qd-thumb { position: relative; display: inline-block; }
+.qd-thumb img { width: 46px; height: 46px; object-fit: cover; border-radius: 7px; border: 1px solid #e5e6eb; display: block; }
+.qd-thumb .qd-file { width: 46px; height: 46px; border-radius: 7px; border: 1px solid #e5e6eb; background: #f7f9fc; display: flex; align-items: center; justify-content: center; font-size: 18px; }
+.qd-thumb .qd-x { position: absolute; top: -6px; right: -6px; width: 17px; height: 17px; border-radius: 50%; background: #f53f3f; color: #fff; font-size: 10px; line-height: 17px; text-align: center; font-style: normal; cursor: pointer; }
+.qd-addimg { padding: 0 10px; height: 46px; border: 1px dashed #c9cdd4; border-radius: 7px; background: #fafbfc; color: #86909c; font-size: 12px; cursor: pointer; }
+.qd-addimg:hover { border-color: #1677ff; color: #1677ff; }
+.qd-hint { font-size: 11.5px; color: #86909c; }
+body.dark .qd-thumb img, body.dark .qd-thumb .qd-file, body.dark .qd-addimg { border-color: #2c313a; background: #1b1e24; color: #a9b0bb; }
+
+/* ===== v2.73 表格操作列：按钮一行排开、垂直居中（原来窄列会折成两行，看着东倒西歪） ===== */
+.el-table th.el-table__cell:last-child .cell,
+.el-table td.el-table__cell:last-child .cell {
+  display: flex; align-items: center; gap: 8px; flex-wrap: nowrap;
+}
+.el-table td.el-table__cell:last-child .cell > * { margin-left: 0 !important; flex-shrink: 0; }
+.el-table th.el-table__cell:last-child .cell { justify-content: flex-start; }

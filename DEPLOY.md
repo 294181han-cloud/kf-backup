@@ -2721,3 +2721,53 @@ AND EXISTS (SELECT 1 FROM messages m WHERE m.session_id = s.id AND m.from_type =
 ### 验证
 - 总控上传接口返回绝对 URL ✓；URL 直接可访问 ✓
 - 真实分控双端互发图片验收待节点 nginx 片段更新后复核
+
+
+## v2.44 变更记录（工作台体验修一批 + 发卡机器人迁移修复，2026-10-04）
+
+用户报的一批问题一次做完（含一条迁移带出来的机器人故障）：
+
+**① 收起会话列表失效** —— `.sess-col` 基础样式里有 `min-width:250px`，`.sess-col.collapsed` 只改了 `width`，
+被 min-width 顶着缩不下去，收起后左边留一条 250px 空白。现在 collapsed 同时压 `min-width/max-width:30px` + `overflow:hidden`。
+实测：收起后宽度 326 → **30** ✅
+
+**② 欢迎语显示在访客那一侧** —— `routes/visitor.php` 发欢迎语时 `from_type` 写的是 `system`，
+前端 `m.from==='agent'?'mine':'from-them'` 就把它排到了左边（访客侧）。改成 **`agent`**，现在工作台里是右侧「我们发出去的」气泡。
+实测：欢迎语那行 class = `msg-row mine` ✅
+
+**③ 多图不并排、文字压在图片上面** —— 原来气泡里先渲染 `m.text` 再平铺所有附件。
+现在先渲染 `.msg-imgs` 图片网格（1 张单列自适应、2~4 张两/三列并排），文字 `.msg-text` 放在网格**下面**，跟 Telegram 一样。
+工作台（app.html）和访客端（visitor.html）都改了，新增 `imgsOf(m)` 只挑图片附件。
+实测：3 张图同一行（顶部坐标一致）、下面是 `.msg-text`、文本内容正确 ✅
+
+**④ 表格操作列按钮东倒西歪** —— 窄列里 编辑/删除 会折成两行。
+app.css / admin.css / visitor.css 统一加：最后一列 `.cell` 用 flex 居中不换行；crud-table 操作列 130px → 155px。
+
+**⑤ 改名后长名字显示不全** —— 会话头 `.ch-top` 允许换行、`.name` 改成可换行 + break-word；列表里 `.name` 上限从 74% 放宽到 100%（仍带 title 悬停看全名）。
+实测：长名字完整显示、未被截断（`scrollHeight == clientHeight`）✅
+
+**⑥ 备注不再显示在会话列表上** —— 去掉列表里的 `📝 备注` 标签（用户要的是「打开对话在右侧看」），
+右侧「访客信息 → 备注」框继续用，数据还是同一份。
+
+**⑦ 浏览器标签页没有图标** —— login / app / admin / visitor 四个页面加 `<link rel="icon" href="/assets/img/mi-logo.png">` + apple-touch-icon（小米 logo）。
+实测：`document.querySelector('link[rel=icon]').href` = 小米 logo ✅
+
+**⑧ 右键菜单「修改备注」→「修改名称」** —— 菜单项换成 ✏️ 修改名称（= 重命名这条会话），弹窗输入框空白、旧名放 placeholder、按钮中文。
+
+**⑨ 快捷消息：在聊天里设置保存不上（真 bug）** —— 弹窗里输入框绑的是 `qe`，但 `quickAdd` 只读 `qa`，
+所以在聊天里点「添加」永远提示"请填写按钮文字"（或加出一条空的）。现在 `quickAdd(form)` 支持传入表单对象，
+弹窗传 `qe`、设置页仍用 `qa`（并防了 `@click="quickAdd"` 把事件对象当表单传进来的情况）。
+实测：4 条 → 添加后 **5 条** ✅
+
+**⑩ 快捷消息支持粘贴/上传图片** ——
+- 聊天里的快捷消息弹窗：每条下面有「🖼 加图片」+ 缩略图（可删）；支持 **Ctrl+V 粘贴**——先点某条的输入框再粘贴＝挂到那条，点「添加」那行再粘贴＝挂到新的一条。
+- 设置页「高级新增（可带图）」弹窗（crud-table 组件）：弹窗里也能直接 Ctrl+V 粘贴图片（自动传到第一个图片字段，遵守数量/大小上限）。
+实测：粘贴一张 PNG → 出现缩略图 + 提示「已粘贴 1 张图片，点『添加』保存这条」✅
+
+**⑪ 迁移遗留：发卡机器人 403**（本次一并修）
+新服务器 `ad.yluu.top` 的 `kv_store` 里没有 `tg_webhook_secret`（迁移时漏了），而 webhook 已经指向新站，
+`handle_tg_webhook` 校验不到 secret 就回 403 —— Telegram 侧表现为 `Wrong response from the webhook: 403 Forbidden`
+且积压 13 条更新（用户发消息机器人不回）。已重新生成 secret 并 `setWebhook`：
+`pending_update_count` → 0、`last_error` → 无 ✅
+
+版本：`version.php` 2.43.1 → **2.44.0**；`app.css?v=3.29.0`、`app.js?v=3.22.0`、`app-components.js?v=2.6.0`、`visitor.css?v=2.12.0`、`visitor.js?v=2.14.0`

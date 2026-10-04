@@ -40,7 +40,7 @@ const CrudTable = defineComponent({
           <template v-else>{{ c.map ? (c.map[row[c.k]] || row[c.k]) : row[c.k] }}</template>
         </template>
       </el-table-column>
-      <el-table-column label="操作" width="130">
+      <el-table-column label="操作" width="155">
         <template #default="{row}">
           <el-button size="small" @click="open(row)">编辑</el-button>
           <el-popconfirm title="确认删除？" @confirm="del(row)">
@@ -49,7 +49,7 @@ const CrudTable = defineComponent({
         </template>
       </el-table-column>
     </el-table>
-    <el-dialog v-model="dlg" :title="editId ? '编辑' : '新增'" width="440px">
+    <el-dialog v-model="dlg" :title="editId ? '编辑' : '新增'" width="440px" @paste.capture="onPasteImgs">
       <el-form label-width="90px">
         <el-form-item v-for="f in fields" :key="f.k" :label="f.label">
           <el-switch v-if="f.type==='bool'" v-model="form[f.k]"/>
@@ -71,7 +71,7 @@ const CrudTable = defineComponent({
               <button type="button" v-if="(form[f.k] || []).length < (f.max || 3)" @click="pickImg(f.k)" style="width:54px;height:54px;border:1px dashed #c9cdd4;border-radius:8px;background:#fafbfc;font-size:20px;color:#86909c;cursor:pointer;">＋</button>
             </div>
             <input :ref="el => setImgRef(f.k, el)" type="file" accept="image/*,video/*,.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.zip,.rar,.7z,.txt,.csv,.apk" style="display:none" @change="onImg($event, f.k)">
-            <div class="muted" style="font-size:11px;margin-top:5px;">{{ f.tip || '发送该条消息时将附带图片' }}</div>
+            <div class="muted" style="font-size:11px;margin-top:5px;">{{ f.tip || '发送该条消息时将附带图片；也可以直接 Ctrl+V 粘贴图片' }}</div>
           </div>
           <el-input v-else v-model="form[f.k]"/>
         </el-form-item>
@@ -158,6 +158,31 @@ const CrudTable = defineComponent({
       } catch (e) { ELEMENT.ElMessage.error(e.message); }
     };
     const rmImg = (k, i) => { if (Array.isArray(form[k])) form[k].splice(i, 1); };
+    // v2.73 弹窗里直接 Ctrl+V 粘贴图片（不用先存成文件再选）——贴到第一个「图片」字段
+    const onPasteImgs = async (ev) => {
+      const field = (props.fields || []).find(f => f.type === 'images');
+      if (!field) return;
+      const items = (ev.clipboardData && ev.clipboardData.items) || [];
+      const files = [];
+      for (const it of items) {
+        if (it.kind !== 'file') continue;
+        const f = it.getAsFile();
+        if (f && /^image\//.test(f.type)) files.push(f);
+      }
+      if (!files.length) return;
+      ev.preventDefault();
+      if (!Array.isArray(form[field.k])) form[field.k] = [];
+      const max = field.max || 3;
+      let n = 0;
+      for (const f of files) {
+        if (form[field.k].length >= max) { ELEMENT.ElMessage.warning('最多 ' + max + ' 个附件'); break; }
+        if (f.size > 5 * 1024 * 1024) { ELEMENT.ElMessage.warning('图片不能超过 5MB'); continue; }
+        const data = await new Promise(res => { const fr = new FileReader(); fr.onload = () => res(fr.result); fr.readAsDataURL(f); });
+        try { form[field.k].push(await API.post('/api/upload', { data, kind: 'image', filename: f.name || 'paste.png' })); n++; }
+        catch (e) { ELEMENT.ElMessage.error(e.message); }
+      }
+      if (n) ElementPlus.ElMessage.success('已粘贴 ' + n + ' 张图片');
+    };
     const save = async () => {
       try {
         if (editId.value) await API.put(props.api + '/' + editId.value, { ...form });
@@ -301,7 +326,7 @@ const CrudTable = defineComponent({
       emit('reload');
       ElementPlus.ElMessage.success('导入完成：成功 ' + ok + ' 条' + (fail ? '，失败 ' + fail + ' 条' : ''));
     };
-    return { dlg, editId, form, open, save, del, pickImg, onImg, rmImg, setImgRef,
+    return { dlg, editId, form, open, save, del, pickImg, onImg, rmImg, setImgRef, onPasteImgs,
       local, rowCls, onDragDown, onDragMove, onDragUp,
       impRef, expJson, expCsv, pickImport, doImport };
   }

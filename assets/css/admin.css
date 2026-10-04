@@ -101,3 +101,11 @@ body { background: var(--a-bg); color: var(--a-ink); -webkit-font-smoothing: ant
 .bar-row .num { width: 46px; text-align: right; color: #86909c; }
 .mono { font-family: Consolas, monospace; }
 .mb { margin-bottom: 14px; }
+
+/* ===== v2.73 表格操作列：按钮一行排开、垂直居中（原来窄列会折成两行，看着东倒西歪） ===== */
+.el-table th.el-table__cell:last-child .cell,
+.el-table td.el-table__cell:last-child .cell {
+  display: flex; align-items: center; gap: 8px; flex-wrap: nowrap;
+}
+.el-table td.el-table__cell:last-child .cell > * { margin-left: 0 !important; flex-shrink: 0; }
+.el-table th.el-table__cell:last-child .cell { justify-content: flex-start; }

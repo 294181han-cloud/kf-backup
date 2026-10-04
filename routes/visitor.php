@@ -401,7 +401,8 @@ function handle_visitor_welcome(string $method): void
     foreach ($st->fetchAll() as $r) $sentSet[(int)$r['welcome_id']] = true;
 
     $now = now_dt();
-    $insM = $pdo->prepare("INSERT INTO messages (tenant_id, session_id, from_type, sender_name, text, msg_type, attachments, created_at) VALUES (?,?,'system',?,?,?,?,?)");
+    // v2.73 欢迎语算「我们发出去的」：from_type 用 agent，工作台里显示在右侧（以前是 system 会跑到访客那边）
+    $insM = $pdo->prepare("INSERT INTO messages (tenant_id, session_id, from_type, sender_name, text, msg_type, attachments, created_at) VALUES (?,?,'agent',?,?,?,?,?)");
     $insSent = $pdo->prepare('INSERT IGNORE INTO welcome_sent (tenant_id, session_id, welcome_id) VALUES (?,?,?)');
     $ids = [];
     $lastText = '';
