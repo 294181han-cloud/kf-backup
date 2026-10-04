@@ -131,7 +131,7 @@ createApp({
     };
     const recallMine = async (m) => {
       try {
-        await fetch('/api/visitor/recall', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+        await fetch((window.KF_API_BASE||'') + '/api/visitor/recall', { method: 'POST', headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ session_id: sessionId.value, msg_id: m.id }) });
         m.recalled = true; // 仅标记，内容保留（客服端可见+撤回标记），自己端由过滤规则隐藏
       } catch (e) { alert('撤回失败：' + e.message); }
@@ -160,7 +160,7 @@ createApp({
           // 纯子域名访问也允许（后端按 host 识别）
         }
         const q = new URLSearchParams(p);
-        const cfg = await fetch('/api/visitor/config?' + q.toString()).then(r => r.json());
+        const cfg = await fetch((window.KF_API_BASE||'') + '/api/visitor/config?' + q.toString()).then(r => r.json());
         if (!cfg.available) {
           blockedDesc.value = cfg.unavailable_reason || '该链接已失效';
           page.value = 'blocked';
@@ -189,7 +189,7 @@ createApp({
         const vt = loadToken();
         if (vt) {
           try {
-            const r = await fetch('/api/visitor/init', {
+            const r = await fetch((window.KF_API_BASE||'') + '/api/visitor/init', {
               method: 'POST', headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({ ...p, visitor_token: vt, from_url: document.referrer || '直接访问' })
             }).then(x => x.json());
@@ -207,7 +207,7 @@ createApp({
         // 询前表单 or 直接入口
         if (cfg.brand.pre_inquiry_on) {
           try {
-            const items = await fetch('/api/visitor/pre-inquiry?' + q.toString()).then(r => r.json());
+            const items = await fetch((window.KF_API_BASE||'') + '/api/visitor/pre-inquiry?' + q.toString()).then(r => r.json());
             if (Array.isArray(items) && items.length) {
               formItems.value = items;
               showForm.value = true;
@@ -236,7 +236,7 @@ createApp({
       if (vt) p.visitor_token = vt;
       if (verifyPassed.value) p.verify_passed = 1;
       if (verifyValue.value.trim()) p.verify_value = verifyValue.value.trim();
-      const r = await fetch('/api/visitor/init', {
+      const r = await fetch((window.KF_API_BASE||'') + '/api/visitor/init', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(p)
       }).then(x => { if (!x.ok) return x.json().then(j => { throw new Error(j.error || '接入失败'); }); return x.json(); });
@@ -248,7 +248,7 @@ createApp({
       await loadHistory();
       // 欢迎语
       try {
-        await fetch('/api/visitor/welcome', {
+        await fetch((window.KF_API_BASE||'') + '/api/visitor/welcome', {
           method: 'POST', headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ session_id: sessionId.value, name: extra.name || '' })
         });
@@ -258,7 +258,7 @@ createApp({
     };
 
     const loadHistory = async () => {
-      const r = await fetch('/api/visitor/messages?session_id=' + sessionId.value).then(x => x.json());
+      const r = await fetch((window.KF_API_BASE||'') + '/api/visitor/messages?session_id=' + sessionId.value).then(x => x.json());
       pushMessages(r.messages || []);
     };
 
@@ -299,7 +299,7 @@ createApp({
     const pollOnce = async () => {
       if (!sessionId.value) return;
       try {
-        const r = await fetch('/api/poll?session=' + sessionId.value + '&sinceMsg=' + maxMsgId.value).then(x => x.json());
+        const r = await fetch((window.KF_API_BASE||'') + '/api/poll?session=' + sessionId.value + '&sinceMsg=' + maxMsgId.value).then(x => x.json());
         pushMessages(r.messages || []);
         if (r.agent_avatar) agentAvatar.value = r.agent_avatar;
         // 会话被客服结束：按提示清除聊天记录并停轮询
@@ -317,21 +317,34 @@ createApp({
     const pollGap = () => {
       if (document.hidden) return 30000;                       // 页面切到后台
       const idle = Date.now() - lastActivity;
-      if (idle > 10 * 60000) return -1;                        // 长期无操作：暂停轮询（回来即恢复）
+      if (idle > 15 * 60000) return -1;                        // 长期无操作：暂停重型轮询，保留轻量探针
       if (idle > 2 * 60000) return 15000;                      // 闲置 2 分钟
       if (idle > 30000) return 8000;                           // 闲置 30 秒
       return 2500;                                             // 活跃
     };
     const startPoll = () => {
       stopPoll();
-      if (pollGap() === -1) return;
+      if (pollGap() === -1) { lightLoop(); return; }
       const tick = async () => {
         try { await pollOnce(); } catch (e) {}
         const gap = pollGap();
-        if (gap === -1) { pollTimer = null; return; }   // 暂停：清句柄，一有操作即恢复
+        if (gap === -1) { pollTimer = null; lightLoop(); return; }   // 转轻量探针：有新消息立即恢复全量轮询
         pollTimer = setTimeout(tick, gap);
       };
       pollTimer = setTimeout(tick, 100);
+    };
+    // 轻量探针：总控只查一个索引（有无新消息）；有新消息 → 立即恢复全量轮询
+    const lightLoop = () => {
+      if (pollTimer !== null) return;
+      const probe = async () => {
+        try {
+          const r = await fetch((window.KF_API_BASE || '') + '/api/poll?session=' + sessionId.value + '&sinceMsg=' + maxMsgId.value + '&light=1').then(x => x.json());
+          if (r.new) { pollTimer = null; startPoll(); return; }
+        } catch (e) {}
+        if (pollTimer === null) return;
+        pollTimer = setTimeout(probe, 30000);
+      };
+      probe();
     };
     const stopPoll = () => { if (pollTimer) { clearTimeout(pollTimer); pollTimer = null; } };
     ['click', 'keydown', 'touchstart', 'scroll', 'visibilitychange'].forEach(ev =>
@@ -353,7 +366,7 @@ createApp({
         const body = { session_id: sessionId.value, text };
         if (atts.length) body.attachments = atts;
         if (replyTo.value) body.reply_to = replyTo.value.id;   // v2.43 引用回复
-        const r = await fetch('/api/visitor/send', {
+        const r = await fetch((window.KF_API_BASE||'') + '/api/visitor/send', {
           method: 'POST', headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(body)
         }).then(x => { if (!x.ok) return x.json().then(j => { throw new Error(j.error); }); return x.json(); });
@@ -443,7 +456,7 @@ createApp({
       if (file.size > 5 * 1024 * 1024) { toast('图片不能超过 5MB'); return false; }
       const data = await new Promise(res => { const fr = new FileReader(); fr.onload = () => res(fr.result); fr.readAsDataURL(file); });
       try {
-        const up = await fetch('/api/visitor/upload', {
+        const up = await fetch((window.KF_API_BASE||'') + '/api/visitor/upload', {
           method: 'POST', headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ session_id: sessionId.value, data, kind: 'image', filename: file.name || 'image.png' })
         }).then(x => { if (!x.ok) return x.json().then(j => { throw new Error(j.error); }); return x.json(); });
@@ -485,11 +498,11 @@ createApp({
           if (blob.size > 10 * 1024 * 1024) { alert('语音过长'); return; }
           const data = await new Promise(res => { const fr = new FileReader(); fr.onload = () => res(fr.result); fr.readAsDataURL(blob); });
           try {
-            const up = await fetch('/api/visitor/upload', {
+            const up = await fetch((window.KF_API_BASE||'') + '/api/visitor/upload', {
               method: 'POST', headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({ session_id: sessionId.value, data, kind: 'audio', filename: 'voice.webm' })
             }).then(x => { if (!x.ok) return x.json().then(j => { throw new Error(j.error); }); return x.json(); });
-            const r = await fetch('/api/visitor/send', {
+            const r = await fetch((window.KF_API_BASE||'') + '/api/visitor/send', {
               method: 'POST', headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({ session_id: sessionId.value, text: '', attachments: [up] })
             }).then(x => x.json());

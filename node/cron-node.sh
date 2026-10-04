@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
-# cron-node.sh — 分控节点定时任务（建议每 5 分钟一次）：
-#   1) git pull 跟随主站版本（本地 config.php 用 skip-worktree 保护，不会被覆盖）
-#   2) 向主站心跳登记（IP / 角色 / 版本），主控「节点管理」页即可看到
+# cron-node.sh — 分控节点定时任务（纯静态节点版，无需 PHP；建议每 5 分钟）：
+#   1) 向总控检查版本并拉取更新包（tar.gz）应用到站点目录（config.php 永不覆盖）
+#   2) 心跳登记（IP/角色/版本），主控「节点管理」页即可见
 #
 # cron 示例（node-setup.sh 会自动安装）：
 #   */5 * * * * bash /www/wwwroot/<站点目录>/node/cron-node.sh >> /tmp/cron-node.log 2>&1
@@ -10,29 +10,30 @@ set -u
 SITE_DIR="${SITE_DIR:-$(cd "$(dirname "$0")/.." && pwd)}"
 cd "$SITE_DIR" || exit 1
 
-# 1) 跟随主站更新（从总控拉更新包并应用，无需 git）
-php "$SITE_DIR/node/update-node.php"
-
-# 2) 心跳登记
-MAIN_URL=$(php -r '$c = require "config.php"; echo rtrim((string)($c["site_main_url"] ?? ""), "/");')
-SECRET=$(php -r '$c = require "config.php"; echo (string)($c["relay_secret"] ?? "");')
-ROLE=$(php -r '$c = require "config.php"; echo (string)($c["site_role"] ?? "");')
-VER=$(php -r 'echo (string)(require "version.php");')
+MAIN_URL=$(grep -o "'site_main_url' => '[^']*'" config.php 2>/dev/null | head -1 | sed "s/.*' //; s/'//")
+ROLE=$(grep -o "'site_role' => '[^']*'" config.php 2>/dev/null | head -1 | sed "s/.*' //; s/'//")
+SECRET=$(grep -o "'relay_secret' => '[^']*'" config.php 2>/dev/null | head -1 | sed "s/.*' //; s/'//")
+VER=$(grep -o "return '[0-9.]*'" version.php 2>/dev/null | head -1 | sed "s/return '//; s/'//")
 
 if [ -z "$MAIN_URL" ] || [ -z "$SECRET" ]; then
-  echo "$(date '+%F %T') 心跳跳过：site_main_url / relay_secret 未配置"
+  echo "$(date '+%F %T') 跳过：config.php 缺少 site_main_url / relay_secret"
   exit 0
 fi
 
+# 1) 检查版本并拉取更新包（tar.gz）应用到站点目录
+curl -fsS -m 60 -X POST "$MAIN_URL/api/internal/update" \
+  -H "Content-Type: application/json" \
+  -d "{\"secret\":\"$SECRET\",\"role\":\"$ROLE\",\"app_version\":\"$VER\",\"format\":\"tgz\"}" \
+  -o /tmp/node-update.tar.gz
+if [ $? -eq 0 ] && [ -s /tmp/node-update.tar.gz ]; then
+  tar -xzf /tmp/node-update.tar.gz -C "$SITE_DIR" && echo "$(date '+%F %T') 已应用更新包"
+else
+  echo "$(date '+%F %T') 无更新或拉取失败"
+fi
+
+# 2) 心跳登记
 curl -fsS -m 15 -X POST "$MAIN_URL/api/internal/heartbeat" \
   -H "Content-Type: application/json" \
   -d "{\"secret\":\"$SECRET\",\"role\":\"$ROLE\",\"app_version\":\"$VER\",\"origin\":\"$SITE_ORIGIN\"}" \
   || echo "$(date '+%F %T') 心跳失败"
-
-# 黑名单/归属同步（边缘本地拦截用）——总控返回全量，落到 data/blcache.json
-curl -fsS -m 15 -X POST "$MAIN_URL/api/internal/sync" \
-  -H "Content-Type: application/json" \
-  -d "{\"secret\":\"$SECRET\"}" \
-  -o "$SITE_DIR/data/blcache.json" \
-  || echo "$(date '+%F %T') 黑名单同步失败"
-echo "$(date '+%F %T') 心跳+同步完成 ver=$VER role=$ROLE"
+echo "$(date '+%F %T') 节点维护完成 ver=$VER role=$ROLE"

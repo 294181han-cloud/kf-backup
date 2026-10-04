@@ -488,6 +488,14 @@ function handle_visitor_poll(string $method): void
     if ($method !== 'GET') { json_error('方法不允许', 405); return; }
     $sid = (int)input('session', 0);
     $sinceMsg = (int)input('sinceMsg', 0);
+    // 轻量探针（访客闲置/暂停期专用）：只答"有无新消息"，一条索引查询；有新消息前端立即恢复全量轮询
+    if (input('light')) {
+        if (!$sid) json_out(['new' => false]);
+        presence_touch('v:' . $sid);
+        $st = db()->prepare('SELECT COUNT(*) FROM messages WHERE session_id = ? AND id > ?');
+        $st->execute([$sid, $sinceMsg]);
+        json_out(['new' => ((int)$st->fetchColumn()) > 0]);
+    }
     if (!$sid) json_out(['messages' => [], 'now' => time()]);
     $pdo = db();
     presence_touch('v:' . $sid);   // 在线状态随请求刷新；停活由总控清理删除，内存只留在线的

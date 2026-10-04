@@ -178,6 +178,15 @@ $uri = parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH) ?: '/';
 $uri = rtrim($uri, '/');
 if ($uri === '') $uri = '/';
 
+/* ---------- 静态边缘模式：/api/* 跨域直连总控（分控站点可为纯静态，无需 PHP） ---------- */
+if (str_starts_with($uri, '/api/')) {
+    header('Access-Control-Allow-Origin: *');
+    header('Access-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS');
+    header('Access-Control-Allow-Headers: Content-Type, Authorization, X-Edge-Secret, X-Edge-Role, X-Edge-Origin, X-Original-Host');
+    header('Access-Control-Max-Age: 86400');
+    if ($method === 'OPTIONS') { http_response_code(204); exit; }
+}
+
 /* ---------- 主站：安装/升级（建表 + 种子 + 幂等迁移） ---------- */
 try { ensure_installed(); } catch (\Throwable $e) { /* 初始化失败由后续请求重试 */ }
 try {

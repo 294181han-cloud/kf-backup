@@ -2,6 +2,7 @@
 (function () {
   const API = {
     token: null,
+    base: (typeof window !== 'undefined' && window.KF_API_BASE) || '',   // 分控静态节点：总控地址（主站同源部署为空）
     setToken(t) { this.token = t; try { localStorage.setItem('kfxt_token', t); } catch (e) {} },
     loadToken() { try { this.token = localStorage.getItem('kfxt_token'); } catch (e) {} return this.token; },
     clearToken() { this.token = null; try { localStorage.removeItem('kfxt_token'); } catch (e) {} },
@@ -15,7 +16,7 @@
       if (this.token) opts.headers['Authorization'] = 'Bearer ' + this.token;
       let res;
       try {
-        res = await fetch(path, opts);
+        res = await fetch(this.base + path, opts);
       } catch (e) {
         throw new Error('网络异常，请稍后重试');
       }

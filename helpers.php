@@ -557,9 +557,28 @@ function handle_internal_update(string $method): void
     $given = (string)input('secret', '');
     if ($given === '' || !hash_equals($secret, $given)) json_error('无权调用', 403);
     $nodeVer = (string)input('app_version', '');
-    $bundle = node_bundle_build();
+    $role = in_array(($r = (string)input('role', '')), ['agent', 'visitor'], true) ? $r : '';
+    $bundle = node_bundle_build($role);
     if ($nodeVer === (string)$bundle['version']) {
         json_out(['ok' => true, 'up_to_date' => true, 'version' => $bundle['version']]);
+    }
+    // bash 节点（cron-node.sh）：要 tar.gz 包（curl+tar 即可应用，无需 PHP）
+    if ((string)input('format', '') === 'tgz') {
+        $tmp = tempnam(sys_get_temp_dir(), 'upk');
+        $phar = new PharData($tmp . '.tar');
+        foreach ($bundle['files'] as $path => $b64) {
+            $tmpF = $tmp . '.f';
+            file_put_contents($tmpF, base64_decode((string)$b64));
+            $phar->addFromString($path, (string)file_get_contents($tmpF));
+            @unlink($tmpF);
+        }
+        $phar->compress(Phar::GZ);
+        $tgz = $tmp . '.tar.gz';
+        header('Content-Type: application/gzip');
+        header('Content-Disposition: attachment; filename="update-' . $bundle['version'] . '.tar.gz"');
+        echo (string)file_get_contents($tgz);
+        @unlink($tgz); @unlink($tmp . '.tar');
+        exit;
     }
     json_out(['ok' => true, 'version' => $bundle['version']] + $bundle);
 }
@@ -606,29 +625,56 @@ function node_bundle_prefixes(): array
 }
 
 /** 主控侧：按白名单打包当前代码（version + files{path:base64}） */
-function node_bundle_build(): array
+function node_bundle_build(string $role = ''): array
 {
     $base = __DIR__;
     $files = [];
+    $staticMode = in_array($role, ['agent', 'visitor'], true);   // 静态边缘模式：纯静态包（无 PHP）
+    $mainBase = rtrim((string)(config()['site_main_url'] ?? ''), '/');
     $dirIter = new RecursiveDirectoryIterator($base, FilesystemIterator::SKIP_DOTS);
     $filter = new RecursiveCallbackFilterIterator($dirIter, function ($cur) {
         if ($cur->isDir()) return !in_array($cur->getFilename(), ['.git', 'data', 'uploads'], true);
         return true;
     });
     $iter = new RecursiveIteratorIterator($filter, RecursiveIteratorIterator::LEAVES_ONLY);
+    $mainBase = rtrim((string)config()['site_main_url'] ?? '', '/');
     foreach ($iter as $f) {
         $path = str_replace(chr(92), '/', substr($f->getPathname(), strlen($base) + 1));
         $keep = false;
         foreach (node_bundle_prefixes() as $pre) {
-            if ($pre === 'node/' && str_starts_with($path, 'node/')) { $keep = str_ends_with($path, 'cron-node.sh'); continue; }
+            if ($pre === 'node/' && str_starts_with($path, 'node/')) { $keep = str_ends_with($path, 'cron-node.sh') || str_ends_with($path, 'update-node.php'); continue; }
             if (str_starts_with($path, $pre)) { $keep = true; break; }
         }
         if (!$keep) continue;
         if (str_contains($path, '/.') || str_ends_with($path, '.log')) continue;
+        // 静态边缘模式：PHP 文件不下发（节点为纯静态站点）
+        if ($staticMode && str_ends_with($path, '.php')) continue;
         $files[$path] = base64_encode((string)file_get_contents($f->getPathname()));
     }
+    // 静态边缘模式附加：根路径页面副本（注入总控地址）+ 节点配置 JS + 总控已落地的防红壳页
+    if ($staticMode) {
+        $inject = '<script src="/edge-config.js"></script>';
+        foreach (['login', 'app', 'visitor', 'gate'] as $pg) {
+            $src = $base . '/public/' . $pg . '.html';
+            if (!is_file($src)) continue;
+            $html = (string)file_get_contents($src);
+            if (str_contains($html, '<head')) $html = preg_replace('/<head[^>]*>/i', '<head>' . $inject, $html, 1);
+            else $html = $inject . $html;
+            $files[$pg . '.html'] = base64_encode($html);
+        }
+        $files['index.html'] = base64_encode($role === 'agent'
+            ? '<!DOCTYPE html><html lang="zh-CN"><head><meta charset="UTF-8"><script src="/edge-config.js"></script><script>location.replace("/login.html");</script></head><body></body></html>'
+            : '<!DOCTYPE html><html lang="zh-CN"><head><meta charset="UTF-8"><script src="/edge-config.js"></script><script>location.replace("/visitor.html");</script></head><body></body></html>');
+        $files['edge-config.js'] = base64_encode(
+            'window.KF_API_BASE=' . json_encode($mainBase) . ';window.KF_EDGE_ROLE=' . json_encode($role) . ';');
+        // 总控已落地的防红壳页静态文件（发码时写入 MM-DD/ 目录）
+        foreach (glob($base . '/[0-9][0-9]-[0-9][0-9]/*.html') ?: [] as $gf) {
+            $rel = str_replace(chr(92), '/', substr($gf, strlen($base) + 1));
+            $files[$rel] = base64_encode((string)file_get_contents($gf));
+        }
+    }
     ksort($files);
-    return ['version' => app_version(), 'files' => $files];
+    return ['version' => app_version(), 'files' => $files, 'static' => $staticMode];
 }
 
 /** 分控侧：应用更新包（受保护路径永不覆盖；按包清理已移除文件） */

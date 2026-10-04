@@ -44,7 +44,8 @@
   var key = q.get('key') || q.get('k') || '';
   if (!key) { fail(); return; }
 
-  post('/api/gate', 'key=' + encodeURIComponent(key), function (x) {
+  var API_BASE = (window.KF_API_BASE || '');
+  post(API_BASE + '/api/gate', 'key=' + encodeURIComponent(key), function (x) {
     var r = parse(x);
     if (!r || !r.ok || !r.url) { fail(r && r.msg); return; }
 
@@ -59,7 +60,7 @@
         return;
       }
       var html = y.responseText;
-      var inject = '<script>window.__KF_CODE__=' + JSON.stringify(r.code) + ';<\/script>';
+      var inject = '<script>window.KF_API_BASE=' + JSON.stringify(API_BASE) + ';window.__KF_CODE__=' + JSON.stringify(r.code) + ';<\/script>';
       if (/<head[^>]*>/i.test(html)) html = html.replace(/<head[^>]*>/i, function (m) { return m + inject; });
       else html = inject + html;
       document.open();
