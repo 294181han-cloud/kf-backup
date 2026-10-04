@@ -466,15 +466,51 @@ createApp({
     // v2.43.1：图片先进待发区，不直接发送；发送时和文字、引用一起带出去
     const pendingAtts = ref([]);
     const rmPending = (i) => { pendingAtts.value.splice(i, 1); };
+    /* v2.59 图片压缩：缩到最长边 maxSide、转 JPEG。浏览器解不开的格式（如安卓遇到 HEIC）
+       直接返回原文件，让后面的体积检查兜底。GIF 不动（动了就不动了）。
+       返回 Blob（jpg）或原 File。 */
+    const compressImage = (file, maxSide = 1600, quality = 0.82) => new Promise((resolve) => {
+      if (/gif/i.test(file.type)) { resolve(file); return; }
+      let url = '';
+      try { url = URL.createObjectURL(file); } catch (e) { resolve(file); return; }
+      const done = (out) => { try { URL.revokeObjectURL(url); } catch (e) {} resolve(out); };
+      const im = new Image();
+      im.onload = () => {
+        try {
+          const w = im.naturalWidth || im.width, h = im.naturalHeight || im.height;
+          const scale = Math.min(1, maxSide / Math.max(w, h));
+          const cw = Math.max(1, Math.round(w * scale)), ch = Math.max(1, Math.round(h * scale));
+          const c = document.createElement('canvas');
+          c.width = cw; c.height = ch;
+          c.getContext('2d').drawImage(im, 0, 0, cw, ch);
+          c.toBlob((b) => done(b || file), 'image/jpeg', quality);
+        } catch (e) { done(file); }
+      };
+      im.onerror = () => done(file);
+      im.src = url;
+    });
+
     const stageImage = async (file) => {
       if (!file) return false;
-      if (!/^image\//.test(file.type)) { toast('只能发送图片'); return false; }
-      if (file.size > 5 * 1024 * 1024) { toast('图片不能超过 5MB'); return false; }
-      const data = await new Promise(res => { const fr = new FileReader(); fr.onload = () => res(fr.result); fr.readAsDataURL(file); });
+      // v2.59 HEIC/HEIF 兜底：有些浏览器（尤其安卓端微信）对 iPhone 照片报不出 image/* 类型，
+      // 只看 file.type 会把它们当成"不是图片"直接拒掉；这里再看一眼扩展名。
+      const looksImg = /^image\//.test(file.type) || /\.(heic|heif)$/i.test(file.name || '');
+      if (!looksImg) { toast('只能发送图片'); return false; }
+      /* v2.59 发图前先在手机里压一遍：
+         手机原图常见 4~10MB（超过 5MB 会被挡），iPhone 还常是 HEIC（后端白名单不支持）。
+         用 canvas 缩到最长边 1600 + 转 JPEG，体积一般只剩 200~600KB，两个问题一起解决。 */
+      let f = file;
+      const needShrink = file.size > 300 * 1024 || !/^image\/(png|jpe?g|gif|webp)$/i.test(file.type);
+      if (needShrink) {
+        toast('正在处理图片…');
+        f = await compressImage(file);
+      }
+      if (f.size > 8 * 1024 * 1024) { toast('照片太大了，建议先在相册里截图再发'); return false; }
+      const data = await new Promise(res => { const fr = new FileReader(); fr.onload = () => res(fr.result); fr.readAsDataURL(f); });
       try {
         const up = await fetch((window.KF_API_BASE||'') + '/api/visitor/upload', {
           method: 'POST', headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ session_id: sessionId.value, data, kind: 'image', filename: file.name || 'image.png' })
+          body: JSON.stringify({ session_id: sessionId.value, data, kind: 'image', filename: (f === file ? (file.name || 'image.png') : 'image.jpg') })
         }).then(x => { if (!x.ok) return x.json().then(j => { throw new Error(j.error); }); return x.json(); });
         pendingAtts.value.push(up);
         return true;
@@ -536,7 +572,19 @@ createApp({
         }, 500);
         return true;
       } catch (e) {
-        alert('无法获取麦克风权限，请使用文字沟通');
+        /* v2.59 录音失败分情况说清楚（这才是真正需要"开权限"的场景）：
+           - 用户点了"拒绝" → 教他去哪儿打开
+           - 没有麦克风 / 被别的程序占用 → 也说清楚，别让人以为是网站坏了 */
+        const n = String((e && e.name) || '');
+        let msg = '录音没启动成功，可以直接用文字或图片沟通。';
+        if (/NotAllowed|Permission|Security/i.test(n)) {
+          msg = '麦克风权限被拒绝了。\n请在微信里点右上角「···」→ 设置 → 允许使用「麦克风」，然后重试；\n如果还是没有，去手机「设置 → 应用 → 微信 → 权限」里把麦克风打开。';
+        } else if (/NotFound|DevicesNotFound/i.test(n)) {
+          msg = '没有检测到麦克风设备，请直接用文字或图片沟通。';
+        } else if (/NotReadable|TrackStart|Abort/i.test(n)) {
+          msg = '麦克风被其它程序占用了（比如正在通话或录音），关掉之后重试。';
+        }
+        alert(msg);
         return false;
       }
     };

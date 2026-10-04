@@ -1076,14 +1076,41 @@ const app = createApp({
     // v2.73 一条消息里的图片（多图并排显示，文字放下面）
     const imgsOf = (m) => ((m && m.attachments) || []).filter(a => a && (!a.type || a.type === 'image') && a.url);
 
+    /* v2.59 图片压缩（与访客端同一套）：手机原图常 4~10MB、iPhone 还常是 HEIC，
+       直接传会被 5MB 限制或格式白名单挡掉 → 先缩到最长边 1600、转 JPEG 再传。 */
+    const compressImage = (file, maxSide = 1600, quality = 0.82) => new Promise((resolve) => {
+      if (/gif/i.test(file.type)) { resolve(file); return; }
+      let url = '';
+      try { url = URL.createObjectURL(file); } catch (e) { resolve(file); return; }
+      const done = (out) => { try { URL.revokeObjectURL(url); } catch (e) {} resolve(out); };
+      const im = new Image();
+      im.onload = () => {
+        try {
+          const w = im.naturalWidth || im.width, h = im.naturalHeight || im.height;
+          const scale = Math.min(1, maxSide / Math.max(w, h));
+          const cw = Math.max(1, Math.round(w * scale)), ch = Math.max(1, Math.round(h * scale));
+          const c = document.createElement('canvas');
+          c.width = cw; c.height = ch;
+          c.getContext('2d').drawImage(im, 0, 0, cw, ch);
+          c.toBlob((b) => done(b || file), 'image/jpeg', quality);
+        } catch (e) { done(file); }
+      };
+      im.onerror = () => done(file);
+      im.src = url;
+    });
+
     // 上传一张图并放进「待发区」（不直接发出去），返回是否成功
     const stageImage = async (file) => {
       if (!file) return false;
-      if (!/^image\//.test(file.type)) { ElementPlus.ElMessage.warning('只能发送图片'); return false; }
-      if (file.size > 5 * 1024 * 1024) { ElementPlus.ElMessage.warning('图片不能超过 5MB'); return false; }
-      const data = await new Promise(res => { const fr = new FileReader(); fr.onload = () => res(fr.result); fr.readAsDataURL(file); });
+      // v2.59 HEIC/HEIF 兜底（同访客端）：类型报不准时按扩展名再判一次
+      const looksImg = /^image\//.test(file.type) || /\.(heic|heif)$/i.test(file.name || '');
+      if (!looksImg) { ElementPlus.ElMessage.warning('只能发送图片'); return false; }
+      let f = file;
+      if (file.size > 300 * 1024 || !/^image\/(png|jpe?g|gif|webp)$/i.test(file.type)) f = await compressImage(file);
+      if (f.size > 8 * 1024 * 1024) { ElementPlus.ElMessage.warning('照片太大了，建议先截图或压缩后再发'); return false; }
+      const data = await new Promise(res => { const fr = new FileReader(); fr.onload = () => res(fr.result); fr.readAsDataURL(f); });
       try {
-        const up = await API.post('/api/upload', { data, kind: 'image', filename: file.name || 'image.png' });
+        const up = await API.post('/api/upload', { data, kind: 'image', filename: (f === file ? (file.name || 'image.png') : 'image.jpg') });
         pendingAtts.value.push(up);
         return true;
       } catch (e) { ElementPlus.ElMessage.error(e.message); return false; }

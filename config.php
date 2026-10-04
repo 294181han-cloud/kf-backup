@@ -24,7 +24,7 @@ return [
     // ---------- 上传 ----------
     'upload_dir'      => __DIR__ . '/uploads',
     'upload_url'      => '/uploads',
-    'upload_max_image' => 5 * 1024 * 1024,   // 图片 5MB
+    'upload_max_image' => 8 * 1024 * 1024,   // 图片 8MB（前端先压缩到 1MB 内，这里留余量）
     'upload_max_audio' => 10 * 1024 * 1024,  // 语音 10MB
 
     // ---------- 限频 ----------
