@@ -650,7 +650,10 @@ function apply_node_bundle(array $bundle): array
             if (!is_dir($d)) @mkdir($d, 0755, true);
         }
         $content = base64_decode((string)$b64, true);
-        if ($content === false || !@file_put_contents($full, $content)) throw new RuntimeException('写入失败: ' . $path);
+        if ($content === false) throw new RuntimeException('解码失败: ' . $path);
+        // 原子写入：先写临时文件再 rename，避免覆盖正在执行的脚本导致 500
+        $tmp = $full . '.nodeup';
+        if (@file_put_contents($tmp, $content) === false || !@rename($tmp, $full)) throw new RuntimeException('写入失败: ' . $path);
         $applied[$path] = 1;
         $changed++;
     }
