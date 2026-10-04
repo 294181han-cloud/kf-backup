@@ -2705,3 +2705,19 @@ AND EXISTS (SELECT 1 FROM messages m WHERE m.session_id = s.id AND m.from_type =
   此前分散在 DEPLOY v2.32~v2.40 各节的机制描述以此为准
 - bootstrap.php 完成页清理：移除过时的 cron 行展示（零 cron 设计下多余，且引用了
   不在更新包内的 update-node.php）；锁定页措辞对齐
+
+## 36. v2.42 变更记录（修复跨节点图片不可见，2026-10-04）
+
+### 根因（分域部署暴露）
+- 上传接口返回**相对路径** /uploads/...：附件 URL 存进消息后，另一节点的页面
+  把它解析成「该节点域名 + /uploads/」——文件实际只在总控磁盘 → 跨节点 404
+
+### 修复（两层）
+1. **上传 URL 绝对化**：总控配置 site_main_url 后，save_upload 返回
+   https://总控/uploads/... 绝对 URL——消息附件存库即跨节点可见（新消息起全量生效）
+2. **分控 nginx 片段补 /uploads/ 反代**：bootstrap 生成的 nginx-edge.conf 增加
+   location /uploads/ → 总控——历史消息里的相对路径附件在分控侧也能解析（存量兼容）
+
+### 验证
+- 总控上传接口返回绝对 URL ✓；URL 直接可访问 ✓
+- 真实分控双端互发图片验收待节点 nginx 片段更新后复核
