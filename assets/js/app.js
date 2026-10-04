@@ -2549,7 +2549,12 @@ const app = createApp({
 
     // 深色主题
     const dark = ref(false);
+    // v2.45 「收起」= 只留在线聊天，把「已归档 / 已结束」两个页签收起来（列表本身一直都在）
     const sessCollapsed = ref(false);
+    const toggleSessTabs = () => {
+      sessCollapsed.value = !sessCollapsed.value;
+      if (sessCollapsed.value && sessScope.value !== 'online') sessScope.value = 'online';
+    };
     const sideCollapsed = ref(false);
     try { dark.value = localStorage.getItem('kfxt_dark') === '1'; } catch (e) {}
     const applyDark = () => { document.body.classList.toggle('dark', dark.value); };
@@ -2658,6 +2663,7 @@ const app = createApp({
       blockSession, blockIp, kwList, kwInput, kwSaving, addKw, removeKw, saveFilter, agentCmd, restartPoll,
       chatSearchOn, chatSearchKw, searchHit, visibleMsgs, canRecall, recallMsg, isRead,
       pol, savePolicy, uploadPolHead, clock, unreadTotal, sessCollapsed,
+      toggleSessTabs,
       sessScope, sessCounts, archiveSession,
       sessMulti, sessChecked, toggleMulti, toggleSessCheck, checkAllSess, bulkSessions,
       ctxMenu, openCtxMenu, openCtxMenuFromBtn, closeCtxMenu, ctxMenuArchive, ctxMenuClose, ctxMenuDelete,

@@ -1837,3 +1837,16 @@ body.dark .qd-thumb img, body.dark .qd-thumb .qd-file, body.dark .qd-addimg { bo
 .sess-item .row2 .tag-agent { flex-shrink: 0; }
 .sess-item .row2 .last { flex: 1 1 auto; min-width: 0; }
 .sess-item .row2 .badge { flex-shrink: 0; }
+
+/* ===== v2.45 「收起」只收「已归档 / 已结束」两个页签，在线聊天和列表一直在 ===== */
+.sess-scope-tabs { align-items: center; }
+.sess-tabs-toggle {
+  flex-shrink: 0; width: 22px; height: 22px; margin-left: 2px; border-radius: 6px;
+  border: 1px solid #e5e6eb; background: #f7f8fa; color: #86909c;
+  font-size: 12px; line-height: 1; cursor: pointer; display: inline-flex; align-items: center; justify-content: center;
+}
+.sess-tabs-toggle:hover { color: #1677ff; border-color: #1677ff; }
+.scope-tab { min-width: 0; }
+/* 收起状态：在线聊天这个页签占满整行 */
+.sess-scope-tabs .scope-tab:only-of-type { flex: 1; }
+body.dark .sess-tabs-toggle { background: #1b1e24; border-color: #2c313a; color: #a9b0bb; }

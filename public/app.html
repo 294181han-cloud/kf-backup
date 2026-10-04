@@ -7,7 +7,7 @@
 <link rel="icon" href="/assets/img/mi-logo.png">
 <link rel="apple-touch-icon" href="/assets/img/mi-logo.png">
 <link rel="stylesheet" href="/assets/vendor/element-plus.css">
-<link rel="stylesheet" href="/assets/css/app.css?v=3.30.0">
+<link rel="stylesheet" href="/assets/css/app.css?v=3.31.0">
 <script src="/assets/ui/ui-registry.js?v=2.8.0"></script>
 <script src="/assets/ui/ui-loader.js?v=2.8.0" data-ui-cat="auto"></script>
 </head>
@@ -116,28 +116,30 @@
       </aside>
 
       <div class="content workbench" v-if="tab==='work'" :class="{'has-chat': !!currentId}">
-        <div class="sess-col" :class="{collapsed: sessCollapsed}">
-          <button class="sess-collapse-btn" :title="sessCollapsed ? '展开会话列表' : '收起会话列表'" @click="sessCollapsed = !sessCollapsed">{{ sessCollapsed ? '»' : '«' }}</button>
-          <div class="sess-scope-tabs" v-if="!sessCollapsed">
+        <div class="sess-col">
+          <div class="sess-scope-tabs">
             <button class="scope-tab" :class="{on: sessScope==='online'}" @click="sessScope='online'">
               在线聊天<span class="scope-n" v-if="sessCounts.online">{{ sessCounts.online }}</span><span class="scope-dot" v-if="sessCounts.online_unread" :title="sessCounts.online_unread + ' 条未读'"></span>
             </button>
-            <button class="scope-tab" :class="{on: sessScope==='archived'}" @click="sessScope='archived'">
+            <button class="scope-tab" v-if="!sessCollapsed" :class="{on: sessScope==='archived'}" @click="sessScope='archived'">
               已归档<span class="scope-n" v-if="sessCounts.archived">{{ sessCounts.archived }}</span><span class="scope-dot" v-if="sessCounts.archived_unread" :title="sessCounts.archived_unread + ' 条未读'"></span>
             </button>
-            <button class="scope-tab" :class="{on: sessScope==='closed'}" @click="sessScope='closed'">
+            <button class="scope-tab" v-if="!sessCollapsed" :class="{on: sessScope==='closed'}" @click="sessScope='closed'">
               已结束<span class="scope-n" v-if="sessCounts.closed">{{ sessCounts.closed }}</span>
             </button>
+            <!-- v2.45 收起＝把「已归档 / 已结束」收起来，只留在线聊天（列表和搜索一直都在） -->
+            <button class="sess-tabs-toggle" @click="toggleSessTabs"
+                    :title="sessCollapsed ? '展开「已归档 / 已结束」' : '收起「已归档 / 已结束」，只留在线聊天'">{{ sessCollapsed ? '»' : '«' }}</button>
           </div>
-          <div class="search" v-if="!sessCollapsed">
+          <div class="search">
             <el-input v-model="sessSearch" placeholder="搜索访客/消息" size="small" clearable></el-input>
           </div>
           <!-- 多选入口（v2.70）：做成一条醒目的文字按钮，不用再找小图标 -->
-          <button type="button" class="sess-multi-entry" v-if="!sessCollapsed && !sessMulti" @click="toggleMulti">
+          <button type="button" class="sess-multi-entry" v-if="!sessMulti" @click="toggleMulti">
             <span class="sme-box">☑</span> 多选：批量归档 / 结束 / 删除
           </button>
           <!-- 多选操作栏（v2.67） -->
-          <div class="sess-multi-bar" v-if="sessMulti && !sessCollapsed">
+          <div class="sess-multi-bar" v-if="sessMulti">
             <div class="smb-row">
               <span class="smb-n">已选 <b>{{ sessChecked.length }}</b> 项</span>
               <a class="smb-link" @click="checkAllSess">全选</a>
@@ -152,7 +154,7 @@
               <button type="button" class="smb-btn" :disabled="!sessChecked.length" @click="bulkSessions('read')">👁 已读</button>
             </div>
           </div>
-          <div class="sess-list" v-if="!sessCollapsed">
+          <div class="sess-list">
             <div v-if="!filteredSessions.length" style="padding:40px;text-align:center;color:#a0a6ad;font-size:13px;">暂无会话</div>
             <div class="sess-item" v-for="s in filteredSessions" :key="s.id"
                  :class="{active: currentId===s.id, pinned: s.pinned, checked: sessMulti && sessChecked.includes(s.id)}"
@@ -1501,7 +1503,7 @@
 <script src="/assets/qr-poster.js?v=2.1.03"></script>
 <script src="/assets/api.js?v=2.0.1"></script>
 <script src="/assets/js/app-components.js?v=2.6.0"></script>
-<script src="/assets/js/app.js?v=3.23.0"></script>
+<script src="/assets/js/app.js?v=3.24.0"></script>
 <script src="/assets/js/app-boot.js?v=2.1.1"></script>
 </body>
 </html>
