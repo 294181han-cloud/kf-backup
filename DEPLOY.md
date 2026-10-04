@@ -2891,3 +2891,32 @@ v2.46 的"静态边缘站"更新包**不含 PHP 根文件**（index.php/helpers.
 - **图片复制**（本次起因）：在边缘站打开图片点「复制」→ 提示 `✅ 已复制图片`，剪贴板里确实是 `image/png` ✅
 
 版本：`version.php` 2.48.0（前端未变，本次是后端/服务器侧修复）
+
+
+## v2.48.2 变更记录（定时任务搬到总控 + 清掉旧站残留 cron，2026-10-04）
+
+用户贴来一条报错：`服务器错误: SQLSTATE[HY000] [1045] Access denied for user 'sql_ad_yluu_top'@'localhost'`。
+
+**它是从哪来的**：老服务器上还留着两条开机就有的 cron，指向**旧站点目录**：
+```
+0 * * * * php /www/wwwroot/kf.ylcz.cc/bin/check_codes.php
+* * * * * php /www/wwwroot/kf.ylcz.cc/bin/tg_orders.php
+```
+而旧站的 `config.php` 基础段从 v2.37 迁移起就是**新库**（`sql_ad_yluu_top`，设计上靠 `hosts['kf.ylcz.cc']` 覆盖回本地 `kfxt`）。
+cron 是 CLI 跑的、没有 Host 头 → 用不到 hosts 覆盖 → 拿基础段去连**老服务器本地的 MySQL** → 那里没有这个库/用户 → 每分钟报一次 1045。
+日志里这条错误从 **10-04 01:16**（新主站建站那一刻）开始，已累计 1180 条。
+
+**顺带发现的真问题**：这两条任务本来就该跟着站点搬走，但**新主站（总控）上完全没有 cron**——
+也就是说发卡机器人的**链上订单核款**只在用户点「我已支付」时才临时查一次（自动到账确认形同半瘫），
+**红码巡检**也一直没跑。本次一并修正：
+
+- **总控（新服务器）新增**（`crontab -e`）：
+  ```
+  * * * * * /usr/bin/php /www/wwwroot/ad.yluu.top/bin/tg_orders.php >> /www/server/cron/kfxt-tg.log 2>&1
+  0 * * * * /usr/bin/php /www/wwwroot/ad.yluu.top/bin/check_codes.php >> /www/server/cron/kfxt-code-check.log 2>&1
+  ```
+- **老服务器移除**上面那两条（目录已不是站点，留着只会每分钟刷错误日志）。
+- 实测：总控 cron 每分钟产出 `核款完成，本轮到账发货 0 单`，老服务器日志不再新增错误。
+
+> 排错备忘：凡是「CLI 跑站点脚本」都拿不到 HTTP_HOST，`hosts` 按域名覆盖不生效，只能用 `config.php` 的基础段。
+> 迁移后如果有脚本还指着旧目录，就会撞上这种"库名对、机器不对"的 1045。
