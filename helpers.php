@@ -616,10 +616,12 @@ function handle_internal_heartbeat(string $method): void
     $ver = mb_substr(trim((string)input('app_version', '')), 0, 32);
     $origin = mb_substr(trim((string)input('origin', '')), 0, 200);
     $pdo = db();
+    /* v2.51 空 app_version 不覆盖登记值：纯静态节点没有 version.php（cron 心跳带空版本），
+       不能把节点管理页已知的真实版本抹掉，否则页面无从判断新旧 */
     $pdo->prepare('INSERT INTO nodes (ip, role, app_version, origin, first_seen, last_seen)
                    VALUES (?,?,?,?,NOW(),NOW())
-                   ON DUPLICATE KEY UPDATE app_version = VALUES(app_version),
-                                           origin = VALUES(origin), last_seen = NOW()')
+                   ON DUPLICATE KEY UPDATE origin = VALUES(origin), last_seen = NOW()'
+                   . ($ver !== '' ? ', app_version = VALUES(app_version)' : ''))
         ->execute([$ip, $role, $ver, $origin]);
     json_out(['ok' => true, 'main_version' => app_version()]);
 }
@@ -771,6 +773,10 @@ function handle_internal_apply(string $method): void
 {
     if ($method !== 'POST') { json_error('方法不允许', 405); return; }
     $cfg = config();
+    /* v2.51 总控绝不把远程推送应用到自身：节点 nginx 把 /api/* 反代回总控时，
+       「推送更新」会打到总控这里——若不拦截，总控静默自应用并回报成功，节点什么都没收到，
+       节点管理页从此显示假版本。拦下后推送方拿到明确报错。 */
+    if (($cfg['site_role'] ?? 'main') === 'main') json_error('目标不是节点（/api 被反代回总控），推送无法直达该节点', 400);
     $secret = (string)($cfg['relay_secret'] ?? '');
     if ($secret === '') json_error('未启用远程更新', 403);
     $given = (string)input('secret', '');
