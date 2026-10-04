@@ -1871,3 +1871,17 @@ body.dark .chat-tobottom { background: rgba(32,36,44,.96); border-color: #333a44
 .msg-edited { display: inline-block; font-size: 10.5px; color: #a0a6ad; margin-left: 6px; vertical-align: 1px; }
 .msg-row.mine .msg-edited { color: rgba(0,0,0,.35); }
 body.dark .msg-edited { color: #7f8791; }
+
+/* ===== v2.57 红码提示条：红了直接怼出来 + 一键换码 ===== */
+.red-alert {
+  display: flex; align-items: center; gap: 12px; margin: 0 0 12px;
+  padding: 12px 14px; border-radius: 12px;
+  background: #fff1f1; border: 1px solid #ffd4d4;
+}
+.red-alert .ra-ic { font-size: 20px; flex-shrink: 0; }
+.red-alert .ra-body { flex: 1; min-width: 0; }
+.red-alert .ra-t { font-size: 13.5px; font-weight: 700; color: #cf1322; margin-bottom: 3px; }
+.red-alert .ra-s { font-size: 12px; color: #a8071a; line-height: 1.7; }
+body.dark .red-alert { background: #3a1c1c; border-color: #5c2727; }
+body.dark .red-alert .ra-t { color: #ff7875; }
+body.dark .red-alert .ra-s { color: #ffa39e; }

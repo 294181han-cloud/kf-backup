@@ -146,7 +146,11 @@ function handle_tenant_service_code(string $method): void
             $url = "$scheme://{$pick['domain']}/$gatePath";
         }
         $pdo->prepare('INSERT INTO service_codes (tenant_id, code, link) VALUES (?,?,?)')->execute([$tid, $code, $url]);
-        json_out(['ok' => true, 'code' => ['id' => (int)$pdo->lastInsertId(), 'code' => $code, 'link' => $url, 'created_at' => dt_to_iso(now_dt())]], 201);
+        $newId = (int)$pdo->lastInsertId();
+        /* v2.57 一个账号只留一个码：换码＝把新码替换掉旧的（旧二维码立即失效）。
+           以前是"新码生成、老码继续有效"，码会越攒越多，客户手上到底哪张能用也说不清。 */
+        $pdo->prepare('DELETE FROM service_codes WHERE tenant_id = ? AND id <> ?')->execute([$tid, $newId]);
+        json_out(['ok' => true, 'code' => ['id' => $newId, 'code' => $code, 'link' => $url, 'created_at' => dt_to_iso(now_dt())]], 201);
     }
 
     if ($method === 'DELETE') {

@@ -801,7 +801,9 @@ const app = createApp({
             '<div style="line-height:1.9;">检测到 <b>' + list.length + '</b> 个客服码已被微信拦截（俗称"红了"）：'
             + '<div style="margin:8px 0;padding:8px 10px;background:#fff8e6;border-radius:8px;font-size:13px;">' + detail
             + (list.length > 6 ? ('<br>…共 ' + list.length + ' 个') : '') + '</div>'
-            + '建议去「客服码」页点「新码」换一个；<br>如果整批都红了，说明该域名被拦，要换域名。</div>',
+            + '建议去「客服码」页点「立即换码 / 新码」换一条。<br>'
+            + '<b>注意：换码后旧码立即失效</b>，记得把新的二维码重新发给客户；<br>'
+            + '如果连域名都被拦（整批都红），那要换域名才行。</div>',
             '⚠️ 有客服码被微信拦截',
             { confirmButtonText: '去客服码页处理', type: 'warning', dangerouslyUseHTMLString: true });
           go = true;
@@ -2517,7 +2519,8 @@ const app = createApp({
       } catch (e) { ElementPlus.ElMessage.error('海报生成失败：' + (e.message || e)); }
     };
     // v2.64 永远只生成新客服码（专属链接功能已废弃，不再走 renew 分支）
-    const codeRotateHint = Vue.computed(() => '生成一个新的客服码？（老的继续有效）');
+    // v2.57 一个账号只留一个码：换码＝替换（旧码立即失效）
+    const codeRotateHint = Vue.computed(() => '换一条新的客服码？\n\n旧码会立即失效，客户手上那张旧二维码就打不开了——换完记得把新的重新发出去。');
     const rotateCode = async () => {
       try {
         await API.post('/api/tenant/service-code');
