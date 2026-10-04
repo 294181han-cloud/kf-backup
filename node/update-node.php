@@ -49,9 +49,11 @@ $protected = static function (string $p): bool {
 };
 
 try {
-    // 1) 检查版本并拉取更新包
+    // 1) 检查版本并拉取更新包（codes_rev：壳页指纹，新码 ≤5 分钟自动到，不用发版）
+    $revFile = __DIR__ . '/data/node-codes-rev.txt';
     $j = un_http_post($main . '/api/internal/update', [
         'secret' => $secret, 'app_version' => (string)app_version(), 'role' => (string)($cfg['site_role'] ?? ''),
+        'codes_rev' => trim((string)(@file_get_contents($revFile) ?: '')),
     ]);
     if (empty($j['files'])) {
         echo '已是最新版本 ' . ($j['version'] ?? app_version()) . "\n";
@@ -60,7 +62,16 @@ try {
         $files = (array)$j['files'];
         $changed = 0;
         $manifestFile = __DIR__ . '/data/node-manifest.json';
-        $applied = is_file($manifestFile) ? (array)json_decode((string)file_get_contents($manifestFile), true) : [];
+        /* 清单统一归一化成 路径=>1 映射（旧格式是路径数组，直接 array_keys 会把 int 当路径传给
+           $protected(string) → TypeError → 节点从第二次更新起永远失败；与 helpers.php 同款修复） */
+        $raw = is_file($manifestFile) ? json_decode((string)file_get_contents($manifestFile), true) : [];
+        $applied = [];
+        if (is_array($raw)) {
+            foreach ($raw as $k => $v) {
+                $p = is_string($k) ? $k : (is_string($v) ? $v : '');
+                if ($p !== '') $applied[$p] = 1;
+            }
+        }
         foreach ($files as $path => $b64) {
             $path = (string)$path;
             if ($protected($path) || str_contains($path, '..')) continue;
@@ -72,12 +83,15 @@ try {
             $applied[$path] = 1;
             $changed++;
         }
-        // 3) 清理总控已删除的文件
-        foreach (array_keys($applied) as $old) {
-            if ($protected($old)) continue;
-            if (!isset($files[$old]) && is_file(__DIR__ . '/' . $old)) { @unlink(__DIR__ . '/' . $old); unset($applied[$old]); }
+        // 3) 清理总控已删除的文件（静态包不含 PHP，绝不清理，防把 PHP 边缘站删成砖）
+        if (empty($j['static'])) {
+            foreach (array_keys($applied) as $old) {
+                if (!is_string($old) || $protected($old) || str_starts_with($old, '_')) continue;
+                if (!isset($files[$old]) && is_file(__DIR__ . '/' . $old)) { @unlink(__DIR__ . '/' . $old); unset($applied[$old]); }
+            }
         }
-        @file_put_contents($manifestFile, json_encode(array_keys($applied), JSON_UNESCAPED_UNICODE));
+        @file_put_contents($manifestFile, json_encode($applied, JSON_UNESCAPED_UNICODE));
+        if (!empty($j['codes_rev'])) @file_put_contents($revFile, (string)$j['codes_rev']);
         echo "已更新到 {$j['version']}（变更 {$changed} 个文件）\n";
     }
     // 4) 心跳登记（IP+角色）

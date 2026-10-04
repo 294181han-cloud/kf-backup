@@ -564,7 +564,8 @@ function handle_internal_update(string $method): void
     $static = (string)input('static', '') === '1';
     $bundle = node_bundle_build($role, $static);
     $nodeRev = trim((string)input('codes_rev', ''));
-    if ($nodeVer === (string)$bundle['version'] && (!$static || $nodeRev === (string)($bundle['codes_rev'] ?? ''))) {
+    // 版本和壳页指纹都一致才算最新——发版后新码也能 ≤5 分钟自动到节点
+    if ($nodeVer === (string)$bundle['version'] && $nodeRev === (string)$bundle['codes_rev']) {
         json_out(['ok' => true, 'up_to_date' => true, 'version' => $bundle['version']]);
     }
     // bash 节点（cron-node.sh）：要 tar.gz 包（curl+tar 即可应用，无需 PHP）
@@ -678,32 +679,35 @@ function node_bundle_build(string $role = '', bool $static = false): array
             $rel = str_replace(chr(92), '/', substr($gf, strlen($base) + 1));
             $files[$rel] = base64_encode((string)file_get_contents($gf));
         }
-        /* v2.49 客服码防红壳页落成真实静态文件：静态分站没有 PHP，/MM-DD/xxx.html 动态路由不存在，
-           扫码链接必 404。把所有客服码链接里的壳页路径按 public/gate.html（注入 edge-config）
-           生成真实文件随包下发——路径与 Host 无关（泛解析子域同路径复用），静态 nginx 直接命中。
-           codes_rev = 壳页路径指纹：节点下次心跳带上，变了才发包（新码即时生效，不用等发版）。 */
-        $shellPaths = [];
-        $gateSrc = $base . '/public/gate.html';
-        if (is_file($gateSrc)) {
-            $gateHtml = (string)file_get_contents($gateSrc);
+    }
+    /* v2.50 客服码防红壳页随所有更新包下发为真实静态文件：节点 nginx 若无动态回退（旧模板坑），
+       /MM-DD/xxx.html 只有文件存在才可达——放全量包里，节点用现有自动拉码通道即可自愈，
+       新码 ≤5 分钟自动到（codes_rev 指纹），零手工零发版。全量包用原样 gate.html（节点同源
+       /api/ 已反代总控）；静态包用注入版（浏览器直连总控跨域）。 */
+    $inject = '<script src="/edge-config.js"></script>';
+    $shellPaths = [];
+    $gateSrc = $base . '/public/gate.html';
+    if (is_file($gateSrc)) {
+        $gateHtml = (string)file_get_contents($gateSrc);
+        if ($staticMode) {
             if (str_contains($gateHtml, '<head')) $gateHtml = preg_replace('/<head[^>]*>/i', '<head>' . $inject, $gateHtml, 1);
             else $gateHtml = $inject . $gateHtml;
-            try {
-                foreach (db()->query('SELECT link FROM service_codes')->fetchAll() as $scRow) {
-                    $lp = (string)(parse_url((string)$scRow['link'], PHP_URL_PATH) ?: '');
-                    if (preg_match('#^/[0-9]{2}-[0-9]{2}/[A-Za-z0-9]{4,16}\.html$#', $lp)) {
-                        $lp = ltrim($lp, '/');
-                        $files[$lp] = base64_encode($gateHtml);
-                        $shellPaths[] = $lp;
-                    }
-                }
-            } catch (\Throwable $e) { /* 壳页打包失败不阻塞更新包 */ }
         }
-        $codesRev = $shellPaths ? md5(implode("\n", array_unique($shellPaths))) : '';
-        if ($codesRev !== '') $files['data/node-codes-rev.txt'] = base64_encode($codesRev);
+        try {
+            foreach (db()->query('SELECT link FROM service_codes')->fetchAll() as $scRow) {
+                $lp = (string)(parse_url((string)$scRow['link'], PHP_URL_PATH) ?: '');
+                if (preg_match('#^/[0-9]{2}-[0-9]{2}/[A-Za-z0-9]{4,16}\.html$#', $lp)) {
+                    $lp = ltrim($lp, '/');
+                    $files[$lp] = base64_encode($gateHtml);
+                    $shellPaths[] = $lp;
+                }
+            }
+        } catch (\Throwable $e) { /* 壳页打包失败不阻塞更新包 */ }
     }
+    $codesRev = $shellPaths ? md5(implode("\n", array_unique($shellPaths))) : '';
+    if ($staticMode && $codesRev !== '') $files['data/node-codes-rev.txt'] = base64_encode($codesRev);
     ksort($files);
-    return ['version' => app_version(), 'files' => $files, 'static' => $staticMode, 'codes_rev' => $codesRev ?? ''];
+    return ['version' => app_version(), 'files' => $files, 'static' => $staticMode, 'codes_rev' => $codesRev];
 }
 
 /** 分控侧：应用更新包（受保护路径永不覆盖；按包清理已移除文件） */
@@ -755,6 +759,10 @@ function apply_node_bundle(array $bundle): array
     }
     if ($isStaticBundle) $applied['_codes_rev'] = (string)($bundle['codes_rev'] ?? '');
     @file_put_contents($manifestFile, json_encode($applied, JSON_UNESCAPED_UNICODE));
+    // 壳页指纹落盘：节点侧（PHP 惰性维护 / update-node.php）下次拉码时回传，码变了即时发包
+    if (($bundle['codes_rev'] ?? '') !== '') {
+        @file_put_contents($base . '/data/node-codes-rev.txt', (string)$bundle['codes_rev']);
+    }
     return ['ok' => true, 'changed' => $changed, 'app_version' => (string)($bundle['version'] ?? app_version())];
 }
 
@@ -802,9 +810,11 @@ function edge_maintenance(): void
         $j = json_decode((string)$resp, true);
         return is_array($j) ? $j : [];
     };
-    // 1) 更新检查（总控版本不同 → 返回更新包并应用）
+    // 1) 更新检查（总控版本不同或壳页指纹变化 → 返回更新包并应用）
     try {
-        $j = $post($main . '/api/internal/update', ['secret' => $secret, 'app_version' => app_version(), 'role' => ($cfg['site_role'] ?? '')]);
+        $rev = @file_get_contents(__DIR__ . '/data/node-codes-rev.txt');
+        $j = $post($main . '/api/internal/update', ['secret' => $secret, 'app_version' => app_version(),
+            'role' => ($cfg['site_role'] ?? ''), 'codes_rev' => trim((string)$rev)]);
         if (!empty($j['files'])) apply_node_bundle($j);
     } catch (\Throwable $e) { /* 静默：下轮重试 */ }
     // 2) 黑名单同步
