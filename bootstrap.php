@@ -154,6 +154,10 @@ if (($isCli || ($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') && !$installed 
             . "    proxy_set_header X-Edge-Role {$role};\n"
             . "    proxy_set_header X-Edge-Origin {$origin};\n"
             . "    proxy_ssl_server_name on;\n"
+            . "location /uploads/ {\n"
+            . "    proxy_pass {$mainUrl}/uploads/;\n"
+            . "    proxy_set_header Host {$host};\n"
+            . "}\n"
             . "}";
         // 直接写成文件：粘贴伪静态时打开 nginx-edge.conf 复制整段即可
         @file_put_contents(__DIR__ . '/nginx-edge.conf', "# /api/ 反代到总控 + 伪静态（整段加入本站点 server 块，替换原 location /）\n" . $nginxSnippet . "\n");

@@ -935,6 +935,10 @@ function save_upload(string $data, string $kind, string $filename = ''): array
     $cfg = config();
     // 1+2+n：非主站节点把文件中转到主站，返回绝对 URL（保证任意节点可见）
     if (($cfg['site_role'] ?? 'main') !== 'main') return relay_upload_to_main($data, $kind, $filename);
+    // 枢纽模式：总控配置了 site_main_url 时，上传 URL 直接绝对化——
+    // 消息附件存在库里，任何节点/任何域名的页面都能直接引用（跨节点可见）
+    $urlBase = $cfg['upload_url'];
+    if (!empty($cfg['site_main_url'])) $urlBase = rtrim((string)$cfg['site_main_url'], '/') . $cfg['upload_url'];
     $dir = $cfg['upload_dir'];
     if (!is_dir($dir)) mkdir($dir, 0775, true);
 
@@ -967,14 +971,14 @@ function save_upload(string $data, string $kind, string $filename = ''): array
         $ext = str_ireplace('jpeg', 'jpg', explode('/', $mime)[1]);
         $name = time() . '-' . bin2hex(random_bytes(4)) . '.' . $ext;
         if (file_put_contents("$dir/$name", $buffer) === false) throw new \RuntimeException('写入文件失败');
-        return ['type' => 'image', 'url' => $cfg['upload_url'] . '/' . $name, 'size' => strlen($buffer)];
+        return ['type' => 'image', 'url' => $urlBase . '/' . $name, 'size' => strlen($buffer)];
     }
 
     if ($kind === 'audio' && $isAudio) {
         $ext = audio_ext_of($mime, $filename);
         $name = time() . '-' . bin2hex(random_bytes(4)) . '.' . $ext;
         if (file_put_contents("$dir/$name", $buffer) === false) throw new \RuntimeException('写入文件失败');
-        return ['type' => 'audio', 'url' => $cfg['upload_url'] . '/' . $name, 'size' => strlen($buffer)];
+        return ['type' => 'audio', 'url' => $urlBase . '/' . $name, 'size' => strlen($buffer)];
     }
 
     // 视频：只放行常见可播格式，前端用 <video> 直接播
@@ -982,7 +986,7 @@ function save_upload(string $data, string $kind, string $filename = ''): array
         $ext = media_ext_of($mime, $filename, ['mp4', 'webm', 'ogg', 'mov', 'm4v'], 'mp4');
         $name = time() . '-' . bin2hex(random_bytes(4)) . '.' . $ext;
         if (file_put_contents("$dir/$name", $buffer) === false) throw new \RuntimeException('写入文件失败');
-        return ['type' => 'video', 'url' => $cfg['upload_url'] . '/' . $name, 'size' => strlen($buffer),
+        return ['type' => 'video', 'url' => $urlBase . '/' . $name, 'size' => strlen($buffer),
             'name' => $filename !== '' ? $filename : ('视频.' . $ext)];
     }
 
@@ -998,7 +1002,7 @@ function save_upload(string $data, string $kind, string $filename = ''): array
         if (!in_array($ext, $safeExt, true)) $ext = 'bin';
         $name = time() . '-' . bin2hex(random_bytes(4)) . '.' . $ext;
         if (file_put_contents("$dir/$name", $buffer) === false) throw new \RuntimeException('写入文件失败');
-        return ['type' => 'file', 'url' => $cfg['upload_url'] . '/' . $name, 'size' => strlen($buffer), 'name' => $orig];
+        return ['type' => 'file', 'url' => $urlBase . '/' . $name, 'size' => strlen($buffer), 'name' => $orig];
     }
 
     throw new \RuntimeException('文件格式不支持：' . ($mime ?: '未知'));
