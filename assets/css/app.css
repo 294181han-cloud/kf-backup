@@ -1885,3 +1885,25 @@ body.dark .msg-edited { color: #7f8791; }
 body.dark .red-alert { background: #3a1c1c; border-color: #5c2727; }
 body.dark .red-alert .ra-t { color: #ff7875; }
 body.dark .red-alert .ra-s { color: #ffa39e; }
+
+/* ===== v2.58 全局红码提示条（任何页面都在最上面）===== */
+.global-red {
+  display: flex; align-items: center; gap: 10px; margin: 10px 14px 0;
+  padding: 10px 14px; border-radius: 12px;
+  background: linear-gradient(90deg, #fff1f1, #ffe9e9);
+  border: 1px solid #ffd0d0; box-shadow: 0 4px 14px -8px rgba(207,19,34,.5);
+}
+.global-red .gr-ic { font-size: 16px; flex-shrink: 0; }
+.global-red .gr-t { font-size: 13px; font-weight: 600; color: #cf1322; line-height: 1.6; }
+.global-red .gr-sp { flex: 1; }
+.global-red .gr-btn {
+  flex-shrink: 0; padding: 6px 14px; border-radius: 999px; cursor: pointer;
+  border: 0; background: #f53f3f; color: #fff; font-size: 12.5px; font-weight: 700;
+}
+.global-red .gr-btn:hover { background: #d92c2c; }
+body.dark .global-red { background: linear-gradient(90deg, #3a1c1c, #341a1a); border-color: #5c2727; }
+body.dark .global-red .gr-t { color: #ff8b8b; }
+@media (max-width: 900px) {
+  .global-red { margin: 8px 10px 0; padding: 9px 12px; flex-wrap: wrap; }
+  .global-red .gr-t { font-size: 12.5px; }
+}

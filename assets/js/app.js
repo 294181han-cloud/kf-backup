@@ -791,7 +791,14 @@ const app = createApp({
       try {
         const r = await API.get('/api/tenant/code/alerts');
         const list = (r && r.alerts) || [];
+        // v2.58 不管在哪个页面，先把「当前这条码红没红」刷一遍 —— 顶部的红条靠它
+        try { await checkCode(false); } catch (e) {}
         if (!list.length) return;
+        /* v2.58 弹窗不再"弹一次就再也不弹"：一直红着的时候，最多每小时再提醒一次
+           （提醒了就标记已读，靠上面那条全局红条持续可见，不用反复骚扰）。 */
+        const lastPop = Number(localStorage.getItem('kfxt_red_popup_at') || 0);
+        if (Date.now() - lastPop < 3600 * 1000) return;
+        localStorage.setItem('kfxt_red_popup_at', String(Date.now()));
         // 弹窗消息要带换行，只能走 HTML（值都转义过，第三方返回的内容也不会变成标签）
         const esc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
         const detail = list.slice(0, 6).map(a => '· <b>' + esc(a.code) + '</b>' + (a.msg ? ('：' + esc(a.msg)) : '')).join('<br>');

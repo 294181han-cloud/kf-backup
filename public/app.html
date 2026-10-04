@@ -7,7 +7,7 @@
 <link rel="icon" href="/assets/img/mi-logo.png">
 <link rel="apple-touch-icon" href="/assets/img/mi-logo.png">
 <link rel="stylesheet" href="/assets/vendor/element-plus.css">
-<link rel="stylesheet" href="/assets/css/app.css?v=3.34.0">
+<link rel="stylesheet" href="/assets/css/app.css?v=3.35.0">
 <script src="/assets/ui/ui-registry.js?v=2.8.0"></script>
 <script src="/assets/ui/ui-loader.js?v=2.8.0" data-ui-cat="auto"></script>
 </head>
@@ -104,6 +104,14 @@
         </div>
       </div>
 
+
+      <!-- v2.58 红码提示：不管你在哪个页面都顶在最上面（不只客服码页才有） -->
+      <div class="global-red" v-if="me && me.role==='tenant' && codeCheck.state==='red'">
+        <span class="gr-ic">🔴</span>
+        <span class="gr-t">你的客服码已被微信拦截（俗称"红了"），客户扫码进不来 —— 请尽快换码，把新的二维码重新发出去</span>
+        <span class="gr-sp"></span>
+        <button type="button" class="gr-btn" @click="tab='links'">去换码 →</button>
+      </div>
 
       <!-- ============ 会话工作台 ============ -->
       <!-- 设置页左侧竖排菜单（在选择器里挑，不占主侧栏） -->
@@ -1459,7 +1467,7 @@
 <script src="/assets/qr-poster.js?v=2.1.03"></script>
 <script src="/assets/api.js?v=2.0.1"></script>
 <script src="/assets/js/app-components.js?v=2.6.0"></script>
-<script src="/assets/js/app.js?v=3.29.0"></script>
+<script src="/assets/js/app.js?v=3.30.0"></script>
 <script src="/assets/js/app-boot.js?v=2.1.1"></script>
 </body>
 </html>
