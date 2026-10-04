@@ -713,7 +713,10 @@ const app = createApp({
     };
 
     const openSession = async (id) => {
+      // v2.55 草稿/待发附件按会话隔离：给 A 打了一半的字（或贴好的图）不会跟着你跑到 B 的聊天框里
+      saveSessionDraft(currentId.value);
       currentId.value = id;
+      restoreSessionDraft(id);
       msgs.value = [];
       maxMsgId.value = 0;
       profile.value = null;
@@ -807,6 +810,21 @@ const app = createApp({
       try { await API.post('/api/sessions/' + id + '/read'); const s = sessions.value.find(x => x.id === id); if (s) s.unread = 0; } catch (e) {}
     };
 
+    /* v2.55 每个会话各自保存「打了一半的文字 + 待发附件」。
+       以前 draft / pendingAtts 是全局唯一的，换到另一个访客时上一个人的内容会跟过来，
+       既容易发错人，也容易把给 A 写的话发给 B。 */
+    const draftBox = reactive({});      // sessionId -> 文字
+    const attBox = reactive({});        // sessionId -> 待发附件数组
+    const saveSessionDraft = (id) => {
+      if (!id) return;
+      draftBox[id] = draft.value;
+      attBox[id] = pendingAtts.value.slice();
+    };
+    const restoreSessionDraft = (id) => {
+      draft.value = (id && draftBox[id]) || '';
+      pendingAtts.value = (id && attBox[id]) ? attBox[id].slice() : [];
+    };
+
     const send = async () => {
       const text = draft.value.trim();
       const atts = pendingAtts.value.slice();
@@ -820,6 +838,9 @@ const app = createApp({
         maxMsgId.value = r.message.id;
         draft.value = '';
         pendingAtts.value = [];
+        // v2.55 发完把该会话的草稿槽也清掉，切回来是干净的
+        draftBox[currentId.value] = '';
+        attBox[currentId.value] = [];
         replyTo.value = null;
         // v2.53 发完消息不再自动收起快捷栏（用户反馈"每次都要点一次才显示"）；
         // 想收起就点「⚡快捷消息」那个按钮，纯手动。
