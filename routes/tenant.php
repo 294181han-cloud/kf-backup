@@ -140,7 +140,15 @@ function handle_tenant_service_code(string $method): void
         // 看起来就是一个普通静态页，页面本身没有任何内容（见 public/gate.html）
         $gatePath = date('m-d') . '/' . gen_gate_name() . '.html?key=' . $code;
         if ($pick['wildcard']) {
-            $sub = substr(preg_replace('/[^a-z0-9]/', 'x', strtolower(base64_encode(random_bytes(6)))), 0, 8);
+            /* v2.60.6 子域从「固定子域池」里随机挑。
+               原因：真通配证书（*.域名）必须走 DNS 验证，而域名 DNS 在注册商手上；
+               退一步用「一批固定子域 + 一次性签进同一张证书」也能达到同样的防红效果，
+               而且续期走 HTTP 验证，全自动。
+               子域池存在 kv_store：pool_subs:<域名> = 逗号分隔的子域列表
+               （没配过的域名照旧随机生成 8 位子域 —— 比如 moupz.cn 有真通配证书，不受影响）。 */
+            $subs = array_values(array_filter(array_map('trim', explode(',', kv_get('pool_subs:' . $pick['domain'], '')))));
+            $sub = $subs ? $subs[array_rand($subs)]
+                : substr(preg_replace('/[^a-z0-9]/', 'x', strtolower(base64_encode(random_bytes(6)))), 0, 8);
             $url = "$scheme://$sub.{$pick['domain']}/$gatePath";
         } else {
             $url = "$scheme://{$pick['domain']}/$gatePath";
