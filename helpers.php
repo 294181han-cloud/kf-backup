@@ -619,9 +619,12 @@ function handle_internal_heartbeat(string $method): void
     $pdo = db();
     /* v2.51 空 app_version 不覆盖登记值：纯静态节点没有 version.php（cron 心跳带空版本），
        不能把节点管理页已知的真实版本抹掉，否则页面无从判断新旧 */
+    /* v2.60.4 同理：cron 心跳不带 origin（脚本里没有请求上下文），空值也不能把已登记的
+       来源地址抹掉 —— 节点管理页「来源」那一列会突然变「—」。 */
     $pdo->prepare('INSERT INTO nodes (ip, role, app_version, origin, first_seen, last_seen)
                    VALUES (?,?,?,?,NOW(),NOW())
-                   ON DUPLICATE KEY UPDATE origin = VALUES(origin), last_seen = NOW()'
+                   ON DUPLICATE KEY UPDATE last_seen = NOW()'
+                   . ($origin !== '' ? ', origin = VALUES(origin)' : '')
                    . ($ver !== '' ? ', app_version = VALUES(app_version)' : ''))
         ->execute([$ip, $role, $ver, $origin]);
     json_out(['ok' => true, 'main_version' => app_version()]);
@@ -821,11 +824,15 @@ function edge_maintenance(): void
         return is_array($j) ? $j : [];
     };
     // 1) 更新检查（总控版本不同或壳页指纹变化 → 返回更新包并应用）
+    $justApplied = '';   // v2.60.4：本轮刚应用的版本，心跳要用它，别用缓存的旧值
     try {
         $rev = @file_get_contents(__DIR__ . '/data/node-codes-rev.txt');
         $j = $post($main . '/api/internal/update', ['secret' => $secret, 'app_version' => app_version(),
             'role' => ($cfg['site_role'] ?? ''), 'codes_rev' => trim((string)$rev)]);
-        if (!empty($j['files'])) apply_node_bundle($j);
+        if (!empty($j['files'])) {
+            apply_node_bundle($j);
+            $justApplied = (string)($j['version'] ?? '');
+        }
     } catch (\Throwable $e) { /* 静默：下轮重试 */ }
     // 2) 黑名单同步
     try {
@@ -835,7 +842,11 @@ function edge_maintenance(): void
     // 3) 节点登记（IP+角色，幂等）
     try {
         $origin = ($_SERVER['REQUEST_SCHEME'] ?? 'https') . '://' . ($_SERVER['HTTP_HOST'] ?? '');
-        $post($main . '/api/internal/heartbeat', ['secret' => $secret, 'role' => ($cfg['site_role'] ?? ''), 'app_version' => app_version(), 'origin' => $origin, 'ip' => '']);
+        /* v2.60.4 修：app_version() 在同一个 PHP 请求里是 static 缓存，上面已经取过一次旧版本，
+           更新后这里再读还是旧版本号 —— 节点刚更新完却上报「落后」，节点管理页要等下一轮才变绿。
+           刚应用过就直接用更新包里的版本号。 */
+        $post($main . '/api/internal/heartbeat', ['secret' => $secret, 'role' => ($cfg['site_role'] ?? ''),
+            'app_version' => $justApplied !== '' ? $justApplied : app_version(), 'origin' => $origin, 'ip' => '']);
     } catch (\Throwable $e) { /* 静默 */ }
 }
 

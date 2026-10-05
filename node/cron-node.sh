@@ -39,7 +39,12 @@ if [ $? -eq 0 ] && [ -s /tmp/node-update.tar.gz ]; then
   #      节点从此卡在旧前端且再也不会自愈（现场踩过两次）。
   # 现在先整包校验（tar -tzf 会读完整个流），校验通过才落地。
   if tar -tzf /tmp/node-update.tar.gz >/dev/null 2>&1; then
-    tar -xzf /tmp/node-update.tar.gz -C "$SITE_DIR" && echo "$(date '+%F %T') 已应用更新包"
+    if tar -xzf /tmp/node-update.tar.gz -C "$SITE_DIR"; then
+      # v2.60.4 修：$VER 是脚本开头读的旧版本号，直接拿它去心跳，会让节点「刚更新完仍显示落后」，
+      # 要等下一轮才变绿。应用完重新读一次版本号再上报。
+      VER=$(sed -n "s/.*return[[:space:]]*'\([0-9.]*\)'.*/\1/p" version.php 2>/dev/null | head -1)
+      echo "$(date '+%F %T') 已应用更新包 ver=$VER"
+    fi
   else
     echo "$(date '+%F %T') 无更新或更新包不完整（$(head -c 60 /tmp/node-update.tar.gz 2>/dev/null | tr -d '\n' | cut -c1-60)），跳过本次，下轮重试"
   fi
