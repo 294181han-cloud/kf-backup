@@ -74,7 +74,7 @@ function handle_sessions(string $method): void
         (SELECT value FROM contacts WHERE session_id = s.id AND type = 'note' LIMIT 1) AS note,
         s.ip, s.from_url AS `from`, s.last_msg AS lastMsg, s.last_time AS lastTime, s.unread, s.source, s.geo, s.ua,
         s.pinned, s.pinned_at,
-        s.archived_at, s.closed_at,
+        s.archived_at, s.closed_at, s.last_online_at AS lastOnline,
         $onlineSql AS status,
         (SELECT COUNT(*) FROM messages WHERE session_id = s.id) AS message_count
         FROM v_sessions s LEFT JOIN agents a ON a.id = s.agent_id AND a.tenant_id = s.tenant_id
@@ -85,6 +85,7 @@ function handle_sessions(string $method): void
     $out = $rows->fetchAll();
     foreach ($out as &$r) {
         $r['lastTime'] = dt_to_iso($r['lastTime']);
+        $r['lastOnline'] = dt_to_iso($r['lastOnline'] ?? null);   // v2.60.1 访客最后上线（心跳时间）
         $r['unread'] = (int)$r['unread'];
         $r['agent_id'] = (int)$r['agent_id'];
         $r['message_count'] = (int)$r['message_count'];
@@ -975,7 +976,7 @@ function handle_agent_poll(string $method): void
     $st = $pdo->prepare("SELECT s.id, s.agent_id, a.nickname AS agent_name, s.visitor_name AS name, s.visitor_avatar,
         (SELECT value FROM contacts WHERE session_id = s.id AND type = 'note' LIMIT 1) AS note,
         s.ip, s.from_url AS `from`, s.last_msg AS lastMsg, s.last_time AS lastTime, s.unread, s.source, s.geo, s.ua,
-        s.archived_at, s.closed_at,
+        s.archived_at, s.closed_at, s.last_online_at AS lastOnline,
         s.pinned, s.pinned_at,
         $onlineSql AS status,
         (SELECT COUNT(*) FROM messages WHERE session_id = s.id) AS message_count
@@ -986,6 +987,7 @@ function handle_agent_poll(string $method): void
     $sessions = [];
     foreach ($st->fetchAll() as $r) {
         $r['lastTime'] = dt_to_iso($r['lastTime']);
+        $r['lastOnline'] = dt_to_iso($r['lastOnline'] ?? null);   // v2.60.1 访客最后上线（心跳时间）
         $r['unread'] = (int)$r['unread'];
         $r['agent_id'] = (int)$r['agent_id'];
         $r['message_count'] = (int)$r['message_count'];

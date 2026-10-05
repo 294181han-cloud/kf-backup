@@ -1946,3 +1946,20 @@ body.dark .global-red .gr-t { color: #ff8b8b; }
   body.dark .ct-card .ctc-row { border-top-color: #262c34; }
   body.dark .ct-card .ctc-v { color: #c6ccd8; }
 }
+
+/* ===== v2.60.1 聊天头部：访客「最后上线」时间 =====
+   显示在「● 离线 / 已结束」旁边；数据取访客心跳时间（last_online_at），
+   老会话没有心跳就退回最后一条消息时间，保证一定有得看。 */
+.ch-last-online {
+  flex-shrink: 0; display: inline-flex; align-items: center; gap: 3px;
+  font-size: 11.5px; line-height: 18px; padding: 0 7px; border-radius: 7px;
+  background: #f2f5fa; color: #7d8798; white-space: nowrap;
+}
+.ch-last-online .clo-t { color: #98a2b3; }
+body.dark .ch-last-online { background: #262c34; color: #9aa4b5; }
+body.dark .ch-last-online .clo-t { color: #7f8791; }
+@media (max-width: 900px) {
+  /* 手机端头部只有一行：只留「🕒 10-04 21:30」，不占访客名字的地方 */
+  .ch-last-online { font-size: 11px; padding: 0 6px; }
+  .ch-last-online .clo-t { display: none; }
+}
