@@ -658,7 +658,10 @@ function node_bundle_build(string $role = '', bool $static = false): array
         if (!$keep) continue;
         if (str_contains($path, '/.') || str_ends_with($path, '.log')) continue;
         // 静态边缘模式：PHP 文件不下发（节点为纯静态站点）
-        if ($staticMode && str_ends_with($path, '.php')) continue;
+        // v2.60.3 例外：version.php 要下发。纯静态节点的 version.php 是历史遗留文件，
+        //   不下发就会永远停在旧版本号 → 每 5 分钟都判定「版本不同」重新下载整包（约 1MB）
+        //   并且重解压一次（解压被打断就会解出半新半旧的站点）。下发后节点版本号能自然对齐。
+        if ($staticMode && str_ends_with($path, '.php') && $path !== 'version.php') continue;
         $files[$path] = base64_encode((string)file_get_contents($f->getPathname()));
     }
     // 静态边缘模式附加：根路径页面副本（注入总控地址）+ 节点配置 JS + 总控已落地的防红壳页
