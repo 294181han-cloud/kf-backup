@@ -7,9 +7,9 @@
 <link rel="icon" href="/assets/img/mi-logo.png">
 <link rel="apple-touch-icon" href="/assets/img/mi-logo.png">
 <link rel="stylesheet" href="/assets/vendor/element-plus.css">
-<link rel="stylesheet" href="/assets/css/app.css?v=3.38.0">
-<script src="/assets/ui/ui-registry.js?v=2.9.1"></script>
-<script src="/assets/ui/ui-loader.js?v=2.9.1" data-ui-cat="auto"></script>
+<link rel="stylesheet" href="/assets/css/app.css?v=3.40.0">
+<script src="/assets/ui/ui-registry.js?v=2.9.2"></script>
+<script src="/assets/ui/ui-loader.js?v=2.9.2" data-ui-cat="auto"></script>
 </head>
 <body>
 <!-- 注意：#app 是挂载容器，写在这里的 @click 不会被绑定（模板取的是它的 innerHTML）。
@@ -113,6 +113,8 @@
         <div style="margin-left:auto;display:flex;align-items:center;gap:14px;">
           <span v-if="unreadTotal > 0" class="unread-chip">{{ unreadTotal }} 条未读</span>
           <span class="clock">{{ clock }}</span>
+          <!-- v2.60.7 借鉴同行手机端：右上角给一个刷新键 -->
+          <button type="button" class="m-refresh m-only" title="刷新当前页面数据" @click="navRefresh">⟳</button>
         </div>
       </div>
 
@@ -126,6 +128,26 @@
       </div>
 
       <!-- ============ 会话工作台 ============ -->
+      <!-- v2.60.7 借鉴同行手机端：底部导航（只手机端显示；聊天窗口打开时自动隐藏，把高度留给消息） -->
+      <nav class="mtab" v-if="booted && !(tab==='work' && currentId)">
+        <button type="button" class="mtab-i" :class="{on: tab==='work'}" @click="navTo('work')">
+          <span class="mt-ic">💬<i class="mt-dot" v-if="unreadTotal>0">{{ unreadTotal>99 ? '99+' : unreadTotal }}</i></span>
+          <span class="mt-t">会话</span>
+        </button>
+        <button type="button" class="mtab-i" :class="{on: tab==='visitors'}" @click="navTo('visitors')">
+          <span class="mt-ic">👥</span><span class="mt-t">访客</span>
+        </button>
+        <button type="button" class="mtab-i" :class="{on: tab==='stats'}" @click="navTo('stats')">
+          <span class="mt-ic">📊</span><span class="mt-t">数据</span>
+        </button>
+        <button type="button" class="mtab-i" v-if="me && me.role==='tenant'" :class="{on: tab==='links'}" @click="navTo('links')">
+          <span class="mt-ic">🔗</span><span class="mt-t">客服码</span>
+        </button>
+        <button type="button" class="mtab-i" :class="{on: tab==='setting'}" @click="navTo('setting')">
+          <span class="mt-ic">⚙️</span><span class="mt-t">设置</span>
+        </button>
+      </nav>
+
       <!-- 设置页左侧竖排菜单（在选择器里挑，不占主侧栏） -->
       <aside class="set-menu" v-if="tab==='setting'">
         <div class="sm-group" v-for="g in setGroups" :key="g.g">
@@ -454,6 +476,35 @@
 
       <!-- ============ 数据面板 ============ -->
       <div class="content" v-if="tab==='stats' && stats">
+        <!-- v2.60.7 借鉴同行手机端：顶部「概览卡 + 账户信息」，内容与配色按我们自己的来 -->
+        <div class="panel hero-panel">
+          <div class="hero-ava"><img src="/assets/img/mi-logo.png" alt="小米客服"></div>
+          <div class="hero-body">
+            <div class="hero-name">小米客服<span class="hero-badge">{{ me.role==='tenant' ? '客服管理员' : '子客服' }}</span></div>
+            <div class="hero-desc">实时概览：接待数据、账户信息和在线状态，快速把握今天的工作节奏。</div>
+          </div>
+          <div class="hero-state">
+            <div class="hs-t">当前状态</div>
+            <div class="hs-v" :class="{bad: meExpired}"><i></i>{{ meExpired ? '账号已到期' : '在线接待' }}</div>
+            <div class="hs-s">数据同步于 {{ clock }}</div>
+          </div>
+        </div>
+        <div class="panel">
+          <div class="panel-title" style="justify-content:flex-start;gap:10px;">账户信息
+            <el-button size="small" text type="primary" @click="navRefresh">刷新</el-button>
+          </div>
+          <div class="kv-list">
+            <div class="kv-row"><span class="kv-k">卡密</span><span class="kv-v mono">{{ me.kami || '—' }}</span></div>
+            <div class="kv-row"><span class="kv-k">身份</span><span class="kv-v">{{ me.role==='tenant' ? '客服管理员' : '子客服' }}</span></div>
+            <div class="kv-row"><span class="kv-k">名称</span><span class="kv-v">{{ me.nickname || me.remark || me.kami || '—' }}</span></div>
+            <div class="kv-row"><span class="kv-k">状态</span><span class="kv-v" :class="meExpired ? 'warn' : 'ok'">{{ meExpired ? '账号已到期' : '在线接待' }}</span></div>
+            <div class="kv-row"><span class="kv-k">到期</span><span class="kv-v">{{ me.expires_at ? (fmtDay(me.expires_at) + ' · ' + expireText) : '永久有效' }}</span></div>
+            <template v-if="me.role==='tenant'">
+              <div class="kv-row"><span class="kv-k">本周额度</span><span class="kv-v">客服码 {{ me.used_app }} / {{ me.quota_app }} · 网页 {{ me.used_web }} / {{ me.quota_web }}</span></div>
+              <div class="kv-row"><span class="kv-k">子客服上限</span><span class="kv-v">{{ me.max_agents }} 个</span></div>
+            </template>
+          </div>
+        </div>
         <div class="panel guide-panel" v-if="me.role==='tenant'">
           <div class="panel-title" style="margin-bottom:10px;">
             接入引导
@@ -1029,7 +1080,7 @@
 
       <!-- ============ 访客资源 ============ -->
       <div class="content" v-if="tab==='visitors' && me.role==='tenant'">
-        <div class="panel">
+        <div class="panel visitor-panel">
           <div class="panel-title" style="justify-content:flex-start;gap:12px;">
             访客资源（{{ visitors.length }}）
             <el-button size="small" @click="loadVisitors">刷新</el-button>
@@ -1071,6 +1122,31 @@
               </template>
             </el-table-column>
           </el-table>
+          <!-- v2.60.7 手机端：访客列表用卡片（表格 565px 宽，手机上得左右滑才看得全） -->
+          <div class="v-cards">
+            <div class="v-card" v-for="row in visitors" :key="'vc' + (row.id || '') + (row.ip || '') + (row.name || '')">
+              <div class="vc-head">
+                <span class="v-ava">{{ row.avatar || (row.name||'?').slice(0,1) }}</span>
+                <div class="vc-id">
+                  <div class="vc-name">{{ row.name }}</div>
+                  <div class="vc-sub">{{ row.session_count }} 次会话 · {{ row.msg_count }} 条消息</div>
+                </div>
+                <div class="vc-time">{{ shortTime(row.last_active) }}</div>
+              </div>
+              <div class="vc-row"><span class="vc-k">联系方式</span><span class="vc-v">
+                <template v-if="row.mobile">📱 {{ row.mobile }}</template>
+                <template v-if="row.wechat"><template v-if="row.mobile"> · </template>💬 {{ row.wechat }}</template>
+                <span v-if="!row.mobile && !row.wechat" class="muted">—</span>
+              </span></div>
+              <div class="vc-row"><span class="vc-k">IP</span><span class="vc-v mono">{{ row.ip || '—' }}</span></div>
+              <div class="vc-ops">
+                <el-button size="small" type="primary" plain @click="openVisitorSessions(row)">查看会话</el-button>
+                <el-popconfirm v-if="row.ip" :title="'拉黑 ' + row.ip + '？'" @confirm="blockIp(row.ip)">
+                  <template #reference><el-button size="small" type="danger" plain>拉黑</el-button></template>
+                </el-popconfirm>
+              </div>
+            </div>
+          </div>
           <div v-if="!visitors.length" class="muted" style="padding:30px;text-align:center;">暂无访客记录</div>
         </div>
       </div>
@@ -1491,7 +1567,7 @@
 <script src="/assets/qr-poster.js?v=2.1.03"></script>
 <script src="/assets/api.js?v=2.0.1"></script>
 <script src="/assets/js/app-components.js?v=2.6.2"></script>
-<script src="/assets/js/app.js?v=3.32.0"></script>
+<script src="/assets/js/app.js?v=3.33.0"></script>
 <script src="/assets/js/app-boot.js?v=2.1.1"></script>
 </body>
 </html>

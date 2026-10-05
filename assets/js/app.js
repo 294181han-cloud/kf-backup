@@ -436,6 +436,35 @@ const app = createApp({
     const loadStats = async () => { try { stats.value = await API.get('/api/stats/dashboard'); } catch (e) {} };
     const loadLinks = async () => { try { links.value = await API.get('/api/tenant/links'); renderCodeQrs(); renderMainQr(); } catch (e) {} };
     const loadAgents = async () => { try { agents.value = await API.get('/api/tenant/agents'); } catch (e) {} };
+
+    /* ===== v2.60.7 手机端体验（借鉴同行手机端，但按我们自己的结构来）=====
+       ① 底部导航：会话 / 访客 / 数据 / 客服码 / 设置 —— 不用再点汉堡菜单；
+       ② 顶栏刷新键：按当前页重新拉一次数据，给个轻提示；
+       ③ 概览卡用到的「是否已到期」和「日期格式」。 */
+    const navTo = (t) => {
+      mSideOpen.value = false;
+      if (t === 'work') { tab.value = 'work'; restartPoll(); return; }
+      if (t === 'stats') { tab.value = 'stats'; loadStats(); restartPoll(); return; }
+      if (t === 'visitors') { tab.value = 'visitors'; loadVisitors(); return; }
+      if (t === 'links') { tab.value = 'links'; if (me.value && me.value.role === 'tenant') loadLinks(); return; }
+      if (t === 'setting') { openSetting(setTab.value); return; }
+    };
+    const navRefresh = async () => {
+      const t = tab.value;
+      try {
+        if (t === 'stats') await Promise.all([loadStats(), pollOnce()]);
+        else if (t === 'visitors') await loadVisitors();
+        else if (t === 'links') { await loadLinks(); await loadStats(); }
+        else await pollOnce();
+        ElementPlus.ElMessage({ message: '已刷新', duration: 800 });
+      } catch (e) { ElementPlus.ElMessage.error(e.message); }
+    };
+    const meExpired = computed(() => !!(me.value && me.value.expires_at && new Date(me.value.expires_at) < new Date()));
+    const fmtDay = (t) => {
+      if (!t) return '';
+      const s = String(t).replace('T', ' ');
+      return s.slice(0, 10);
+    };
     const loadBrand = async () => {
       try {
         const b = await API.get('/api/tenant/settings');
@@ -2805,6 +2834,7 @@ const app = createApp({
 
     return {
       tab, tabTitle, booted, me, expireText, stats, sessions, sessSearch, filteredSessions, currentId, current,
+      navTo, navRefresh, meExpired, fmtDay,
       msgs, draft, sending, chatBody, viewing, profile, contactList, noteDraft, transferDlg, transferTo, agentOptions,
       pinBottom, onMediaLoad,
       chatAtBottom, onChatScroll, toBottom,

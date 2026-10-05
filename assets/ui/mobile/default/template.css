@@ -303,3 +303,40 @@ html[data-ui-cat="mobile"][data-ui-template="default"] .panel-title { flex-wrap:
 html[data-ui-cat="mobile"][data-ui-template="default"] .panel-title > span {
   margin-left: 0 !important; flex: 1 1 100%;
 }
+
+/* =====================================================================
+   v2.60.7 借鉴同行手机端：底部导航 + 顶栏刷新键 + 概览卡/账户信息在窄屏的排布
+   —— 导航项、配色、文案都是我们自己的（会话 / 访客 / 数据 / 客服码 / 设置）。
+   .mtab 在 app.css 里默认 display:none，这里才打开；聊天窗口打开时由 v-if 整个移除，
+   不会跟输入框抢高度。
+   ===================================================================== */
+html[data-ui-cat="mobile"][data-ui-template="default"] .mtab {
+  display: flex; order: 99; flex-shrink: 0;
+  background: var(--card); border-top: 1px solid var(--line);
+  padding-bottom: env(safe-area-inset-bottom);
+}
+html[data-ui-cat="mobile"][data-ui-template="default"] .mtab-i {
+  flex: 1 1 0; min-width: 0; display: flex; flex-direction: column; align-items: center; gap: 2px;
+  padding: 8px 0 7px; border: 0; background: transparent; color: var(--ink-3);
+  font-size: 10.5px; line-height: 1.2; font-family: inherit; cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+html[data-ui-cat="mobile"][data-ui-template="default"] .mtab-i.on { color: var(--theme, #1677ff); font-weight: 700; }
+html[data-ui-cat="mobile"][data-ui-template="default"] .mtab-i:active { background: color-mix(in srgb, var(--theme, #1677ff) 8%, transparent); }
+html[data-ui-cat="mobile"][data-ui-template="default"] .mtab-i .mt-ic { position: relative; font-size: 19px; line-height: 1; }
+html[data-ui-cat="mobile"][data-ui-template="default"] .mtab-i .mt-dot {
+  position: absolute; top: -6px; right: -13px; min-width: 16px; height: 16px; padding: 0 4px;
+  border-radius: 999px; background: #f53f3f; color: #fff; font-size: 10px; font-style: normal;
+  font-weight: 700; line-height: 16px; text-align: center; box-shadow: 0 1px 3px rgba(0, 0, 0, .18);
+}
+/* 顶栏刷新键 */
+html[data-ui-cat="mobile"][data-ui-template="default"] .m-refresh {
+  width: 30px; height: 30px; border: 1px solid var(--line); border-radius: 9px;
+  background: var(--card); color: var(--ink-2); font-size: 15px; line-height: 1; cursor: pointer;
+}
+html[data-ui-cat="mobile"][data-ui-template="default"] .m-refresh:active { background: var(--bg); }
+/* 概览卡在手机上：状态块单独占一行，别把名字挤没 */
+html[data-ui-cat="mobile"][data-ui-template="default"] .hero-panel { gap: 10px; }
+html[data-ui-cat="mobile"][data-ui-template="default"] .hero-state { flex: 1 1 100%; min-width: 0; }
+html[data-ui-cat="mobile"][data-ui-template="default"] .kv-row { font-size: 13px; padding: 9px 11px; }
+html[data-ui-cat="mobile"][data-ui-template="default"] .kv-k { flex: 0 0 76px; }

@@ -1963,3 +1963,82 @@ body.dark .ch-last-online .clo-t { color: #7f8791; }
   .ch-last-online { font-size: 11px; padding: 0 6px; }
   .ch-last-online .clo-t { display: none; }
 }
+
+/* =====================================================================
+   v2.60.7 借鉴同行手机端的三处：① 顶部概览卡 ② 账户信息键值表 ③ 底部导航
+   —— 只借结构思路，配色/字段/文案都是我们自己的（小米客服）。
+   底部导航默认隐藏，手机端模板里才打开（见 assets/ui/mobile/default/template.css）。
+   ===================================================================== */
+.mtab { display: none; }
+
+/* 概览卡：头像 + 名称/角色徽章 + 一句话 + 右侧「当前状态」 */
+.hero-panel { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
+.hero-ava {
+  width: 54px; height: 54px; border-radius: 16px; overflow: hidden; flex-shrink: 0;
+  background: #eef3fb; border: 1px solid var(--v-line, #ecf0f6);
+}
+.hero-ava img { width: 100%; height: 100%; display: block; object-fit: cover; }
+.hero-body { flex: 1 1 240px; min-width: 0; }
+.hero-name {
+  display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+  font-size: 17px; font-weight: 700; color: var(--v-ink, #1f2329);
+}
+.hero-badge {
+  font-size: 11.5px; font-weight: 600; padding: 1px 8px; border-radius: 999px;
+  background: color-mix(in srgb, var(--theme, #1677ff) 14%, #fff); color: var(--theme, #1677ff);
+}
+.hero-desc { margin-top: 5px; font-size: 12.5px; line-height: 1.7; color: var(--v-ink-3, #86909c); }
+.hero-state {
+  flex: 0 0 auto; min-width: 152px; padding: 10px 14px; border-radius: 12px;
+  background: #f7f9fc; border: 1px solid var(--v-line, #ecf0f6);
+}
+.hero-state .hs-t { font-size: 11.5px; color: #98a2b3; }
+.hero-state .hs-v { display: flex; align-items: center; gap: 6px; margin-top: 4px; font-size: 14px; font-weight: 700; color: #0aa15a; }
+.hero-state .hs-v i { width: 8px; height: 8px; border-radius: 50%; background: #18c964; box-shadow: 0 0 0 3px rgba(24, 201, 100, .16); }
+.hero-state .hs-v.bad { color: #cf1322; }
+.hero-state .hs-v.bad i { background: #f53f3f; box-shadow: 0 0 0 3px rgba(245, 63, 63, .16); }
+.hero-state .hs-s { margin-top: 4px; font-size: 11px; color: #a9b3c2; }
+
+/* 账户信息：一行一项的圆角键值表 */
+.kv-list { display: flex; flex-direction: column; gap: 8px; }
+.kv-row {
+  display: flex; align-items: center; gap: 12px; padding: 9px 12px;
+  border-radius: 10px; background: #f7f9fc; font-size: 13.5px;
+}
+.kv-k { flex: 0 0 84px; color: #86909c; }
+.kv-v { flex: 1; min-width: 0; text-align: right; color: #1f2329; font-weight: 600; word-break: break-all; }
+.kv-v.ok { color: #0aa15a; }
+.kv-v.warn { color: #cf1322; }
+
+body.dark .hero-ava { background: #232830; border-color: #2b313a; }
+body.dark .hero-name { color: #e7eaf0; }
+body.dark .hero-badge { background: color-mix(in srgb, var(--theme, #1677ff) 26%, #232830); color: #9fc7ff; }
+body.dark .hero-state { background: #232830; border-color: #2b313a; }
+body.dark .kv-row { background: #232830; }
+body.dark .kv-v { color: #e7eaf0; }
+body.dark .kv-v.ok { color: #4ade80; }
+body.dark .kv-v.warn { color: #ff7875; }
+
+/* 访客列表：手机端改卡片（表格在 390px 宽要左右滑才看得全） */
+.v-cards { display: none; }
+.v-card {
+  border: 1px solid #eef1f5; border-radius: 12px; background: #fff;
+  padding: 10px 12px; margin-bottom: 10px;
+}
+.v-card .vc-head { display: flex; align-items: center; gap: 10px; }
+.v-card .vc-id { flex: 1; min-width: 0; }
+.v-card .vc-name { font-size: 14.5px; font-weight: 650; color: #1f2329; word-break: break-all; }
+.v-card .vc-sub { font-size: 11.5px; color: #86909c; margin-top: 2px; }
+.v-card .vc-time { flex-shrink: 0; font-size: 11px; color: #a9b3c2; }
+.v-card .vc-row { display: flex; gap: 10px; padding: 6px 0; border-top: 1px dashed #f2f4f8; font-size: 13px; }
+.v-card .vc-k { flex: 0 0 62px; color: #86909c; }
+.v-card .vc-v { flex: 1; min-width: 0; color: #4e5969; word-break: break-all; }
+.v-card .vc-ops { display: flex; gap: 8px; margin-top: 4px; }
+body.dark .v-card { background: #1e2229; border-color: #2b313a; }
+body.dark .v-card .vc-name { color: #e7eaf0; }
+body.dark .v-card .vc-row { border-top-color: #262c34; }
+body.dark .v-card .vc-v { color: #c6ccd8; }
+@media (max-width: 900px) {
+  .visitor-panel > .el-table { display: none; }
+  .v-cards { display: block; }
+}
