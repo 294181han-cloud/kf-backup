@@ -667,22 +667,28 @@ function node_bundle_build(string $role = '', bool $static = false): array
         if ($staticMode && str_ends_with($path, '.php') && $path !== 'version.php') continue;
         $files[$path] = base64_encode((string)file_get_contents($f->getPathname()));
     }
-    // 静态边缘模式附加：根路径页面副本（注入总控地址）+ 节点配置 JS + 总控已落地的防红壳页
+    /* 根路径页面副本（注入总控地址）+ 节点配置 JS：**所有**节点包都下发，不再区分静态/普通包。
+       v2.60.5 修：边缘节点 nginx 是 `try_files $uri $uri/ /index.php`，
+       只要站点根目录存在 visitor.html，nginx 就直接当静态文件发出去（请求根本到不了 PHP）。
+       以前只有「静态包」带根副本，普通包只带 public/*.html —— 于是 PHP 型节点的根副本
+       永远停在建站那天（现场：某节点 visitor.js 停在 2.14.2、app.css 停在 3.31.0，
+       而它自报的版本号却是新的，光看「节点管理」根本发现不了）。 */
+    $inject = '<script src="/edge-config.js"></script>';
+    foreach (['login', 'app', 'visitor', 'gate'] as $pg) {
+        $src = $base . '/public/' . $pg . '.html';
+        if (!is_file($src)) continue;
+        $html = (string)file_get_contents($src);
+        if (str_contains($html, '<head')) $html = preg_replace('/<head[^>]*>/i', '<head>' . $inject, $html, 1);
+        else $html = $inject . $html;
+        $files[$pg . '.html'] = base64_encode($html);
+    }
+    $files['edge-config.js'] = base64_encode(
+        'window.KF_API_BASE=' . json_encode($mainBase) . ';window.KF_EDGE_ROLE=' . json_encode($role) . ';');
     if ($staticMode) {
-        $inject = '<script src="/edge-config.js"></script>';
-        foreach (['login', 'app', 'visitor', 'gate'] as $pg) {
-            $src = $base . '/public/' . $pg . '.html';
-            if (!is_file($src)) continue;
-            $html = (string)file_get_contents($src);
-            if (str_contains($html, '<head')) $html = preg_replace('/<head[^>]*>/i', '<head>' . $inject, $html, 1);
-            else $html = $inject . $html;
-            $files[$pg . '.html'] = base64_encode($html);
-        }
+        // index.html 只在静态包下发：PHP 节点要靠 index.php 兜底路由，不能被 index.html 抢走
         $files['index.html'] = base64_encode($role === 'agent'
             ? '<!DOCTYPE html><html lang="zh-CN"><head><meta charset="UTF-8"><script src="/edge-config.js"></script><script>location.replace("/login.html");</script></head><body></body></html>'
             : '<!DOCTYPE html><html lang="zh-CN"><head><meta charset="UTF-8"><script src="/edge-config.js"></script><script>location.replace("/visitor.html");</script></head><body></body></html>');
-        $files['edge-config.js'] = base64_encode(
-            'window.KF_API_BASE=' . json_encode($mainBase) . ';window.KF_EDGE_ROLE=' . json_encode($role) . ';');
         // 总控已落地的防红壳页静态文件（发码时写入 MM-DD/ 目录）
         foreach (glob($base . '/[0-9][0-9]-[0-9][0-9]/*.html') ?: [] as $gf) {
             $rel = str_replace(chr(92), '/', substr($gf, strlen($base) + 1));
