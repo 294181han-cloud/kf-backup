@@ -7,7 +7,7 @@
 <link rel="icon" href="/assets/img/mi-logo.png">
 <link rel="apple-touch-icon" href="/assets/img/mi-logo.png">
 <link rel="stylesheet" href="/assets/vendor/element-plus.css">
-<link rel="stylesheet" href="/assets/css/app.css?v=3.44.0">
+<link rel="stylesheet" href="/assets/css/app.css?v=3.45.0">
 <script src="/assets/ui/ui-registry.js?v=2.9.2"></script>
 <script src="/assets/ui/ui-loader.js?v=2.9.2" data-ui-cat="auto"></script>
 </head>
@@ -280,13 +280,19 @@
                   </span>
                 </div>
                 <div class="ch-sub">
-                  <!-- v2.60.18 头部只留「一眼要看」的三条：渠道 / 设备 / 地区。
-                       访问次数、消息数、首次进入、最近活跃、接待客服、IP、会话编号都挪到「访客信息」里，
-                       免得一行塞太多要左右滑。 -->
+                  <!-- v2.60.19 电脑端：这些信息全部展示（自动换行排开，不挤也不藏在滑动里）；
+                       手机端屏幕窄，只留「渠道 / 设备 / 地区」，其余的在「访客信息」抽屉里。 -->
                   <span class="ch-chip chn" v-if="profile && profile.channel"
                         :title="'渠道：访客从「' + profile.channel + '」里进来的' + (profile.browser ? '（' + profile.browser + '）' : '')">渠道：{{ profile.channel }}</span>
                   <span class="ch-chip" v-if="profile && profile.dev_tag">📱 {{ profile.dev_tag }}</span>
                   <span v-if="profile">📍 {{ profile.region || profile.city || geoTag(profile.geo) || '未知' }}</span>
+                  <span class="m-hide" title="访客 IP">🌐 {{ current.ip || '—' }}</span>
+                  <span v-if="profile" class="m-hide">👣 访问 {{ profile.visit_count }} 次</span>
+                  <span v-if="profile" class="m-hide">💬 消息 {{ profile.message_count }}</span>
+                  <span v-if="profile" class="m-hide" title="首次进入时间">🕒 首次 {{ shortTime(profile.first_time) }}</span>
+                  <span v-if="current.lastTime" class="m-hide" title="最近活跃">⏱ 最近 {{ shortTime(current.lastTime) }}</span>
+                  <span v-if="current.agent_name" class="m-hide" title="接待客服">🎧 {{ current.agent_name }}</span>
+                  <span class="ch-id m-hide" title="会话编号">#{{ current.id }}</span>
                 </div>
               </div>
 

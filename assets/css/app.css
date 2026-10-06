@@ -2091,3 +2091,14 @@ body.dark .sto-btn.danger { background: #3a1c1c; border-color: #5c2727; color: #
 body.dark .ch-resume { background: #3a2f1a; color: #f0b45c; border-color: #5a4620; }
 .sess-resume-entry .sme-box { background: #fff7e6; color: #b26a00; }
 body.dark .sess-resume-entry .sme-box { background: #3a2f1a; color: #f0b45c; }
+
+/* =====================================================================
+   v2.60.19 电脑端会话头部：信息一条不少，但要排得开
+   —— ch-sub 改成自动换行（原来 nowrap + 横滑，右边几条会被挡住看不见）；
+      手机端屏幕窄，保持精简：只留渠道/设备/地区，其余在「访客信息」里。
+   ===================================================================== */
+.chat-head .ch-sub { flex-wrap: wrap; overflow: visible; row-gap: 6px; }
+@media (max-width: 900px) {
+  .chat-head .ch-sub { flex-wrap: nowrap; overflow-x: auto; overflow-y: hidden; row-gap: 0; }
+  .chat-head .ch-sub .m-hide { display: none !important; }
+}
