@@ -490,6 +490,12 @@ function handle_visitor_poll(string $method): void
     if ($method !== 'GET') { json_error('方法不允许', 405); return; }
     $sid = (int)input('session', 0);
     $sinceMsg = (int)input('sinceMsg', 0);
+    /* v2.67 会话绑定：轮询（含轻量探针）必须携带与会话匹配的 visitor_token，防枚举偷聊天记录 */
+    $vt = trim((string)input('visitor_token', ''));
+    $stTok = db()->prepare('SELECT visitor_token FROM v_sessions WHERE id = ?');
+    $stTok->execute([$sid]);
+    $sessTok = (string)($stTok->fetchColumn() ?: '');
+    if ($sessTok !== '' && $vt !== $sessTok) json_error('会话已失效', 403);
     // 轻量探针（访客闲置/暂停期专用）：只答"有无新消息"，一条索引查询；有新消息前端立即恢复全量轮询
     if (input('light')) {
         if (!$sid) json_out(['new' => false]);
@@ -666,6 +672,10 @@ function handle_visitor_send(string $method): void
     $st->execute([$sid]);
     $s = $st->fetch();
     if (!$s) json_error('会话不存在', 400);
+    /* v2.67 会话绑定：发送必须携带与会话匹配的 visitor_token（防冒用会话发消息） */
+    if ((string)($s['visitor_token'] ?? '') !== '' && trim((string)input('visitor_token', '')) !== (string)$s['visitor_token']) {
+        json_error('会话已失效', 403);
+    }
     $tid = (int)$s['tenant_id'];
     $ip = $s['ip'] ?: get_client_ip();
     if (is_ip_blocked($tid, $ip)) json_error('您的访问受限', 403);

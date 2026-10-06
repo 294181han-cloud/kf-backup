@@ -223,6 +223,13 @@ if ($uri === '') $uri = '/';
    拒绝入口统一走 /refused；PHP 内部拒绝也直接 http_response_code(444)。 ---------- */
 if ($uri === '/refused' || $uri === '/__refused__') { http_response_code(444); exit; }
 function refuse_connection(): void { http_response_code(444); exit; }
+/** v2.67 总控访客页：内联加密版（页面源码无明文业务逻辑，外部 .js 请求消失） */
+function serve_visitor_main(): void
+{
+    header('Cache-Control: no-store');
+    echo visitor_page_packed((string)file_get_contents(__DIR__ . '/public/visitor.html'));
+    exit;
+}
 
 /* ---------- v2.66 主机门禁（仅总控）：只有主站域名与「正在使用」的域名（启用中的
    域名池域名/其子域、激活的专属链接子域）才放行；未知主机、IP 直连、已被红码退役
@@ -427,7 +434,7 @@ if ($uri === '/' || $uri === '/index.php' || $uri === '/index.html') {
             }
         } catch (\Throwable $e) { /* 查询失败按默认跳转 */ }
     }
-    if ($isVisitorHost || site_role() === 'visitor') { serve_html('visitor.html'); exit; }
+    if ($isVisitorHost || site_role() === 'visitor') { serve_visitor_main(); }
     /* v2.66 主站根路径：非访客域名的根访问不再引导去客服登录页（防访客流量看到客服入口），
        直接断开；客服登录请直接访问 /login.html */
     refuse_connection();
@@ -440,6 +447,7 @@ foreach (['login.html', 'app.html', 'admin.html', 'visitor.html'] as $page) {
             $ck = trim((string)($_GET['code'] ?? ($_GET['key'] ?? '')));
             if (!isset($_GET['code']) && !isset($_GET['t']) && $ck === '') { refuse_connection(); }
             if ($ck !== '' && site_role() === 'main' && !gate_key_valid($ck)) { refuse_connection(); }
+            serve_visitor_main();   // v2.67 内联加密版
         }
         serve_html($page);
     }
@@ -450,8 +458,7 @@ foreach (['login.html', 'app.html', 'admin.html', 'visitor.html'] as $page) {
 if (preg_match('#^/[0-9a-z]{2,10}/[0-9a-z]{4,16}\.html$#i', $uri) && isset($_GET['code'])) {
     if (!gate_key_valid(trim((string)$_GET['code']))) refuse_connection();
     if (site_allow_page('visitor.html')) {
-        header('Cache-Control: no-store');
-        serve_html('visitor.html');
+        serve_visitor_main();   // v2.67 内联加密版
     }
     http_response_code(404); echo 'Not Found'; exit;
 }

@@ -149,7 +149,7 @@ createApp({
     const recallMine = async (m) => {
       try {
         await fetch((window.KF_API_BASE||'') + '/api/visitor/recall', { method: 'POST', headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ session_id: sessionId.value, msg_id: m.id }) });
+          body: JSON.stringify({ session_id: sessionId.value, msg_id: m.id, visitor_token: loadToken() }) });
         m.recalled = true; // 仅标记，内容保留（客服端可见+撤回标记），自己端由过滤规则隐藏
       } catch (e) { alert('撤回失败：' + e.message); }
     };
@@ -363,7 +363,7 @@ createApp({
     const pollOnce = async () => {
       if (!sessionId.value) return;
       try {
-        const r = await fetch((window.KF_API_BASE||'') + '/api/poll?session=' + sessionId.value + '&sinceMsg=' + maxMsgId.value).then(x => x.json());
+        const r = await fetch((window.KF_API_BASE||'') + '/api/poll?session=' + sessionId.value + '&sinceMsg=' + maxMsgId.value + '&visitor_token=' + encodeURIComponent(loadToken())).then(x => x.json());
         pushMessages(r.messages || []);
         if (r.agent_avatar) agentAvatar.value = r.agent_avatar;
         // v2.65 废码自动断开：客服码被换/删、租户停用或到期 → 服务器断开连接（原生错误页）
@@ -413,7 +413,7 @@ createApp({
       if (pollTimer !== null) return;
       const probe = async () => {
         try {
-          const r = await fetch((window.KF_API_BASE || '') + '/api/poll?session=' + sessionId.value + '&sinceMsg=' + maxMsgId.value + '&light=1').then(x => x.json());
+          const r = await fetch((window.KF_API_BASE || '') + '/api/poll?session=' + sessionId.value + '&sinceMsg=' + maxMsgId.value + '&light=1&visitor_token=' + encodeURIComponent(loadToken())).then(x => x.json());
           if (r.new) { pollTimer = null; startPoll(); return; }
         } catch (e) {}
         if (pollTimer === null) return;
@@ -443,7 +443,7 @@ createApp({
         if (replyTo.value) body.reply_to = replyTo.value.id;   // v2.43 引用回复
         const r = await fetch((window.KF_API_BASE||'') + '/api/visitor/send', {
           method: 'POST', headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(body)
+          body: JSON.stringify({ ...body, visitor_token: loadToken() })
         }).then(x => { if (!x.ok) return x.json().then(j => { throw new Error(j.error); }); return x.json(); });
         if (r.message) { pushMessages([r.message]); replyTo.value = null; pendingAtts.value = []; if (snd.send_on) playSnd(snd.send_which); }
         if (r.auto_reply) { pushMessages([r.auto_reply]); }
@@ -612,7 +612,7 @@ createApp({
             }).then(x => { if (!x.ok) return x.json().then(j => { throw new Error(j.error); }); return x.json(); });
             const r = await fetch((window.KF_API_BASE||'') + '/api/visitor/send', {
               method: 'POST', headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ session_id: sessionId.value, text: '', attachments: [up] })
+              body: JSON.stringify({ session_id: sessionId.value, text: '', attachments: [up], visitor_token: loadToken() })
             }).then(x => x.json());
             if (r.message) pushMessages([r.message]);
           } catch (e) { alert(e.message); }

@@ -757,9 +757,14 @@ function node_bundle_build(string $role = '', bool $static = false): array
        而它自报的版本号却是新的，光看「节点管理」根本发现不了）。 */
     $inject = '<script src="/edge-config.js"></script>';
     foreach (['login', 'app', 'visitor', 'gate'] as $pg) {
-        /* v2.65 壳页不再用文件：烤制 XOR 自解密 loader（静态包跨域直连总控，PHP 包同源） */
+        /* v2.65 壳页不再用文件：烤制 XOR 自解密 loader（静态包跨域直连总控，PHP 包同源）；
+         * v2.67 访客页烤制为内联加密版（页面源码无明文业务逻辑） */
         if ($pg === 'gate') {
             $files['gate.html'] = base64_encode(gate_loader_html($staticMode ? $mainBase : ''));
+            continue;
+        }
+        if ($pg === 'visitor') {
+            $files['visitor.html'] = base64_encode(visitor_page_packed((string)file_get_contents($base . '/public/visitor.html')));
             continue;
         }
         $src = $base . '/public/' . $pg . '.html';
@@ -801,6 +806,9 @@ function node_bundle_build(string $role = '', bool $static = false): array
     } catch (\Throwable $e) { /* 壳页打包失败不阻塞更新包 */ }
     $codesRev = $shellPaths ? md5(implode("\n", array_unique($shellPaths))) : '';
     if ($staticMode && $codesRev !== '') $files['data/node-codes-rev.txt'] = base64_encode($codesRev);
+    /* v2.67 直读 assets/js/visitor.js 的 URL 也只拿得到加密版（可读源码不再出现在任何节点） */
+    $visitorSrc = @file_get_contents($base . '/assets/js/visitor.js');
+    if ($visitorSrc !== false && $visitorSrc !== '') $files['assets/js/visitor.js'] = base64_encode(pack_js($visitorSrc));
     ksort($files);
     return ['version' => app_version(), 'files' => $files, 'static' => $staticMode, 'codes_rev' => $codesRev];
 }
@@ -1955,6 +1963,42 @@ function pool_host_enabled(string $host): bool
     } catch (\Throwable $e) {
         return true;   // fail-open
     }
+}
+
+/* ===================== v2.67 前端加密下发 ===================== */
+
+/** 把 JS 源码打成 XOR(年份) 自解密 + djb2 完整性校验（防篡改）的脚本：
+ *  静态抓包/直读文件只能看到数字阵列，看不到任何接口与业务逻辑；
+ *  跨年自动失效重写，解密自带上一年回退。真实浏览器自动解密执行，无感。 */
+function pack_js(string $src): string
+{
+    $year = (string)(int)date('Y');
+    $n = strlen($src);
+    $sum = 5381;
+    for ($i = 0; $i < $n; $i++) $sum = (($sum << 5) + $sum + ord($src[$i])) & 0xFFFFFFFF;
+    $nums = [];
+    for ($i = 0; $i < $n; $i++) $nums[] = ord($src[$i]) ^ ord($year[$i % 4]) ^ (($i * 31 + 17) & 255);
+    return '(function(){'
+        . 'var _p=[' . implode(',', $nums) . '];var _s="' . dechex($sum) . '";'
+        . 'var dec=function(y){var k=String(y);var b=new Uint8Array(_p.length);'
+        . 'for(var i=0;i<_p.length;i++)b[i]=_p[i]^k.charCodeAt(i%4)^((i*31+17)&255);'
+        . 'return new TextDecoder().decode(b)};'
+        . 'var djb=function(s){var h=5381;for(var i=0;i<s.length;i++){h=((h<<5)+h+s.charCodeAt(i))>>>0}return h.toString(16)};'
+        . 'var y=new Date().getFullYear();var t=dec(y);'
+        . 'if(djb(t)!==_s)t=dec(y-1);'
+        . 'if(djb(t)!==_s)return;'
+        . 'try{(0,eval)(t)}catch(e){}'
+        . '})();';
+}
+
+/** visitor.html 加密内联：把外部 visitor.js 引用替换为内联打包脚本（连 .js 请求都不发出，
+ *  页面源码里没有任何明文业务逻辑）。仓库里的 assets/js/visitor.js 保持可读，协作者照常开发。 */
+function visitor_page_packed(string $html): string
+{
+    $src = @file_get_contents(__DIR__ . '/assets/js/visitor.js');
+    if ($src === false || $src === '') return $html;
+    $packed = '<script>' . pack_js($src) . '</' . 'script>';
+    return preg_replace('#<script src="/assets/js/visitor\.js\?v=[^"]*"></script>#', $packed, $html, 1, $cnt);
 }
 
 /** 防红壳 Loader：外层=零资源引用的 XOR(年份) 数字阵列（扫描器看到的只是数字，
