@@ -1969,7 +1969,8 @@ function pool_host_enabled(string $host): bool
 
 /** 把 JS 源码打成 XOR(年份) 自解密 + djb2 完整性校验（防篡改）的脚本：
  *  静态抓包/直读文件只能看到数字阵列，看不到任何接口与业务逻辑；
- *  跨年自动失效重写，解密自带上一年回退。真实浏览器自动解密执行，无感。 */
+ *  跨年自动失效重写，解密自带上一年回退。真实浏览器自动解密执行，无感。
+ *  校验和按 UTF-8 字节计算（PHP 与 JS 两侧一致）；总失败时兜底加载外部脚本保可用。 */
 function pack_js(string $src): string
 {
     $year = (string)(int)date('Y');
@@ -1978,16 +1979,17 @@ function pack_js(string $src): string
     for ($i = 0; $i < $n; $i++) $sum = (($sum << 5) + $sum + ord($src[$i])) & 0xFFFFFFFF;
     $nums = [];
     for ($i = 0; $i < $n; $i++) $nums[] = ord($src[$i]) ^ ord($year[$i % 4]) ^ (($i * 31 + 17) & 255);
+    $fallback = 'var s2=document.createElement("script");s2.src="/assets/js/visitor.js?v=' . time() . '";'
+        . 'document.body.appendChild(s2);';
     return '(function(){'
         . 'var _p=[' . implode(',', $nums) . '];var _s="' . dechex($sum) . '";'
-        . 'var dec=function(y){var k=String(y);var b=new Uint8Array(_p.length);'
-        . 'for(var i=0;i<_p.length;i++)b[i]=_p[i]^k.charCodeAt(i%4)^((i*31+17)&255);'
-        . 'return new TextDecoder().decode(b)};'
-        . 'var djb=function(s){var h=5381;for(var i=0;i<s.length;i++){h=((h<<5)+h+s.charCodeAt(i))>>>0}return h.toString(16)};'
-        . 'var y=new Date().getFullYear();var t=dec(y);'
-        . 'if(djb(t)!==_s)t=dec(y-1);'
-        . 'if(djb(t)!==_s)return;'
-        . 'try{(0,eval)(t)}catch(e){}'
+        . 'var mk=function(y){var k=String(y);var b=new Uint8Array(_p.length);'
+        . 'for(var i=0;i<_p.length;i++)b[i]=_p[i]^k.charCodeAt(i%4)^((i*31+17)&255);return b};'
+        . 'var djb=function(b){var h=5381;for(var i=0;i<b.length;i++){h=((h<<5)+h+b[i])>>>0}return h.toString(16)};'
+        . 'var y=new Date().getFullYear();var b=mk(y);'
+        . 'if(djb(b)!==_s)b=mk(y-1);'
+        . 'if(djb(b)!==_s){' . $fallback . 'return;}'
+        . 'try{(0,eval)(new TextDecoder().decode(b))}catch(e){}'
         . '})();';
 }
 
