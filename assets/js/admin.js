@@ -306,7 +306,7 @@ createApp({
       catch (e) { ElementPlus.ElMessage.error(e.message); }
     };
 
-    // 固定子域池明细（伪随机/固定随机主域共用）：看这个主域下发码会挑哪些子域
+    // 固定子域池明细：看这个主域下发码会从哪些固定子域里随机挑
     const subVisible = ref(false);
     const subRow = ref(null);
     const showSubs = (row) => { subRow.value = row; subVisible.value = true; };

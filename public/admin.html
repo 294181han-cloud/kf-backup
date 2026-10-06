@@ -151,7 +151,7 @@
               <el-table-column prop="domain" label="域名"></el-table-column>
               <el-table-column label="类型" width="150">
                 <template #default="{row}">
-                  {{ row.dtype === 'fixed' ? '固定随机' : (row.dtype === 'pseudo' ? '伪随机' : (row.wildcard ? '泛解析' : '单域名')) }}
+                  {{ row.dtype === 'fixed' ? '固定随机' : (row.wildcard ? '泛解析' : '单域名') }}
                   <el-tag v-if="row.subs_count" size="small" type="info" style="margin-left:4px;">{{ row.subs_count }} 子域</el-tag>
                 </template>
               </el-table-column>
@@ -172,7 +172,7 @@
             </el-table>
           </div>
 
-          <!-- 固定子域池明细：这个主域下发码会从这些子域里伪随机挑 -->
+          <!-- 固定子域池明细：这个主域下发码会从这些子域里随机挑 -->
           <el-dialog v-model="subVisible" :title="'固定子域池 — ' + (subRow ? subRow.domain : '')" width="520px">
             <p style="font-size:13px;color:#86909c;margin:0 0 10px;">
               发码时从下面 {{ subRow ? subRow.subs_count : 0 }} 个子域里随机挑一个（主域名本身不会出现在客服码链接里）。

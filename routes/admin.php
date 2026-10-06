@@ -235,8 +235,8 @@ function handle_admin_domain_pool(string $method): void
     $pdo = db();
 
     if ($method === 'GET') {
-        /* v2.62 伪随机自动识别：kv_store 里有 pool_subs:<域名> 的行（v2.60.6 固定子域池），
-           后台自动标 dtype=pseudo 并带上子域明细，不再靠人记忆或查库 */
+        /* v2.62.1 伪随机并入固定随机：两者存储逻辑相同（kv_store pool_subs:<域名>），
+           有固定子域池的行统一标 dtype=fixed 并带子域明细，显示与发码实际行为一致 */
         $rows = $pdo->query('SELECT id, domain, wildcard, dtype, enabled, created_at FROM domain_pool ORDER BY id ASC')->fetchAll();
         $subsMap = [];
         foreach ($pdo->query("SELECT skey, sval FROM kv_store WHERE skey LIKE 'pool_subs:%'") as $kv) {
@@ -249,7 +249,7 @@ function handle_admin_domain_pool(string $method): void
             $list = $subsMap[strtolower((string)$r['domain'])] ?? [];
             $r['subs'] = $list;
             $r['subs_count'] = count($list);
-            if ((string)$r['dtype'] === '' && $list) $r['dtype'] = 'pseudo';
+            if ((string)$r['dtype'] === '' && $list) $r['dtype'] = 'fixed';
         }
         unset($r);
         json_out($rows);

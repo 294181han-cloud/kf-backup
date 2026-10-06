@@ -139,16 +139,20 @@ function handle_tenant_service_code(string $method): void
         // v2.59 防红：入口改成「日期目录 + 随机文件名.html?key=客服码」
         // 看起来就是一个普通静态页，页面本身没有任何内容（见 public/gate.html）
         $gatePath = date('m-d') . '/' . gen_gate_name() . '.html?key=' . $code;
-        if ($pick['wildcard']) {
-            /* v2.60.6 子域从「固定子域池」里随机挑。
-               原因：真通配证书（*.域名）必须走 DNS 验证，而域名 DNS 在注册商手上；
-               退一步用「一批固定子域 + 一次性签进同一张证书」也能达到同样的防红效果，
-               而且续期走 HTTP 验证，全自动。
-               子域池存在 kv_store：pool_subs:<域名> = 逗号分隔的子域列表
-               （没配过的域名照旧随机生成 8 位子域 —— 比如 moupz.cn 有真通配证书，不受影响）。 */
-            $subs = array_values(array_filter(array_map('trim', explode(',', kv_get('pool_subs:' . $pick['domain'], '')))));
-            $sub = $subs ? $subs[array_rand($subs)]
-                : substr(preg_replace('/[^a-z0-9]/', 'x', strtolower(base64_encode(random_bytes(6)))), 0, 8);
+        /* v2.62.1 整合发码选域：只要该域名配了固定子域池（kv_store pool_subs:<域名>），
+           不管池里登记成泛解析还是单域名，一律从子域池随机挑——主域名本身永远不会
+           出现在客服码链接里。此前单域名行即使配了子域池也走裸域分支，导致随机时
+           冒出单域名链接（显示与实际不一致）。
+           没配子域池的：泛解析行照旧每次随机 8 位子域（配合真通配证书），单域名行用裸域。
+           固定子域池的来源：⚡快速导入（v2.61）自动写入，或后台手工写库。 */
+        $subs = array_values(array_filter(array_map('trim', explode(',', kv_get('pool_subs:' . $pick['domain'], '')))));
+        if ($subs) {
+            $url = "$scheme://" . $subs[array_rand($subs)] . ".{$pick['domain']}/$gatePath";
+        } elseif ($pick['wildcard']) {
+            /* v2.60.6 没配固定子域池的泛解析：每次随机 8 位子域。
+               真通配证书（*.域名）必须走 DNS 验证，而域名 DNS 在注册商手上；
+               退一步用「一批固定子域 + 一次性签进同一张证书」也能达到同样的防红效果（见上）。 */
+            $sub = substr(preg_replace('/[^a-z0-9]/', 'x', strtolower(base64_encode(random_bytes(6)))), 0, 8);
             $url = "$scheme://$sub.{$pick['domain']}/$gatePath";
         } else {
             $url = "$scheme://{$pick['domain']}/$gatePath";
