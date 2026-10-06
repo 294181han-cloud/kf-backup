@@ -149,16 +149,20 @@
             </div>
             <el-table :data="domains" stripe>
               <el-table-column prop="domain" label="域名"></el-table-column>
-              <el-table-column label="类型" width="110">
-                <template #default="{row}">{{ row.dtype === 'fixed' ? '固定随机' : (row.wildcard ? '泛解析' : '单域名') }}</template>
+              <el-table-column label="类型" width="150">
+                <template #default="{row}">
+                  {{ row.dtype === 'fixed' ? '固定随机' : (row.dtype === 'pseudo' ? '伪随机' : (row.wildcard ? '泛解析' : '单域名')) }}
+                  <el-tag v-if="row.subs_count" size="small" type="info" style="margin-left:4px;">{{ row.subs_count }} 子域</el-tag>
+                </template>
               </el-table-column>
               <el-table-column label="状态" width="90">
                 <template #default="{row}">
                   <el-tag :type="row.enabled ? 'success' : 'info'" size="small">{{ row.enabled ? '启用' : '停用' }}</el-tag>
                 </template>
               </el-table-column>
-              <el-table-column label="操作" width="160">
+              <el-table-column label="操作" width="220">
                 <template #default="{row}">
+                  <el-button v-if="row.subs_count" size="small" @click="showSubs(row)">子域明细</el-button>
                   <el-button size="small" @click="toggleDomain(row)">{{ row.enabled ? '停用' : '启用' }}</el-button>
                   <el-popconfirm title="删除该域名？" @confirm="delDomain(row)">
                     <template #reference><el-button size="small" type="danger">删除</el-button></template>
@@ -167,6 +171,20 @@
               </el-table-column>
             </el-table>
           </div>
+
+          <!-- 固定子域池明细：这个主域下发码会从这些子域里伪随机挑 -->
+          <el-dialog v-model="subVisible" :title="'固定子域池 — ' + (subRow ? subRow.domain : '')" width="520px">
+            <p style="font-size:13px;color:#86909c;margin:0 0 10px;">
+              发码时从下面 {{ subRow ? subRow.subs_count : 0 }} 个子域里随机挑一个（主域名本身不会出现在客服码链接里）。
+              这些子域需要在节点/面板上有对应证书（多域名一张 SAN 证书或逐个签）。
+            </p>
+            <el-input v-if="subRow" type="textarea" :rows="10" readonly
+              :model-value="(subRow.subs || []).map(s => s + '.' + subRow.domain).join('\n')"></el-input>
+            <template #footer>
+              <el-button @click="copySubs">复制全部</el-button>
+              <el-button type="primary" @click="subVisible = false">关闭</el-button>
+            </template>
+          </el-dialog>
 
           <!-- aaPanel 快速导入：一个站点（主域+固定随机子域别名）+ 一张 SAN 证书 -->
           <el-dialog v-model="aaVisible" title="⚡ 快速导入（aaPanel）" width="560px">
@@ -572,6 +590,6 @@
 <script src="/assets/vendor/vue.global.js?v=2.0.1"></script>
 <script src="/assets/vendor/element-plus.js?v=2.0.1"></script>
 <script src="/assets/api.js?v=2.0.3"></script>
-<script src="/assets/js/admin.js?v=2.5.0"></script>
+<script src="/assets/js/admin.js?v=2.6.0"></script>
 </body>
 </html>

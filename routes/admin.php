@@ -235,7 +235,24 @@ function handle_admin_domain_pool(string $method): void
     $pdo = db();
 
     if ($method === 'GET') {
-        json_out($pdo->query('SELECT id, domain, wildcard, dtype, enabled, created_at FROM domain_pool ORDER BY id ASC')->fetchAll());
+        /* v2.62 伪随机自动识别：kv_store 里有 pool_subs:<域名> 的行（v2.60.6 固定子域池），
+           后台自动标 dtype=pseudo 并带上子域明细，不再靠人记忆或查库 */
+        $rows = $pdo->query('SELECT id, domain, wildcard, dtype, enabled, created_at FROM domain_pool ORDER BY id ASC')->fetchAll();
+        $subsMap = [];
+        foreach ($pdo->query("SELECT skey, sval FROM kv_store WHERE skey LIKE 'pool_subs:%'") as $kv) {
+            $dom = strtolower(substr((string)$kv['skey'], strlen('pool_subs:')));
+            if ($dom === '') continue;
+            $list = array_values(array_filter(array_map('trim', explode(',', (string)$kv['sval']))));
+            $subsMap[$dom] = $list;
+        }
+        foreach ($rows as &$r) {
+            $list = $subsMap[strtolower((string)$r['domain'])] ?? [];
+            $r['subs'] = $list;
+            $r['subs_count'] = count($list);
+            if ((string)$r['dtype'] === '' && $list) $r['dtype'] = 'pseudo';
+        }
+        unset($r);
+        json_out($rows);
     }
 
     if ($method === 'POST') {

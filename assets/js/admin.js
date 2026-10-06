@@ -306,6 +306,17 @@ createApp({
       catch (e) { ElementPlus.ElMessage.error(e.message); }
     };
 
+    // 固定子域池明细（伪随机/固定随机主域共用）：看这个主域下发码会挑哪些子域
+    const subVisible = ref(false);
+    const subRow = ref(null);
+    const showSubs = (row) => { subRow.value = row; subVisible.value = true; };
+    const copySubs = async () => {
+      if (!subRow.value) return;
+      const text = (subRow.value.subs || []).map(s => s + '.' + subRow.value.domain).join('\n');
+      try { await navigator.clipboard.writeText(text); ElementPlus.ElMessage.success('已复制 ' + subRow.value.subs_count + ' 个子域'); }
+      catch (e) { ElementPlus.ElMessage.error('复制失败，请手动全选文本框复制'); }
+    };
+
     // aaPanel 快速导入（v2.61）：一个站点=主域+固定随机子域别名，一张 SAN 证书，写 v2.60.6 固定子域池
     const aaVisible = ref(false);
     const aaBusy = ref(false);
@@ -374,6 +385,7 @@ createApp({
     return {
       tab, tabTitle, booted, me, ov, tenants, domains, newDomain, rootDomain, defVal, pwOld, pwNew,
       aaVisible, aaBusy, aaPhp, aaResult, aaTip, aaTipType, aaForm, openAa, aaTest, aaImport,
+      subVisible, subRow, showSubs, copySubs,
       nodes, mainVersion, pushingIp, loadNodes, pushNode, forgetNode, dlBootstrap,
       nodeCodes, newCodeRole, lastCode, genNodeCode, revokeNodeCode,
       gips, newGip, newGipNote, gipVersion, addGip, delGip,
