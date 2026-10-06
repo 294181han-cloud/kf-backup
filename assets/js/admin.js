@@ -306,15 +306,22 @@ createApp({
       catch (e) { ElementPlus.ElMessage.error(e.message); }
     };
 
-    // 固定子域池明细：看这个主域下发码会从哪些固定子域里随机挑
+    // 子域明细 · 状态表：拉这个主域下每个子域的实时状态（红码/使用中/已作废/待分配）
     const subVisible = ref(false);
     const subRow = ref(null);
-    const showSubs = (row) => { subRow.value = row; subVisible.value = true; };
+    const subRows = ref([]);
+    const subLoading = ref(false);
+    const showSubs = async (row) => {
+      subRow.value = row; subVisible.value = true; subLoading.value = true; subRows.value = [];
+      try { subRows.value = await API.get('/api/admin/domain-pool/subs?domain=' + encodeURIComponent(row.domain)); }
+      catch (e) { ElementPlus.ElMessage.error(e.message); }
+      subLoading.value = false;
+    };
     const copySubs = async () => {
-      if (!subRow.value) return;
-      const text = (subRow.value.subs || []).map(s => s + '.' + subRow.value.domain).join('\n');
-      try { await navigator.clipboard.writeText(text); ElementPlus.ElMessage.success('已复制 ' + subRow.value.subs_count + ' 个子域'); }
-      catch (e) { ElementPlus.ElMessage.error('复制失败，请手动全选文本框复制'); }
+      if (!subRows.value.length) return;
+      const text = subRows.value.map(r => r.host).join('\n');
+      try { await navigator.clipboard.writeText(text); ElementPlus.ElMessage.success('已复制 ' + subRows.value.length + ' 个子域'); }
+      catch (e) { ElementPlus.ElMessage.error('复制失败，请手动全选表格复制'); }
     };
 
     // 已红域名名单（自动退役）：查看 + 恢复
@@ -396,7 +403,7 @@ createApp({
     return {
       tab, tabTitle, booted, me, ov, tenants, domains, newDomain, rootDomain, defVal, pwOld, pwNew,
       aaVisible, aaBusy, aaPhp, aaResult, aaTip, aaTipType, aaForm, openAa, aaTest, aaImport,
-      subVisible, subRow, showSubs, copySubs,
+      subVisible, subRow, subRows, subLoading, showSubs, copySubs,
       reds, loadReds, restoreRed,
       nodes, mainVersion, pushingIp, loadNodes, pushNode, forgetNode, dlBootstrap,
       nodeCodes, newCodeRole, lastCode, genNodeCode, revokeNodeCode,

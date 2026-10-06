@@ -407,6 +407,58 @@ function handle_admin_aa_import(string $method): void
         'site_existed' => $siteExisted, 'cert_ok' => $certOk, 'cert_msg' => $certMsg]);
 }
 
+/* ---------- 子域明细 · 状态表（v2.64）----------
+   主域下每个子域的实时状态，优先级：红码 > 使用中 > 已作废 > 待分配。
+   固定随机：待分配 = 固定子域池里还没被码占用的；
+   泛解析：只显示出现过的（现役码占用 / 检测留档的历史码 / 红名单），每次随机新造的子域不预列。
+   数据源：service_codes（现役）、code_check_cache（检测留档，码已不在即视为已作废）、
+   red_domains（红）、pool_subs（固定池）。 */
+function handle_admin_pool_subs(string $method): void
+{
+    require_admin_ctx();
+    if ($method !== 'GET') json_error('方法不允许', 405);
+    $main = strtolower(trim((string)input('domain', '')));
+    if ($main === '' || !str_contains($main, '.')) json_error('缺少 domain');
+    $pdo = db();
+    $likeSub = '%.' . $main . '/%';
+    $likeBare = '%//' . $main . '/%';
+
+    $rows = [];
+    $liveCodes = [];
+    foreach ($pdo->query('SELECT code, link FROM service_codes WHERE link LIKE ' . $pdo->quote($likeSub) . ' OR link LIKE ' . $pdo->quote($likeBare)) as $r) {
+        $h = strtolower((string)(parse_url((string)$r['link'], PHP_URL_HOST) ?: ''));
+        if ($h === '') continue;
+        $rows[$h] = ['host' => $h, 'status' => '使用中', 'code' => (string)$r['code'], 'checked_at' => ''];
+        $liveCodes[] = (string)$r['code'];
+    }
+    foreach ($pdo->query('SELECT link, state, at_ts FROM code_check_cache WHERE link LIKE ' . $pdo->quote($likeSub) . ' OR link LIKE ' . $pdo->quote($likeBare)) as $r) {
+        $h = strtolower((string)(parse_url((string)$r['link'], PHP_URL_HOST) ?: ''));
+        if ($h === '' || isset($rows[$h])) continue;
+        parse_str((string)(parse_url((string)$r['link'], PHP_URL_QUERY) ?: ''), $q);
+        $code = (string)($q['key'] ?? '');
+        $isLive = $code !== '' && in_array($code, $liveCodes, true);
+        $rows[$h] = ['host' => $h,
+            'status' => $isLive ? '使用中' : ((string)$r['state'] === 'red' ? '红码' : '已作废'),
+            'code' => $code,
+            'checked_at' => (int)$r['at_ts'] ? date('Y-m-d H:i', (int)$r['at_ts']) : ''];
+    }
+    $st = $pdo->prepare('SELECT host, code, created_at FROM red_domains WHERE main = ? OR host = ?');
+    $st->execute([$main, $main]);
+    foreach ($st->fetchAll() as $r) {
+        $h = strtolower((string)$r['host']);
+        $rows[$h] = ['host' => $h, 'status' => '红码', 'code' => (string)$r['code'],
+            'checked_at' => dt_to_iso((string)$r['created_at'])];
+    }
+    foreach (array_filter(array_map('trim', explode(',', kv_get('pool_subs:' . $main, '')))) as $s) {
+        $h = strtolower($s) . '.' . $main;
+        if (!isset($rows[$h])) $rows[$h] = ['host' => $h, 'status' => '待分配', 'code' => '', 'checked_at' => ''];
+    }
+    $rank = ['红码' => 0, '使用中' => 1, '已作废' => 2, '待分配' => 3];
+    $out = array_values($rows);
+    usort($out, fn($a, $b) => ($rank[$a['status']] ?? 9) <=> ($rank[$b['status']] ?? 9) ?: strcmp($a['host'], $b['host']));
+    json_out($out);
+}
+
 /* ---------- 已红域名名单（v2.63）：检测到红自动退役，这里查看/恢复 ---------- */
 
 function handle_admin_red_domains(string $method): void

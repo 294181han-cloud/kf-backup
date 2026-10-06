@@ -505,6 +505,7 @@ function dispatch_api(string $method, string $uri): void
     if ($uri === '/api/admin/tenants/gen')       handle_admin_tenants_gen($method);
     if (preg_match('#^/api/admin/tenants/(\d+)$#', $uri, $m)) handle_admin_tenants_id($method, (int)$m[1]);
     if ($uri === '/api/admin/domain-pool')       handle_admin_domain_pool($method);
+    if ($uri === '/api/admin/domain-pool/subs')  handle_admin_pool_subs($method);
     if (preg_match('#^/api/admin/domain-pool/(\d+)$#', $uri, $m)) handle_admin_domain_pool_id($method, (int)$m[1]);
     if ($uri === '/api/admin/aa-test')           handle_admin_aa_test($method);
     if ($uri === '/api/admin/aa-import')         handle_admin_aa_import($method);
