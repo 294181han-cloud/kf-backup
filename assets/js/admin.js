@@ -306,6 +306,54 @@ createApp({
       catch (e) { ElementPlus.ElMessage.error(e.message); }
     };
 
+    // aaPanel 快速导入（v2.61）：一个站点=主域+固定随机子域别名，一张 SAN 证书，写 v2.60.6 固定子域池
+    const aaVisible = ref(false);
+    const aaBusy = ref(false);
+    const aaPhp = ref([]);
+    const aaResult = ref(null);
+    const aaTip = ref('');
+    const aaTipType = ref('info');
+    const aaForm = reactive({ panel: '', api_key: '', main_domain: '', sub_count: 64, sub_len: 8, php_version: '84' });
+    const openAa = () => { aaVisible.value = true; aaResult.value = null; aaTip.value = ''; };
+    const aaCheck = () => {
+      if (!aaForm.panel.trim() || !aaForm.api_key.trim()) { ElementPlus.ElMessage.warning('请先填面板地址和 API 密钥'); return false; }
+      if (!/^https?:\/\//i.test(aaForm.panel.trim())) { ElementPlus.ElMessage.warning('面板地址要以 http(s):// 开头'); return false; }
+      return true;
+    };
+    const aaTest = async () => {
+      if (!aaCheck()) return;
+      aaBusy.value = true; aaTip.value = '';
+      try {
+        const r = await API.post('/api/admin/aa-test', { panel: aaForm.panel.trim(), api_key: aaForm.api_key.trim() });
+        aaPhp.value = r.php || [];
+        if (aaPhp.value.length && !aaPhp.value.includes(aaForm.php_version)) aaForm.php_version = aaPhp.value[aaPhp.value.length - 1];
+        aaTip.value = '连接成功，可选 PHP 版本：' + (aaPhp.value.join(' / ') || '未获取到（可手动填，如 84）');
+        aaTipType.value = 'success';
+      } catch (e) {
+        aaTip.value = e.message; aaTipType.value = 'error';
+      }
+      aaBusy.value = false;
+    };
+    const aaImport = async () => {
+      if (!aaCheck()) return;
+      if (!aaForm.main_domain.trim() || !aaForm.main_domain.trim().includes('.')) { ElementPlus.ElMessage.warning('请填主域名，例如 moupz.cn'); return; }
+      aaBusy.value = true; aaTip.value = '导入中：建站 → 签证书（可能要 10~60 秒）→ 写域名池…'; aaTipType.value = 'info';
+      try {
+        const r = await API.post('/api/admin/aa-import', {
+          panel: aaForm.panel.trim(), api_key: aaForm.api_key.trim(),
+          main_domain: aaForm.main_domain.trim(), sub_count: aaForm.sub_count,
+          sub_len: aaForm.sub_len, php_version: aaForm.php_version,
+        });
+        aaResult.value = r;
+        if (r.cert_ok) { aaTip.value = '导入完成：站点+证书+子域池全部就绪'; aaTipType.value = 'success'; }
+        else { aaTip.value = '站点和子域池已就绪，但证书没签成——确认泛解析已生效后点「开始导入」重试补签（建站是幂等的）'; aaTipType.value = 'warning'; }
+        await loadDomains();
+      } catch (e) {
+        aaTip.value = e.message; aaTipType.value = 'error';
+      }
+      aaBusy.value = false;
+    };
+
     // 设置
     const saveRootDomain = async () => {
       try { await API.post('/api/admin/root-domain', { root_domain: rootDomain.value }); ElementPlus.ElMessage.success('已保存'); }
@@ -325,6 +373,7 @@ createApp({
     onMounted(loadAll);
     return {
       tab, tabTitle, booted, me, ov, tenants, domains, newDomain, rootDomain, defVal, pwOld, pwNew,
+      aaVisible, aaBusy, aaPhp, aaResult, aaTip, aaTipType, aaForm, openAa, aaTest, aaImport,
       nodes, mainVersion, pushingIp, loadNodes, pushNode, forgetNode, dlBootstrap,
       nodeCodes, newCodeRole, lastCode, genNodeCode, revokeNodeCode,
       gips, newGip, newGipNote, gipVersion, addGip, delGip,

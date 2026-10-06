@@ -92,6 +92,10 @@ function ensure_upgrade(): void
         // v2.60.11 会话回收站：删除会话改成软删除（30 天内可自己恢复，也能立刻撤销）
         try { $pdo->exec("ALTER TABLE v_sessions ADD COLUMN deleted_at DATETIME NULL"); } catch (\Throwable $e) { /* 列已存在 */ }
         try { $pdo->exec("ALTER TABLE v_sessions ADD INDEX idx_deleted (tenant_id, deleted_at)"); } catch (\Throwable $e) { /* 索引已存在 */ }
+        // v2.61 aaPanel 快速导入：domain_pool 增加类型（fixed=固定随机子域池主域）；kv_store sval 扩容
+        //（64 个固定子域的逗号列表约 600 字符，VARCHAR(255) 放不下会静默截断）
+        try { $pdo->exec("ALTER TABLE domain_pool ADD COLUMN dtype VARCHAR(16) NOT NULL DEFAULT ''"); } catch (\Throwable $e) { /* 列已存在 */ }
+        try { $pdo->exec("ALTER TABLE kv_store MODIFY sval TEXT NOT NULL"); } catch (\Throwable $e) { /* 已是 TEXT */ }
         try { $pdo->exec("ALTER TABLE v_sessions ADD INDEX idx_tenant_pinned (tenant_id, pinned, last_time)"); } catch (\Throwable $e) { /* 已存在 */ }
         // v2.33/v2.39 分域节点登记：同一台服务器可同时跑客服入口+访客站点，唯一键 = IP+角色
         $pdo->exec("CREATE TABLE IF NOT EXISTS nodes (
@@ -491,6 +495,8 @@ function dispatch_api(string $method, string $uri): void
     if (preg_match('#^/api/admin/tenants/(\d+)$#', $uri, $m)) handle_admin_tenants_id($method, (int)$m[1]);
     if ($uri === '/api/admin/domain-pool')       handle_admin_domain_pool($method);
     if (preg_match('#^/api/admin/domain-pool/(\d+)$#', $uri, $m)) handle_admin_domain_pool_id($method, (int)$m[1]);
+    if ($uri === '/api/admin/aa-test')           handle_admin_aa_test($method);
+    if ($uri === '/api/admin/aa-import')         handle_admin_aa_import($method);
     if ($uri === '/api/admin/root-domain')       handle_admin_root_domain($method);
     if ($uri === '/api/admin/nodes')             handle_admin_nodes($method);
     if ($uri === '/api/admin/node-codes')        handle_admin_node_codes($method);
