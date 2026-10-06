@@ -280,17 +280,13 @@
                   </span>
                 </div>
                 <div class="ch-sub">
+                  <!-- v2.60.18 头部只留「一眼要看」的三条：渠道 / 设备 / 地区。
+                       访问次数、消息数、首次进入、最近活跃、接待客服、IP、会话编号都挪到「访客信息」里，
+                       免得一行塞太多要左右滑。 -->
                   <span class="ch-chip chn" v-if="profile && profile.channel"
                         :title="'渠道：访客从「' + profile.channel + '」里进来的' + (profile.browser ? '（' + profile.browser + '）' : '')">渠道：{{ profile.channel }}</span>
                   <span class="ch-chip" v-if="profile && profile.dev_tag">📱 {{ profile.dev_tag }}</span>
-                  <span class="m-hide" title="访客 IP">🌐 {{ current.ip || '—' }}</span>
                   <span v-if="profile">📍 {{ profile.region || profile.city || geoTag(profile.geo) || '未知' }}</span>
-                  <span v-if="profile" class="m-hide">👣 访问 {{ profile.visit_count }} 次</span>
-                  <span v-if="profile" class="m-hide">💬 消息 {{ profile.message_count }}</span>
-                  <span v-if="profile" class="m-hide" title="首次进入时间">🕒 首次 {{ shortTime(profile.first_time) }}</span>
-                  <span v-if="current.lastTime" class="m-hide" title="最近活跃">⏱ 最近 {{ shortTime(current.lastTime) }}</span>
-                  <span v-if="current.agent_name" class="m-hide" title="接待客服">🎧 {{ current.agent_name }}</span>
-                  <span class="ch-id m-hide" title="会话编号">#{{ current.id }}</span>
                 </div>
               </div>
 
@@ -515,9 +511,13 @@
           </div>
           <div class="info-item" v-if="profile"><span class="k">地区</span><span class="v" style="font-size:12px;">{{ profile.region || profile.city || geoTag(profile.geo) || '未知' }}</span></div>
           <div class="info-item" v-if="current.lastOnline || current.lastTime"><span class="k">最后上线</span><span class="v" style="font-size:12px;">{{ fmtTime(current.lastOnline || current.lastTime) }}</span></div>
+          <!-- v2.60.18 头部删掉的那些，都在这里补全 -->
+          <div class="info-item" v-if="profile && profile.first_time"><span class="k">首次进入</span><span class="v" style="font-size:12px;">{{ shortTime(profile.first_time) }}</span></div>
           <div class="info-item"><span class="k">进入方式</span><span class="v">{{ sourceText(current.source) }}</span></div>
           <div class="info-item" v-if="profile"><span class="k">访问次数</span><span class="v">{{ profile.visit_count }}</span></div>
           <div class="info-item" v-if="profile"><span class="k">消息数</span><span class="v">{{ profile.message_count }}</span></div>
+          <div class="info-item" v-if="current.agent_name"><span class="k">接待客服</span><span class="v">{{ current.agent_name }}</span></div>
+          <div class="info-item"><span class="k">会话编号</span><span class="v mono">#{{ current.id }}</span></div>
           <!-- v2.60.9 恢复码：客户换手机/换浏览器后，把码发给他就能回到这段对话 -->
           <div class="info-item" v-if="profile && profile.resume_code">
             <span class="k">恢复码</span>
