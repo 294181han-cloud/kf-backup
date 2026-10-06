@@ -3217,3 +3217,4 @@ VER=$(sed -n "s/.*return[[:space:]]*'\([0-9.]*\)'.*/\1/p" version.php | head -1)
 | 页面 JS 报错 | 无 ✅ |
 
 版本：`version.php` 2.58.0 → **2.59.0**；`app.js?v=3.31.0`、`visitor.js?v=2.20.0`
+
