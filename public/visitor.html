@@ -7,7 +7,7 @@
 <title>在线咨询</title>
 <link rel="icon" href="/assets/img/mi-logo.png">
 <link rel="apple-touch-icon" href="/assets/img/mi-logo.png">
-<link rel="stylesheet" href="/assets/css/visitor.css?v=2.14.0">
+<link rel="stylesheet" href="/assets/css/visitor.css?v=2.15.0">
 </head>
 <body>
 <!-- v2.52 兜底：脚本没跑起来时（微信旧内核 document.write 不执行脚本 / 资源被缓存污染 / 网络抽风），
@@ -145,6 +145,11 @@
             </div>
             <div class="msg-time" v-if="m.from === 'visitor' && canRecall(m)">
               <a class="recall-link" @click="recallMine(m)">撤回</a>
+            </div>
+            <!-- v2.60.20 每条消息右下角给个 ⋯：点一下出「回复 / 复制文字 / 撤回」，
+                 不用再长按（长按在部分手机上会触发浏览器的全选/拷贝，很难用） -->
+            <div class="msg-time">
+              <button type="button" class="msg-more" title="回复 / 复制" @click.stop="openActSheet(m)">⋯</button>
             </div>
           </div>
         </template>

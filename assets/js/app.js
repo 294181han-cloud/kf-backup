@@ -284,8 +284,13 @@ const app = createApp({
       tab.value = 'setting';
       if (v) setTab.value = v;
       if (setTab.value === 'security') loadSecurityPage();
+      if (setTab.value === 'brand') loadBrand();   // 公告横幅也在这个页，进来先拉一次最新值
     };
-    const switchSetting = (v) => { setTab.value = v; if (v === 'security') loadSecurityPage(); };
+    const switchSetting = (v) => {
+      setTab.value = v;
+      if (v === 'security') loadSecurityPage();
+      if (v === 'brand') loadBrand();
+    };
     // 会话列表/会话头：按来访设备/平台给一个图标，比纯文字更好认
     // v2.65 「等待接入...」是访客刚打开聊天页、还没说话时的占位（visitor.php 建的初始 last_msg），
     // 列表里不显示它，免得看着像一条系统提示；等他真发了消息，这里自然就有内容了。

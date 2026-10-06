@@ -908,3 +908,20 @@ body.dark .v-pending .vp-tip { color: #98a3b4; }
 .vm-btn:disabled { opacity: .6; }
 .vm-btn.ghost { flex: 0 0 92px; background: #f2f4f8; color: #5c6b85; }
 .vm-tip { margin-top: 10px; font-size: 11px; color: #a9b3c2; text-align: center; }
+
+/* =====================================================================
+   v2.60.20 访客端长按/复制体验
+   ① 长按消息不再触发浏览器自带的「全选 / 拷贝 / 查询」菜单（用户反馈"总是全选整页"）；
+   ② 每条消息右下角给一个 ⋯ 按钮，点一下出「回复 / 复制文字 / 撤回」，不用长按也能用。
+   ===================================================================== */
+.msg-row, .msg-bubble, .msg-box { -webkit-touch-callout: none; -webkit-user-select: none; user-select: none; }
+.msg-bubble a, .msg-bubble img { -webkit-touch-callout: none; }
+.visitor .msg-more, .msg-more {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 24px; height: 24px; margin-left: 6px; vertical-align: middle;
+  border: 1px solid var(--line, #e3e8f0); border-radius: 50%; background: #fff;
+  color: #8b95a7; font-size: 15px; line-height: 1; padding: 0; cursor: pointer; font-family: inherit;
+}
+.msg-more:active { background: #eef1f7; color: var(--theme, #1677ff); border-color: var(--theme, #1677ff); }
+/* 访客自己那条：⋯ 放左边一点，别贴着屏幕边 */
+.msg-row.visitor .msg-time { display: flex; justify-content: flex-end; align-items: center; gap: 6px; }
