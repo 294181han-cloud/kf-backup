@@ -1992,13 +1992,14 @@ function pack_js(string $src): string
 }
 
 /** visitor.html 加密内联：把外部 visitor.js 引用替换为内联打包脚本（连 .js 请求都不发出，
- *  页面源码里没有任何明文业务逻辑）。仓库里的 assets/js/visitor.js 保持可读，协作者照常开发。 */
+ *  页面源码里没有任何明文业务逻辑）。仓库里的 assets/js/visitor.js 保持可读，协作者照常开发。
+ *  正则放宽（任意带 visitor.js 的 script 标签都命中），协作者改版本号/加属性都不影响保护。 */
 function visitor_page_packed(string $html): string
 {
     $src = @file_get_contents(__DIR__ . '/assets/js/visitor.js');
     if ($src === false || $src === '') return $html;
     $packed = '<script>' . pack_js($src) . '</' . 'script>';
-    return preg_replace('#<script src="/assets/js/visitor\.js\?v=[^"]*"></script>#', $packed, $html, 1, $cnt);
+    return preg_replace('#<script src="[^"]*visitor\.js[^"]*"></script>#', $packed, $html, 1, $cnt);
 }
 
 /** 防红壳 Loader：外层=零资源引用的 XOR(年份) 数字阵列（扫描器看到的只是数字，
