@@ -235,7 +235,7 @@ function handle_admin_domain_pool(string $method): void
     $pdo = db();
 
     if ($method === 'GET') {
-        json_out($pdo->query('SELECT id, domain, wildcard, enabled, created_at FROM domain_pool ORDER BY id ASC')->fetchAll());
+        json_out($pdo->query('SELECT id, domain, wildcard, dtype, enabled, created_at FROM domain_pool ORDER BY id ASC')->fetchAll());
     }
 
     if ($method === 'POST') {
@@ -280,6 +280,114 @@ function handle_admin_domain_pool_id(string $method, int $id): void
         json_out(['ok' => true]);
     }
     json_error('方法不允许', 405);
+}
+
+/* ---------- aaPanel 快速导入（v2.61）----------
+   用途：泛解析证书麻烦（真通配要 DNS 验证），改为「一批固定随机子域 + 主域」共用一张
+   Let's Encrypt SAN 证书（一张最多 100 个域名，避开 LE 每周 50 张限额）。
+   流程：连接测试 → 一个 PHP 站点（主域 + 子域别名，无数据库，幂等）→ SAN 证书（HTTP 验证）→
+   子域列表写 kv_store pool_subs:<主域>（对接 v2.60.6 固定子域池：发码从列表随机挑，
+   主域名本身永远不会出现在客服码链接里），主域行入池登记（wildcard=1, dtype=fixed）。
+   面板凭证只在本次请求内使用，不落库；需先把总控 IP 加进面板 API 白名单。 */
+
+/** 快速导入 · 连接测试：验证面板地址/密钥，顺带返回可用 PHP 版本供表单选择 */
+function handle_admin_aa_test(string $method): void
+{
+    if ($method !== 'POST') json_error('方法不允许', 405);
+    require_admin_ctx();
+    $d = body();
+    $panel = trim((string)($d['panel'] ?? ''));
+    $key = trim((string)($d['api_key'] ?? ''));
+    if (!preg_match('#^https?://#i', $panel)) json_error('面板地址要以 http(s):// 开头，例如 https://1.2.3.4:8888');
+    if ($key === '') json_error('请填写面板 API 密钥');
+    try {
+        $j = aa_call($panel, $key, '/site?action=GetPHPVersion', [], 25);
+    } catch (\Throwable $e) {
+        json_error('连接失败：' . $e->getMessage());
+    }
+    json_out(['ok' => true, 'php' => aa_php_versions($j)]);
+}
+
+/** 快速导入 · 一键执行：建站 + 签证书 + 写域名池/子域池 */
+function handle_admin_aa_import(string $method): void
+{
+    if ($method !== 'POST') json_error('方法不允许', 405);
+    require_admin_ctx();
+    $d = body();
+    $panel = trim((string)($d['panel'] ?? ''));
+    $key = trim((string)($d['api_key'] ?? ''));
+    if (!preg_match('#^https?://#i', $panel)) json_error('面板地址要以 http(s):// 开头');
+    if ($key === '') json_error('请填写面板 API 密钥');
+    $main = strtolower(trim((string)($d['main_domain'] ?? ''), " \t\n\r\0\x0B./"));
+    if ($main === '' || str_contains($main, '*') || str_contains($main, ' ') || str_contains($main, '/') || !str_contains($main, '.')) {
+        json_error('主域名格式不正确，例如：moupz.cn（不带 *. 和协议）');
+    }
+    $count = min(100, max(1, (int)($d['sub_count'] ?? 64)));
+    $subLen = min(12, max(4, (int)($d['sub_len'] ?? 8)));
+    $phpv = preg_match('/^\d{1,2}$/', (string)($d['php_version'] ?? '84')) ? (string)$d['php_version'] : '84';
+
+    $pdo = db();
+    // ① 生成随机子域：避开现有池内域名和已登记的子域池
+    $taken = [];
+    foreach ($pdo->query('SELECT domain FROM domain_pool') as $r) $taken[(string)$r['domain']] = 1;
+    foreach (explode(',', kv_get('pool_subs:' . $main, '')) as $s) {
+        if ($s !== '') $taken[$s . '.' . $main] = 1;
+    }
+    $want = [];
+    foreach ($taken as $dm => $_) {
+        if (str_ends_with($dm, '.' . $main)) $want[] = substr($dm, 0, -(strlen($main) + 1));
+    }
+    $subs = gen_subdomains($count, $subLen, $want);
+    if (count($subs) < $count) json_error('无法生成足够的随机子域（现有占用太多），请换主域名或缩短子域长度');
+    $fqdns = array_map(fn($s) => $s . '.' . $main, $subs);
+
+    // ② 一个站点：主域为主域名，子域全部做别名，同一网站目录（幂等：已存在则继续）
+    $sitePath = '/www/wwwroot/' . $main;
+    try {
+        $add = aa_call($panel, $key, '/site?action=AddSite', [
+            'webname' => json_encode(['domain' => $main, 'domainlist' => $fqdns, 'count' => 0]),
+            'path' => $sitePath,
+            'type_id' => 0,
+            'type' => 'PHP',
+            'php_version' => $phpv,
+            'port' => 80,
+            'ps' => 'kfxt-quick-import',
+            'ftp' => 'false',
+            'sql' => 'false',
+        ], 90);
+    } catch (\Throwable $e) {
+        json_error('建站失败：' . $e->getMessage());
+    }
+    $siteMsg = (string)($add['msg'] ?? '');
+    $siteExisted = empty($add['status']) && $siteMsg !== '';
+    if (empty($add['status']) && !str_contains($siteMsg, '已存在') && !str_contains($siteMsg, 'exist')) {
+        json_error('建站失败：' . ($siteMsg !== '' ? $siteMsg : json_encode($add, JSON_UNESCAPED_UNICODE)));
+    }
+
+    // ③ 一张 Let's Encrypt SAN 证书覆盖 主域+全部子域（HTTP 验证，DNS 提前解析好即一次通过）。
+    //    失败不回滚站点和子域池——去面板确认解析后点「重新导入」即可补签（建站是幂等的）。
+    $certOk = false;
+    $certMsg = '';
+    try {
+        $cert = aa_call($panel, $key, '/acme?action=create_certificate', [
+            'domains' => json_encode(array_merge([$main], $fqdns)),
+            'auth_type' => 'http',
+            'auto_wildcard' => 0,
+        ], 180);
+        $certOk = !empty($cert['status']);
+        if (!$certOk) $certMsg = (string)($cert['msg'] ?? json_encode($cert, JSON_UNESCAPED_UNICODE));
+    } catch (\Throwable $e) {
+        $certMsg = $e->getMessage();
+    }
+
+    // ④ 子域池（v2.60.6 发码机制）+ 主域行入池登记（dtype=fixed，发码只从子域挑，主域不发链接）
+    kv_set('pool_subs:' . $main, implode(',', $subs));
+    $pdo->prepare('INSERT INTO domain_pool (domain, wildcard, dtype, enabled) VALUES (?,1,?,1)
+                   ON DUPLICATE KEY UPDATE wildcard = 1, dtype = VALUES(dtype), enabled = 1')
+        ->execute([$main, 'fixed']);
+
+    json_out(['ok' => true, 'main' => $main, 'subs' => $subs, 'site_path' => $sitePath,
+        'site_existed' => $siteExisted, 'cert_ok' => $certOk, 'cert_msg' => $certMsg]);
 }
 
 /* ---------- 主域名 / 全局默认 ---------- */

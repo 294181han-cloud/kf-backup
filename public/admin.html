@@ -145,11 +145,12 @@
             <div style="display:flex;gap:10px;margin-bottom:14px;">
               <el-input v-model="newDomain" placeholder="例如 abc.com 或 *.abc.com" style="max-width:320px;" @keyup.enter="addDomain"></el-input>
               <el-button type="primary" @click="addDomain">添加</el-button>
+              <el-button type="success" plain @click="openAa">⚡ 快速导入（aaPanel 一键建站+证书）</el-button>
             </div>
             <el-table :data="domains" stripe>
               <el-table-column prop="domain" label="域名"></el-table-column>
               <el-table-column label="类型" width="110">
-                <template #default="{row}">{{ row.wildcard ? '泛解析' : '单域名' }}</template>
+                <template #default="{row}">{{ row.dtype === 'fixed' ? '固定随机' : (row.wildcard ? '泛解析' : '单域名') }}</template>
               </el-table-column>
               <el-table-column label="状态" width="90">
                 <template #default="{row}">
@@ -166,6 +167,47 @@
               </el-table-column>
             </el-table>
           </div>
+
+          <!-- aaPanel 快速导入：一个站点（主域+固定随机子域别名）+ 一张 SAN 证书 -->
+          <el-dialog v-model="aaVisible" title="⚡ 快速导入（aaPanel）" width="560px">
+            <el-form label-width="150px">
+              <el-form-item label="面板地址">
+                <el-input v-model="aaForm.panel" placeholder="https://1.2.3.4:8888"></el-input>
+              </el-form-item>
+              <el-form-item label="API 密钥">
+                <el-input v-model="aaForm.api_key" type="password" show-password placeholder="面板「设置 → API」里的密钥"></el-input>
+              </el-form-item>
+              <el-form-item label="主域名">
+                <el-input v-model="aaForm.main_domain" placeholder="例如 moupz.cn（不带 *. 和协议，泛解析需提前解析到面板服务器）"></el-input>
+              </el-form-item>
+              <el-form-item label="随机子域数量">
+                <el-input-number v-model="aaForm.sub_count" :min="1" :max="100"></el-input-number>
+                <span style="margin-left:8px;font-size:12px;color:#86909c;">+ 主域名共用一张证书（上限 100 个域名）</span>
+              </el-form-item>
+              <el-form-item label="子域长度">
+                <el-input-number v-model="aaForm.sub_len" :min="4" :max="12"></el-input-number>
+              </el-form-item>
+              <el-form-item label="PHP 版本">
+                <el-select v-model="aaForm.php_version" style="width:140px;" :loading="aaBusy">
+                  <el-option v-for="v in aaPhp" :key="v" :label="v" :value="v"></el-option>
+                </el-select>
+                <span style="margin-left:8px;font-size:12px;color:#86909c;">点「连接测试」自动获取</span>
+              </el-form-item>
+            </el-form>
+            <el-alert v-if="aaTip" :title="aaTip" :type="aaTipType" show-icon :closable="false" style="margin-bottom:10px;"></el-alert>
+            <div v-if="aaResult" style="font-size:12px;background:#f7f8fa;border-radius:8px;padding:10px;line-height:1.8;">
+              <div>建站目录：<span class="mono">{{ aaResult.site_path }}</span> <el-tag v-if="aaResult.site_existed" size="small" type="info">站点已存在，跳过建站</el-tag></div>
+              <div>证书：<el-tag size="small" :type="aaResult.cert_ok ? 'success' : 'danger'">{{ aaResult.cert_ok ? '签发成功' : '签发失败' }}</el-tag>
+                <span v-if="!aaResult.cert_ok" style="color:#f53f3f;">{{ aaResult.cert_msg }}</span></div>
+              <div>已写入域名池的固定随机子域（{{ (aaResult.subs || []).length }} 个）：</div>
+              <el-input type="textarea" :rows="4" readonly :model-value="(aaResult.subs || []).map(s => s + '.' + aaResult.main).join('\n')"></el-input>
+            </div>
+            <template #footer>
+              <el-button @click="aaVisible = false">关闭</el-button>
+              <el-button :disabled="aaBusy" @click="aaTest">连接测试</el-button>
+              <el-button type="primary" :loading="aaBusy" @click="aaImport">开始导入</el-button>
+            </template>
+          </el-dialog>
         </template>
 
         <!-- ===================== 节点管理（1+2+n 分域部署） ===================== -->
@@ -530,6 +572,6 @@
 <script src="/assets/vendor/vue.global.js?v=2.0.1"></script>
 <script src="/assets/vendor/element-plus.js?v=2.0.1"></script>
 <script src="/assets/api.js?v=2.0.1"></script>
-<script src="/assets/js/admin.js?v=2.4.0"></script>
+<script src="/assets/js/admin.js?v=2.5.0"></script>
 </body>
 </html>

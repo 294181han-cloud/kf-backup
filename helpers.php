@@ -1739,6 +1739,68 @@ function resume_code_for(int $sid): string
     } catch (\Throwable $e) { return ''; }
 }
 
+/* ===================== v2.61 aaPanel（宝塔国际版）快速导入固定随机子域 ===================== */
+
+/** aaPanel API 调用：request_token = md5(时间戳 + md5(API密钥))，表单 POST，返回 JSON 数组。
+ *  面板常用自签证书，跳过校验；凭证只在调用方（管理员快速导入）请求内使用，不落库。 */
+function aa_call(string $panel, string $key, string $path, array $params = [], int $timeout = 60): array
+{
+    $t = (string)time();
+    $params['request_time'] = $t;
+    $params['request_token'] = md5($t . md5($key));
+    $ch = curl_init(rtrim($panel, '/') . $path);
+    curl_setopt_array($ch, [
+        CURLOPT_POST => true,
+        CURLOPT_POSTFIELDS => http_build_query($params),
+        CURLOPT_RETURNTRANSFER => true,
+        CURLOPT_TIMEOUT => $timeout,
+        CURLOPT_CONNECTTIMEOUT => 10,
+        CURLOPT_SSL_VERIFYPEER => false,
+        CURLOPT_SSL_VERIFYHOST => 0,
+    ]);
+    $resp = curl_exec($ch);
+    $err = curl_error($ch);
+    $http = (int)curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    curl_close($ch);
+    if ($resp === false || $resp === '') {
+        throw new RuntimeException('面板无响应（HTTP ' . $http . ($err !== '' ? '：' . $err : '') . '）——确认面板地址可达、面板「设置→API」已开启、总控 IP 在 API 白名单里');
+    }
+    $j = json_decode((string)$resp, true);
+    if (!is_array($j)) {
+        throw new RuntimeException('面板返回非 JSON（HTTP ' . $http . '）：' . mb_substr((string)$resp, 0, 300));
+    }
+    return $j;
+}
+
+/** 从 aaPanel PHP 版本列表响应里宽容地抽出版本号（不同面板版本返回结构不一） */
+function aa_php_versions(array $j): array
+{
+    $out = [];
+    $walk = function ($v) use (&$walk, &$out) {
+        if (!is_array($v)) return;
+        if (isset($v['version'])) { $out[] = (string)$v['version']; return; }
+        foreach ($v as $vv) $walk($vv);
+    };
+    $walk($j);
+    return array_values(array_unique($out));
+}
+
+/** 生成随机子域：小写字母+数字，去掉易混淆的 0/1/o/l；$taken 为已占用集合 */
+function gen_subdomains(int $count, int $len, array $taken = []): array
+{
+    $chars = 'abcdefghjkmnpqrstuvwxyz23456789';
+    $out = [];
+    $guard = 0;
+    while (count($out) < $count && $guard++ < $count * 60) {
+        $s = '';
+        for ($i = 0; $i < $len; $i++) $s .= $chars[random_int(0, strlen($chars) - 1)];
+        if (isset($taken[$s])) continue;
+        $taken[$s] = 1;
+        $out[] = $s;
+    }
+    return $out;
+}
+
 /** 访客默认名：月-日 编号 */
 function gen_visitor_name(int $tenantId): string
 {
