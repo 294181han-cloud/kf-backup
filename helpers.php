@@ -2108,7 +2108,8 @@ function gate_content_url(string $code, string $host = ''): string
     $paths = gate_content_paths($domain !== '' ? $domain : $host);
     if (!$paths) $paths = ['/web/data/' . date('Y/m/d') . '/' . bin2hex(random_bytes(16)) . '.html'];
     $path = $paths[array_rand($paths)];
-    return ($host !== '' ? 'https://' . $host : '') . $path . '?code=' . rawurlencode($code);
+    // 不在这里带 code：壳页会自己拼 ?code=（避免出现两个 code 参数）
+    return ($host !== '' ? 'https://' . $host : '') . $path;
 }
 
 /** 码无效/租户停用时的友好页（v2.68：不再跳百度、不再 444 断开） */
