@@ -145,7 +145,7 @@
             <div style="display:flex;gap:10px;margin-bottom:14px;">
               <el-input v-model="newDomain" placeholder="例如 abc.com 或 *.abc.com" style="max-width:320px;" @keyup.enter="addDomain"></el-input>
               <el-button type="primary" @click="addDomain">添加</el-button>
-              <el-button type="success" plain @click="openAa">⚡ 快速导入（aaPanel 一键建站+证书）</el-button>
+              <el-button type="success" plain @click="openAa">⚡ 快速导入</el-button>
             </div>
             <el-table :data="domains" stripe>
               <el-table-column prop="domain" label="域名"></el-table-column>
@@ -166,6 +166,42 @@
                   <el-button size="small" @click="toggleDomain(row)">{{ row.enabled ? '停用' : '启用' }}</el-button>
                   <el-popconfirm title="删除该域名？" @confirm="delDomain(row)">
                     <template #reference><el-button size="small" type="danger">删除</el-button></template>
+                  </el-popconfirm>
+                </template>
+              </el-table-column>
+            </el-table>
+          </div>
+
+          <!-- 已红域名名单：检测到红自动退役（子域从固定子域池摘除 / 主域停用池行），这里查看与恢复 -->
+          <div class="panel">
+            <div class="panel-title">已红域名（自动退役名单）
+              <el-button size="small" style="float:right;" @click="loadReds">刷新</el-button>
+            </div>
+            <p style="font-size:13px;color:#86909c;margin:0 0 14px;">
+              客服码检测/巡检发现「红」→ 自动退役：固定子域从子域池摘除（明细区分），主域停用池行，并发工作台红码提醒。
+              恢复 = 主域重新启用池行 / 子域追加回子域池。确认真恢复了再点。
+            </p>
+            <el-table :data="reds" stripe size="small">
+              <el-table-column prop="host" label="红的域名/子域"><template #default="{row}"><span class="mono">{{ row.host }}</span></template></el-table-column>
+              <el-table-column label="级别" width="90">
+                <template #default="{row}">
+                  <el-tag size="small" :type="row.kind === 'sub' ? 'warning' : 'danger'">{{ row.kind === 'sub' ? '子域红' : '主域红' }}</el-tag>
+                </template>
+              </el-table-column>
+              <el-table-column prop="main" label="所属主域" width="150"></el-table-column>
+              <el-table-column prop="code" label="触发客服码" width="130">
+                <template #default="{row}"><span class="mono">{{ row.code || '—' }}</span></template>
+              </el-table-column>
+              <el-table-column prop="channel" label="渠道" width="70">
+                <template #default="{row}">{{ (row.channel || 'wx').toUpperCase() }}</template>
+              </el-table-column>
+              <el-table-column label="时间" width="150">
+                <template #default="{row}">{{ (row.created_at || '').slice(0, 19).replace('T', ' ') }}</template>
+              </el-table-column>
+              <el-table-column label="操作" width="90">
+                <template #default="{row}">
+                  <el-popconfirm title="确认恢复该域名/子域？" @confirm="restoreRed(row)">
+                    <template #reference><el-button size="small" type="success">恢复</el-button></template>
                   </el-popconfirm>
                 </template>
               </el-table-column>
@@ -590,6 +626,6 @@
 <script src="/assets/vendor/vue.global.js?v=2.0.1"></script>
 <script src="/assets/vendor/element-plus.js?v=2.0.1"></script>
 <script src="/assets/api.js?v=2.0.3"></script>
-<script src="/assets/js/admin.js?v=2.6.0"></script>
+<script src="/assets/js/admin.js?v=2.7.0"></script>
 </body>
 </html>

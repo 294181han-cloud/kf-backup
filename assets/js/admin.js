@@ -109,7 +109,7 @@ createApp({
       try {
         me.value = await API.me();
         if (me.value.role !== 'admin') { location.href = '/login.html'; return; }
-        await Promise.all([loadOverview(), loadTenants(), loadDomains(), loadSettings(), loadEntrances().catch(() => {})]);
+        await Promise.all([loadOverview(), loadTenants(), loadDomains(), loadReds(), loadSettings(), loadEntrances().catch(() => {})]);
         booted.value = true;
       } catch (e) { ElementPlus.ElMessage.error(e.message); }
     };
@@ -317,6 +317,17 @@ createApp({
       catch (e) { ElementPlus.ElMessage.error('复制失败，请手动全选文本框复制'); }
     };
 
+    // 已红域名名单（自动退役）：查看 + 恢复
+    const reds = ref([]);
+    const loadReds = async () => { try { reds.value = await API.get('/api/admin/red-domains'); } catch (e) {} };
+    const restoreRed = async (row) => {
+      try {
+        await API.del('/api/admin/red-domains/' + row.id);
+        ElementPlus.ElMessage.success('已恢复 ' + row.host);
+        await Promise.all([loadReds(), loadDomains()]);
+      } catch (e) { ElementPlus.ElMessage.error(e.message); }
+    };
+
     // aaPanel 快速导入（v2.61）：一个站点=主域+固定随机子域别名，一张 SAN 证书，写 v2.60.6 固定子域池
     const aaVisible = ref(false);
     const aaBusy = ref(false);
@@ -386,6 +397,7 @@ createApp({
       tab, tabTitle, booted, me, ov, tenants, domains, newDomain, rootDomain, defVal, pwOld, pwNew,
       aaVisible, aaBusy, aaPhp, aaResult, aaTip, aaTipType, aaForm, openAa, aaTest, aaImport,
       subVisible, subRow, showSubs, copySubs,
+      reds, loadReds, restoreRed,
       nodes, mainVersion, pushingIp, loadNodes, pushNode, forgetNode, dlBootstrap,
       nodeCodes, newCodeRole, lastCode, genNodeCode, revokeNodeCode,
       gips, newGip, newGipNote, gipVersion, addGip, delGip,

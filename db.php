@@ -227,8 +227,20 @@ function init_schema(): void
         id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
         domain VARCHAR(128) NOT NULL UNIQUE,
         wildcard TINYINT NOT NULL DEFAULT 0,
+        dtype VARCHAR(16) NOT NULL DEFAULT '',
         enabled TINYINT NOT NULL DEFAULT 1,
         created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+
+    $pdo->exec("CREATE TABLE IF NOT EXISTS red_domains (
+        id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+        host VARCHAR(128) NOT NULL,
+        main VARCHAR(128) NOT NULL DEFAULT '',
+        kind VARCHAR(8) NOT NULL DEFAULT '',
+        code VARCHAR(64) NOT NULL DEFAULT '',
+        channel VARCHAR(8) NOT NULL DEFAULT 'wx',
+        created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE KEY uk_host_channel (host, channel)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
 
     $pdo->exec("CREATE TABLE IF NOT EXISTS kv_store (

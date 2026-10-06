@@ -407,6 +407,38 @@ function handle_admin_aa_import(string $method): void
         'site_existed' => $siteExisted, 'cert_ok' => $certOk, 'cert_msg' => $certMsg]);
 }
 
+/* ---------- 已红域名名单（v2.63）：检测到红自动退役，这里查看/恢复 ---------- */
+
+function handle_admin_red_domains(string $method): void
+{
+    require_admin_ctx();
+    if ($method !== 'GET') json_error('方法不允许', 405);
+    json_out(db()->query('SELECT id, host, main, kind, code, channel, created_at FROM red_domains ORDER BY id DESC LIMIT 300')->fetchAll());
+}
+
+/** 恢复：主域红 → 重新启用池行；子域红 → 追加回固定子域池；然后从名单移除 */
+function handle_admin_red_domain_restore(string $method, int $id): void
+{
+    require_admin_ctx();
+    if ($method !== 'DELETE') json_error('方法不允许', 405);
+    $pdo = db();
+    $st = $pdo->prepare('SELECT * FROM red_domains WHERE id = ? LIMIT 1');
+    $st->execute([$id]);
+    $r = $st->fetch();
+    if (!$r) json_error('记录不存在', 404);
+    if ($r['kind'] === 'sub' && $r['main'] !== '') {
+        $key = 'pool_subs:' . $r['main'];
+        $list = array_values(array_filter(array_map('trim', explode(',', kv_get($key, '')))));
+        if (!in_array((string)$r['host'], $list, true)) $list[] = (string)$r['host'];
+        kv_set($key, implode(',', $list));
+        $pdo->prepare("UPDATE domain_pool SET enabled = 1 WHERE domain = ? AND dtype = 'fixed'")->execute([$r['main']]);
+    } elseif ($r['main'] !== '') {
+        $pdo->prepare('UPDATE domain_pool SET enabled = 1 WHERE domain = ?')->execute([$r['main']]);
+    }
+    $pdo->prepare('DELETE FROM red_domains WHERE id = ?')->execute([$id]);
+    json_out(['ok' => true]);
+}
+
 /* ---------- 主域名 / 全局默认 ---------- */
 
 function handle_admin_root_domain(string $method): void

@@ -45,6 +45,8 @@ foreach ($codes as $c) {
 
     if ($res['state'] === 'red') {
         $red++;
+        /* v2.63 码红了 → 自动退役：固定子域从子域池摘除 / 主域停用池行，并记入红名单 */
+        try { code_red_retire((string)$c['link'], 'wx'); } catch (\Throwable $e) {}
         $st = $pdo->prepare('SELECT id FROM code_alerts WHERE tenant_id = ? AND code = ? AND seen = 0 LIMIT 1');
         $st->execute([(int)$c['tenant_id'], (string)$c['code']]);
         if (!$st->fetchColumn()) {
@@ -72,6 +74,8 @@ foreach ($pool as $d) {
     $r = wxcheck_single_run('https://' . $d['domain'] . '/', 'wx');
     if (($r['state'] ?? '') === 'red') {
         $poolRed++;
+        /* v2.63 主域红也记入红名单（子域/主域明细统一在此表），并自动停用池行 */
+        try { code_red_retire('https://' . $d['domain'] . '/', 'wx'); } catch (\Throwable $e) {}
         if ((int)$d['enabled'] === 1) {
             $pdo->prepare('UPDATE domain_pool SET enabled = 0 WHERE id = ?')->execute([(int)$d['id']]);
             $disabled++;

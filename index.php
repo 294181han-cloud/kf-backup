@@ -120,6 +120,17 @@ function ensure_upgrade(): void
             KEY idx_tenant_seen (tenant_id, seen),
             KEY idx_code (tenant_id, code)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+        // v2.63 已红域名名单：客服码/巡检测到红 → 自动退役（子域从固定子域池摘除 / 主域停用池行）并记入此表
+        $pdo->exec("CREATE TABLE IF NOT EXISTS red_domains (
+            id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+            host VARCHAR(128) NOT NULL,
+            main VARCHAR(128) NOT NULL DEFAULT '',
+            kind VARCHAR(8) NOT NULL DEFAULT '',
+            code VARCHAR(64) NOT NULL DEFAULT '',
+            channel VARCHAR(8) NOT NULL DEFAULT 'wx',
+            created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            UNIQUE KEY uk_host_channel (host, channel)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
         // v2.61 逐条/批量「检测码」的结果缓存（同链接同渠道 5 分钟内不重复扣费）
         $pdo->exec("CREATE TABLE IF NOT EXISTS code_check_cache (
             id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
@@ -497,6 +508,8 @@ function dispatch_api(string $method, string $uri): void
     if (preg_match('#^/api/admin/domain-pool/(\d+)$#', $uri, $m)) handle_admin_domain_pool_id($method, (int)$m[1]);
     if ($uri === '/api/admin/aa-test')           handle_admin_aa_test($method);
     if ($uri === '/api/admin/aa-import')         handle_admin_aa_import($method);
+    if ($uri === '/api/admin/red-domains')       handle_admin_red_domains($method);
+    if (preg_match('#^/api/admin/red-domains/(\d+)$#', $uri, $m)) handle_admin_red_domain_restore($method, (int)$m[1]);
     if ($uri === '/api/admin/root-domain')       handle_admin_root_domain($method);
     if ($uri === '/api/admin/nodes')             handle_admin_nodes($method);
     if ($uri === '/api/admin/node-codes')        handle_admin_node_codes($method);

@@ -687,6 +687,10 @@ function handle_tenant_code_check(string $method): void
         ts_set($tid, 'code_check_link', $link);
         ts_set($tid, 'code_check_channel', $channel);
     }
+    /* v2.63 手动检测到红 → 与巡检同款自动退役（子域从固定子域池摘除 / 主域停用池行）+ 记红名单 */
+    if ($state === 'red') {
+        try { code_red_retire($link, $channel); } catch (\Throwable $e) {}
+    }
     json_out(['state' => $state, 'text' => $text, 'tag' => $tag, 'at' => $at, 'msg' => $msg,
         'channel' => $channel, 'link' => $link]);
 }

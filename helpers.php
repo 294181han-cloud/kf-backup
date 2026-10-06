@@ -1836,6 +1836,57 @@ function gen_subdomains(int $count, int $len, array $taken = []): array
     return $out;
 }
 
+/** v2.63 客服码/域名红了 → 自动退役并记入红名单（子域级明细区分）：
+ *  - 链接 host 是某主域的固定子域（host != 主域）→ 从子域池（pool_subs）摘除，发码不再挑中它；
+ *    固定随机的子域全部退役则整行停用（否则会退化成没有证书的随机子域）；
+ *  - host 是主域本身（单域名/泛解析裸域）→ 停用池行；
+ *  - 两种情况都写 red_domains（管理台红名单可查看/恢复）。域名不在池里只记名单不动行。 */
+function code_red_retire(string $link, string $channel = 'wx'): array
+{
+    $out = ['kind' => '', 'host' => '', 'main' => '', 'disabled_row' => false, 'retired_sub' => false];
+    $host = strtolower((string)(parse_url($link, PHP_URL_HOST) ?: ''));
+    if ($host === '') return $out;
+    $out['host'] = $host;
+    $pdo = db();
+    // 归属：host 本身是池行 → 主域；否则找 host 所属的池行主域（子域）
+    $main = '';
+    $row = null;
+    $st = $pdo->prepare('SELECT id, domain, dtype, enabled FROM domain_pool WHERE domain = ? LIMIT 1');
+    $st->execute([$host]);
+    if ($r = $st->fetch()) { $main = $host; $row = $r; }
+    else {
+        foreach ($pdo->query('SELECT id, domain, dtype, enabled FROM domain_pool') as $r) {
+            if (str_ends_with($host, '.' . strtolower((string)$r['domain']))) {
+                $main = strtolower((string)$r['domain']); $row = $r; break;
+            }
+        }
+    }
+    $out['main'] = $main !== '' ? $main : $host;
+    parse_str((string)(parse_url($link, PHP_URL_QUERY) ?: ''), $q);
+    $code = mb_substr(trim((string)($q['key'] ?? '')), 0, 64);
+    try {
+        $kind = ($row && $host !== $main) ? 'sub' : 'main';
+        $pdo->prepare('INSERT IGNORE INTO red_domains (host, main, kind, code, channel) VALUES (?,?,?,?,?)')
+            ->execute([$host, $out['main'], $kind, $code, $channel]);
+        $out['kind'] = $kind;
+    } catch (\Throwable $e) { /* 名单写失败不影响退役 */ }
+    if (!$row) return $out;   // 域名不在池里（可能已删）：只记名单
+    if ($out['kind'] === 'sub') {
+        $key = 'pool_subs:' . $main;
+        $list = array_values(array_diff(array_filter(array_map('trim', explode(',', kv_get($key, '')))), [$host]));
+        kv_set($key, implode(',', $list));
+        $out['retired_sub'] = true;
+        if (!$list && (string)$row['dtype'] === 'fixed') {
+            $pdo->prepare('UPDATE domain_pool SET enabled = 0 WHERE id = ?')->execute([(int)$row['id']]);
+            $out['disabled_row'] = true;
+        }
+    } else {
+        $pdo->prepare('UPDATE domain_pool SET enabled = 0 WHERE id = ?')->execute([(int)$row['id']]);
+        $out['disabled_row'] = true;
+    }
+    return $out;
+}
+
 /** 访客默认名：月-日 编号 */
 function gen_visitor_name(int $tenantId): string
 {
