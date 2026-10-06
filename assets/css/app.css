@@ -2080,3 +2080,14 @@ body.dark .v-card .vc-v { color: #c6ccd8; }
 body.dark .img-only-bar { background: color-mix(in srgb, var(--theme, #1677ff) 20%, #1e2229); border-color: color-mix(in srgb, var(--theme, #1677ff) 40%, #1e2229); }
 body.dark .sto-btn { background: color-mix(in srgb, var(--theme, #1677ff) 16%, #1e2229); border-color: color-mix(in srgb, var(--theme, #1677ff) 36%, #1e2229); }
 body.dark .sto-btn.danger { background: #3a1c1c; border-color: #5c2727; color: #ff8b8b; }
+
+/* ===== v2.60.13 恢复码：客服会话头部的 🔑 小标签 + 工作台「用恢复码找回会话」入口 ===== */
+.ch-resume {
+  flex-shrink: 0; display: inline-flex; align-items: center; gap: 3px; cursor: pointer;
+  font-size: 11.5px; line-height: 18px; padding: 0 8px; border-radius: 7px;
+  background: #fff7e6; color: #b26a00; border: 1px solid #ffe7ba; white-space: nowrap;
+}
+.ch-resume:hover { background: #ffeec7; }
+body.dark .ch-resume { background: #3a2f1a; color: #f0b45c; border-color: #5a4620; }
+.sess-resume-entry .sme-box { background: #fff7e6; color: #b26a00; }
+body.dark .sess-resume-entry .sme-box { background: #3a2f1a; color: #f0b45c; }

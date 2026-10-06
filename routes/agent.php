@@ -286,6 +286,27 @@ function handle_session_delete(string $method, array $m): void
     json_out(['ok' => true, 'soft' => true, 'sid' => $sid]);
 }
 
+/* v2.60.13 工作台用恢复码找回会话：客户报一串恢复码，客服在这里输入就能直接跳到那段对话
+   （客户换了手机/浏览器，或者我们这边把会话删进回收站了，都能靠它接回来） */
+function handle_session_by_resume(string $method): void
+{
+    if ($method !== 'POST') { json_error('方法不允许', 405); return; }
+    $ctx = require_workspace();
+    $rc = strtolower(trim((string)input('code', '')));
+    if ($rc === '' || !preg_match('/^[a-z0-9]{4,16}$/', $rc)) json_error('恢复码格式不对（8 位字母数字）');
+    $pdo = db();
+    $st = $pdo->prepare("SELECT * FROM v_sessions WHERE tenant_id = ? AND resume_code = ? AND status <> 'closed'"
+        . session_visible_sql($ctx) . ' ORDER BY last_time DESC LIMIT 1');
+    $st->execute([$ctx['tenant_id'], $rc]);
+    $row = $st->fetch();
+    if (!$row) json_error('没找到这段对话：恢复码不对，或这段对话已经结束', 404);
+    $fromTrash = !empty($row['deleted_at']);
+    if ($fromTrash) {
+        $pdo->prepare('UPDATE v_sessions SET deleted_at = NULL WHERE id = ?')->execute([(int)$row['id']]);
+    }
+    json_out(['ok' => true, 'session_id' => (int)$row['id'], 'from_trash' => $fromTrash, 'name' => $row['visitor_name']]);
+}
+
 /* v2.60.11 回收站：恢复一个被删除的会话 */
 function handle_session_restore(string $method, array $m): void
 {

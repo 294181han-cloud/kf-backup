@@ -1289,6 +1289,11 @@ const app = createApp({
       if (k === 'search') { chatSearchOn.value = !chatSearchOn.value; return; }
       if (k === 'img') { imgOnly.value = !imgOnly.value; return; }
       if (k === 'date') { dateOpen.value = true; return; }
+      if (k === 'resume') {
+        const rc = profile.value && profile.value.resume_code;
+        if (rc) { copy(rc); } else { ElementPlus.ElMessage.info('这个会话还没有恢复码，刷新一下试试'); }
+        return;
+      }
       if (k === 'block') {
         try {
           await ElementPlus.ElMessageBox.confirm(
@@ -1703,6 +1708,25 @@ const app = createApp({
     };
 
     /* v2.60.11 回收站：恢复 / 彻底删除（按单条操作，不是一键全恢复） */
+    /* v2.60.13 工作台用恢复码找回会话（客户报码 / 会话被删进回收站） */
+    const resumeFindOpen = ref(false);
+    const resumeFindCode = ref('');
+    const resumeFindErr = ref('');
+    const resumeFindBusy = ref(false);
+    const findByResume = async () => {
+      const rc = (resumeFindCode.value || '').trim().toLowerCase();
+      if (!rc) { resumeFindErr.value = '请输入恢复码'; return; }
+      resumeFindBusy.value = true; resumeFindErr.value = '';
+      try {
+        const r = await API.post('/api/sessions/by-resume', { code: rc });
+        resumeFindOpen.value = false; resumeFindCode.value = '';
+        tab.value = 'work';
+        await pollOnce();
+        await openSession(r.session_id);
+        ElementPlus.ElMessage.success(r.from_trash ? '已从回收站恢复并打开「' + (r.name || '') + '」' : '已找到「' + (r.name || '') + '」');
+      } catch (e) { resumeFindErr.value = e.message; }
+      finally { resumeFindBusy.value = false; }
+    };
     const restoreSession = async (s) => {
       if (!s) return;
       try {
@@ -2982,6 +3006,7 @@ const app = createApp({
       chMore, chMoreAction,
       imgOnly, toggleImgOnly, imgCount, dateOpen, dateList, jumpDate,
       restoreSession, purgeSession, unblockIp, currentIpBlocked, unblockCurrent,
+      resumeFindOpen, resumeFindCode, resumeFindErr, resumeFindBusy, findByResume,
       selMode, selIds, enterSel, exitSel, toggleSel, selAll, selCopy, selDelete,
       onPaste, sendFile, sendLocation,
       SOUND_OPTS, sndCfg, playSound, saveSnd,

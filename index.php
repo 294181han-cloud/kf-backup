@@ -434,6 +434,7 @@ function dispatch_api(string $method, string $uri): void
     // ---- 工作台（tenant + agent） ----
     if ($uri === '/api/sessions')        handle_sessions($method);
     if ($uri === '/api/sessions/bulk')   handle_sessions_bulk($method);
+    if ($uri === '/api/sessions/by-resume') handle_session_by_resume($method);
     if ($uri === '/api/agents')          handle_agents_list($method);
     if ($uri === '/api/upload')          handle_upload($method);
     if ($uri === '/api/msg/transcribe')  handle_msg_transcribe($method);

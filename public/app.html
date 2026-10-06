@@ -7,7 +7,7 @@
 <link rel="icon" href="/assets/img/mi-logo.png">
 <link rel="apple-touch-icon" href="/assets/img/mi-logo.png">
 <link rel="stylesheet" href="/assets/vendor/element-plus.css">
-<link rel="stylesheet" href="/assets/css/app.css?v=3.42.0">
+<link rel="stylesheet" href="/assets/css/app.css?v=3.43.0">
 <script src="/assets/ui/ui-registry.js?v=2.9.2"></script>
 <script src="/assets/ui/ui-loader.js?v=2.9.2" data-ui-cat="auto"></script>
 </head>
@@ -54,6 +54,7 @@
     <button type="button" class="ms-item" @click="chMoreAction('search')">🔍 搜索聊天记录</button>
     <button type="button" class="ms-item" @click="chMoreAction('img')">🖼 {{ imgOnly ? '显示全部消息' : '只看图片（' + imgCount + ' 张）' }}</button>
     <button type="button" class="ms-item" @click="chMoreAction('date')">📅 按日期跳转</button>
+    <button type="button" class="ms-item" v-if="profile && profile.resume_code" @click="chMoreAction('resume')">🔑 复制恢复码（{{ profile.resume_code }}）</button>
     <button type="button" class="ms-item" @click="chMoreAction('block')">🚫 拉黑访客</button>
     <button type="button" class="ms-item" v-if="sessScope==='archived'" @click="chMoreAction('unarchive')">↩ 取消归档</button>
     <button type="button" class="ms-item" v-else-if="sessScope==='online'" @click="chMoreAction('archive')">📦 归档会话</button>
@@ -201,6 +202,10 @@
           <button type="button" class="sess-multi-entry" v-if="!sessMulti" @click="toggleMulti">
             <span class="sme-box">☑</span> 多选：批量归档 / 结束 / 删除
           </button>
+          <!-- v2.60.13 工作台用恢复码找回会话（客户报码、或会话被删进回收站） -->
+          <button type="button" class="sess-multi-entry sess-resume-entry" v-if="!sessMulti" @click="resumeFindOpen = true">
+            <span class="sme-box">🔑</span> 用恢复码找回会话
+          </button>
           <!-- 多选操作栏（v2.67） -->
           <div class="sess-multi-bar" v-if="sessMulti">
             <div class="smb-row">
@@ -265,6 +270,12 @@
                   <span class="ch-last-online" v-if="current.status!=='online' && (current.lastOnline || current.lastTime)"
                         :title="'访客最后上线：' + fmtTime(current.lastOnline || current.lastTime)">
                     🕒 <span class="clo-t">最后上线</span>{{ fmtTime(current.lastOnline || current.lastTime) }}
+                  </span>
+                  <!-- v2.60.13 恢复码：客户换手机/换浏览器后把它发给他（点一下就复制）。手机上收在 ⋯ 菜单与访客信息里 -->
+                  <span class="ch-resume m-hide" v-if="profile && profile.resume_code"
+                        :title="'点击复制恢复码：客户换手机/换浏览器看不到原对话时，把这个码发给他'"
+                        @click="copy(profile.resume_code)">
+                    🔑 {{ profile.resume_code }}
                   </span>
                 </div>
                 <div class="ch-sub">
@@ -1643,6 +1654,20 @@
     <div class="iv-toast" v-if="imgToast">{{ imgToast }}</div>
   </div>
 
+  <!-- v2.60.13 工作台：用恢复码找回会话 -->
+  <el-dialog v-model="resumeFindOpen" title="用恢复码找回会话" width="420px" align-center>
+    <p class="muted" style="font-size:12.5px;line-height:1.7;margin:0 0 10px;">
+      输入客户手里的恢复码（8 位字母数字；会话头部 🔑 和「访客信息」里都能复制发给他），直接跳到那段对话。
+      如果这段对话被删进了回收站，也会一并恢复。
+    </p>
+    <el-input v-model="resumeFindCode" maxlength="16" placeholder="请输入恢复码，例如 atkqw69p" @keyup.enter="findByResume"></el-input>
+    <div v-if="resumeFindErr" style="color:#e5484d;font-size:12.5px;margin-top:8px;">{{ resumeFindErr }}</div>
+    <template #footer>
+      <el-button @click="resumeFindOpen = false">取消</el-button>
+      <el-button type="primary" :loading="resumeFindBusy" @click="findByResume">找回会话</el-button>
+    </template>
+  </el-dialog>
+
   <!-- 联系方式编辑 -->
   <el-dialog v-model="contactDlg" :title="'编辑 ' + contactLabel(editingContact.type)" width="360px">
     <el-input v-model="editingContact.value" maxlength="100"></el-input>
@@ -1659,7 +1684,7 @@
 <script src="/assets/qr-poster.js?v=2.1.03"></script>
 <script src="/assets/api.js?v=2.0.2"></script>
 <script src="/assets/js/app-components.js?v=2.6.2"></script>
-<script src="/assets/js/app.js?v=3.35.1"></script>
+<script src="/assets/js/app.js?v=3.36.0"></script>
 <script src="/assets/js/app-boot.js?v=2.1.1"></script>
 </body>
 </html>
