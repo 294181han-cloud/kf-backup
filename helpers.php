@@ -1932,6 +1932,31 @@ function gate_env_ok(): bool
     return $ua !== '' && str_contains($ua, 'Mozilla');
 }
 
+/** v2.66 主机门禁：host 是否为「正在使用」的域名——启用中的域名池域名（含其子域）
+ *  或激活中的专属链接子域。未知/已停用（红码退役）域名 → false → 服务器直接断开。
+ *  库不可用时放行（fail-open，安装期/瞬断不能把主站打死），后续路径仍有各自的校验。 */
+function pool_host_enabled(string $host): bool
+{
+    try {
+        $pdo = db();
+        $host = strtolower(trim($host));
+        if ($host === '') return false;
+        foreach ($pdo->query('SELECT domain, enabled FROM domain_pool') as $r) {
+            $d = strtolower((string)$r['domain']);
+            if ($host === $d || str_ends_with($host, '.' . $d)) {
+                return (int)$r['enabled'] === 1;
+            }
+        }
+        foreach ($pdo->query('SELECT subdomain FROM domain_links WHERE active = 1') as $r) {
+            $s = strtolower((string)$r['subdomain']);
+            if ($s !== '' && ($host === $s || str_starts_with($host, $s . '.'))) return true;
+        }
+        return false;
+    } catch (\Throwable $e) {
+        return true;   // fail-open
+    }
+}
+
 /** 防红壳 Loader：外层=零资源引用的 XOR(年份) 数字阵列（扫描器看到的只是数字，
  *  跨年自动失效重写；解密脚本自带上一年回退，静态边缘的包内壳页跨年仍可用）；
  *  内层（解密后才存在）：防嵌套 + 环境检查（webdriver/UA）→ 只有像真人的合法 key

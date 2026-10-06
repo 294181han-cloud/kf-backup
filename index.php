@@ -224,6 +224,17 @@ if ($uri === '') $uri = '/';
 if ($uri === '/refused' || $uri === '/__refused__') { http_response_code(444); exit; }
 function refuse_connection(): void { http_response_code(444); exit; }
 
+/* ---------- v2.66 主机门禁（仅总控）：只有主站域名与「正在使用」的域名（启用中的
+   域名池域名/其子域、激活的专属链接子域）才放行；未知主机、IP 直连、已被红码退役
+   停用的域名 → 一律 444 断开连接（配了 nginx 断连段即为 TCP 层直接关闭）。
+   访客流量从此不可能再看到客服登录页。 ---------- */
+$REQ_HOST = strtolower(preg_replace('/:\d+$/', '', $_SERVER['HTTP_HOST'] ?? ''));
+$MAIN_HOST = strtolower(parse_url((string)site_main_url(), PHP_URL_HOST) ?: '');
+if ($MAIN_HOST !== '' && $REQ_HOST !== '' && $REQ_HOST !== $MAIN_HOST && $REQ_HOST !== 'www.' . $MAIN_HOST
+    && !pool_host_enabled($REQ_HOST)) {
+    refuse_connection();
+}
+
 /* ---------- 静态边缘模式：/api/* 跨域直连总控（分控站点可为纯静态，无需 PHP） ---------- */
 if (str_starts_with($uri, '/api/')) {
     header('Access-Control-Allow-Origin: *');
@@ -332,8 +343,8 @@ if (site_role() !== 'main') {
     }
     if ($uri === '/') {
         if (site_role() === 'visitor') { serve_html('visitor.html'); exit; }
-        header('Location: /login.html');
-        exit;
+        /* v2.66 访客节点之外的一切未知路径不再引导去客服登录页——直接断开（防访客流量看到客服入口） */
+        refuse_connection();
     }
     // 健康检查任何节点都可用（含角色/版本，供巡检）
     if ($uri === '/health' || $uri === '/api/health') {
@@ -417,8 +428,9 @@ if ($uri === '/' || $uri === '/index.php' || $uri === '/index.html') {
         } catch (\Throwable $e) { /* 查询失败按默认跳转 */ }
     }
     if ($isVisitorHost || site_role() === 'visitor') { serve_html('visitor.html'); exit; }
-    header('Location: /login.html');
-    exit;
+    /* v2.66 主站根路径：非访客域名的根访问不再引导去客服登录页（防访客流量看到客服入口），
+       直接断开；客服登录请直接访问 /login.html */
+    refuse_connection();
 }
 foreach (['login.html', 'app.html', 'admin.html', 'visitor.html'] as $page) {
     if ($uri === "/$page") {
