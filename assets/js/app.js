@@ -1844,7 +1844,7 @@ const app = createApp({
     const copy = (s) => { navigator.clipboard && navigator.clipboard.writeText(s); ElementPlus.ElMessage.success('已复制'); };
     const createLink = async () => { try { await API.post('/api/tenant/link'); ElementPlus.ElMessage.success('已生成'); await loadLinks(); } catch (e) { ElementPlus.ElMessage.error(e.message); } };
     const renewLink = async () => { try { await API.post('/api/tenant/link/renew'); ElementPlus.ElMessage.success('已更换'); await loadLinks(); } catch (e) { ElementPlus.ElMessage.error(e.message); } };
-    const newCode = async () => { try { await API.post('/api/tenant/service-code'); ElementPlus.ElMessage.success('已生成新客服码'); await loadLinks(); } catch (e) { ElementPlus.ElMessage.error(e.message); } };
+    const newCode = async () => { try { await API.post('/api/tenant/service-code'); ElementPlus.ElMessage.success('已生成新客服码（旧码已失效，请把新二维码重新发给客户）'); await loadLinks(); } catch (e) { ElementPlus.ElMessage.error(e.message); } };
     const delCode = async (c) => { try { await API.del('/api/tenant/service-code?code=' + c.code); await loadLinks(); } catch (e) { ElementPlus.ElMessage.error(e.message); } };
     const blockSession = async () => {
       if (!currentId.value) return;
@@ -2377,7 +2377,7 @@ const app = createApp({
       customSaving.value = true;
       try {
         await API.post('/api/tenant/service-code', c ? { code: c } : {});
-        ElementPlus.ElMessage.success(c ? ('已生成自定义码 ' + c) : '已生成新客服码');
+        ElementPlus.ElMessage.success((c ? ('已生成自定义码 ' + c) : '已生成新客服码') + '（旧码已失效，请把新二维码重新发给客户）');
         customCode.value = '';
         await loadLinks(); await loadHistory(); renderMainQr(); checkCode(true);
       } catch (e) { ElementPlus.ElMessage.error(e.message); }
@@ -2819,7 +2819,9 @@ const app = createApp({
     const rotateCode = async () => {
       try {
         await API.post('/api/tenant/service-code');
-        ElementPlus.ElMessage.success('已生成新客服码（老码仍可用）');
+        /* v2.60.22 文案修正：现在是「一人一码、换码即替换」，旧码**立刻失效**，
+           原来那句「老码仍可用」是旧逻辑留下来的，会误导人以为还能继续发旧二维码。 */
+        ElementPlus.ElMessage.success('已生成新客服码（旧码已失效，请把新二维码重新发给客户）');
         await loadLinks(); renderMainQr(); checkCode(true);
       } catch (e) { ElementPlus.ElMessage.error(e.message); }
     };
