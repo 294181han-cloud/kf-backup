@@ -20,6 +20,16 @@
       } catch (e) {
         throw new Error('网络异常，请稍后重试');
       }
+      /* v2.60.16 发版瞬间的 500（PHP 文件正在被替换，可能读到半截）：
+         GET 自动重试一次，用户基本感觉不到；写操作不重试，避免重复提交。 */
+      if (res.status >= 500 && (method === 'GET' || method === 'get')) {
+        await new Promise(function (r) { setTimeout(r, 700); });
+        try {
+          res = await fetch(this.base + path, opts);
+        } catch (e) {
+          throw new Error('网络异常，请稍后重试');
+        }
+      }
       if (res.status === 401) {
         this.clearToken();
         if (!location.pathname.startsWith('/visitor')) {
