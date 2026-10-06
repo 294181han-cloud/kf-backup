@@ -133,10 +133,10 @@ function handle_visitor_config(string $method): void
     if ($method !== 'GET') { json_error('方法不允许', 405); return; }
     $ctx = resolve_visitor_context();
     if (!$ctx) {
-        // v2.46 策略：裸域名/无标识访问一律中性引导页，不自动接入任何客服
+        // v2.65 策略：无标识/废码访问一律拒绝连接（不展示引导文案，不泄露任何状态差异）
         $hadId = input('code', '') !== '' || input('t', '') !== '';
         json_out(['available' => false,
-            'unavailable_reason' => $hadId ? '链接已失效，请联系客服获取新的链接' : '欢迎扫码咨询：请通过客服码进入',
+            'unavailable_reason' => '拒绝连接',
             'neutral' => !$hadId]);
         return;
     }
@@ -571,7 +571,7 @@ function handle_gate_check(string $method): void
     if ($method !== 'POST') { json_error('方法不允许', 405); return; }
     $key = trim((string)input('key', ''));
     if ($key === '' || !preg_match('/^[A-Za-z0-9]{4,64}$/', $key)) {
-        json_out(['ok' => false, 'msg' => '链接不完整，请重新扫码进入']);
+        json_out(['ok' => false, 'msg' => '拒绝连接']);
         return;
     }
     /* v2.65 浏览器证明 + 环境校验：pf 由壳页内层在真实浏览器里算出（djb2(key|年|kfxt)），
@@ -580,17 +580,17 @@ function handle_gate_check(string $method): void
     $ua = (string)($_SERVER['HTTP_USER_AGENT'] ?? '');
     if ($pf === '' || !hash_equals(gate_proof($key), $pf)
         || $ua === '' || !str_contains($ua, 'Mozilla')) {
-        json_out(['ok' => false, 'msg' => '页面已失效，请重新扫码进入']);
+        json_out(['ok' => false, 'msg' => '拒绝连接']);
         return;
     }
     $st = db()->prepare('SELECT sc.code, sc.tenant_id, t.status, t.expires_at
         FROM service_codes sc JOIN tenants t ON t.id = sc.tenant_id WHERE sc.code = ? LIMIT 1');
     $st->execute([$key]);
     $row = $st->fetch();
-    if (!$row) { json_out(['ok' => false, 'msg' => '链接已失效，请重新扫码进入']); return; }
-    if (($row['status'] ?? '') !== 'active') { json_out(['ok' => false, 'msg' => '该客服已停用，请联系管理员']); return; }
+    if (!$row) { json_out(['ok' => false, 'msg' => '拒绝连接']); return; }
+    if (($row['status'] ?? '') !== 'active') { json_out(['ok' => false, 'msg' => '拒绝连接']); return; }
     if (!empty($row['expires_at']) && strtotime((string)$row['expires_at']) < time()) {
-        json_out(['ok' => false, 'msg' => '该客服已到期，请联系管理员']);
+        json_out(['ok' => false, 'msg' => '拒绝连接']);
         return;
     }
     json_out(['ok' => true, 'code' => (string)$row['code'], 'url' => '/visitor.html']);

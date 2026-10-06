@@ -5,7 +5,7 @@ createApp({
   setup() {
     const qs = new URLSearchParams(location.search);
     const page = ref('loading');
-    const blockedTitle = ref('暂时无法接入');
+    const blockedTitle = ref('拒绝连接');
     const blockedDesc = ref('');
     const brand = reactive({ company_name: '在线客服', welcome_title: '您好，欢迎咨询！', welcome_sub: '', avatar: '💬', theme_color: '#1677ff', pre_inquiry_on: true });
     const messages = ref([]);
@@ -200,7 +200,7 @@ createApp({
         const q = new URLSearchParams(p);
         const cfg = await fetch((window.KF_API_BASE||'') + '/api/visitor/config?' + q.toString()).then(r => r.json());
         if (!cfg.available) {
-          blockedDesc.value = cfg.unavailable_reason || '该链接已失效';
+          blockedDesc.value = '';   // v2.65 一律拒绝连接，不泄露原因
           page.value = 'blocked';
           return;
         }
@@ -218,7 +218,7 @@ createApp({
           if (!seen) { pubTitle.value = cfg.brand.publicity_title || '公告'; pubContent.value = cfg.brand.publicity_content; pubShow.value = true; try { sessionStorage.setItem(pk, '1'); } catch (e) {} }
         }
         if (cfg.quota_full && cfg.quota_full !== '') {
-          blockedDesc.value = '本周客服名额已满，请稍后再来';
+          blockedDesc.value = '';
           page.value = 'blocked';
           return;
         }
@@ -267,7 +267,7 @@ createApp({
           if (robotType.value === 'code') genCode();
           return;
         }
-        blockedDesc.value = em || '链接无效，请联系客服获取新的链接';
+        blockedDesc.value = '';   // v2.65 一律拒绝连接，不泄露原因
         page.value = 'blocked';
       }
     };
@@ -354,8 +354,8 @@ createApp({
         // v2.65 废码自动断开：客服码被换/删、租户停用或到期 → 立即断开并停轮询
         if (r.revoked) {
           page.value = 'blocked';
-          blockedTitle.value = '链接已失效';
-          blockedDesc.value = '当前客服链接已失效，请联系客服获取新的链接';
+          blockedTitle.value = '拒绝连接';
+          blockedDesc.value = '';
           stopPoll();
           return;
         }
