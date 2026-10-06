@@ -130,9 +130,10 @@ function handle_tenant_service_code(string $method): void
         $cur = $curSt->fetch() ?: null;
         $forceNew = (string)input('new_link', '') === '1';
         $curHost = $cur ? strtolower((string)(parse_url((string)$cur['link'], PHP_URL_HOST) ?: '')) : '';
-        /* 老链接没带入口 ID（?key=客服码）、或落地域名已经被停用 → 必须换一张新链接 */
+        /* 只要这一行已经有入口 ID、且落地域名还在用，就原地换码（链接不动）。
+           注意：老链接（?key=客服码）也走这条 —— 首次会「保留客服码、只把链接升级成 ?w=入口ID」，
+           顾客手里已经印出去的老二维码因此不失效。只有落地域名被停用或要求换新链接才另发一张。 */
         $keepLink = $cur && !$forceNew && (string)$cur['entry_id'] !== ''
-            && strpos((string)$cur['link'], '?w=') !== false
             && $curHost !== '' && pool_host_enabled($curHost);
 
         $entryId = $keepLink ? (string)$cur['entry_id'] : gen_entry_id();
