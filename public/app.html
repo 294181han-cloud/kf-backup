@@ -7,7 +7,7 @@
 <link rel="icon" href="/assets/img/mi-logo.png">
 <link rel="apple-touch-icon" href="/assets/img/mi-logo.png">
 <link rel="stylesheet" href="/assets/vendor/element-plus.css">
-<link rel="stylesheet" href="/assets/css/app.css?v=3.41.0">
+<link rel="stylesheet" href="/assets/css/app.css?v=3.42.0">
 <script src="/assets/ui/ui-registry.js?v=2.9.2"></script>
 <script src="/assets/ui/ui-loader.js?v=2.9.2" data-ui-cat="auto"></script>
 </head>
@@ -187,7 +187,7 @@
               已结束<span class="scope-n" v-if="sessCounts.closed">{{ sessCounts.closed }}</span>
             </button>
             <!-- v2.60.11 回收站：删掉的会话 30 天内可以自己恢复 -->
-            <button class="scope-tab" v-if="!sessCollapsed" :class="{on: sessScope==='trash'}" @click="setScope('trash')">
+            <button class="scope-tab" :class="{on: sessScope==='trash'}" @click="setScope('trash')">
               已删除<span class="scope-n" v-if="sessCounts.trash">{{ sessCounts.trash }}</span>
             </button>
             <!-- v2.45 收起＝把「已归档 / 已结束」收起来，只留在线聊天（列表和搜索一直都在） -->
@@ -1242,6 +1242,11 @@
 
           <div class="panel">
             <div class="panel-title">数据清理（不可恢复，谨慎操作）</div>
+            <!-- v2.60.12 回收站入口：删掉的会话在这里找回（按条恢复） -->
+            <div class="link-line">
+              <span style="flex:1;">会话回收站（{{ sessCounts.trash || 0 }} 条，删除后 30 天内可恢复）</span>
+              <el-button size="small" plain @click="tab='work'; setScope('trash')">去回收站</el-button>
+            </div>
             <div class="link-line" v-for="opt in cleanupOpts" :key="opt.label">
               <span style="flex:1;">{{ opt.label }}</span>
               <el-popconfirm :title="'确认' + opt.label + '？不可恢复！'" @confirm="doCleanup(opt.days, 'sessions')">
