@@ -1898,6 +1898,40 @@ function gate_proof(string $key): string
     return dechex($h);
 }
 
+/** v2.65.3 从查询串取客服码（兼容 ?key= / ?k= / ?d=base64(key=…)） */
+function gate_key_from_query(): string
+{
+    $k = trim((string)($_GET['key'] ?? ($_GET['k'] ?? '')));
+    if ($k === '') {
+        try {
+            $d = (string)($_GET['d'] ?? '');
+            if ($d !== '') {
+                $s = base64_decode($d, true) ?: '';
+                if (preg_match('/key=([A-Za-z0-9]+)/', $s, $m)) $k = $m[1];
+                elseif (preg_match('/^[A-Za-z0-9]{4,64}$/', $s)) $k = $s;
+            }
+        } catch (\Throwable $e) { /* 解不出来当无码 */ }
+    }
+    return $k;
+}
+
+/** v2.65.3 码有效性（总控侧，需数据库）：存在 + 租户 active + 未到期 */
+function gate_key_valid(string $key): bool
+{
+    if (!preg_match('/^[A-Za-z0-9]{4,64}$/', $key)) return false;
+    $st = db()->prepare('SELECT 1 FROM service_codes sc JOIN tenants t ON t.id = sc.tenant_id
+        WHERE sc.code = ? AND t.status = \'active\' AND (t.expires_at IS NULL OR t.expires_at >= NOW()) LIMIT 1');
+    $st->execute([$key]);
+    return (bool)$st->fetchColumn();
+}
+
+/** v2.65.3 壳路由/访客页共用：环境像真人才放行（UA 缺失或非浏览器一律拒绝） */
+function gate_env_ok(): bool
+{
+    $ua = (string)($_SERVER['HTTP_USER_AGENT'] ?? '');
+    return $ua !== '' && str_contains($ua, 'Mozilla');
+}
+
 /** 防红壳 Loader：外层=零资源引用的 XOR(年份) 数字阵列（扫描器看到的只是数字，
  *  跨年自动失效重写；解密脚本自带上一年回退，静态边缘的包内壳页跨年仍可用）；
  *  内层（解密后才存在）：防嵌套 + 环境检查（webdriver/UA）→ 只有像真人的合法 key

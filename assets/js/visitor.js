@@ -10,6 +10,15 @@ createApp({
     // v2.65.2 拒绝 = 让浏览器显示原生连接错误：导航到服务器 444 断连路径；
     // 若 1.2s 后仍在本页（nginx 未断开），兜底跳拒绝端口（原生「拒绝连接」）
     const refuseConn = () => {
+      // v2.65.3 先同页 reload：总控会在服务端对废码直接断开连接（444，原生错误页）；
+      // 已重试过或边缘无库场景 → /refused（444）→ 仍未断开则跳拒绝端口（原生「拒绝连接」）
+      try {
+        if (!sessionStorage.getItem('kfxt_refused_once')) {
+          sessionStorage.setItem('kfxt_refused_once', '1');
+          location.reload();
+          return;
+        }
+      } catch (e) {}
       try {
         location.replace((location.origin || '') + '/refused');
         setTimeout(function () { try { location.replace('http://127.0.0.1:1/'); } catch (e) {} }, 1200);
@@ -186,6 +195,7 @@ createApp({
           maxMsgId.value = 0;
           resumeOpen.value = false;
           resumeCode.value = '';
+          try { sessionStorage.removeItem('kfxt_refused_once'); } catch (e) {}   // v2.65.3 正常接入，清重试标志
           page.value = 'chat';
           await loadHistory();
           startPoll();

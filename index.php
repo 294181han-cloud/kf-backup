@@ -305,13 +305,17 @@ if (site_role() !== 'main') {
     // 访客/防红壳页（visitor 节点）与登录/工作台（agent 节点）放行；其余页面 404
     if (preg_match('#^/[0-9]{2}-[0-9]{2}/[A-Za-z0-9]{4,16}\.html$#', $uri)) {
         if (site_role() !== 'visitor') { http_response_code(404); echo 'Not Found'; exit; }
+        // v2.65.3 直接在原网页拒绝：无码/环境不像真人 → 服务器断开连接（444），不出任何内容；
+        // 码真伪边缘无库，由内层 /api/gate 校验（失效跳百度）
+        $k = gate_key_from_query();
+        if ($k === '' || !gate_env_ok()) refuse_connection();
         header('Cache-Control: no-store');
         echo gate_loader_html();
     }
     foreach (['login.html', 'app.html', 'admin.html', 'visitor.html'] as $page) {
         if ($uri === "/$page") {
             if (!site_allow_page($page)) { http_response_code(404); echo 'Not Found'; exit; }
-            // v2.65.2 服务端拒绝：访客页无 code → 服务器直接断开连接（444，浏览器原生错误页）
+            // v2.65.3 服务端拒绝：访客页无 code → 服务器直接断开连接（444，浏览器原生错误页）
             if ($page === 'visitor.html' && !isset($_GET['code']) && !isset($_GET['t'])) {
                 refuse_connection();
             }
@@ -377,10 +381,12 @@ function site_allow_api(string $uri): bool
 }
 
 /* ---------- 防红中转「空壳页」（v2.59 → v2.65 重做）：/MM-DD/xxxxxx.html?key=… ----------
-   出的是 XOR(年份) 自解密 loader（零资源引用，扫描器只见数字阵列），内层校验通过后
-   用全屏 iframe 装真实聊天页（随机路径 catch-all），地址栏始终停在随机路径上。 */
+   v2.65.3 直接在原网页拒绝：总控有库，无码/环境不像真人/码已废 → 一律 444 断开连接，
+   不出 loader 不出任何内容；通过后才出 XOR 自解密 loader（内层 iframe 随机路径 catch-all）。 */
 if (preg_match('#^/[0-9]{2}-[0-9]{2}/[A-Za-z0-9]{4,16}\.html$#', $uri)) {
     if (!site_allow_page('gate.html')) { http_response_code(404); echo 'Not Found'; exit; }
+    $k = gate_key_from_query();
+    if ($k === '' || !gate_env_ok() || !gate_key_valid($k)) refuse_connection();
     header('Cache-Control: no-store');
     echo gate_loader_html();
     exit;
@@ -417,26 +423,20 @@ if ($uri === '/' || $uri === '/index.php' || $uri === '/index.html') {
 foreach (['login.html', 'app.html', 'admin.html', 'visitor.html'] as $page) {
     if ($uri === "/$page") {
         if (!site_allow_page($page)) { http_response_code(404); echo 'Not Found'; exit; }
-        // v2.65.2 服务端拒绝：访客页无 code → 服务器直接断开连接（444，浏览器原生错误页）；
-        // 带码的再查码是否仍生效（总控有库可查），无效同样断开
+        // v2.65.3 服务端拒绝：访客页无 code → 直接断开连接；带码的总控侧查码是否仍生效，无效断开
         if ($page === 'visitor.html') {
             $ck = trim((string)($_GET['code'] ?? ($_GET['key'] ?? '')));
             if (!isset($_GET['code']) && !isset($_GET['t']) && $ck === '') { refuse_connection(); }
-            if ($ck !== '' && !preg_match('/^[A-Za-z0-9]{4,64}$/', $ck)) { refuse_connection(); }
-            if ($ck !== '' && site_role() === 'main') {
-                $stv = db()->prepare('SELECT 1 FROM service_codes sc JOIN tenants t ON t.id = sc.tenant_id
-                    WHERE sc.code = ? AND t.status = \'active\'
-                      AND (t.expires_at IS NULL OR t.expires_at >= NOW()) LIMIT 1');
-                $stv->execute([$ck]);
-                if (!$stv->fetchColumn()) { refuse_connection(); }
-            }
+            if ($ck !== '' && site_role() === 'main' && !gate_key_valid($ck)) { refuse_connection(); }
         }
         serve_html($page);
     }
 }
 /* v2.65 catch-all：未知随机 .html 路径带 code → 出真实访客页（壳 loader 的随机 iframe 落点，
-   真实页不再依赖固定文件名，扫描器探测任意路径都拿不到业务内容）；无 code 的未知路径维持 404 */
+   真实页不再依赖固定文件名，扫描器探测任意路径都拿不到业务内容）；无 code 的未知路径维持 404。
+   v2.65.3：码已废/格式坏 → 直接 444 断开，在原网页拒绝 */
 if (preg_match('#^/[0-9a-z]{2,10}/[0-9a-z]{4,16}\.html$#i', $uri) && isset($_GET['code'])) {
+    if (!gate_key_valid(trim((string)$_GET['code']))) refuse_connection();
     if (site_allow_page('visitor.html')) {
         header('Cache-Control: no-store');
         serve_html('visitor.html');
