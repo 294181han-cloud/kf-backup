@@ -435,6 +435,7 @@ function dispatch_api(string $method, string $uri): void
     if ($uri === '/api/sessions')        handle_sessions($method);
     if ($uri === '/api/sessions/bulk')   handle_sessions_bulk($method);
     if ($uri === '/api/sessions/by-resume') handle_session_by_resume($method);
+    if (preg_match('#^/api/sessions/(\d+)/merge$#', $uri, $m)) handle_session_merge($method, $m);
     if ($uri === '/api/agents')          handle_agents_list($method);
     if ($uri === '/api/upload')          handle_upload($method);
     if ($uri === '/api/msg/transcribe')  handle_msg_transcribe($method);

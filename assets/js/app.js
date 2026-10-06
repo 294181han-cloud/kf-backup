@@ -1294,6 +1294,7 @@ const app = createApp({
         if (rc) { copy(rc); } else { ElementPlus.ElMessage.info('这个会话还没有恢复码，刷新一下试试'); }
         return;
       }
+      if (k === 'resumeFind') { resumeFindOpen.value = true; return; }
       if (k === 'block') {
         try {
           await ElementPlus.ElMessageBox.confirm(
@@ -1720,12 +1721,50 @@ const app = createApp({
       try {
         const r = await API.post('/api/sessions/by-resume', { code: rc });
         resumeFindOpen.value = false; resumeFindCode.value = '';
+        /* v2.60.14 如果当前正开着一段对话，问一句：合并进来，还是跳过去？
+           —— 同一个人微信来一次、浏览器又来一次会变成两条会话，客服一般想合并成一条。 */
+        if (currentId.value && currentId.value !== r.session_id) {
+          const target = currentId.value;
+          try {
+            await ElementPlus.ElMessageBox.confirm(
+              '找到「' + (r.name || '') + '」这段对话。要把它合并到当前会话「' + (current.value ? current.value.name : '') + '」吗？合并后只留一条，聊天记录是完整的。',
+              '找到另一段对话',
+              { type: 'info', confirmButtonText: '合并到当前会话', cancelButtonText: '跳到那段对话', distinguishCancelAndClose: true });
+            const mr = await API.post('/api/sessions/' + target + '/merge', { from: r.session_id });
+            await pollOnce();
+            msgs.value = []; await openSession(target);
+            ElementPlus.ElMessage.success('已合并 ' + (mr.moved || 0) + ' 条消息到「' + (mr.into_name || '') + '」');
+          } catch (action) {
+            if (action === 'cancel') {
+              tab.value = 'work';
+              await pollOnce();
+              await openSession(r.session_id);
+              ElementPlus.ElMessage.success('已打开「' + (r.name || '') + '」');
+            }
+          }
+          return;
+        }
         tab.value = 'work';
         await pollOnce();
         await openSession(r.session_id);
         ElementPlus.ElMessage.success(r.from_trash ? '已从回收站恢复并打开「' + (r.name || '') + '」' : '已找到「' + (r.name || '') + '」');
       } catch (e) { resumeFindErr.value = e.message; }
       finally { resumeFindBusy.value = false; }
+    };
+    /** v2.60.14 右键会话 → 合并到当前会话 */
+    const ctxMenuMerge = async () => {
+      const from = ctxMenu.sid; const name = ctxMenu.name; const target = currentId.value;
+      closeCtxMenu();
+      if (!target || !from || target === from) return;
+      try {
+        await ElementPlus.ElMessageBox.confirm(
+          '把「' + name + '」的聊天记录合并到「' + (current.value ? current.value.name : '当前会话') + '」？合并后这条会话会消失，客户那边看到的是一整段完整记录。',
+          '合并会话', { type: 'warning', confirmButtonText: '合并', cancelButtonText: '取消' });
+        const r = await API.post('/api/sessions/' + target + '/merge', { from });
+        ElementPlus.ElMessage.success('已合并 ' + (r.moved || 0) + ' 条消息');
+        await pollOnce();
+        msgs.value = []; await openSession(target);
+      } catch (e) { if (e && e.message && e !== 'cancel') ElementPlus.ElMessage.error(e.message); }
     };
     const restoreSession = async (s) => {
       if (!s) return;
@@ -2995,7 +3034,7 @@ const app = createApp({
       sessMulti, sessChecked, toggleMulti, toggleSessCheck, checkAllSess, bulkSessions,
       ctxMenu, openCtxMenu, openCtxMenuFromBtn, closeCtxMenu, ctxMenuArchive, ctxMenuClose, ctxMenuDelete,
       ctxMenuPin, ctxMenuUnread, ctxMenuBlock,
-      ctxMenuNote,
+      ctxMenuNote, ctxMenuMerge,
       ctxMenuRename, imgsOf,
       qeImgs, quickFocus, quickImgInput, quickPickImg, quickOnImg, quickPaste, quickRmAtt,
       replyTo, quoteOf, quoteWho, quoteText, startReply, jumpToMsg, copyMsg, flashId, fmtSize, mapUrl,

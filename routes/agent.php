@@ -286,6 +286,56 @@ function handle_session_delete(string $method, array $m): void
     json_out(['ok' => true, 'soft' => true, 'sid' => $sid]);
 }
 
+/* v2.60.14 会话合并：同一个人用微信来一次、浏览器又来一次 → 列表里变成两条。
+   把「from」这条的聊天记录、联系方式整体并到「target」（通常是当前正在接待的那条），
+   只留一条，客户和客服看到的都是完整上下文。 */
+function handle_session_merge(string $method, array $m): void
+{
+    if ($method !== 'POST') { json_error('方法不允许', 405); return; }
+    $target = (int)$m[1];
+    $ctx = require_workspace();
+    if ($ctx['role'] !== 'tenant') json_error('仅租户可合并会话', 403);
+    $from = (int)input('from', 0);
+    if ($from <= 0 || $from === $target) json_error('参数不对');
+    $tid = (int)$ctx['tenant_id'];
+    $pdo = db();
+    $ta = session_of($ctx, $target);
+    $fa = session_of($ctx, $from);
+
+    $moved = 0;
+    $pdo->beginTransaction();
+    try {
+        $st = $pdo->prepare('UPDATE messages SET session_id = ? WHERE session_id = ? AND tenant_id = ?');
+        $st->execute([$target, $from, $tid]);
+        $moved = $st->rowCount();
+        // 联系方式：目标没有的才补，别把已有的覆盖掉
+        $q = $pdo->prepare('SELECT type, value FROM contacts WHERE session_id = ? AND tenant_id = ?');
+        $q->execute([$from, $tid]);
+        $ins = $pdo->prepare('INSERT INTO contacts (tenant_id, session_id, type, value, updated_at) VALUES (?,?,?,?,?) ON DUPLICATE KEY UPDATE value = VALUES(value)');
+        foreach ($q->fetchAll() as $c) {
+            $has = $pdo->prepare('SELECT 1 FROM contacts WHERE session_id = ? AND type = ? LIMIT 1');
+            $has->execute([$target, $c['type']]);
+            if (!$has->fetch()) $ins->execute([$tid, $target, $c['type'], $c['value'], now_dt()]);
+        }
+        $pdo->prepare('DELETE FROM contacts WHERE session_id = ? AND tenant_id = ?')->execute([$from, $tid]);
+        $pdo->prepare('DELETE FROM welcome_sent WHERE session_id = ? AND tenant_id = ?')->execute([$from, $tid]);
+        $pdo->prepare('DELETE FROM v_sessions WHERE id = ? AND tenant_id = ?')->execute([$from, $tid]);
+        // 目标会话的最后消息/时间跟着更新成合并后的最新一条
+        $last = $pdo->prepare('SELECT text, msg_type, created_at FROM messages WHERE session_id = ? ORDER BY id DESC LIMIT 1');
+        $last->execute([$target]);
+        $lm = $last->fetch();
+        if ($lm) {
+            $summary = msg_summary((string)$lm['text'], []);
+            $pdo->prepare('UPDATE v_sessions SET last_msg = ?, last_time = ? WHERE id = ?')->execute([$summary, $lm['created_at'], $target]);
+        }
+        $pdo->commit();
+    } catch (\Throwable $e) {
+        try { $pdo->rollBack(); } catch (\Throwable $e2) {}
+        json_error('合并失败：' . $e->getMessage(), 500);
+    }
+    json_out(['ok' => true, 'moved' => $moved, 'target' => $target, 'from_name' => $fa['visitor_name'], 'into_name' => $ta['visitor_name']]);
+}
+
 /* v2.60.13 工作台用恢复码找回会话：客户报一串恢复码，客服在这里输入就能直接跳到那段对话
    （客户换了手机/浏览器，或者我们这边把会话删进回收站了，都能靠它接回来） */
 function handle_session_by_resume(string $method): void

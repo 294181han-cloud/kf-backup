@@ -7,7 +7,7 @@
 <link rel="icon" href="/assets/img/mi-logo.png">
 <link rel="apple-touch-icon" href="/assets/img/mi-logo.png">
 <link rel="stylesheet" href="/assets/vendor/element-plus.css">
-<link rel="stylesheet" href="/assets/css/app.css?v=3.43.0">
+<link rel="stylesheet" href="/assets/css/app.css?v=3.44.0">
 <script src="/assets/ui/ui-registry.js?v=2.9.2"></script>
 <script src="/assets/ui/ui-loader.js?v=2.9.2" data-ui-cat="auto"></script>
 </head>
@@ -20,6 +20,10 @@
     <div class="ctx-item" @click="ctxMenuPin">📌 {{ ctxMenu.pinned ? '取消置顶' : '置顶会话' }}<div class="ctx-sub">置顶后一直排在最上面</div></div>
     <div class="ctx-item" @click="ctxMenuUnread">🔴 标为未读<div class="ctx-sub">提醒自己稍后回来看</div></div>
     <div class="ctx-item" @click="ctxMenuRename">✏️ 修改名称<div class="ctx-sub">换个好认的名字，列表和聊天里都会变</div></div>
+    <!-- v2.60.14 同一个人分成两条会话（微信一条、浏览器一条）时，把这条并到当前正在聊的那条 -->
+    <div class="ctx-item" v-if="currentId && currentId !== ctxMenu.sid" @click="ctxMenuMerge">
+      🔀 合并到当前会话<div class="ctx-sub">把这条的聊天记录并进「{{ current ? current.name : '' }}」，只留一条</div>
+    </div>
     <div class="ctx-item" @click="ctxMenuBlock">🚫 拉黑访客<div class="ctx-sub">拉黑该 IP，之后进不来也发不了消息</div></div>
     <div class="ctx-divider"></div>
     <div class="ctx-item danger" @click="ctxMenuDelete">🗑️ 删除会话<div class="ctx-sub">彻底删除，腾出会话额度</div></div>
@@ -55,6 +59,7 @@
     <button type="button" class="ms-item" @click="chMoreAction('img')">🖼 {{ imgOnly ? '显示全部消息' : '只看图片（' + imgCount + ' 张）' }}</button>
     <button type="button" class="ms-item" @click="chMoreAction('date')">📅 按日期跳转</button>
     <button type="button" class="ms-item" v-if="profile && profile.resume_code" @click="chMoreAction('resume')">🔑 复制恢复码（{{ profile.resume_code }}）</button>
+    <button type="button" class="ms-item" @click="chMoreAction('resumeFind')">📥 输入恢复码（找回 / 合并对话）</button>
     <button type="button" class="ms-item" @click="chMoreAction('block')">🚫 拉黑访客</button>
     <button type="button" class="ms-item" v-if="sessScope==='archived'" @click="chMoreAction('unarchive')">↩ 取消归档</button>
     <button type="button" class="ms-item" v-else-if="sessScope==='online'" @click="chMoreAction('archive')">📦 归档会话</button>
@@ -202,10 +207,6 @@
           <button type="button" class="sess-multi-entry" v-if="!sessMulti" @click="toggleMulti">
             <span class="sme-box">☑</span> 多选：批量归档 / 结束 / 删除
           </button>
-          <!-- v2.60.13 工作台用恢复码找回会话（客户报码、或会话被删进回收站） -->
-          <button type="button" class="sess-multi-entry sess-resume-entry" v-if="!sessMulti" @click="resumeFindOpen = true">
-            <span class="sme-box">🔑</span> 用恢复码找回会话
-          </button>
           <!-- 多选操作栏（v2.67） -->
           <div class="sess-multi-bar" v-if="sessMulti">
             <div class="smb-row">
@@ -301,6 +302,7 @@
                 <!-- v2.60.11 聊天记录快速查找：只看图片 / 按日期跳转 -->
                 <el-button size="small" plain class="cbtn icon m-hide-btn" :class="{on: imgOnly}" title="只看图片" @click="toggleImgOnly">🖼</el-button>
                 <el-button size="small" plain class="cbtn icon m-hide-btn" title="按日期跳转" @click="dateOpen = true">📅</el-button>
+                <el-button size="small" plain class="cbtn icon m-hide-btn" title="输入恢复码：找回/合并另一段对话（客户报码时用）" @click="resumeFindOpen = true">🔑</el-button>
                 <el-popconfirm title="拉黑该访客 IP？拉黑后其无法再进入或发消息" @confirm="blockSession">
                   <template #reference><el-button size="small" type="danger" plain class="cbtn m-hide-btn">🚫 拉黑</el-button></template>
                 </el-popconfirm>
@@ -1658,7 +1660,8 @@
   <el-dialog v-model="resumeFindOpen" title="用恢复码找回会话" width="420px" align-center>
     <p class="muted" style="font-size:12.5px;line-height:1.7;margin:0 0 10px;">
       输入客户手里的恢复码（8 位字母数字；会话头部 🔑 和「访客信息」里都能复制发给他），直接跳到那段对话。
-      如果这段对话被删进了回收站，也会一并恢复。
+      如果这段对话被删进了回收站，也会一并恢复。如果当前正开着另一段对话（比如同一个人用微信来一次、浏览器又来一次），
+      会问你是「合并到当前会话」还是「跳到那段对话」。
     </p>
     <el-input v-model="resumeFindCode" maxlength="16" placeholder="请输入恢复码，例如 atkqw69p" @keyup.enter="findByResume"></el-input>
     <div v-if="resumeFindErr" style="color:#e5484d;font-size:12.5px;margin-top:8px;">{{ resumeFindErr }}</div>
@@ -1684,7 +1687,7 @@
 <script src="/assets/qr-poster.js?v=2.1.03"></script>
 <script src="/assets/api.js?v=2.0.2"></script>
 <script src="/assets/js/app-components.js?v=2.6.2"></script>
-<script src="/assets/js/app.js?v=3.36.0"></script>
+<script src="/assets/js/app.js?v=3.37.0"></script>
 <script src="/assets/js/app-boot.js?v=2.1.1"></script>
 </body>
 </html>
