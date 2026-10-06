@@ -71,6 +71,9 @@ function ensure_upgrade(): void
         try { $pdo->exec("ALTER TABLE messages ADD COLUMN reply_to INT UNSIGNED NOT NULL DEFAULT 0"); } catch (\Throwable $e) { /* 列已存在 */ }
         try { $pdo->exec("ALTER TABLE v_sessions ADD COLUMN pinned TINYINT NOT NULL DEFAULT 0"); } catch (\Throwable $e) { /* 列已存在 */ }
         try { $pdo->exec("ALTER TABLE v_sessions ADD COLUMN pinned_at DATETIME NULL"); } catch (\Throwable $e) { /* 列已存在 */ }
+        // v2.60.9 访客「恢复码」：客户换浏览器/换设备后，用客服给的码把原对话接回来
+        try { $pdo->exec("ALTER TABLE v_sessions ADD COLUMN resume_code VARCHAR(16) NOT NULL DEFAULT ''"); } catch (\Throwable $e) { /* 列已存在 */ }
+        try { $pdo->exec("ALTER TABLE v_sessions ADD UNIQUE KEY uk_resume_code (resume_code)"); } catch (\Throwable $e) { /* 索引已存在 */ }
         try { $pdo->exec("ALTER TABLE v_sessions ADD INDEX idx_tenant_pinned (tenant_id, pinned, last_time)"); } catch (\Throwable $e) { /* 已存在 */ }
         // v2.33/v2.39 分域节点登记：同一台服务器可同时跑客服入口+访客站点，唯一键 = IP+角色
         $pdo->exec("CREATE TABLE IF NOT EXISTS nodes (
@@ -404,6 +407,7 @@ function dispatch_api(string $method, string $uri): void
     if ($uri === '/api/visitor/upload')      handle_visitor_upload($method);
     if ($uri === '/api/visitor/messages')    handle_visitor_messages($method);
     if ($uri === '/api/visitor/recall')      handle_visitor_recall($method);
+    if ($uri === '/api/visitor/resume')      handle_visitor_resume($method);
 
     // ---- 工作台（tenant + agent） ----
     if ($uri === '/api/sessions')        handle_sessions($method);

@@ -464,6 +464,17 @@
           <div class="info-item"><span class="k">进入方式</span><span class="v">{{ sourceText(current.source) }}</span></div>
           <div class="info-item" v-if="profile"><span class="k">访问次数</span><span class="v">{{ profile.visit_count }}</span></div>
           <div class="info-item" v-if="profile"><span class="k">消息数</span><span class="v">{{ profile.message_count }}</span></div>
+          <!-- v2.60.9 恢复码：客户换手机/换浏览器后，把码发给他就能回到这段对话 -->
+          <div class="info-item" v-if="profile && profile.resume_code">
+            <span class="k">恢复码</span>
+            <span class="v mono" style="display:flex;align-items:center;gap:8px;justify-content:flex-end;">
+              {{ profile.resume_code }}
+              <el-button size="small" text type="primary" @click="copy(profile.resume_code)">复制</el-button>
+            </span>
+          </div>
+          <div class="muted" style="font-size:11.5px;line-height:1.7;padding:2px 0 8px;">
+            客户换手机/换浏览器后看不到原来的对话时，把这个恢复码发给他，让他在访客端点右上角「恢复对话」输入即可接回这段对话。请勿发给无关人员。
+          </div>
           <h4>联系方式</h4>
           <div v-for="c in contactList" :key="c.type" class="info-item">
             <span class="k">{{ contactLabel(c.type) }}</span>

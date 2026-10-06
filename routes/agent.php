@@ -589,6 +589,8 @@ function handle_session_profile(string $method, array $m): void
         'visit_count' => $visitCount, 'message_count' => $msgCount,
         'first_time' => dt_to_iso($ft ?: $s['created_at']),
         'stay_seconds' => $ft ? max(0, time() - strtotime($ft)) : 0,
+        // v2.60.9 恢复码：老会话第一次查看时自动补一个，客服在「访客信息」里复制给客户
+        'resume_code' => resume_code_for($sid),
     ]);
 }
 

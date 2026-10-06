@@ -319,9 +319,11 @@ function handle_visitor_init(string $method): void
     }
 
     $firstMsg = $question !== '' ? $question : '等待接入...';
-    $pdo->prepare('INSERT INTO v_sessions (tenant_id, agent_id, visitor_name, visitor_token, ip, from_url, last_msg, last_time, unread, status, source, quota_key, last_online_at, ua, visitor_avatar) VALUES (?,?,?,?,?,?,?,?,0,\'online\',?,?,?,?,?)')
+    // v2.60.9 建会话时就生成「恢复码」，客服随时能复制给客户（换设备后接回原对话）
+    $resumeCode = resume_code_new();
+    $pdo->prepare('INSERT INTO v_sessions (tenant_id, agent_id, visitor_name, visitor_token, ip, from_url, last_msg, last_time, unread, status, source, quota_key, last_online_at, ua, visitor_avatar, resume_code) VALUES (?,?,?,?,?,?,?,?,0,\'online\',?,?,?,?,?,?)')
         ->execute([$tid, $ctx['agent_id'], $name, $visitorToken, $ip, $fromUrl, $firstMsg, $now,
-            $code !== '' ? 'app' : 'web', $quotaKey, $now, mb_substr($_SERVER['HTTP_USER_AGENT'] ?? '', 0, 500), $visitorAvatar]);
+            $code !== '' ? 'app' : 'web', $quotaKey, $now, mb_substr($_SERVER['HTTP_USER_AGENT'] ?? '', 0, 500), $visitorAvatar, $resumeCode]);
     $sid = (int)$pdo->lastInsertId();
 
     if ($phone !== '') {
@@ -570,6 +572,62 @@ function handle_gate_check(string $method): void
         return;
     }
     json_out(['ok' => true, 'code' => (string)$row['code'], 'url' => '/visitor.html']);
+}
+
+/* ---------- v2.60.9 访客「恢复原对话」 ----------
+   换手机 / 换浏览器 / 清了缓存后，浏览器里的 visitor_token 没了，访客会被当成新访客。
+   输入客服给的 8 位恢复码 → 找到那段未结束的会话 → 把它的 visitor_token 还给前端
+   （前端存进 localStorage），之后访客看到的就还是原来那段对话。
+   安全：只对未结束的会话生效；同一 IP 10 分钟最多尝试 20 次。 */
+function handle_visitor_resume(string $method): void
+{
+    if ($method !== 'POST') { json_error('方法不允许', 405); return; }
+    $key = trim((string)input('code', ''));
+    $rc = strtolower(trim((string)input('resume', '')));
+    if ($rc === '') { json_out(['ok' => false, 'msg' => '请输入恢复码']); return; }
+    if (!preg_match('/^[a-z0-9]{4,16}$/', $rc)) { json_out(['ok' => false, 'msg' => '恢复码格式不对']); return; }
+
+    // 限频：同 IP 10 分钟内最多 20 次，防爆破
+    $lk = 'resume_try:' . md5(get_client_ip());
+    $raw = kv_get($lk, '');
+    $nowTs = time(); $cnt = 0; $start = $nowTs;
+    if ($raw !== '') {
+        $parts = explode(':', $raw);
+        if (count($parts) === 2 && $nowTs - (int)$parts[1] < 600) { $cnt = (int)$parts[0]; $start = (int)$parts[1]; }
+    }
+    $cnt++;
+    kv_set($lk, $cnt . ':' . $start);
+    if ($cnt > 20) { json_out(['ok' => false, 'msg' => '尝试次数太多了，请稍后再试']); return; }
+
+    $pdo = db();
+    $tid = 0;
+    if ($key !== '') {
+        $st = $pdo->prepare('SELECT tenant_id FROM service_codes WHERE code = ? LIMIT 1');
+        $st->execute([$key]);
+        $tid = (int)($st->fetchColumn() ?: 0);
+    }
+    if ($tid > 0) {
+        $st = $pdo->prepare("SELECT * FROM v_sessions WHERE tenant_id = ? AND resume_code = ? AND status <> 'closed' ORDER BY last_time DESC LIMIT 1");
+        $st->execute([$tid, $rc]);
+    } else {
+        $st = $pdo->prepare("SELECT * FROM v_sessions WHERE resume_code = ? AND status <> 'closed' ORDER BY last_time DESC LIMIT 1");
+        $st->execute([$rc]);
+    }
+    $row = $st->fetch();
+    if (!$row) { json_out(['ok' => false, 'msg' => '恢复码不对，或者这段对话已经结束了']); return; }
+
+    // 接回来的会话回到在线列表（原来是归档状态的话），并把心跳刷新
+    if (($row['status'] ?? '') === 'archived') {
+        $pdo->prepare("UPDATE v_sessions SET status = 'online', last_online_at = ? WHERE id = ?")->execute([now_dt(), (int)$row['id']]);
+    } else {
+        $pdo->prepare('UPDATE v_sessions SET last_online_at = ? WHERE id = ?')->execute([now_dt(), (int)$row['id']]);
+    }
+    json_out([
+        'ok' => true,
+        'session_id' => (int)$row['id'],
+        'visitor_token' => (string)$row['visitor_token'],
+        'session' => visitor_session_out($row),
+    ]);
 }
 
 function handle_visitor_send(string $method): void

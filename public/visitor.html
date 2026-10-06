@@ -7,7 +7,7 @@
 <title>在线咨询</title>
 <link rel="icon" href="/assets/img/mi-logo.png">
 <link rel="apple-touch-icon" href="/assets/img/mi-logo.png">
-<link rel="stylesheet" href="/assets/css/visitor.css?v=2.13.0">
+<link rel="stylesheet" href="/assets/css/visitor.css?v=2.14.0">
 </head>
 <body>
 <!-- v2.52 兜底：脚本没跑起来时（微信旧内核 document.write 不执行脚本 / 资源被缓存污染 / 网络抽风），
@@ -48,6 +48,23 @@
         <div class="v-sub" v-if="brand.show_support">{{ brand.welcome_sub }}</div>
       </div>
       <div class="v-status"><i class="st-dot"></i>{{ onlineText }}</div>
+      <!-- v2.60.9 换手机/换浏览器后接回原对话 -->
+      <button type="button" class="v-resume-btn" title="换设备后恢复原对话" @click="openResume">恢复对话</button>
+    </div>
+
+    <!-- v2.60.9 恢复原对话弹窗 -->
+    <div class="v-modal" v-if="resumeOpen">
+      <div class="v-modal-card">
+        <div class="vm-t">恢复原对话</div>
+        <div class="vm-d">输入客服给你的恢复码，就能回到换设备前的那段对话。</div>
+        <input class="vm-in" v-model="resumeCode" maxlength="16" placeholder="请输入恢复码" @keyup.enter="doResume">
+        <div class="vm-err" v-if="resumeErr">{{ resumeErr }}</div>
+        <div class="vm-ops">
+          <button type="button" class="vm-btn ghost" @click="resumeOpen = false">取消</button>
+          <button type="button" class="vm-btn" :disabled="resumeBusy" @click="doResume">{{ resumeBusy ? '恢复中…' : '恢复原对话' }}</button>
+        </div>
+        <div class="vm-tip">恢复码和续聊链接都能进入当前对话，请不要发给无关人员。</div>
+      </div>
     </div>
 
     <!-- 滚动通知 -->
@@ -295,7 +312,7 @@
 </div>
 
 <script src="/assets/vendor/vue.global.js?v=2.0.1"></script>
-<script src="/assets/js/visitor.js?v=2.20.0"></script>
+<script src="/assets/js/visitor.js?v=2.21.1"></script>
 <script>
 /* v2.52 加载兜底：正常挂载后由 visitor.js 移除提示；8 秒还没挂载就提示"加载失败" */
 (function () {

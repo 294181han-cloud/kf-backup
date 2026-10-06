@@ -152,6 +152,44 @@ createApp({
       if (gotAgent && snd.recv_on) playSnd(snd.recv_which);
     };
 
+    /* ===== v2.60.9 恢复原对话 =====
+       客户换手机 / 换浏览器 / 清了缓存后，本地的 visitor_token 没了，会被当成新访客。
+       输入客服给的 8 位恢复码 → 把原会话的 token 接回来 → 重新拉历史消息。 */
+    const resumeOpen = ref(false);
+    const resumeCode = ref('');
+    const resumeErr = ref('');
+    const resumeBusy = ref(false);
+    const openResume = () => { resumeErr.value = ''; resumeOpen.value = true; };
+    const doResume = async () => {
+      const rc = (resumeCode.value || '').trim().toLowerCase();
+      if (!rc) { resumeErr.value = '请输入恢复码'; return; }
+      resumeBusy.value = true; resumeErr.value = '';
+      try {
+        const p = params();
+        const r = await fetch((window.KF_API_BASE || '') + '/api/visitor/resume', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ code: p.code || p.t || '', resume: rc })
+        }).then(x => x.json());
+        if (r && r.ok) {
+          storeToken(r.visitor_token);
+          sessionId.value = r.session_id;
+          // 关键：换会话前先清空消息游标，否则新会话（消息 id 更大）会让原会话的历史被当成"更旧的"跳过
+          messages.value = [];
+          maxMsgId.value = 0;
+          resumeOpen.value = false;
+          resumeCode.value = '';
+          page.value = 'chat';
+          await loadHistory();
+          startPoll();
+          scrollBottom();
+          toast('已恢复原对话');
+        } else {
+          resumeErr.value = (r && r.msg) || '恢复码不对';
+        }
+      } catch (e) { resumeErr.value = '网络异常，请稍后再试'; }
+      finally { resumeBusy.value = false; }
+    };
+
     // ---- 初始化流程 ----
     const boot = async () => {
       try {
@@ -841,6 +879,7 @@ createApp({
       ui, robotType, verifyTitle, verifyBg, verifyPassed, verifyValue, verifyErr, codeText, codeInput,
       genCode, codeVerify, verifyGo, slideStart, slideMove, slideEnd, doEnter,
       pubShow, pubTitle, pubContent, linkMode, linkSegs, copyLink, myAvatar,
+      resumeOpen, resumeCode, resumeErr, resumeBusy, openResume, doResume,
       ended, handleEnded, restartChat,
       replyTo, quoteOf, quoteWho, quoteText, fmtSize, mapUrl, jumpTo, startReply,
       actSheet, openActSheet, copyMsg, onMsgTouchStart, onMsgTouchEnd, onPaste, flashId,

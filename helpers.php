@@ -1624,6 +1624,39 @@ function gen_gate_name(): string
     return $s;
 }
 
+/* ===================== v2.60.9 访客「恢复码」 =====================
+   场景：客户换手机 / 换浏览器 / 清了缓存后重新扫码，浏览器里原来的 visitor_token 没了，
+   会被当成新访客、看不到之前的聊天记录。给他一个 8 位恢复码，就能把那段对话接回来。
+   （客服端在「访客信息」里能看到并复制这个码，然后发给客户。） */
+function resume_code_new(): string
+{
+    $chars = 'abcdefghjkmnpqrstuvwxyz23456789';   // 去掉容易看错的 i l o 0 1
+    for ($try = 0; $try < 8; $try++) {
+        $s = '';
+        for ($i = 0; $i < 8; $i++) $s .= $chars[random_int(0, strlen($chars) - 1)];
+        try {
+            $st = db()->prepare('SELECT 1 FROM v_sessions WHERE resume_code = ? LIMIT 1');
+            $st->execute([$s]);
+            if (!$st->fetch()) return $s;
+        } catch (\Throwable $e) { return $s; }   // 老库没这列时也别报错
+    }
+    return 'r' . substr(bin2hex(random_bytes(5)), 0, 7);
+}
+
+/** 取会话的恢复码（没有就生成并存下来），老会话第一次查看时自动补上 */
+function resume_code_for(int $sid): string
+{
+    try {
+        $st = db()->prepare('SELECT resume_code FROM v_sessions WHERE id = ?');
+        $st->execute([$sid]);
+        $cur = trim((string)($st->fetchColumn() ?: ''));
+        if ($cur !== '') return $cur;
+        $code = resume_code_new();
+        db()->prepare('UPDATE v_sessions SET resume_code = ? WHERE id = ?')->execute([$code, $sid]);
+        return $code;
+    } catch (\Throwable $e) { return ''; }
+}
+
 /** 访客默认名：月-日 编号 */
 function gen_visitor_name(int $tenantId): string
 {
