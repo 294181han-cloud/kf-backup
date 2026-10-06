@@ -23,12 +23,15 @@ function session_of(array $ctx, int $sid): array
 }
 
 /* ---------- 会话列表 ---------- */
-/** 会话分区过滤（v2.25 三级）：online=在线（未结束未归档） archived=已归档 closed=已结束 */
+/** 会话分区过滤（v2.25 三级）：online=在线（未结束未归档） archived=已归档 closed=已结束
+ *  v2.60.11 加第四级 trash=回收站（软删除，30 天内可恢复）；其他三个分区都把回收站里的排除掉 */
 function session_scope_sql(string $scope): string
 {
-    if ($scope === 'archived') return " AND s.status = 'archived'";
-    if ($scope === 'closed') return " AND s.status = 'closed'";
-    return " AND s.status NOT IN ('closed', 'archived')";
+    if ($scope === 'trash') return " AND s.deleted_at IS NOT NULL";
+    $base = " AND s.deleted_at IS NULL";
+    if ($scope === 'archived') return $base . " AND s.status = 'archived'";
+    if ($scope === 'closed') return $base . " AND s.status = 'closed'";
+    return $base . " AND s.status NOT IN ('closed', 'archived')";
 }
 
 /** v2.66：只把「访客真的说过话」的会话放进列表。
@@ -42,10 +45,25 @@ function session_spoken_sql(): string
 /** 已结束会话自动清理（poll 时懒执行；closed_keep_days=0 表示永久保留） */
 function cleanup_closed_sessions(int $tenantId): void
 {
+    /* v2.60.11 回收站超时清理：删掉的会话保留 30 天，过期自动彻底删除 */
+    try {
+        $pdo = db();
+        $st = $pdo->prepare('SELECT id FROM v_sessions WHERE tenant_id = ? AND deleted_at IS NOT NULL AND deleted_at < ? LIMIT 200');
+        $st->execute([$tenantId, now_dt(time() - 30 * 86400)]);
+        $old = $st->fetchAll(PDO::FETCH_COLUMN);
+        if ($old) {
+            $in = implode(',', array_map('intval', $old));
+            $pdo->exec("DELETE FROM messages WHERE session_id IN ($in)");
+            $pdo->exec("DELETE FROM contacts WHERE session_id IN ($in)");
+            $pdo->exec("DELETE FROM welcome_sent WHERE session_id IN ($in)");
+            $pdo->exec("DELETE FROM v_sessions WHERE id IN ($in)");
+        }
+    } catch (\Throwable $e) { /* 清理失败不影响主流程 */ }
     $days = fetch_count(db(), 'SELECT closed_keep_days FROM tenants WHERE id = ?', [$tenantId]);
     if ($days <= 0) return;
     $pdo = db();
-    $st = $pdo->prepare('SELECT id FROM v_sessions WHERE tenant_id = ? AND status = \'closed\' AND closed_at IS NOT NULL AND closed_at < ? LIMIT 100');
+    // 注意：回收站里的（deleted_at 不为空）不在这里清，交给上面的 30 天逻辑，否则刚删的会话会被「已结束自动清理」顺手干掉
+    $st = $pdo->prepare('SELECT id FROM v_sessions WHERE tenant_id = ? AND deleted_at IS NULL AND status = \'closed\' AND closed_at IS NOT NULL AND closed_at < ? LIMIT 100');
     $st->execute([$tenantId, now_dt(time() - $days * 86400)]);
     $ids = $st->fetchAll(PDO::FETCH_COLUMN);
     if (!$ids) return;
@@ -66,7 +84,7 @@ function handle_sessions(string $method): void
     $ctx = require_workspace();
     $pdo = db();
     $cfg = config();
-    $scope = in_array((string)input('scope', 'online'), ['online', 'archived', 'closed'], true) ? (string)input('scope', 'online') : 'online';
+    $scope = in_array((string)input('scope', 'online'), ['online', 'archived', 'closed', 'trash'], true) ? (string)input('scope', 'online') : 'online';
     $onlineSql = "CASE WHEN s.status IN ('closed','archived') THEN s.status
         WHEN s.last_online_at IS NOT NULL AND s.last_online_at > DATE_SUB(NOW(), INTERVAL " . (int)$cfg['session_online_secs'] . " SECOND) THEN 'online'
         ELSE 'offline' END";
@@ -78,7 +96,7 @@ function handle_sessions(string $method): void
         $onlineSql AS status,
         (SELECT COUNT(*) FROM messages WHERE session_id = s.id) AS message_count
         FROM v_sessions s LEFT JOIN agents a ON a.id = s.agent_id AND a.tenant_id = s.tenant_id
-        WHERE s.tenant_id = ?" . session_scope_sql($scope) . session_visible_sql($ctx) . session_spoken_sql() . "
+        WHERE s.tenant_id = ?" . session_scope_sql($scope) . session_visible_sql($ctx) . ($scope === 'trash' ? '' : session_spoken_sql()) . "
         ORDER BY s.pinned DESC, s.pinned_at DESC, s.last_time DESC LIMIT 500";
     $rows = $pdo->prepare($sql);
     $rows->execute([$ctx['tenant_id']]);
@@ -109,13 +127,17 @@ function handle_sessions(string $method): void
         SUM(status = 'closed') AS closed_cnt,
         COALESCE(SUM(CASE WHEN status NOT IN ('closed','archived') THEN unread ELSE 0 END), 0) AS online_unread,
         COALESCE(SUM(CASE WHEN status = 'archived' THEN unread ELSE 0 END), 0) AS archived_unread
-        FROM v_sessions s WHERE s.tenant_id = ?" . $vis);
+        FROM v_sessions s WHERE s.tenant_id = ? AND s.deleted_at IS NULL" . $vis);
     $cnt->execute([$ctx['tenant_id']]);
     $c = $cnt->fetch() ?: [];
+    // 回收站数量（软删除、未过期）：不带「访客说过话」过滤，删了就该看得见
+    $trashCnt = fetch_count($pdo, 'SELECT COUNT(*) FROM v_sessions s WHERE s.tenant_id = ? AND s.deleted_at IS NOT NULL'
+        . session_visible_sql($ctx), [$ctx['tenant_id']]);
     json_out(['sessions' => $out, 'counts' => [
         'online' => (int)($c['online_cnt'] ?? 0),
         'archived' => (int)($c['archived_cnt'] ?? 0),
         'closed' => (int)($c['closed_cnt'] ?? 0),
+        'trash' => $trashCnt,
         'online_unread' => (int)($c['online_unread'] ?? 0),
         'archived_unread' => (int)($c['archived_unread'] ?? 0),
     ]]);
@@ -258,13 +280,42 @@ function handle_session_delete(string $method, array $m): void
     if ($ctx['role'] !== 'tenant') json_error('仅租户可删除会话', 403);
     $tid = (int)$ctx['tenant_id'];
     $pdo = db();
+    /* v2.60.11 改成软删除（进回收站）：30 天内可以在「已删除」页签里自己恢复，
+       也能在刚删完的提示里点「撤销」。会话额度按未删除的算，所以删了就等于腾出额度。 */
+    $pdo->prepare("UPDATE v_sessions SET deleted_at = ? WHERE tenant_id = ? AND id = ?")->execute([now_dt(), $tid, $sid]);
+    json_out(['ok' => true, 'soft' => true, 'sid' => $sid]);
+}
+
+/* v2.60.11 回收站：恢复一个被删除的会话 */
+function handle_session_restore(string $method, array $m): void
+{
+    if ($method !== 'POST') { json_error('方法不允许', 405); return; }
+    $sid = (int)$m[1];
+    $ctx = require_workspace();
+    session_of($ctx, $sid);
+    if ($ctx['role'] !== 'tenant') json_error('仅租户可恢复会话', 403);
+    $pdo = db();
+    $pdo->prepare("UPDATE v_sessions SET deleted_at = NULL WHERE tenant_id = ? AND id = ?")->execute([(int)$ctx['tenant_id'], $sid]);
+    json_out(['ok' => true]);
+}
+
+/* v2.60.11 回收站：彻底删除（只在已删除的会话上允许，不可恢复） */
+function handle_session_purge(string $method, array $m): void
+{
+    if ($method !== 'POST') { json_error('方法不允许', 405); return; }
+    $sid = (int)$m[1];
+    $ctx = require_workspace();
+    $row = session_of($ctx, $sid);
+    if ($ctx['role'] !== 'tenant') json_error('仅租户可彻底删除会话', 403);
+    if (empty($row['deleted_at'])) json_error('请先删除会话再彻底删除', 400);
+    $tid = (int)$ctx['tenant_id'];
+    $pdo = db();
     $pdo->beginTransaction();
     try {
         $pdo->prepare("DELETE FROM messages WHERE tenant_id = ? AND session_id = ?")->execute([$tid, $sid]);
         $pdo->prepare("DELETE FROM contacts WHERE tenant_id = ? AND session_id = ?")->execute([$tid, $sid]);
         $pdo->prepare("DELETE FROM welcome_sent WHERE tenant_id = ? AND session_id = ?")->execute([$tid, $sid]);
-        $st = $pdo->prepare("DELETE FROM v_sessions WHERE tenant_id = ? AND id = ?");
-        $st->execute([$tid, $sid]);
+        $pdo->prepare("DELETE FROM v_sessions WHERE tenant_id = ? AND id = ?")->execute([$tid, $sid]);
         $pdo->commit();
     } catch (\Throwable $e) {
         try { $pdo->rollBack(); } catch (\Throwable $e2) {}
@@ -766,7 +817,8 @@ function handle_stats_dashboard(string $method): void
     $ctx = require_workspace();
     $pdo = db();
     $tid = $ctx['tenant_id'];
-    $vis = session_visible_sql($ctx); // agent 只统计自己可见会话
+    // v2.60.11 统计口径：回收站里的（软删除）不算数——删了就等于腾出额度
+    $vis = session_visible_sql($ctx) . ' AND s.deleted_at IS NULL'; // agent 只统计自己可见会话
     $today = date('Y-m-d');
     $weekAgo = date('Y-m-d', strtotime('-6 days'));
 
@@ -946,7 +998,7 @@ function handle_export_sessions(string $method): void
     if ($method !== 'GET') { json_error('方法不允许', 405); return; }
     $ctx = require_workspace();
     $pdo = db();
-    $vis = session_visible_sql($ctx);
+    $vis = session_visible_sql($ctx) . ' AND s.deleted_at IS NULL';   // 导出不含回收站
     $rows = $pdo->prepare("SELECT s.id, s.visitor_name, s.ip, s.from_url, s.last_msg, s.last_time, s.status, s.source,
         (SELECT COUNT(*) FROM messages WHERE session_id = s.id) msg_count,
         (SELECT COUNT(*) FROM messages WHERE session_id = s.id AND from_type = 'visitor') visitor_msg,
@@ -971,7 +1023,7 @@ function handle_agent_poll(string $method): void
     $cfg = config();
     // 已结束会话自动清理（懒执行；closed_keep_days=0 永久保留）
     try { cleanup_closed_sessions($ctx['tenant_id']); } catch (\Throwable $e) {}
-    $scope = in_array((string)input('scope', 'online'), ['online', 'archived', 'closed'], true) ? (string)input('scope', 'online') : 'online';
+    $scope = in_array((string)input('scope', 'online'), ['online', 'archived', 'closed', 'trash'], true) ? (string)input('scope', 'online') : 'online';
     $onlineSql = "CASE WHEN s.status IN ('closed','archived') THEN s.status
         WHEN s.last_online_at IS NOT NULL AND s.last_online_at > DATE_SUB(NOW(), INTERVAL " . (int)$cfg['session_online_secs'] . " SECOND) THEN 'online'
         ELSE 'offline' END";
@@ -983,7 +1035,7 @@ function handle_agent_poll(string $method): void
         $onlineSql AS status,
         (SELECT COUNT(*) FROM messages WHERE session_id = s.id) AS message_count
         FROM v_sessions s LEFT JOIN agents a ON a.id = s.agent_id AND a.tenant_id = s.tenant_id
-        WHERE s.tenant_id = ?" . session_scope_sql($scope) . session_visible_sql($ctx) . session_spoken_sql() . "
+        WHERE s.tenant_id = ?" . session_scope_sql($scope) . session_visible_sql($ctx) . ($scope === 'trash' ? '' : session_spoken_sql()) . "
         ORDER BY s.pinned DESC, s.pinned_at DESC, s.last_time DESC LIMIT 500");
     $st->execute([$ctx['tenant_id']]);
     $sessions = [];
@@ -1019,13 +1071,14 @@ function handle_agent_poll(string $method): void
         SUM(status = 'closed') AS closed_cnt,
         COALESCE(SUM(CASE WHEN status NOT IN ('closed','archived') THEN unread ELSE 0 END), 0) AS online_unread,
         COALESCE(SUM(CASE WHEN status = 'archived' THEN unread ELSE 0 END), 0) AS archived_unread
-        FROM v_sessions s WHERE s.tenant_id = ?" . $vis);
+        FROM v_sessions s WHERE s.tenant_id = ? AND s.deleted_at IS NULL" . $vis);
     $cnt->execute([$ctx['tenant_id']]);
     $c = $cnt->fetch() ?: [];
     $counts = [
         'online' => (int)($c['online_cnt'] ?? 0),
         'archived' => (int)($c['archived_cnt'] ?? 0),
         'closed' => (int)($c['closed_cnt'] ?? 0),
+        'trash' => fetch_count($pdo, 'SELECT COUNT(*) FROM v_sessions s WHERE s.tenant_id = ? AND s.deleted_at IS NOT NULL' . session_visible_sql($ctx), [$ctx['tenant_id']]),
         'online_unread' => (int)($c['online_unread'] ?? 0),
         'archived_unread' => (int)($c['archived_unread'] ?? 0),
     ];

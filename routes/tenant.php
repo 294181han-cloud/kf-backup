@@ -460,7 +460,7 @@ function handle_tenant_visitors(string $method): void
         MIN(s.created_at) AS first_seen,
         SUM(s.unread) AS unread_total
         FROM v_sessions s
-        WHERE s.tenant_id = ? AND s.visitor_token != ''
+        WHERE s.tenant_id = ? AND s.deleted_at IS NULL AND s.visitor_token != ''
         GROUP BY s.visitor_token
         ORDER BY last_active DESC
         LIMIT 500");
@@ -471,7 +471,7 @@ function handle_tenant_visitors(string $method): void
     $qMobile = $pdo->prepare("SELECT value FROM contacts WHERE session_id = ? AND type='mobile' LIMIT 1");
     $qWechat = $pdo->prepare("SELECT value FROM contacts WHERE session_id = ? AND type='wechat' LIMIT 1");
     $qMsgCnt = $pdo->prepare('SELECT COUNT(*) FROM messages WHERE session_id = ?');
-    $qLastSid = $pdo->prepare('SELECT id FROM v_sessions WHERE tenant_id = ? AND visitor_token = ? ORDER BY last_time DESC LIMIT 1');
+    $qLastSid = $pdo->prepare('SELECT id FROM v_sessions WHERE tenant_id = ? AND deleted_at IS NULL AND visitor_token = ? ORDER BY last_time DESC LIMIT 1');
     foreach ($out as &$v) {
         $qLastSid->execute([$tid, $v['tok']]);
         $lastSid = (int)$qLastSid->fetchColumn();

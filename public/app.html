@@ -7,7 +7,7 @@
 <link rel="icon" href="/assets/img/mi-logo.png">
 <link rel="apple-touch-icon" href="/assets/img/mi-logo.png">
 <link rel="stylesheet" href="/assets/vendor/element-plus.css">
-<link rel="stylesheet" href="/assets/css/app.css?v=3.40.0">
+<link rel="stylesheet" href="/assets/css/app.css?v=3.41.0">
 <script src="/assets/ui/ui-registry.js?v=2.9.2"></script>
 <script src="/assets/ui/ui-loader.js?v=2.9.2" data-ui-cat="auto"></script>
 </head>
@@ -52,12 +52,27 @@
   <div class="msg-sheet-mask" v-if="chMore" @click="chMore = false"></div>
   <div class="msg-sheet" v-if="chMore">
     <button type="button" class="ms-item" @click="chMoreAction('search')">🔍 搜索聊天记录</button>
+    <button type="button" class="ms-item" @click="chMoreAction('img')">🖼 {{ imgOnly ? '显示全部消息' : '只看图片（' + imgCount + ' 张）' }}</button>
+    <button type="button" class="ms-item" @click="chMoreAction('date')">📅 按日期跳转</button>
     <button type="button" class="ms-item" @click="chMoreAction('block')">🚫 拉黑访客</button>
     <button type="button" class="ms-item" v-if="sessScope==='archived'" @click="chMoreAction('unarchive')">↩ 取消归档</button>
     <button type="button" class="ms-item" v-else-if="sessScope==='online'" @click="chMoreAction('archive')">📦 归档会话</button>
     <button type="button" class="ms-item" v-if="sessScope!=='closed'" @click="chMoreAction('transfer')">⇄ 转接会话</button>
     <button type="button" class="ms-item danger" v-if="sessScope!=='closed'" @click="chMoreAction('close')">✅ 结束会话</button>
     <button type="button" class="ms-item ghost" @click="chMore = false">取消</button>
+  </div>
+
+  <!-- v2.60.11 按日期跳转：把这段对话里出现过的日期列出来，点一下就跳到当天第一条 -->
+  <div class="msg-sheet-mask" v-if="dateOpen" @click="dateOpen = false"></div>
+  <div class="msg-sheet" v-if="dateOpen">
+    <div class="date-sheet-t">按日期跳转 · 共 {{ dateList.length }} 天</div>
+    <div class="date-sheet-list">
+      <button type="button" class="ms-item date-item" v-for="d in dateList" :key="d.d" @click="jumpDate(d.d)">
+        <span>{{ d.label }}</span><span class="date-n">{{ d.n }} 条</span>
+      </button>
+      <div v-if="!dateList.length" class="muted" style="padding:16px;text-align:center;">这段对话还没有消息</div>
+    </div>
+    <button type="button" class="ms-item ghost" @click="dateOpen = false">取消</button>
   </div>
 
   <!-- 快捷消息右键菜单 -->
@@ -162,14 +177,18 @@
       <div class="content workbench" v-if="tab==='work'" :class="{'has-chat': !!currentId}">
         <div class="sess-col">
           <div class="sess-scope-tabs">
-            <button class="scope-tab" :class="{on: sessScope==='online'}" @click="sessScope='online'">
+            <button class="scope-tab" :class="{on: sessScope==='online'}" @click="setScope('online')">
               在线聊天<span class="scope-n" v-if="sessCounts.online">{{ sessCounts.online }}</span><span class="scope-dot" v-if="sessCounts.online_unread" :title="sessCounts.online_unread + ' 条未读'"></span>
             </button>
-            <button class="scope-tab" v-if="!sessCollapsed" :class="{on: sessScope==='archived'}" @click="sessScope='archived'">
+            <button class="scope-tab" v-if="!sessCollapsed" :class="{on: sessScope==='archived'}" @click="setScope('archived')">
               已归档<span class="scope-n" v-if="sessCounts.archived">{{ sessCounts.archived }}</span><span class="scope-dot" v-if="sessCounts.archived_unread" :title="sessCounts.archived_unread + ' 条未读'"></span>
             </button>
-            <button class="scope-tab" v-if="!sessCollapsed" :class="{on: sessScope==='closed'}" @click="sessScope='closed'">
+            <button class="scope-tab" v-if="!sessCollapsed" :class="{on: sessScope==='closed'}" @click="setScope('closed')">
               已结束<span class="scope-n" v-if="sessCounts.closed">{{ sessCounts.closed }}</span>
+            </button>
+            <!-- v2.60.11 回收站：删掉的会话 30 天内可以自己恢复 -->
+            <button class="scope-tab" v-if="!sessCollapsed" :class="{on: sessScope==='trash'}" @click="setScope('trash')">
+              已删除<span class="scope-n" v-if="sessCounts.trash">{{ sessCounts.trash }}</span>
             </button>
             <!-- v2.45 收起＝把「已归档 / 已结束」收起来，只留在线聊天（列表和搜索一直都在） -->
             <button class="sess-tabs-toggle" @click="toggleSessTabs"
@@ -202,7 +221,7 @@
             <div v-if="!filteredSessions.length" style="padding:40px;text-align:center;color:#a0a6ad;font-size:13px;">暂无会话</div>
             <div class="sess-item" v-for="s in filteredSessions" :key="s.id"
                  :class="{active: currentId===s.id, pinned: s.pinned, checked: sessMulti && sessChecked.includes(s.id)}"
-                 @click="sessMulti ? toggleSessCheck(s.id) : openSession(s.id)" @contextmenu="openCtxMenu(s, $event)">
+                 @click="sessMulti ? toggleSessCheck(s.id) : (sessScope==='trash' ? null : openSession(s.id))" @contextmenu="openCtxMenu(s, $event)">
               <span class="sess-check" v-if="sessMulti" :class="{on: sessChecked.includes(s.id)}"></span>
               <div class="sess-ava" :class="{on: s.status==='online'}">
                 <span>{{ s.visitor_avatar || sessIcon(s) }}</span>
@@ -222,6 +241,13 @@
                 </div>
               </div>
               <button type="button" class="sess-more" v-if="!sessMulti" title="更多操作（拉黑 / 置顶 / 归档 / 结束 / 删除）" @click.stop="openCtxMenuFromBtn(s, $event)">⋯</button>
+              <!-- v2.60.11 回收站：删掉的会话在这条里直接给「恢复 / 彻底删除」 -->
+              <div class="sess-trash-ops" v-if="sessScope==='trash'">
+                <button type="button" class="sto-btn" @click.stop="restoreSession(s)">↩ 恢复</button>
+                <el-popconfirm title="彻底删除？不可恢复！" @confirm="purgeSession(s)">
+                  <template #reference><button type="button" class="sto-btn danger" @click.stop>🗑 彻底删除</button></template>
+                </el-popconfirm>
+              </div>
             </div>
           </div>
         </div>
@@ -261,6 +287,9 @@
                 <el-button size="small" plain class="cbtn m-only" title="访客信息" @click="infoOpen = !infoOpen">👤</el-button>
                 <el-button size="small" plain class="cbtn m-only" title="更多操作（搜索 / 拉黑 / 归档 / 转接 / 结束）" @click.stop="chMore = true">⋯</el-button>
                 <el-button size="small" plain class="cbtn icon m-hide-btn" title="搜索聊天记录" @click="chatSearchOn = !chatSearchOn">🔍</el-button>
+                <!-- v2.60.11 聊天记录快速查找：只看图片 / 按日期跳转 -->
+                <el-button size="small" plain class="cbtn icon m-hide-btn" :class="{on: imgOnly}" title="只看图片" @click="toggleImgOnly">🖼</el-button>
+                <el-button size="small" plain class="cbtn icon m-hide-btn" title="按日期跳转" @click="dateOpen = true">📅</el-button>
                 <el-popconfirm title="拉黑该访客 IP？拉黑后其无法再进入或发消息" @confirm="blockSession">
                   <template #reference><el-button size="small" type="danger" plain class="cbtn m-hide-btn">🚫 拉黑</el-button></template>
                 </el-popconfirm>
@@ -277,6 +306,11 @@
               <span class="muted" style="font-size:12px;white-space:nowrap;">{{ searchHit }} 条匹配</span>
             </div>
             <div class="chat-body" ref="chatBody" @scroll.passive="onChatScroll">
+              <!-- v2.60.11 只看图片时的提示条 -->
+              <div class="img-only-bar" v-if="imgOnly">
+                <span>🖼 只看图片 · 共 {{ imgCount }} 张</span>
+                <button type="button" @click="imgOnly = false">显示全部</button>
+              </div>
               <template v-for="m in visibleMsgs" :key="m.id">
                 <div class="msg-row sys" v-if="m.recalled && m.from === 'agent'">
                   <div class="msg-bubble">{{ m.sender_name ? m.sender_name + ' 撤回了一条消息' : '消息已撤回' }}</div>
@@ -459,6 +493,13 @@
           <div class="info-item" v-if="profile"><span class="k">设备 / 平台</span><span class="v">{{ profile.dev_tag || profile.os || '未知' }}</span></div>
             <div class="info-item" v-if="profile"><span class="k">渠道</span><span class="v" :title="profile.browser ? ('浏览器标识：' + profile.browser) : ''">{{ profile.channel || profile.browser || '未知' }}</span></div>
           <div class="info-item"><span class="k">I P</span><span class="v mono">{{ current.ip }}</span></div>
+          <div class="info-item" v-if="currentIpBlocked">
+            <span class="k">黑名单</span>
+            <span class="v" style="display:flex;align-items:center;gap:8px;justify-content:flex-end;">
+              <span style="color:#cf1322;">该 IP 已被拉黑</span>
+              <el-button size="small" text type="primary" @click="unblockCurrent">解除拉黑</el-button>
+            </span>
+          </div>
           <div class="info-item" v-if="profile"><span class="k">地区</span><span class="v" style="font-size:12px;">{{ profile.region || profile.city || geoTag(profile.geo) || '未知' }}</span></div>
           <div class="info-item" v-if="current.lastOnline || current.lastTime"><span class="k">最后上线</span><span class="v" style="font-size:12px;">{{ fmtTime(current.lastOnline || current.lastTime) }}</span></div>
           <div class="info-item"><span class="k">进入方式</span><span class="v">{{ sourceText(current.source) }}</span></div>
@@ -1613,7 +1654,7 @@
 <script src="/assets/qr-poster.js?v=2.1.03"></script>
 <script src="/assets/api.js?v=2.0.2"></script>
 <script src="/assets/js/app-components.js?v=2.6.2"></script>
-<script src="/assets/js/app.js?v=3.34.0"></script>
+<script src="/assets/js/app.js?v=3.35.1"></script>
 <script src="/assets/js/app-boot.js?v=2.1.1"></script>
 </body>
 </html>

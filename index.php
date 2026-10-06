@@ -89,6 +89,9 @@ function ensure_upgrade(): void
             KEY idx_owner_seen (owner_key, last_seen)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
         try { $pdo->exec("ALTER TABLE tenants ADD COLUMN max_devices INT UNSIGNED NOT NULL DEFAULT 3"); } catch (\Throwable $e) { /* 列已存在 */ }
+        // v2.60.11 会话回收站：删除会话改成软删除（30 天内可自己恢复，也能立刻撤销）
+        try { $pdo->exec("ALTER TABLE v_sessions ADD COLUMN deleted_at DATETIME NULL"); } catch (\Throwable $e) { /* 列已存在 */ }
+        try { $pdo->exec("ALTER TABLE v_sessions ADD INDEX idx_deleted (tenant_id, deleted_at)"); } catch (\Throwable $e) { /* 索引已存在 */ }
         try { $pdo->exec("ALTER TABLE v_sessions ADD INDEX idx_tenant_pinned (tenant_id, pinned, last_time)"); } catch (\Throwable $e) { /* 已存在 */ }
         // v2.33/v2.39 分域节点登记：同一台服务器可同时跑客服入口+访客站点，唯一键 = IP+角色
         $pdo->exec("CREATE TABLE IF NOT EXISTS nodes (
@@ -443,6 +446,8 @@ function dispatch_api(string $method, string $uri): void
     if (preg_match('#^/api/sessions/(\d+)/close$#', $uri, $m))     handle_session_close($method, $m);
     if (preg_match('#^/api/sessions/(\d+)/archive$#', $uri, $m))   handle_session_archive($method, $m);
     if (preg_match('#^/api/sessions/(\d+)/delete$#', $uri, $m))    handle_session_delete($method, $m);
+    if (preg_match('#^/api/sessions/(\d+)/restore$#', $uri, $m))   handle_session_restore($method, $m);
+    if (preg_match('#^/api/sessions/(\d+)/purge$#', $uri, $m))     handle_session_purge($method, $m);
     if (preg_match('#^/api/sessions/(\d+)/read$#', $uri, $m))      handle_session_read($method, $m);
     if (preg_match('#^/api/sessions/(\d+)/transfer$#', $uri, $m))  handle_session_transfer($method, $m);
     if (preg_match('#^/api/sessions/(\d+)/block$#', $uri, $m))   handle_session_block($method, $m);

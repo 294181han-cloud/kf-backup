@@ -1121,7 +1121,35 @@ const app = createApp({
     };
 
     // ===== 可见消息（撤回的显示为系统胶囊） =====
-    const visibleMsgs = Vue.computed(() => msgs.value);
+    /* v2.60.11 聊天记录快速查找：① 只看图片 ② 按日期跳转 */
+    const imgOnly = ref(false);
+    const dateOpen = ref(false);
+    const visibleMsgs = Vue.computed(() => (imgOnly.value ? msgs.value.filter(m => ((m && m.attachments) || []).some(a => a && (!a.type || a.type === 'image') && a.url)) : msgs.value));
+    const imgCount = Vue.computed(() => msgs.value.filter(m => ((m && m.attachments) || []).some(a => a && (!a.type || a.type === 'image') && a.url)).length);
+    const toggleImgOnly = () => { imgOnly.value = !imgOnly.value; };
+    /* 这段对话里出现过的日期（倒序），点一下跳到当天第一条 */
+    const dateList = Vue.computed(() => {
+      const map = {};
+      for (const m of msgs.value) {
+        const d = String(m.time || '').slice(0, 10);
+        if (!d) continue;
+        map[d] = (map[d] || 0) + 1;
+      }
+      return Object.keys(map).sort().reverse().map(d => {
+        const today = new Date();
+        const pad = (n) => String(n).padStart(2, '0');
+        const td = `${today.getFullYear()}-${pad(today.getMonth() + 1)}-${pad(today.getDate())}`;
+        const yd = new Date(today.getTime() - 86400000);
+        const ydd = `${yd.getFullYear()}-${pad(yd.getMonth() + 1)}-${pad(yd.getDate())}`;
+        const label = d === td ? '今天' : (d === ydd ? '昨天' : d.slice(5).replace('-', '月') + '日');
+        return { d, n: map[d], label };
+      });
+    });
+    const jumpDate = (d) => {
+      dateOpen.value = false;
+      const first = msgs.value.find(m => String(m.time || '').slice(0, 10) === d);
+      if (first) jumpToMsg(first.id);
+    };
     // v2.73 一条消息里的图片（多图并排显示，文字放下面）
     const imgsOf = (m) => ((m && m.attachments) || []).filter(a => a && (!a.type || a.type === 'image') && a.url);
 
@@ -1259,6 +1287,8 @@ const app = createApp({
     const chMoreAction = async (k) => {
       chMore.value = false;
       if (k === 'search') { chatSearchOn.value = !chatSearchOn.value; return; }
+      if (k === 'img') { imgOnly.value = !imgOnly.value; return; }
+      if (k === 'date') { dateOpen.value = true; return; }
       if (k === 'block') {
         try {
           await ElementPlus.ElMessageBox.confirm(
@@ -1659,14 +1689,49 @@ const app = createApp({
       const sid = ctxMenu.sid; const name = ctxMenu.name; closeCtxMenu();
       try {
         await ElementPlus.ElMessageBox.confirm(
-          '彻底删除「' + name + '」及其全部聊天记录？删除后不可恢复，可腾出会话额度空间', '删除会话',
+          '把「' + name + '」移到回收站？会话额度立刻腾出来，30 天内还能在「已删除」里恢复。', '删除会话',
           { type: 'warning', confirmButtonText: '删除', cancelButtonText: '取消' });
         await API.post('/api/sessions/' + sid + '/delete');
-        ElementPlus.ElMessage.success('已删除');
         sessions.value = sessions.value.filter(s => s.id !== sid);
         if (currentId.value === sid) { currentId.value = 0; msgs.value = []; }
         await pollOnce();
+        toastWithUndo('已移到回收站', '撤销', async () => {
+          await API.post('/api/sessions/' + sid + '/restore');
+          await pollOnce();
+        });
       } catch (e) { if (e !== 'cancel' && e && e.message) ElementPlus.ElMessage.error(e.message); }
+    };
+
+    /* v2.60.11 回收站：恢复 / 彻底删除（按单条操作，不是一键全恢复） */
+    const restoreSession = async (s) => {
+      if (!s) return;
+      try {
+        await API.post('/api/sessions/' + s.id + '/restore');
+        ElementPlus.ElMessage.success('已恢复「' + (s.name || '会话') + '」');
+        await pollOnce();
+      } catch (e) { ElementPlus.ElMessage.error(e.message); }
+    };
+    const purgeSession = async (s) => {
+      if (!s) return;
+      try {
+        await API.post('/api/sessions/' + s.id + '/purge');
+        ElementPlus.ElMessage.success('已彻底删除');
+        await pollOnce();
+      } catch (e) { ElementPlus.ElMessage.error(e.message); }
+    };
+    /** 带「撤销」按钮的提示（点一下就把刚做的事撤回，只针对这一条） */
+    const toastWithUndo = (msg, actionText, undoFn) => {
+      const box = ElementPlus.ElMessage({
+        duration: 8000, showClose: true, type: 'success', offset: 60,
+        message: h('span', { style: 'display:inline-flex;align-items:center;gap:10px;' }, [
+          h('span', null, msg),
+          h('a', {
+            style: 'color:#1677ff;font-weight:600;cursor:pointer;',
+            onClick: async () => { try { box.close(); await undoFn(); ElementPlus.ElMessage.success('已撤销'); } catch (e) { ElementPlus.ElMessage.error(e.message); } },
+          }, actionText),
+        ]),
+      });
+      return box;
     };
     const doTransfer = async () => {
       if (transferTo.value === null) { ElementPlus.ElMessage.warning('请选择目标'); return; }
@@ -1717,14 +1782,35 @@ const app = createApp({
       if (!currentId.value) return;
       try {
         const r = await API.post('/api/sessions/' + currentId.value + '/block');
-        ElementPlus.ElMessage.success('已拉黑 ' + r.ip);
+        await loadBlacklist();
+        toastWithUndo('已拉黑 ' + r.ip, '撤销拉黑', async () => { await unblockIp(r.ip); });
       } catch (e) { ElementPlus.ElMessage.error(e.message); }
     };
     const blockIp = async (ip) => {
       try {
         await API.post('/api/ip-blacklist', { ip, reason: '访客资源手动拉黑' });
-        ElementPlus.ElMessage.success('已拉黑 ' + ip);
+        await loadBlacklist();
+        toastWithUndo('已拉黑 ' + ip, '撤销拉黑', async () => { await unblockIp(ip); });
       } catch (e) { ElementPlus.ElMessage.error(e.message); }
+    };
+    /** v2.60.11 解除拉黑（按单个 IP）：把黑名单里这条删掉即可立刻恢复 */
+    const unblockIp = async (ip) => {
+      if (!ip) return;
+      let item = (blacklist.value || []).find(b => String(b.ip) === String(ip));
+      if (!item) { try { await loadBlacklist(); } catch (e) {} item = (blacklist.value || []).find(b => String(b.ip) === String(ip)); }
+      if (!item) { ElementPlus.ElMessage.warning('黑名单里没有这条记录'); return; }
+      await API.del('/api/ip-blacklist/' + item.id);
+      await loadBlacklist();
+    };
+    /** 当前会话的 IP 是否在黑名单里（访客信息里给「解除拉黑」用） */
+    const currentIpBlocked = computed(() => {
+      if (!current.value || !current.value.ip) return false;
+      return (blacklist.value || []).some(b => String(b.ip) === String(current.value.ip));
+    });
+    const unblockCurrent = async () => {
+      if (!current.value) return;
+      try { await unblockIp(current.value.ip); ElementPlus.ElMessage.success('已解除拉黑'); }
+      catch (e) { ElementPlus.ElMessage.error(e.message); }
     };
     // 关键词标签式管理
     const kwList = ref([]);
@@ -2767,6 +2853,8 @@ const app = createApp({
       sessCollapsed.value = !sessCollapsed.value;
       if (sessCollapsed.value && sessScope.value !== 'online') sessScope.value = 'online';
     };
+    /** v2.60.11 切页签立刻刷新（原来要等下一次轮询，切到「已删除」会先闪一下上一页的旧列表） */
+    const setScope = (s) => { sessScope.value = s; try { pollOnce(); } catch (e) {} };
     const sideCollapsed = ref(false);
     try { dark.value = localStorage.getItem('kfxt_dark') === '1'; } catch (e) {}
     const applyDark = () => { document.body.classList.toggle('dark', dark.value); };
@@ -2878,7 +2966,7 @@ const app = createApp({
       devices, deviceLimit, loadDevices, kickDevice, renameDevice,
       chatSearchOn, chatSearchKw, searchHit, visibleMsgs, canRecall, recallMsg, isRead,
       pol, savePolicy, uploadPolHead, clock, unreadTotal, sessCollapsed,
-      toggleSessTabs,
+      toggleSessTabs, setScope,
       sessScope, sessCounts, archiveSession,
       sessMulti, sessChecked, toggleMulti, toggleSessCheck, checkAllSess, bulkSessions,
       ctxMenu, openCtxMenu, openCtxMenuFromBtn, closeCtxMenu, ctxMenuArchive, ctxMenuClose, ctxMenuDelete,
@@ -2892,6 +2980,8 @@ const app = createApp({
       canEdit, editMsg,
       msgSheet, openMsgSheet, onMsgTouchStart, onMsgTouchMove, onMsgTouchEnd,
       chMore, chMoreAction,
+      imgOnly, toggleImgOnly, imgCount, dateOpen, dateList, jumpDate,
+      restoreSession, purgeSession, unblockIp, currentIpBlocked, unblockCurrent,
       selMode, selIds, enterSel, exitSel, toggleSel, selAll, selCopy, selDelete,
       onPaste, sendFile, sendLocation,
       SOUND_OPTS, sndCfg, playSound, saveSnd,

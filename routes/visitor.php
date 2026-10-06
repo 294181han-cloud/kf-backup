@@ -76,7 +76,7 @@ function tenant_availability(array $tenant): array
 /** 近 7 天该租户对应渠道进粉数 */
 function quota_used(int $tenantId, string $key): int
 {
-    return fetch_count(db(), 'SELECT COUNT(*) FROM v_sessions WHERE tenant_id = ? AND quota_key = ? AND last_time >= ?',
+    return fetch_count(db(), 'SELECT COUNT(*) FROM v_sessions WHERE tenant_id = ? AND deleted_at IS NULL AND quota_key = ? AND last_time >= ?',
         [$tenantId, $key, now_dt(strtotime('-6 days'))]);
 }
 
@@ -215,10 +215,10 @@ function handle_visitor_init(string $method): void
     if ($visitorToken !== '') {
         $dedup = ts_get($tid, 'dedup_on', '0') === '1';
         if ($dedup) {
-            $st = $pdo->prepare("SELECT * FROM v_sessions WHERE tenant_id = ? AND visitor_token = ? AND (status != 'closed' OR last_time >= ?) ORDER BY last_time DESC LIMIT 1");
+            $st = $pdo->prepare("SELECT * FROM v_sessions WHERE tenant_id = ? AND deleted_at IS NULL AND visitor_token = ? AND (status != 'closed' OR last_time >= ?) ORDER BY last_time DESC LIMIT 1");
             $st->execute([$tid, $visitorToken, now_dt(time() - 86400)]);
         } else {
-            $st = $pdo->prepare("SELECT * FROM v_sessions WHERE tenant_id = ? AND visitor_token = ? AND status != 'closed' ORDER BY last_time DESC LIMIT 1");
+            $st = $pdo->prepare("SELECT * FROM v_sessions WHERE tenant_id = ? AND deleted_at IS NULL AND visitor_token = ? AND status != 'closed' ORDER BY last_time DESC LIMIT 1");
             $st->execute([$tid, $visitorToken]);
         }
         $old = $st->fetch();
@@ -247,7 +247,7 @@ function handle_visitor_init(string $method): void
         $needVerify = true;
         if ($freq === 'first' && $visitorToken !== '') {
             // 有 token 且 24h 内有历史会话 → 视为老访客，跳过
-            $hist = fetch_count($pdo, 'SELECT COUNT(*) FROM v_sessions WHERE tenant_id = ? AND visitor_token = ? AND last_time >= ?',
+            $hist = fetch_count($pdo, 'SELECT COUNT(*) FROM v_sessions WHERE tenant_id = ? AND deleted_at IS NULL AND visitor_token = ? AND last_time >= ?',
                 [$tid, $visitorToken, now_dt(time() - 86400)]);
             if ($hist > 0) $needVerify = false;
         }
@@ -288,7 +288,7 @@ function handle_visitor_init(string $method): void
     // 会话总数额度（v2.25）：0=不限；到顶后新访客被拒（老访客恢复会话不受影响）
     $maxSessions = (int)($t['max_sessions'] ?? 0);
     if ($maxSessions > 0) {
-        $total = fetch_count($pdo, 'SELECT COUNT(*) FROM v_sessions WHERE tenant_id = ?', [$tid]);
+        $total = fetch_count($pdo, 'SELECT COUNT(*) FROM v_sessions WHERE tenant_id = ? AND deleted_at IS NULL', [$tid]);
         if ($total >= $maxSessions) json_error('当前咨询人数较多，请稍后再试', 403);
     }
 
@@ -607,10 +607,10 @@ function handle_visitor_resume(string $method): void
         $tid = (int)($st->fetchColumn() ?: 0);
     }
     if ($tid > 0) {
-        $st = $pdo->prepare("SELECT * FROM v_sessions WHERE tenant_id = ? AND resume_code = ? AND status <> 'closed' ORDER BY last_time DESC LIMIT 1");
+        $st = $pdo->prepare("SELECT * FROM v_sessions WHERE tenant_id = ? AND deleted_at IS NULL AND resume_code = ? AND status <> 'closed' ORDER BY last_time DESC LIMIT 1");
         $st->execute([$tid, $rc]);
     } else {
-        $st = $pdo->prepare("SELECT * FROM v_sessions WHERE resume_code = ? AND status <> 'closed' ORDER BY last_time DESC LIMIT 1");
+        $st = $pdo->prepare("SELECT * FROM v_sessions WHERE deleted_at IS NULL AND resume_code = ? AND status <> 'closed' ORDER BY last_time DESC LIMIT 1");
         $st->execute([$rc]);
     }
     $row = $st->fetch();

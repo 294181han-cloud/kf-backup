@@ -196,9 +196,9 @@ function handle_auth_me(string $method): void
     if ($ctx['role'] === 'tenant') {
         $t = $ctx['row'];
         $t['avatar'] = ts_get((int)$t['id'], 'me_avatar', '');  // 租户自定义头像（图片 URL）
-        $usedWeb = fetch_count($pdo, "SELECT COUNT(*) FROM v_sessions WHERE tenant_id=? AND quota_key='web' AND last_time >= ?",
+        $usedWeb = fetch_count($pdo, "SELECT COUNT(*) FROM v_sessions WHERE tenant_id=? AND deleted_at IS NULL AND quota_key='web' AND last_time >= ?",
             [$t['id'], now_dt(strtotime('-6 days'))]);
-        $usedApp = fetch_count($pdo, "SELECT COUNT(*) FROM v_sessions WHERE tenant_id=? AND quota_key='app' AND last_time >= ?",
+        $usedApp = fetch_count($pdo, "SELECT COUNT(*) FROM v_sessions WHERE tenant_id=? AND deleted_at IS NULL AND quota_key='app' AND last_time >= ?",
             [$t['id'], now_dt(strtotime('-6 days'))]);
         json_out([
             'role' => 'tenant', 'id' => (int)$t['id'], 'kami' => $t['kami'], 'nickname' => $t['nickname'], 'avatar' => $t['avatar'],
