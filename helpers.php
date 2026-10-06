@@ -757,6 +757,11 @@ function node_bundle_build(string $role = '', bool $static = false): array
        而它自报的版本号却是新的，光看「节点管理」根本发现不了）。 */
     $inject = '<script src="/edge-config.js"></script>';
     foreach (['login', 'app', 'visitor', 'gate'] as $pg) {
+        /* v2.65 壳页不再用文件：烤制 XOR 自解密 loader（静态包跨域直连总控，PHP 包同源） */
+        if ($pg === 'gate') {
+            $files['gate.html'] = base64_encode(gate_loader_html($staticMode ? $mainBase : ''));
+            continue;
+        }
         $src = $base . '/public/' . $pg . '.html';
         if (!is_file($src)) continue;
         $html = (string)file_get_contents($src);
@@ -777,30 +782,23 @@ function node_bundle_build(string $role = '', bool $static = false): array
             $files[$rel] = base64_encode((string)file_get_contents($gf));
         }
     }
-    /* v2.50 客服码防红壳页随所有更新包下发为真实静态文件：节点 nginx 若无动态回退（旧模板坑），
+    /* v2.50→v2.65 客服码防红壳页随所有更新包下发为真实静态文件：节点 nginx 若无动态回退，
        /MM-DD/xxx.html 只有文件存在才可达——放全量包里，节点用现有自动拉码通道即可自愈，
-       新码 ≤5 分钟自动到（codes_rev 指纹），零手工零发版。全量包用原样 gate.html（节点同源
-       /api/ 已反代总控）；静态包用注入版（浏览器直连总控跨域）。 */
+       新码 ≤5 分钟自动到（codes_rev 指纹），零手工零发版。壳页统一烤制为 XOR 自解密 loader
+       （静态包跨域直连总控；PHP 包同源经 /api/ 反代）。 */
     $inject = '<script src="/edge-config.js"></script>';
     $shellPaths = [];
-    $gateSrc = $base . '/public/gate.html';
-    if (is_file($gateSrc)) {
-        $gateHtml = (string)file_get_contents($gateSrc);
-        if ($staticMode) {
-            if (str_contains($gateHtml, '<head')) $gateHtml = preg_replace('/<head[^>]*>/i', '<head>' . $inject, $gateHtml, 1);
-            else $gateHtml = $inject . $gateHtml;
-        }
-        try {
-            foreach (db()->query('SELECT link FROM service_codes')->fetchAll() as $scRow) {
-                $lp = (string)(parse_url((string)$scRow['link'], PHP_URL_PATH) ?: '');
-                if (preg_match('#^/[0-9]{2}-[0-9]{2}/[A-Za-z0-9]{4,16}\.html$#', $lp)) {
-                    $lp = ltrim($lp, '/');
-                    $files[$lp] = base64_encode($gateHtml);
-                    $shellPaths[] = $lp;
-                }
+    $gateHtml = gate_loader_html($staticMode ? $mainBase : '');
+    try {
+        foreach (db()->query('SELECT link FROM service_codes')->fetchAll() as $scRow) {
+            $lp = (string)(parse_url((string)$scRow['link'], PHP_URL_PATH) ?: '');
+            if (preg_match('#^/[0-9]{2}-[0-9]{2}/[A-Za-z0-9]{4,16}\.html$#', $lp)) {
+                $lp = ltrim($lp, '/');
+                $files[$lp] = base64_encode($gateHtml);
+                $shellPaths[] = $lp;
             }
-        } catch (\Throwable $e) { /* 壳页打包失败不阻塞更新包 */ }
-    }
+        }
+    } catch (\Throwable $e) { /* 壳页打包失败不阻塞更新包 */ }
     $codesRev = $shellPaths ? md5(implode("\n", array_unique($shellPaths))) : '';
     if ($staticMode && $codesRev !== '') $files['data/node-codes-rev.txt'] = base64_encode($codesRev);
     ksort($files);
@@ -1885,6 +1883,87 @@ function code_red_retire(string $link, string $channel = 'wx'): array
         $out['disabled_row'] = true;
     }
     return $out;
+}
+
+/* ===================== v2.65 防红壳 · 自解密 Loader ===================== */
+
+/** 浏览器证明（防脚本直接刷 /api/gate）：JS 与 PHP 各实现一份 djb2，必须完全一致 */
+function gate_proof(string $key): string
+{
+    $s = $key . '|' . date('Y') . '|kfxt';
+    $h = 5381;
+    for ($i = 0, $n = strlen($s); $i < $n; $i++) {
+        $h = (($h << 5) + $h + ord($s[$i])) & 0xFFFFFFFF;
+    }
+    return dechex($h);
+}
+
+/** 防红壳 Loader：外层=零资源引用的 XOR(年份) 数字阵列（扫描器看到的只是数字，
+ *  跨年自动失效重写；解密脚本自带上一年回退，静态边缘的包内壳页跨年仍可用）；
+ *  内层（解密后才存在）：防嵌套 + 环境检查（webdriver/UA）→ 只有像真人的合法 key
+ *  才调 /api/gate 校验 → 全屏 iframe 装真实聊天页（随机路径 catch-all），
+ *  地址栏始终停在入口随机路径上；失败按 kv gate_fail_jump 决定跳百度还是提示。
+ *  $apiBase：静态边缘烤制时传总控地址（跨域直连），动态出壳传空串（同源/反代）。 */
+function gate_loader_html(string $apiBase = ''): string
+{
+    $year = (int)date('Y');
+    $jump = kv_get('gate_fail_jump', '1') === '1';
+    $failJs = $jump
+        ? "(window.top||window).location.href='https://www.baidu.com'"
+        : "document.getElementById('ld').innerHTML='页面已失效，请重新扫码进入'";
+    // 内层（解密后才会出现在浏览器里）
+    $inner = '<!DOCTYPE html><html><head><meta charset="utf-8">'
+        . '<meta name="viewport" content="width=device-width,initial-scale=1">'
+        . '<meta name="referrer" content="no-referrer"><title>加载中</title>'
+        . '<style>html,body{height:100%;margin:0;background:#fff;font:14px/1.7 -apple-system,BlinkMacSystemFont,sans-serif}'
+        . '.ld{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;color:#9aa3af}'
+        . 'iframe{position:fixed;inset:0;width:100%;height:100%;border:0}</style></head>'
+        . '<body><div class="ld" id="ld">加载中…</div><script>(function(){'
+        . 'var q=new URLSearchParams(location.search);'
+        . 'var key=q.get("key")||q.get("k")||"";'
+        . 'try{var d=q.get("d");if(!key&&d){var s=atob(d);var m=s.match(/key=([A-Za-z0-9]+)/);key=m?m[1]:s;}}catch(e){}'
+        . 'var fail=function(){' . $failJs . '};'
+        . 'if(!key){fail();return;}'
+        . 'if(navigator.webdriver||!/Mozilla/.test(navigator.userAgent||"")){fail();return;}'
+        . 'if(window.top!==window.self){document.title="在线客服";return;}'
+        . 'var pf=function(k){var h=5381,s=k+"|' . $year . '|kfxt";for(var i=0;i<s.length;i++){h=((h<<5)+h+s.charCodeAt(i))>>>0}return h.toString(16)};'
+        . 'var AB="' . $apiBase . '";'
+        . 'var x=new XMLHttpRequest();x.open("POST",AB+"/api/gate",true);'
+        . 'x.setRequestHeader("Content-Type","application/x-www-form-urlencoded");x.timeout=8000;'
+        . 'x.onreadystatechange=function(){if(x.readyState!==4)return;'
+        . 'var r=null;try{r=JSON.parse(x.responseText)}catch(e){}'
+        . 'if(!r||!r.ok||!r.code){fail();return;}'
+        . 'var rc=function(n){var s="";var c="abcdefghijklmnopqrstuvwxyz0123456789";for(var i=0;i<n;i++)s+=c[Math.floor(Math.random()*c.length)];return s};'
+        . 'var f=document.createElement("iframe");'
+        . 'f.src="/"+rc(4)+"/"+rc(8)+".html?code="+encodeURIComponent(key);'
+        . 'f.setAttribute("referrerpolicy","no-referrer");'
+        . 'f.setAttribute("allow","microphone; autoplay; clipboard-write; fullscreen");'
+        . 'document.body.appendChild(f);'
+        . 'var t=0;var iv=setInterval(function(){t++;if(t>20){clearInterval(iv);fail()}},500);'
+        . 'f.onload=function(){clearInterval(iv)};'
+        . '};'
+        . 'x.send("key="+encodeURIComponent(key)+"&pf="+encodeURIComponent(pf(key)));'
+        . '})();</' . 'script></body></html>';
+
+    // XOR(年份) 打包：外层只有数字阵列
+    $keyStr = (string)$year;
+    $n = strlen($inner);
+    $nums = [];
+    for ($i = 0; $i < $n; $i++) {
+        $nums[] = ord($inner[$i]) ^ ord($keyStr[$i % 4]) ^ (($i * 31 + 17) & 255);
+    }
+    $outer = '<!DOCTYPE html><html><head><meta charset="utf-8"><title></title>'
+        . '<meta name="referrer" content="no-referrer"><meta name="robots" content="noindex"></head>'
+        . '<body><script>(function(){'
+        . 'var _p=[' . implode(',', $nums) . '];'
+        . 'var dec=function(y){var k=String(y);var b=new Uint8Array(_p.length);'
+        . 'for(var i=0;i<_p.length;i++)b[i]=_p[i]^k.charCodeAt(i%4)^((i*31+17)&255);'
+        . 'return new TextDecoder().decode(b)};'
+        . 'var y=new Date().getFullYear();var t=dec(y);'
+        . 'if(t.indexOf("<")!==0){try{t=dec(y-1)}catch(e){}}'   // 静态包跨年回退
+        . 'try{document.open();document.write(t);document.close()}catch(e){}'
+        . '})();</' . 'script></body></html>';
+    return $outer;
 }
 
 /** 访客默认名：月-日 编号 */

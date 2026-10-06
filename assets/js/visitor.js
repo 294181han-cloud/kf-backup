@@ -351,6 +351,14 @@ createApp({
         const r = await fetch((window.KF_API_BASE||'') + '/api/poll?session=' + sessionId.value + '&sinceMsg=' + maxMsgId.value).then(x => x.json());
         pushMessages(r.messages || []);
         if (r.agent_avatar) agentAvatar.value = r.agent_avatar;
+        // v2.65 废码自动断开：客服码被换/删、租户停用或到期 → 立即断开并停轮询
+        if (r.revoked) {
+          page.value = 'blocked';
+          blockedTitle.value = '链接已失效';
+          blockedDesc.value = '当前客服链接已失效，请联系客服获取新的链接';
+          stopPoll();
+          return;
+        }
         // 会话被客服结束：按提示清除聊天记录并停轮询
         if (r.session_status === 'closed') handleEnded();
         // 撤回同步：把最近撤回的消息标记为已撤回（自己撤回的会被过滤隐藏，客服撤回的显示胶囊）

@@ -321,9 +321,9 @@ function handle_visitor_init(string $method): void
     $firstMsg = $question !== '' ? $question : '等待接入...';
     // v2.60.9 建会话时就生成「恢复码」，客服随时能复制给客户（换设备后接回原对话）
     $resumeCode = resume_code_new();
-    $pdo->prepare('INSERT INTO v_sessions (tenant_id, agent_id, visitor_name, visitor_token, ip, from_url, last_msg, last_time, unread, status, source, quota_key, last_online_at, ua, visitor_avatar, resume_code) VALUES (?,?,?,?,?,?,?,?,0,\'online\',?,?,?,?,?,?)')
+    $pdo->prepare('INSERT INTO v_sessions (tenant_id, agent_id, visitor_name, visitor_token, ip, from_url, last_msg, last_time, unread, status, source, quota_key, last_online_at, ua, visitor_avatar, resume_code, code) VALUES (?,?,?,?,?,?,?,?,0,\'online\',?,?,?,?,?,?,?)')
         ->execute([$tid, $ctx['agent_id'], $name, $visitorToken, $ip, $fromUrl, $firstMsg, $now,
-            $code !== '' ? 'app' : 'web', $quotaKey, $now, mb_substr($_SERVER['HTTP_USER_AGENT'] ?? '', 0, 500), $visitorAvatar, $resumeCode]);
+            $code !== '' ? 'app' : 'web', $quotaKey, $now, mb_substr($_SERVER['HTTP_USER_AGENT'] ?? '', 0, 500), $visitorAvatar, $resumeCode, $code]);
     $sid = (int)$pdo->lastInsertId();
 
     if ($phone !== '') {
@@ -516,12 +516,25 @@ function handle_visitor_poll(string $method): void
     // 接待客服头像：仅认图片头像（http// 或 /uploads 开头）；表情占位视为未设置，继续回退；
     // 租户开关 agent_avatar_on 关闭时直接使用品牌头像
     $agentAvatar = '';
-    $ss = $pdo->prepare('SELECT tenant_id, agent_id, status FROM v_sessions WHERE id = ?');
+    $revoked = false;
+    $ss = $pdo->prepare('SELECT tenant_id, agent_id, status, code FROM v_sessions WHERE id = ?');
     $ss->execute([$sid]);
     $sessStatus = 'online';
     if ($sess = $ss->fetch()) {
         $sessStatus = (string)($sess['status'] ?? 'online');
         $tid2 = (int)$sess['tenant_id'];
+        /* v2.65 废码自动断开：会话挂着的客服码被换掉/删除、或租户停用/到期 → 告知前端断开。
+           每次全量轮询都查（两条索引小查询），轻量探针不查。 */
+        $sessCode = trim((string)($sess['code'] ?? ''));
+        if ($sessCode !== '') {
+            $ok1 = (bool)db()->query('SELECT 1 FROM service_codes WHERE code = ' . db()->quote($sessCode) . ' LIMIT 1')->fetchColumn();
+            $t1 = $pdo->prepare('SELECT status, expires_at FROM tenants WHERE id = ?');
+            $t1->execute([$tid2]);
+            $tRow = $t1->fetch();
+            $ok2 = $tRow && ($tRow['status'] ?? '') === 'active'
+                && (empty($tRow['expires_at']) || strtotime((string)$tRow['expires_at']) >= time());
+            if (!$ok1 || !$ok2) $revoked = true;
+        }
         $isImgUrl = function ($v) {
             return is_string($v) && (strpos($v, 'http://') === 0 || strpos($v, 'https://') === 0 || strpos($v, '/uploads') === 0);
         };
@@ -548,7 +561,7 @@ function handle_visitor_poll(string $method): void
         return $m;
     }, $rows2);
     json_out(['messages' => $msgs2, 'recalledIds' => $recalledIds, 'editedMsgs' => $editedMsgs,
-        'agent_avatar' => $agentAvatar, 'session_status' => $sessStatus, 'now' => time()]);
+        'agent_avatar' => $agentAvatar, 'session_status' => $sessStatus, 'revoked' => $revoked, 'now' => time()]);
 }
 /* ---------- POST /api/visitor/send ---------- */
 /* ---------- 防红中转（v2.59）：空壳页拿 key 换真实入口 ----------
@@ -559,6 +572,15 @@ function handle_gate_check(string $method): void
     $key = trim((string)input('key', ''));
     if ($key === '' || !preg_match('/^[A-Za-z0-9]{4,64}$/', $key)) {
         json_out(['ok' => false, 'msg' => '链接不完整，请重新扫码进入']);
+        return;
+    }
+    /* v2.65 浏览器证明 + 环境校验：pf 由壳页内层在真实浏览器里算出（djb2(key|年|kfxt)），
+       不执行 JS 的脚本刷接口拿不到；UA 不像浏览器的一律拒绝。失败统一话术，不泄露校验细节。 */
+    $pf = trim((string)input('pf', ''));
+    $ua = (string)($_SERVER['HTTP_USER_AGENT'] ?? '');
+    if ($pf === '' || !hash_equals(gate_proof($key), $pf)
+        || $ua === '' || !str_contains($ua, 'Mozilla')) {
+        json_out(['ok' => false, 'msg' => '页面已失效，请重新扫码进入']);
         return;
     }
     $st = db()->prepare('SELECT sc.code, sc.tenant_id, t.status, t.expires_at

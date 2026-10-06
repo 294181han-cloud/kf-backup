@@ -74,6 +74,8 @@ function ensure_upgrade(): void
         // v2.60.9 访客「恢复码」：客户换浏览器/换设备后，用客服给的码把原对话接回来
         try { $pdo->exec("ALTER TABLE v_sessions ADD COLUMN resume_code VARCHAR(16) NOT NULL DEFAULT ''"); } catch (\Throwable $e) { /* 列已存在 */ }
         try { $pdo->exec("ALTER TABLE v_sessions ADD UNIQUE KEY uk_resume_code (resume_code)"); } catch (\Throwable $e) { /* 索引已存在 */ }
+        // v2.65 废码自动断开：会话记下发码来源，轮询时校验码/租户仍生效，失效即让前端断开
+        try { $pdo->exec("ALTER TABLE v_sessions ADD COLUMN code VARCHAR(32) NOT NULL DEFAULT ''"); } catch (\Throwable $e) { /* 列已存在 */ }
         // v2.60.10 登录设备（防卡密共享）：默认 3 台
         $pdo->exec("CREATE TABLE IF NOT EXISTS login_devices (
             id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
@@ -222,6 +224,7 @@ if (str_starts_with($uri, '/api/')) {
     header('Access-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS');
     header('Access-Control-Allow-Headers: Content-Type, Authorization, X-Edge-Secret, X-Edge-Role, X-Edge-Origin, X-Original-Host');
     header('Access-Control-Max-Age: 86400');
+    header('Cache-Control: no-store');
     if ($method === 'OPTIONS') { http_response_code(204); exit; }
 }
 
@@ -296,13 +299,22 @@ if (site_role() !== 'main') {
     // 访客/防红壳页（visitor 节点）与登录/工作台（agent 节点）放行；其余页面 404
     if (preg_match('#^/[0-9]{2}-[0-9]{2}/[A-Za-z0-9]{4,16}\.html$#', $uri)) {
         if (site_role() !== 'visitor') { http_response_code(404); echo 'Not Found'; exit; }
-        serve_html('gate.html');
+        header('Cache-Control: no-store');
+        echo gate_loader_html();
     }
     foreach (['login.html', 'app.html', 'admin.html', 'visitor.html'] as $page) {
         if ($uri === "/$page") {
             if (!site_allow_page($page)) { http_response_code(404); echo 'Not Found'; exit; }
             serve_html($page);
         }
+    }
+    // v2.65 catch-all：未知随机 .html 路径带 code → 出真实访客页（壳 loader 的随机 iframe 落点）
+    if (preg_match('#^/[0-9a-z]{2,10}/[0-9a-z]{4,16}\.html$#i', $uri) && isset($_GET['code'])) {
+        if (site_allow_page('visitor.html')) {
+            header('Cache-Control: no-store');
+            serve_html('visitor.html');
+        }
+        http_response_code(404); echo 'Not Found'; exit;
     }
     if ($uri === '/') {
         if (site_role() === 'visitor') { serve_html('visitor.html'); exit; }
@@ -354,12 +366,14 @@ function site_allow_api(string $uri): bool
     return $uri === '/api/gate' || $uri === '/api/poll' || $uri === '/api/internal/apply';
 }
 
-/* ---------- 防红中转「空壳页」（v2.59）：/MM-DD/xxxxxx.html?key=… ----------
-   看起来就是一个放在日期目录里的普通静态页；文件里没有任何业务内容，
-   真实入口由页内脚本拿 key 调 /api/gate 换出来（见 public/gate.html）。 */
+/* ---------- 防红中转「空壳页」（v2.59 → v2.65 重做）：/MM-DD/xxxxxx.html?key=… ----------
+   出的是 XOR(年份) 自解密 loader（零资源引用，扫描器只见数字阵列），内层校验通过后
+   用全屏 iframe 装真实聊天页（随机路径 catch-all），地址栏始终停在随机路径上。 */
 if (preg_match('#^/[0-9]{2}-[0-9]{2}/[A-Za-z0-9]{4,16}\.html$#', $uri)) {
     if (!site_allow_page('gate.html')) { http_response_code(404); echo 'Not Found'; exit; }
-    serve_html('gate.html');
+    header('Cache-Control: no-store');
+    echo gate_loader_html();
+    exit;
 }
 
 if ($uri === '/' || $uri === '/index.php' || $uri === '/index.html') {
@@ -395,6 +409,15 @@ foreach (['login.html', 'app.html', 'admin.html', 'visitor.html'] as $page) {
         if (!site_allow_page($page)) { http_response_code(404); echo 'Not Found'; exit; }
         serve_html($page);
     }
+}
+/* v2.65 catch-all：未知随机 .html 路径带 code → 出真实访客页（壳 loader 的随机 iframe 落点，
+   真实页不再依赖固定文件名，扫描器探测任意路径都拿不到业务内容）；无 code 的未知路径维持 404 */
+if (preg_match('#^/[0-9a-z]{2,10}/[0-9a-z]{4,16}\.html$#i', $uri) && isset($_GET['code'])) {
+    if (site_allow_page('visitor.html')) {
+        header('Cache-Control: no-store');
+        serve_html('visitor.html');
+    }
+    http_response_code(404); echo 'Not Found'; exit;
 }
 if ($uri === '/health' || $uri === '/api/health') {
     json_out(['ok' => true, 'time' => time(), 'version' => '2.0', 'site_role' => site_role(), 'app_version' => app_version(), 'apcu' => mem_ok()]);
