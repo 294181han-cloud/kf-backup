@@ -74,6 +74,21 @@ function ensure_upgrade(): void
         // v2.60.9 访客「恢复码」：客户换浏览器/换设备后，用客服给的码把原对话接回来
         try { $pdo->exec("ALTER TABLE v_sessions ADD COLUMN resume_code VARCHAR(16) NOT NULL DEFAULT ''"); } catch (\Throwable $e) { /* 列已存在 */ }
         try { $pdo->exec("ALTER TABLE v_sessions ADD UNIQUE KEY uk_resume_code (resume_code)"); } catch (\Throwable $e) { /* 索引已存在 */ }
+        // v2.60.10 登录设备（防卡密共享）：默认 3 台
+        $pdo->exec("CREATE TABLE IF NOT EXISTS login_devices (
+            id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+            owner_key VARCHAR(24) NOT NULL,
+            tenant_id INT UNSIGNED NOT NULL DEFAULT 0,
+            dev_id VARCHAR(32) NOT NULL,
+            note VARCHAR(32) NOT NULL DEFAULT '',
+            ip VARCHAR(64) NOT NULL DEFAULT '',
+            ua VARCHAR(200) NOT NULL DEFAULT '',
+            created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            last_seen DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            UNIQUE KEY uk_owner_dev (owner_key, dev_id),
+            KEY idx_owner_seen (owner_key, last_seen)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+        try { $pdo->exec("ALTER TABLE tenants ADD COLUMN max_devices INT UNSIGNED NOT NULL DEFAULT 3"); } catch (\Throwable $e) { /* 列已存在 */ }
         try { $pdo->exec("ALTER TABLE v_sessions ADD INDEX idx_tenant_pinned (tenant_id, pinned, last_time)"); } catch (\Throwable $e) { /* 已存在 */ }
         // v2.33/v2.39 分域节点登记：同一台服务器可同时跑客服入口+访客站点，唯一键 = IP+角色
         $pdo->exec("CREATE TABLE IF NOT EXISTS nodes (
@@ -396,6 +411,10 @@ function dispatch_api(string $method, string $uri): void
     if ($uri === '/api/auth/me')       handle_auth_me($method);
     if ($uri === '/api/auth/password') handle_auth_password($method);
     if ($uri === '/api/auth/profile')  handle_auth_profile($method);
+    // v2.60.10 登录设备（防卡密共享）：看列表 / 改备注 / 踢掉
+    if ($uri === '/api/login-devices')      handle_login_devices($method);
+    if ($uri === '/api/login-devices/kick') handle_login_device_kick($method);
+    if ($uri === '/api/login-devices/note') handle_login_device_note($method);
 
     // ---- 访客端（公开） ----
     if ($uri === '/api/visitor/config')      handle_visitor_config($method);

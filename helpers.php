@@ -186,6 +186,9 @@ function require_auth(): array
         if (!$t) json_error('账号不存在', 401);
         if ($t['status'] !== 'active') json_error('账号已被停用，请联系平台管理员', 403);
         if ($t['expires_at'] && strtotime($t['expires_at']) < time()) json_error('账号已到期，请联系平台管理员续期', 403);
+        if (!empty($p['dev']) && !device_touch(device_owner_key('tenant', (int)$t['id'], (int)$t['id']), (string)$p['dev'])) {
+            json_error('这台设备已被踢下线，请重新登录', 401);
+        }
         return ['role' => 'tenant', 'id' => (int)$t['id'], 'kami' => $t['kami'], 'name' => $t['nickname'], 'row' => $t];
     }
 
@@ -197,6 +200,9 @@ function require_auth(): array
         if ($a['status'] !== 'active') json_error('客服账号已被停用', 403);
         if ($a['tenant_status'] !== 'active') json_error('所属账号已被停用', 403);
         if ($a['tenant_expires'] && strtotime($a['tenant_expires']) < time()) json_error('所属账号已到期，请联系客服续期', 403);
+        if (!empty($p['dev']) && !device_touch(device_owner_key('agent', (int)$a['id'], (int)$a['tenant_id']), (string)$p['dev'])) {
+            json_error('这台设备已被踢下线，请重新登录', 401);
+        }
         return ['role' => 'agent', 'id' => (int)$a['id'], 'tenant_id' => (int)$a['tenant_id'], 'name' => $a['nickname'], 'row' => $a];
     }
 
@@ -224,6 +230,82 @@ function require_workspace(): array
     $ctx['tenant_id'] = (int)($ctx['tenant_id'] ?? $ctx['id']);
     $ctx['agent_id']  = $ctx['role'] === 'agent' ? $ctx['id'] : 0;
     return $ctx;
+}
+
+/* ================= v2.60.10 登录设备（防卡密共享） =================
+   一个卡密默认只能有 3 台设备在线（浏览器/手机各算一台），满了别人就登不进来，
+   但自己这边可以看设备列表、改备注、把不认识的那台踢掉。
+   —— 做卡密生意最怕的就是一张卡被转卖/共享几十个人用。 */
+function device_limit_for(array $t): int
+{
+    $n = (int)($t['max_devices'] ?? 3);
+    if ($n <= 0) $n = 3;          // 默认 3 台
+    return min(8, $n);            // 最高 8 台
+}
+
+function device_owner_key(string $role, int $id, int $tenantId): string
+{
+    return $role === 'agent' ? ('a:' . $id) : ('t:' . ($tenantId > 0 ? $tenantId : $id));
+}
+
+/** 取某个租户的登录设备上限（默认 3，最高 8） */
+function tenant_device_limit(int $tenantId): int
+{
+    try {
+        $st = db()->prepare('SELECT max_devices FROM tenants WHERE id = ?');
+        $st->execute([$tenantId]);
+        $row = $st->fetch() ?: [];
+        return device_limit_for($row);
+    } catch (\Throwable $e) { return 3; }
+}
+
+function device_norm_id(string $dev): string
+{
+    $dev = preg_replace('/[^A-Za-z0-9_-]/', '', $dev);
+    return mb_substr((string)$dev, 0, 32);
+}
+
+/** 登录时登记设备：已登记过就刷新；没登记过且已满员 → 拒绝登录 */
+function device_register(string $ownerKey, int $tenantId, string $devId, string $ip, string $ua, int $limit): array
+{
+    try {
+        $pdo = db();
+        $st = $pdo->prepare('SELECT * FROM login_devices WHERE owner_key = ? AND dev_id = ? LIMIT 1');
+        $st->execute([$ownerKey, $devId]);
+        $found = $st->fetch();
+        if ($found) {
+            $pdo->prepare('UPDATE login_devices SET last_seen = ?, ip = ?, ua = ? WHERE id = ?')
+                ->execute([now_dt(), $ip, mb_substr($ua, 0, 200), (int)$found['id']]);
+            return ['ok' => true, 'dev' => $found];
+        }
+        $n = fetch_count($pdo, 'SELECT COUNT(*) FROM login_devices WHERE owner_key = ?', [$ownerKey]);
+        if ($n >= $limit) {
+            return ['ok' => false, 'msg' => '登录设备已达上限（' . $limit . ' 台），请在「设置 → 安全与维护 → 登录设备」里把不用的设备踢掉，或联系客服提高上限'];
+        }
+        $pdo->prepare('INSERT INTO login_devices (owner_key, tenant_id, dev_id, note, ip, ua, created_at, last_seen) VALUES (?,?,?,\'\',?,?,?,?)')
+            ->execute([$ownerKey, $tenantId, $devId, $ip, mb_substr($ua, 0, 200), now_dt(), now_dt()]);
+        return ['ok' => true, 'dev' => ['id' => (int)$pdo->lastInsertId(), 'dev_id' => $devId]];
+    } catch (\Throwable $e) {
+        return ['ok' => true, 'dev' => null];   // 老库没建表时别把登录堵死
+    }
+}
+
+/** 每次带 token 的请求都核对设备还在不在（被踢掉 → token 立刻失效）；last_seen 最多 2 分钟写一次 */
+function device_touch(string $ownerKey, string $devId): bool
+{
+    try {
+        $pdo = db();
+        $st = $pdo->prepare('SELECT id, last_seen FROM login_devices WHERE owner_key = ? AND dev_id = ? LIMIT 1');
+        $st->execute([$ownerKey, $devId]);
+        $d = $st->fetch();
+        if (!$d) return false;
+        if (strtotime((string)$d['last_seen']) < time() - 120) {
+            $pdo->prepare('UPDATE login_devices SET last_seen = ? WHERE id = ?')->execute([now_dt(), (int)$d['id']]);
+        }
+        return true;
+    } catch (\Throwable $e) {
+        return true;   // 表不存在（老库）时放行
+    }
 }
 
 /* ================= 登录防爆破 ================= */

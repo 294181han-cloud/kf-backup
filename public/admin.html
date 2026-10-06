@@ -113,6 +113,7 @@
                 <template #default="{row}">{{ row.quota_web }} / {{ row.quota_app }}</template>
               </el-table-column>
               <el-table-column prop="max_agents" label="子客服上限" width="90"></el-table-column>
+              <el-table-column prop="max_devices" label="设备上限" width="90"></el-table-column>
               <el-table-column prop="agents_cnt" label="子客服" width="70"></el-table-column>
               <el-table-column prop="sessions" label="会话数" width="75"></el-table-column>
               <el-table-column prop="last_login_at" label="最后登录" width="150">
@@ -481,6 +482,9 @@
       <el-form-item label="网页周额度"><el-input-number v-model="dlg.quota_web" :min="0"></el-input-number></el-form-item>
       <el-form-item label="客服码周额度"><el-input-number v-model="dlg.quota_app" :min="0"></el-input-number></el-form-item>
       <el-form-item label="子客服上限"><el-input-number v-model="dlg.max_agents" :min="0" :max="50"></el-input-number></el-form-item>
+      <el-form-item label="登录设备上限"><el-input-number v-model="dlg.max_devices" :min="1" :max="8"></el-input-number>
+        <span class="muted" style="margin-left:8px;font-size:12px;">同账号同时在线设备数，默认 3，最高 8</span>
+      </el-form-item>
       <el-form-item label="结束保留天数"><el-input-number v-model="dlg.closed_keep_days" :min="0" :max="3650"></el-input-number><span class="muted" style="margin-left:8px;font-size:12px;">0=永久</span></el-form-item>
       <el-form-item label="会话总额度"><el-input-number v-model="dlg.max_sessions" :min="0" :max="1000000"></el-input-number><span class="muted" style="margin-left:8px;font-size:12px;">0=不限</span></el-form-item>
       <el-form-item label="备注"><el-input v-model="dlg.remark" placeholder="购买渠道 / 联系方式等"></el-input></el-form-item>
@@ -526,6 +530,6 @@
 <script src="/assets/vendor/vue.global.js?v=2.0.1"></script>
 <script src="/assets/vendor/element-plus.js?v=2.0.1"></script>
 <script src="/assets/api.js?v=2.0.1"></script>
-<script src="/assets/js/admin.js?v=2.4.6"></script>
+<script src="/assets/js/admin.js?v=2.4.0"></script>
 </body>
 </html>

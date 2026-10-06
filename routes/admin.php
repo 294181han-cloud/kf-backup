@@ -75,6 +75,7 @@ function tenant_fields(array $t, ?int $sessions = null): array
         'id' => (int)$t['id'], 'kami' => $t['kami'], 'nickname' => $t['nickname'], 'remark' => $t['remark'],
         'status' => $t['status'], 'expires_at' => $t['expires_at'],
         'quota_web' => (int)$t['quota_web'], 'quota_app' => (int)$t['quota_app'], 'max_agents' => (int)$t['max_agents'],
+        'max_devices' => (int)($t['max_devices'] ?? 3),   // v2.60.10 登录设备上限（默认 3，最高 8）
         'closed_keep_days' => (int)($t['closed_keep_days'] ?? 3), 'max_sessions' => (int)($t['max_sessions'] ?? 0),
         'created_at' => $t['created_at'], 'last_login_at' => $t['last_login_at'],
         'expired' => $t['expires_at'] && strtotime($t['expires_at']) < time(),
@@ -180,6 +181,8 @@ function handle_admin_tenants_id(string $method, int $id): void
         foreach (['quota_web', 'quota_app', 'max_agents', 'closed_keep_days', 'max_sessions'] as $f) {
             if (array_key_exists($f, $data)) { $set[] = "$f = ?"; $vals[] = max(0, min(3650, (int)$data[$f])); }
         }
+        // v2.60.10 登录设备上限：默认 3，最高 8
+        if (array_key_exists('max_devices', $data)) { $set[] = 'max_devices = ?'; $vals[] = max(1, min(8, (int)$data['max_devices'])); }
         if (array_key_exists('expires_at', $data)) {
             $ev = trim((string)$data['expires_at']);
             if ($ev === '') { $set[] = 'expires_at = ?'; $vals[] = null; }
@@ -209,7 +212,7 @@ function handle_admin_tenants_id(string $method, int $id): void
         try {
             foreach (['v_sessions', 'messages', 'contacts', 'quick_msgs', 'welcome_msgs', 'welcome_sent',
                       'auto_replies', 'broadcasts', 'ip_blacklist', 'pre_inquiries', 'tenant_settings',
-                      'service_codes', 'domain_links', 'agents'] as $tbl) {
+                      'service_codes', 'domain_links', 'agents', 'login_devices'] as $tbl) {
                 $pdo->prepare("DELETE FROM $tbl WHERE tenant_id = ?")->execute([$id]);
             }
             $pdo->prepare('DELETE FROM tenants WHERE id = ?')->execute([$id]);

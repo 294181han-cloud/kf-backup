@@ -47,7 +47,23 @@
     del(path) { return this.request('DELETE', path); },
 
     // 登录
-    login(account, password) { return this.post('/api/auth/login', { account, password }); },
+    /* v2.60.10 登录设备：本地生成一个稳定的设备号（清缓存/换浏览器会变成新设备），
+       同一卡密默认只允许 3 台设备在线，防盗用。 */
+    deviceId() {
+      const KEY = 'kfxt_dev';
+      try {
+        let d = localStorage.getItem(KEY);
+        if (!d) {
+          const rnd = (self.crypto && crypto.randomUUID)
+            ? crypto.randomUUID().replace(/-/g, '')
+            : (Date.now().toString(36) + Math.random().toString(36).slice(2));
+          d = rnd.slice(0, 24);
+          localStorage.setItem(KEY, d);
+        }
+        return d;
+      } catch (e) { return ''; }
+    },
+    login(account, password) { return this.post('/api/auth/login', { account, password, dev: this.deviceId() }); },
     me() { return this.get('/api/auth/me'); },
     changePassword(oldP, newP) { return this.put('/api/auth/password', { old_password: oldP, new_password: newP }); },
     updateProfile(data) { return this.put('/api/auth/profile', data); },

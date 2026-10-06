@@ -23,6 +23,13 @@ function handle_auth_login(string $method): void
     if ($method !== 'POST') { json_error('方法不允许', 405); return; }
     $account  = trim((string)input('account', ''));
     $password = (string)input('password', '');
+    /* v2.60.10 登录设备：前端在 localStorage 里存一个稳定的设备号随登录一起发过来。
+       同一账号默认只能有 3 台设备在线（浏览器/手机各算一台），满了别人登不进来，
+       但自己可以在「设置 → 安全与维护 → 登录设备」里踢掉不用的。 */
+    $devId = device_norm_id((string)input('dev', ''));
+    if ($devId === '') {
+        $devId = 'd' . substr(hash('sha256', get_client_ip() . '|' . ($_SERVER['HTTP_USER_AGENT'] ?? '')), 0, 12);
+    }
     if ($account === '' || $password === '') json_error('请输入账号和密码');
 
     $ip = get_client_ip();
@@ -69,7 +76,10 @@ function handle_auth_login(string $method): void
         login_fail_clear($ip);
         $pdo->prepare('UPDATE agents SET work_status = ? WHERE id = ?')->execute(['online', $a['id']]);
         log_tenant_login((int)$t['id'], 'agent', $a['username']);
-        json_out(['token' => jwt_encode(['role' => 'agent', 'id' => (int)$a['id'], 'tenant_id' => (int)$t['id']]),
+        $chk = device_register(device_owner_key('agent', (int)$a['id'], (int)$t['id']), (int)$t['id'], $devId, $ip,
+            mb_substr((string)($_SERVER['HTTP_USER_AGENT'] ?? ''), 0, 200), device_limit_for($t));
+        if (empty($chk['ok'])) json_error((string)$chk['msg'], 403);
+        json_out(['token' => jwt_encode(['role' => 'agent', 'id' => (int)$a['id'], 'tenant_id' => (int)$t['id'], 'dev' => $devId]),
             'user' => ['role' => 'agent', 'id' => (int)$a['id'], 'tenant_id' => (int)$t['id'],
                 'nickname' => $a['nickname'], 'avatar' => $a['avatar'], 'work_status' => 'online'],
             'redirect' => '/app.html']);
@@ -82,10 +92,91 @@ function handle_auth_login(string $method): void
     login_fail_clear($ip);
     $pdo->prepare('UPDATE tenants SET last_login_at = ? WHERE id = ?')->execute([now_dt(), $t['id']]);
     log_tenant_login((int)$t['id'], 'tenant', $t['kami']);
-    json_out(['token' => jwt_encode(['role' => 'tenant', 'id' => (int)$t['id']]),
+    $chk = device_register(device_owner_key('tenant', (int)$t['id'], (int)$t['id']), (int)$t['id'], $devId, $ip,
+        mb_substr((string)($_SERVER['HTTP_USER_AGENT'] ?? ''), 0, 200), device_limit_for($t));
+    if (empty($chk['ok'])) json_error((string)$chk['msg'], 403);
+    json_out(['token' => jwt_encode(['role' => 'tenant', 'id' => (int)$t['id'], 'dev' => $devId]),
         'user' => ['role' => 'tenant', 'id' => (int)$t['id'], 'kami' => $t['kami'],
             'nickname' => $t['nickname'], 'expires_at' => $t['expires_at']],
         'redirect' => '/app.html']);
+}
+
+/* ---------- v2.60.10 登录设备管理 ----------
+   租户看自己的设备；子客服只看自己那台（不想把别人的设备暴露给子客服）。 */
+function login_device_owner(): array
+{
+    $ctx = require_workspace();
+    $key = device_owner_key($ctx['role'], (int)$ctx['id'], (int)$ctx['tenant_id']);
+    return [$ctx, $key];
+}
+
+function device_row_out(array $r): array
+{
+    $ua = (string)($r['ua'] ?? '');
+    $dev = '未知设备';
+    if (preg_match('/iPhone|iPad|iPod/i', $ua)) $dev = 'iPhone/iPad';
+    elseif (preg_match('/Android/i', $ua)) $dev = '安卓手机';
+    elseif (preg_match('/Windows/i', $ua)) $dev = 'Windows 电脑';
+    elseif (preg_match('/Macintosh|Mac OS/i', $ua)) $dev = 'Mac';
+    elseif (preg_match('/Linux/i', $ua)) $dev = 'Linux';
+    if (preg_match('/MicroMessenger/i', $ua)) $dev .= ' · 微信';
+    elseif (preg_match('/Edg\//i', $ua)) $dev .= ' · Edge';
+    elseif (preg_match('/Chrome/i', $ua)) $dev .= ' · Chrome';
+    elseif (preg_match('/Safari/i', $ua)) $dev .= ' · Safari';
+    return [
+        'id' => (int)$r['id'],
+        'dev_id' => substr((string)$r['dev_id'], 0, 8),
+        'note' => (string)$r['note'],
+        'device' => $dev,
+        'ip' => (string)$r['ip'],
+        'created_at' => dt_to_iso((string)$r['created_at']),
+        'last_seen' => dt_to_iso((string)$r['last_seen']),
+    ];
+}
+
+function handle_login_devices(string $method): void
+{
+    if ($method !== 'GET') { json_error('方法不允许', 405); return; }
+    [$ctx, $key] = login_device_owner();
+    $pdo = db();
+    $st = $pdo->prepare('SELECT * FROM login_devices WHERE owner_key = ? ORDER BY last_seen DESC LIMIT 50');
+    $st->execute([$key]);
+    $list = array_map('device_row_out', $st->fetchAll());
+    $limit = tenant_device_limit((int)$ctx['tenant_id']);
+    json_out(['devices' => $list, 'limit' => $limit, 'count' => count($list)]);
+}
+
+function handle_login_device_kick(string $method): void
+{
+    if ($method !== 'POST') { json_error('方法不允许', 405); return; }
+    [$ctx, $key] = login_device_owner();
+    $id = (int)input('id', 0);
+    if ($id <= 0) json_error('缺少设备 id');
+    // 只允许踢自己名下的设备；别把自己正在用的这台踢了
+    $pdo = db();
+    $st = $pdo->prepare('SELECT * FROM login_devices WHERE id = ? AND owner_key = ? LIMIT 1');
+    $st->execute([$id, $key]);
+    $row = $st->fetch();
+    if (!$row) json_error('设备不存在', 404);
+    $tok = bearer_token();
+    $dec = $tok ? jwt_decode($tok) : null;
+    $cur = device_norm_id((string)(is_array($dec) ? ($dec['dev'] ?? '') : ''));
+    if ($cur !== '' && $cur === (string)$row['dev_id']) json_error('这是你当前正在使用的设备，不能踢', 400);
+    $pdo->prepare('DELETE FROM login_devices WHERE id = ?')->execute([$id]);
+    json_out(['ok' => true]);
+}
+
+function handle_login_device_note(string $method): void
+{
+    if ($method !== 'POST') { json_error('方法不允许', 405); return; }
+    [$ctx, $key] = login_device_owner();
+    $id = (int)input('id', 0);
+    $note = mb_substr(trim((string)input('note', '')), 0, 32);
+    if ($id <= 0) json_error('缺少设备 id');
+    $pdo = db();
+    $st = $pdo->prepare('UPDATE login_devices SET note = ? WHERE id = ? AND owner_key = ?');
+    $st->execute([$note, $id, $key]);
+    json_out(['ok' => true]);
 }
 
 /** 当前身份详情（工作台/管理台通用） */

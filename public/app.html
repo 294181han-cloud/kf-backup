@@ -1216,6 +1216,41 @@
           </div>
 
           <div class="panel wide">
+            <!-- v2.60.10 登录设备：默认 3 台，防卡密被共享/转卖 -->
+            <div class="panel-title" style="justify-content:flex-start;gap:10px;">
+              登录设备
+              <span class="muted" style="font-size:12px;font-weight:normal;">当前 {{ devices.length }} / {{ deviceLimit }} 台</span>
+              <el-button size="small" text type="primary" style="margin-left:auto;" @click="loadDevices">刷新</el-button>
+            </div>
+            <p class="muted" style="margin:0 0 10px;font-size:12px;line-height:1.7;">
+              同一账号最多 {{ deviceLimit }} 台设备同时在线（一个浏览器算一台）。满了别人就登不进来，做卡密的尤其要盯这里：
+              发现不认识的设备，先点「备注」认一下，再「踢掉」——被踢的设备立刻掉线，要重新登录。
+            </p>
+            <el-table :data="devices" size="small" stripe>
+              <el-table-column label="设备" min-width="150">
+                <template #default="{row}">
+                  <div>{{ row.device }}</div>
+                  <div class="muted" style="font-size:11px;">ID {{ row.dev_id }}</div>
+                </template>
+              </el-table-column>
+              <el-table-column label="备注" min-width="110">
+                <template #default="{row}"><span v-if="row.note">{{ row.note }}</span><span v-else class="muted">未备注</span></template>
+              </el-table-column>
+              <el-table-column label="最近活跃" width="110"><template #default="{row}">{{ shortTime(row.last_seen) }}</template></el-table-column>
+              <el-table-column prop="ip" label="IP" width="130"></el-table-column>
+              <el-table-column label="操作" width="150">
+                <template #default="{row}">
+                  <el-button size="small" text type="primary" @click="renameDevice(row)">备注</el-button>
+                  <el-popconfirm title="踢掉这台设备？对方会立刻掉线" @confirm="kickDevice(row)">
+                    <template #reference><el-button size="small" text type="danger">踢掉</el-button></template>
+                  </el-popconfirm>
+                </template>
+              </el-table-column>
+            </el-table>
+            <div v-if="!devices.length" class="muted" style="padding:20px;text-align:center;">暂无设备记录</div>
+          </div>
+
+          <div class="panel wide">
             <div class="panel-title">登录记录（最近 20 次）</div>
             <el-table :data="loginLogs" size="small" stripe max-height="220">
               <el-table-column label="时间" width="160"><template #default="{row}">{{ shortTime(row.created_at) }}</template></el-table-column>
@@ -1576,9 +1611,9 @@
 <script src="/assets/vendor/element-plus.js?v=2.0.1"></script>
 <script src="/assets/vendor/qrcode.min.js?v=2.0.1"></script>
 <script src="/assets/qr-poster.js?v=2.1.03"></script>
-<script src="/assets/api.js?v=2.0.1"></script>
+<script src="/assets/api.js?v=2.0.2"></script>
 <script src="/assets/js/app-components.js?v=2.6.2"></script>
-<script src="/assets/js/app.js?v=3.33.0"></script>
+<script src="/assets/js/app.js?v=3.34.0"></script>
 <script src="/assets/js/app-boot.js?v=2.1.1"></script>
 </body>
 </html>

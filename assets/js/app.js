@@ -1915,6 +1915,34 @@ const app = createApp({
       try {
         loginLogs.value = await API.get('/api/tenant/login-logs');
       } catch (e) {}
+      await loadDevices();
+    };
+
+    /* ===== v2.60.10 登录设备（防卡密共享）：默认 3 台，能看/备注/踢 ===== */
+    const devices = ref([]);
+    const deviceLimit = ref(3);
+    const loadDevices = async () => {
+      try {
+        const r = await API.get('/api/login-devices');
+        devices.value = r.devices || [];
+        deviceLimit.value = r.limit || 3;
+      } catch (e) {}
+    };
+    const kickDevice = async (d) => {
+      try {
+        await API.post('/api/login-devices/kick', { id: d.id });
+        ElementPlus.ElMessage.success('已踢下线');
+        await loadDevices();
+      } catch (e) { ElementPlus.ElMessage.error(e.message); }
+    };
+    const renameDevice = async (d) => {
+      try {
+        const { value } = await ElementPlus.ElMessageBox.prompt(
+          '给这台设备起个名字（例如：老板手机 / 客服小李），以后要踢谁一目了然',
+          '设备备注', { inputValue: d.note || '', inputPlaceholder: '如：老板手机', confirmButtonText: '保存', cancelButtonText: '取消' });
+        await API.post('/api/login-devices/note', { id: d.id, note: (value || '').trim() });
+        await loadDevices();
+      } catch (e) {}
     };
     const saveSecurity = async () => {
       try {
@@ -2847,6 +2875,7 @@ const app = createApp({
       guide, guideDone, dark, toggleDark, renameVisitor, renderCodeQrs, tplList,
       uiCatList, uiCurrentCat, uiActiveCat, uiActiveList, uiSel, uiTplList, uiColorList, uiPick, sideCollapsed, mSideOpen,
       blockSession, blockIp, kwList, kwInput, kwSaving, addKw, removeKw, saveFilter, agentCmd, restartPoll,
+      devices, deviceLimit, loadDevices, kickDevice, renameDevice,
       chatSearchOn, chatSearchKw, searchHit, visibleMsgs, canRecall, recallMsg, isRead,
       pol, savePolicy, uploadPolHead, clock, unreadTotal, sessCollapsed,
       toggleSessTabs,
