@@ -1175,7 +1175,9 @@ function handle_agent_poll(string $method): void
     }
     if ($session && $sinceMsg > 0) {
         session_of($ctx, $session); // 越权检查
-        $st = $pdo->prepare('SELECT id, session_id, from_type AS `from`, sender_id, sender_name, text, msg_type, attachments, recalled_at, edited_at, created_at FROM messages WHERE session_id = ? AND id > ? ORDER BY id ASC');
+        // v2.60.23 修 bug：这里原来漏了 reply_to —— 客服端轮询拿新消息时拿不到「回复的是哪条」，
+        // 访客回复某句话时客服端就看不到引用条（初次打开会话是另一条 SQL，那条是有的，所以只有轮询到的消息有问题）
+        $st = $pdo->prepare('SELECT id, session_id, from_type AS `from`, sender_id, sender_name, text, msg_type, attachments, reply_to, recalled_at, edited_at, created_at FROM messages WHERE session_id = ? AND id > ? ORDER BY id ASC');
         $st->execute([$session, $sinceMsg]);
         $msgs = array_map('to_msg', $st->fetchAll());
     }
