@@ -208,9 +208,12 @@ function init_schema(): void
         tenant_id INT UNSIGNED NOT NULL,
         agent_id INT UNSIGNED NOT NULL DEFAULT 0,
         code VARCHAR(24) NOT NULL UNIQUE,
+        entry_id VARCHAR(16) NULL,
+        content_host VARCHAR(120) NOT NULL DEFAULT '',
         link VARCHAR(255) NOT NULL DEFAULT '',
         created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-        KEY idx_tenant (tenant_id)
+        KEY idx_tenant (tenant_id),
+        UNIQUE KEY uk_entry_id (entry_id)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
 
     $pdo->exec("CREATE TABLE IF NOT EXISTS domain_links (

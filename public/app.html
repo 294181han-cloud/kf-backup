@@ -749,17 +749,20 @@
             <el-popconfirm :title="codeRotateHint" @confirm="rotateCode">
               <template #reference><el-button type="primary" size="small">新码</el-button></template>
             </el-popconfirm>
+            <el-popconfirm title="会重新生成一条链接（顾客手里那张旧二维码就作废了），确定吗？" @confirm="rotateLink">
+              <template #reference><el-button size="small">换新链接</el-button></template>
+            </el-popconfirm>
           </div>
 
           <!-- 拦截检测：微信 logo 就查微信能不能打开 / 有没有被拦截（红了） -->
-          <!-- v2.57 红了就直接怼一条提示 + 一键换码（换码会作废旧码，老二维码要重发） -->
+          <!-- v2.68 红了直接一键换内容域名，二维码里印的是「入口 ID」，顾客那张码不用重发 -->
           <div class="red-alert" v-if="codeCheck.state === 'red'">
             <div class="ra-ic">🔴</div>
             <div class="ra-body">
               <div class="ra-t">当前客服码已被微信拦截（俗称"红了"），客户扫码进不来</div>
-              <div class="ra-s">点右边「立即换码」会生成一条新码，<b>旧码立即失效</b>——换完记得把新的二维码重新发给客户。</div>
+              <div class="ra-s">点右边「立即换码」会换一条全新的链接（换掉被拦的域名），<b>旧二维码会作废，记得把新的重新发给客户</b>。<br>如果只是想升级成「二维码永不过期」的入口链接，点上面的「新码」——它不会改二维码。</div>
             </div>
-            <el-popconfirm title="换码后旧码立即失效，确定要换吗？" @confirm="rotateCode">
+            <el-popconfirm title="换一条全新的链接（旧二维码作废，客户要重新扫码），确定吗？" @confirm="rotateLink">
               <template #reference><el-button type="danger" size="small" style="font-weight:700;">立即换码</el-button></template>
             </el-popconfirm>
           </div>
@@ -1698,7 +1701,7 @@
 <script src="/assets/qr-poster.js?v=2.1.03"></script>
 <script src="/assets/api.js?v=2.0.3"></script>
 <script src="/assets/js/app-components.js?v=2.6.2"></script>
-<script src="/assets/js/app.js?v=3.39.0"></script>
+<script src="/assets/js/app.js?v=3.40.0"></script>
 <script src="/assets/js/app-boot.js?v=2.1.1"></script>
 </body>
 </html>

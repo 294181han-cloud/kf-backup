@@ -76,6 +76,18 @@ function ensure_upgrade(): void
         try { $pdo->exec("ALTER TABLE v_sessions ADD UNIQUE KEY uk_resume_code (resume_code)"); } catch (\Throwable $e) { /* 索引已存在 */ }
         // v2.65 废码自动断开：会话记下发码来源，轮询时校验码/租户仍生效，失效即让前端断开
         try { $pdo->exec("ALTER TABLE v_sessions ADD COLUMN code VARCHAR(32) NOT NULL DEFAULT ''"); } catch (\Throwable $e) { /* 列已存在 */ }
+        // v2.68 入口 ID：二维码里印的是它（不是客服码）——换码/换内容域名都不用重印二维码。
+        try { $pdo->exec("ALTER TABLE service_codes ADD COLUMN entry_id VARCHAR(16) NULL"); } catch (\Throwable $e) { /* 列已存在 */ }
+        try { $pdo->exec("ALTER TABLE service_codes ADD UNIQUE KEY uk_entry_id (entry_id)"); } catch (\Throwable $e) { /* 索引已存在 */ }
+        // v2.68 内容落地主机：一张码固定一台（访客 localStorage 按域隔离，换域会丢会话）
+        try { $pdo->exec("ALTER TABLE service_codes ADD COLUMN content_host VARCHAR(120) NOT NULL DEFAULT ''"); } catch (\Throwable $e) { /* 列已存在 */ }
+        try {
+            $needIds = $pdo->query("SELECT id FROM service_codes WHERE entry_id IS NULL OR entry_id = ''")->fetchAll(PDO::FETCH_COLUMN);
+            if ($needIds) {
+                $upEntry = $pdo->prepare('UPDATE service_codes SET entry_id = ? WHERE id = ?');
+                foreach ($needIds as $rid) $upEntry->execute([gen_entry_id(), (int)$rid]);
+            }
+        } catch (\Throwable $e) { /* 迁移失败下轮请求再试 */ }
         // v2.60.10 登录设备（防卡密共享）：默认 3 台
         $pdo->exec("CREATE TABLE IF NOT EXISTS login_devices (
             id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
@@ -221,7 +233,15 @@ if ($uri === '') $uri = '/';
 /* ---------- v2.65.2 服务器断连拒绝：PHP 返回 444，nginx 对上游 444 直接断开连接不回任何字节，
    浏览器显示原生「无法访问此页面 · 似乎服务器关闭了连接」（ERR_EMPTY_RESPONSE）。
    拒绝入口统一走 /refused；PHP 内部拒绝也直接 http_response_code(444)。 ---------- */
-if ($uri === '/refused' || $uri === '/__refused__') { http_response_code(444); exit; }
+/* v2.68：/refused 不再断连接 —— 老访客页/老链接的兜底入口统一给友好页，
+   免得顾客看到浏览器原生「无法访问此页面」，或者节点上没实现的 404/500。 */
+if ($uri === '/refused' || $uri === '/__refused__') {
+    header('Cache-Control: no-store');
+    header('Content-Type: text/html; charset=utf-8');
+    echo gate_fail_page('链接已失效，请重新扫码进入');
+    exit;
+}
+/** 真正该断开的地方（未知主机 / IP 直连扫描）仍走 444：TCP 层直接关闭 */
 function refuse_connection(): void { http_response_code(444); exit; }
 /** v2.67 总控访客页：内联加密版（页面源码无明文业务逻辑，外部 .js 请求消失） */
 function serve_visitor_main(): void
@@ -229,6 +249,19 @@ function serve_visitor_main(): void
     header('Cache-Control: no-store');
     echo visitor_page_packed((string)file_get_contents(__DIR__ . '/public/visitor.html'));
     exit;
+}
+/** v2.68 内容页伪装落地点（/web/data/YYYY/MM/DD/<uuid>.html）：真聊天页挂在这类像静态资源的路径下 */
+function serve_visitor_fake_asset(): void
+{
+    header('Cache-Control: no-store');
+    header('Content-Type: text/html; charset=utf-8');
+    echo visitor_page_packed((string)file_get_contents(__DIR__ . '/public/visitor.html'));
+    exit;
+}
+/** v2.68 内容页伪装路径判定（静态边缘节点的更新包里也烤了同名真实文件） */
+function is_fake_asset_uri(string $uri): bool
+{
+    return (bool)preg_match('#^/web/data/\d{4}/\d{2}/\d{2}/[A-Za-z0-9\-]{16,48}\.html$#', $uri);
 }
 
 /* ---------- v2.66 主机门禁（仅总控）：只有主站域名与「正在使用」的域名（启用中的
@@ -323,12 +356,22 @@ if (site_role() !== 'main') {
     // 访客/防红壳页（visitor 节点）与登录/工作台（agent 节点）放行；其余页面 404
     if (preg_match('#^/[0-9]{2}-[0-9]{2}/[A-Za-z0-9]{4,16}\.html$#', $uri)) {
         if (site_role() !== 'visitor') { http_response_code(404); echo 'Not Found'; exit; }
-        // v2.65.3 直接在原网页拒绝：无码/环境不像真人 → 服务器断开连接（444），不出任何内容；
-        // 码真伪边缘无库，由内层 /api/gate 校验（失效跳百度）
-        $k = gate_key_from_query();
-        if ($k === '' || !gate_env_ok()) refuse_connection();
+        // v2.68：只有「连入口参数都没有」的纯扫描流量才断连接；带 w/key 的一律出壳页，
+        // 码真伪由内层 /api/gate 校验（失败先重试 → 换备用域名 → 友好提示，不再跳百度）
+        if (gate_token_from_query() === '' || !gate_env_ok()) refuse_connection();
         header('Cache-Control: no-store');
         echo gate_loader_html();
+    }
+    /* v2.68 内容页伪装路径：静态节点上更新包已烤成真文件（nginx 直接命中，走不到这里）；
+       PHP 型访客节点由这里兜底，保证 /api/gate 下发的地址一定能出访客页。 */
+    if (is_fake_asset_uri($uri)) {
+        if (site_role() !== 'visitor') { http_response_code(404); echo 'Not Found'; exit; }
+        if (!isset($_GET['code'])) {
+            header('Content-Type: text/html; charset=utf-8');
+            echo gate_fail_page('链接已失效，请重新扫码进入');
+            exit;
+        }
+        serve_visitor_fake_asset();
     }
     foreach (['login.html', 'app.html', 'admin.html', 'visitor.html'] as $page) {
         if ($uri === "/$page") {
@@ -403,11 +446,25 @@ function site_allow_api(string $uri): bool
    不出 loader 不出任何内容；通过后才出 XOR 自解密 loader（内层 iframe 随机路径 catch-all）。 */
 if (preg_match('#^/[0-9]{2}-[0-9]{2}/[A-Za-z0-9]{4,16}\.html$#', $uri)) {
     if (!site_allow_page('gate.html')) { http_response_code(404); echo 'Not Found'; exit; }
-    $k = gate_key_from_query();
-    if ($k === '' || !gate_env_ok() || !gate_key_valid($k)) refuse_connection();
+    /* v2.68：有入口参数（?w= 入口 ID / 老链接的 ?key= 客服码）就出壳页，码真伪交给
+       壳页内层调 /api/gate 判定 —— 无效时壳页先重试、再换备用域名，最后给友好提示。 */
+    if (gate_token_from_query() === '' || !gate_env_ok()) refuse_connection();
     header('Cache-Control: no-store');
     echo gate_loader_html();
     exit;
+}
+
+/* ---------- v2.68 内容页伪装落点：/web/data/YYYY/MM/DD/<uuid>.html ----------
+   壳页从 /api/gate 拿到这个地址，装在 iframe 里当聊天页 —— 入口域名与内容域名解耦，
+   二维码里那个域名永远不用换。（静态节点由更新包烤成真文件，nginx 直接命中，不走这里。） */
+if (is_fake_asset_uri($uri)) {
+    if (!isset($_GET['code']) || !gate_resolve_token(trim((string)$_GET['code']))) {
+        header('Cache-Control: no-store');
+        header('Content-Type: text/html; charset=utf-8');
+        echo gate_fail_page('链接已失效，请重新扫码进入');
+        exit;
+    }
+    serve_visitor_fake_asset();
 }
 
 if ($uri === '/' || $uri === '/index.php' || $uri === '/index.html') {
@@ -445,8 +502,19 @@ foreach (['login.html', 'app.html', 'admin.html', 'visitor.html'] as $page) {
         // v2.65.3 服务端拒绝：访客页无 code → 直接断开连接；带码的总控侧查码是否仍生效，无效断开
         if ($page === 'visitor.html') {
             $ck = trim((string)($_GET['code'] ?? ($_GET['key'] ?? '')));
-            if (!isset($_GET['code']) && !isset($_GET['t']) && $ck === '') { refuse_connection(); }
-            if ($ck !== '' && site_role() === 'main' && !gate_key_valid($ck)) { refuse_connection(); }
+            /* v2.68：链接失效不再断连接（顾客会以为网站挂了）——统一给一句人话 */
+            if (!isset($_GET['code']) && !isset($_GET['t']) && $ck === '') {
+                header('Cache-Control: no-store');
+                header('Content-Type: text/html; charset=utf-8');
+                echo gate_fail_page('请通过客服码或扫码进入');
+                exit;
+            }
+            if ($ck !== '' && site_role() === 'main' && !gate_resolve_token($ck)) {
+                header('Cache-Control: no-store');
+                header('Content-Type: text/html; charset=utf-8');
+                echo gate_fail_page('链接已失效，请重新扫码进入');
+                exit;
+            }
             serve_visitor_main();   // v2.67 内联加密版
         }
         serve_html($page);
@@ -456,7 +524,12 @@ foreach (['login.html', 'app.html', 'admin.html', 'visitor.html'] as $page) {
    真实页不再依赖固定文件名，扫描器探测任意路径都拿不到业务内容）；无 code 的未知路径维持 404。
    v2.65.3：码已废/格式坏 → 直接 444 断开，在原网页拒绝 */
 if (preg_match('#^/[0-9a-z]{2,10}/[0-9a-z]{4,16}\.html$#i', $uri) && isset($_GET['code'])) {
-    if (!gate_key_valid(trim((string)$_GET['code']))) refuse_connection();
+    if (!gate_resolve_token(trim((string)$_GET['code']))) {
+        header('Cache-Control: no-store');
+        header('Content-Type: text/html; charset=utf-8');
+        echo gate_fail_page('链接已失效，请重新扫码进入');
+        exit;
+    }
     if (site_allow_page('visitor.html')) {
         serve_visitor_main();   // v2.67 内联加密版
     }

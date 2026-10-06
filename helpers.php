@@ -806,6 +806,20 @@ function node_bundle_build(string $role = '', bool $static = false): array
     } catch (\Throwable $e) { /* 壳页打包失败不阻塞更新包 */ }
     $codesRev = $shellPaths ? md5(implode("\n", array_unique($shellPaths))) : '';
     if ($staticMode && $codesRev !== '') $files['data/node-codes-rev.txt'] = base64_encode($codesRev);
+    /* v2.68 内容页伪装路径：每个落地域名固定一批 /web/data/YYYY/MM/DD/<uuid>.html（存 kv_store），
+       更新包里烤成真实静态文件 —— 静态节点（无 PHP）也能直接命中，壳页拿 /api/gate 下发的
+       地址就能进聊天页；总控侧 gate_content_url() 只从同一份清单里挑，两边永远一致。 */
+    try {
+        $visitorPacked = visitor_page_packed((string)file_get_contents($base . '/public/visitor.html'));
+        foreach (db()->query('SELECT domain FROM domain_pool WHERE enabled = 1') as $dpRow) {
+            $dom = strtolower(trim((string)$dpRow['domain']));
+            if ($dom === '') continue;
+            foreach (gate_content_paths($dom) as $cp) {
+                $rel = ltrim($cp, '/');
+                if (!isset($files[$rel])) $files[$rel] = base64_encode($visitorPacked);
+            }
+        }
+    } catch (\Throwable $e) { /* 无库/打包失败不阻塞更新包 */ }
     /* v2.67 直读 assets/js/visitor.js 的 URL 也只拿得到加密版（可读源码不再出现在任何节点） */
     $visitorSrc = @file_get_contents($base . '/assets/js/visitor.js');
     if ($visitorSrc !== false && $visitorSrc !== '') $files['assets/js/visitor.js'] = base64_encode(pack_js($visitorSrc));
@@ -1933,6 +1947,207 @@ function gate_key_valid(string $key): bool
     return (bool)$st->fetchColumn();
 }
 
+/* ===================== v2.68 入口 ID（二维码永不过期） =====================
+   老做法：二维码里印的就是客服码，而且域名+路径一起写死 —— 换码 / 换域名都要重印二维码。
+   新做法：二维码里印的是「入口 ID」（跟客服码、跟落地域名都解耦）：
+     https://<入口域名>/MM-DD/<随机>.html?w=<入口ID>
+   总控在 /api/gate 里把入口 ID 解析成「当前客服码 + 当前内容域名」再下发，
+   于是换客服码、换内容域名，顾客手里那张二维码都不用重印。
+   老的 ?key=<客服码> 链接继续原样可用（解析顺序：先按入口 ID 找，找不到再当客服码）。 */
+
+/** 入口 ID 字符集去掉易混的 l/0/1 */
+function gen_entry_id(int $len = 12): string
+{
+    $c = 'abcdefghijkmnpqrstuvwxyz23456789';
+    $n = strlen($c) - 1;
+    $s = '';
+    for ($i = 0; $i < $len; $i++) $s .= $c[random_int(0, $n)];
+    return $s;
+}
+
+/** 从查询串取「入口令牌」：优先 v2.68 的 ?w=，兼容老的 ?key=/?k=/?d=（base64） */
+function gate_token_from_query(): string
+{
+    $t = trim((string)($_GET['w'] ?? ''));
+    if ($t !== '' && preg_match('/^[A-Za-z0-9]{6,32}$/', $t)) return $t;
+    return gate_key_from_query();
+}
+
+/** 入口令牌 → 真实客服码（先按入口 ID 找，再退回当客服码解析）。
+ *  返回 ['code'=>…, 'tenant_id'=>…]；无效 / 租户停用 / 已到期 → null。
+ *  库不可用（边缘节点无库）→ null，由调用方决定怎么兜。 */
+function gate_resolve_token(string $token): ?array
+{
+    if ($token === '' || !preg_match('/^[A-Za-z0-9]{4,64}$/', $token)) return null;
+    try {
+        $pdo = db();
+        $row = null;
+        $st = $pdo->prepare('SELECT sc.code, sc.tenant_id, t.status, t.expires_at
+            FROM service_codes sc JOIN tenants t ON t.id = sc.tenant_id WHERE sc.entry_id = ? LIMIT 1');
+        $st->execute([$token]);
+        $row = $st->fetch();
+        if (!$row) {
+            $st = $pdo->prepare('SELECT sc.code, sc.tenant_id, t.status, t.expires_at
+                FROM service_codes sc JOIN tenants t ON t.id = sc.tenant_id WHERE sc.code = ? LIMIT 1');
+            $st->execute([$token]);
+            $row = $st->fetch();
+        }
+    } catch (\Throwable $e) {
+        return null;
+    }
+    if (!$row) return null;
+    if (($row['status'] ?? '') !== 'active') return null;
+    if (!empty($row['expires_at']) && strtotime((string)$row['expires_at']) < time()) return null;
+    return ['code' => (string)$row['code'], 'tenant_id' => (int)$row['tenant_id']];
+}
+
+/** 从启用的域名池挑落地主机（子域优先）。
+ *  $stable=true 时每个域名固定取子域池第一个（给壳页的「备用域名」用，保证同一个包内稳定）。 */
+function gate_pool_hosts(int $limit = 8, bool $stable = false): array
+{
+    try {
+        $rows = db()->query('SELECT domain, wildcard FROM domain_pool WHERE enabled = 1 ORDER BY id ASC')->fetchAll();
+    } catch (\Throwable $e) {
+        return [];   // 边缘节点无库
+    }
+    $out = [];
+    foreach ($rows as $r) {
+        $d = trim((string)($r['domain'] ?? ''));
+        if ($d === '') continue;
+        $subs = array_values(array_filter(array_map('trim', explode(',', kv_get('pool_subs:' . $d, '')))));
+        if ($subs) {
+            $h = ($stable ? $subs[0] : $subs[array_rand($subs)]) . '.' . $d;
+        } elseif ((int)($r['wildcard'] ?? 0) === 1) {
+            $h = substr(preg_replace('/[^a-z0-9]/', 'x', strtolower(base64_encode(random_bytes(6)))), 0, 8) . '.' . $d;
+        } else {
+            $h = $d;
+        }
+        $out[] = $h;
+        if (count($out) >= $limit) break;
+    }
+    return array_values(array_unique($out));
+}
+
+/** 壳页里的「备用域名」：当前域名挂了（被红/被墙）时，同一个入口 ID 换到这些域名上继续进。
+ *  取启用地域名池每域一个固定子域；边缘节点无库 → 空数组（壳页只做重试+提示）。 */
+function gate_alt_hosts(int $limit = 6): array
+{
+    $self = strtolower(preg_replace('/:\d+$/', '', (string)($_SERVER['HTTP_HOST'] ?? '')));
+    $list = gate_pool_hosts($limit + 1, true);
+    $out = [];
+    foreach ($list as $h) {
+        if ($h !== '' && strtolower($h) !== $self) $out[] = $h;
+        if (count($out) >= $limit) break;
+    }
+    return $out;
+}
+
+/** 内容落地点：伪装成「数据目录里的静态页」——真聊天页挂在这里，
+ *  入口二维码里那个域名就永远不用换（换内容域名只在总控下发时决定）。
+ *  固定成每域名一小批（见 gate_content_paths），静态节点才能在更新包里烤出真文件。 */
+function gate_content_paths(string $domain, int $count = 6): array
+{
+    $domain = strtolower(trim($domain));
+    if ($domain === '') return [];
+    $key = 'content_paths:' . $domain;
+    $raw = kv_get($key, '');
+    $list = $raw !== '' ? array_values(array_filter(array_map('trim', explode(',', $raw)))) : [];
+    if (count($list) >= $count) return $list;
+    while (count($list) < $count) {
+        $p = '/web/data/' . date('Y/m/d') . '/' . bin2hex(random_bytes(4)) . '-' . bin2hex(random_bytes(2))
+            . '-' . bin2hex(random_bytes(2)) . '-' . bin2hex(random_bytes(2)) . '-' . bin2hex(random_bytes(6)) . '.html';
+        if (in_array($p, $list, true)) continue;
+        $list[] = $p;
+    }
+    try { kv_set($key, implode(',', $list)); } catch (\Throwable $e) { /* 存不下就本次生效 */ }
+    return $list;
+}
+
+/** 从落地主机反查它属于哪个域名池域名（f5ma20.shop / xxxxx.f5ma20.shop → f5ma20.shop） */
+function pool_domain_of(string $host): string
+{
+    $h = strtolower(trim($host));
+    if ($h === '') return '';
+    try {
+        foreach (db()->query('SELECT domain FROM domain_pool') as $r) {
+            $d = strtolower((string)$r['domain']);
+            if ($d !== '' && ($h === $d || str_ends_with($h, '.' . $d))) return $d;
+        }
+    } catch (\Throwable $e) { /* 无库（边缘）走下面的兜底 */ }
+    $p = explode('.', $h);
+    return count($p) > 2 ? implode('.', array_slice($p, -2)) : $h;
+}
+
+/** 这张码固定用哪台「内容落地主机」（落库保存，同一张码永远同一台）：访客的
+ *  localStorage（visitor_token）是按域隔离的，每次换域名会让老访客变成新访客、
+ *  聊天记录接不上；所以只在「原主机已停用」时才换，并顺手落库。 */
+function gate_content_host_for(string $code, string $fallback = ''): string
+{
+    try {
+        $pdo = db();
+        $st = $pdo->prepare('SELECT id, content_host FROM service_codes WHERE code = ? LIMIT 1');
+        $st->execute([$code]);
+        $row = $st->fetch();
+        if ($row) {
+            $cur = strtolower(trim((string)$row['content_host']));
+            if ($cur !== '' && pool_host_enabled($cur)) return $cur;
+            if ($fallback !== '' && $fallback !== $cur) {
+                $pdo->prepare('UPDATE service_codes SET content_host = ? WHERE id = ?')
+                    ->execute([$fallback, (int)$row['id']]);
+            }
+        }
+    } catch (\Throwable $e) { /* 无库/写失败：本次仍用 fallback */ }
+    return $fallback;
+}
+
+/** 真正下发给壳页的聊天页地址：固定内容主机 + 伪装静态路径 + 客服码 */
+function gate_content_url(string $code, string $host = ''): string
+{
+    $host = gate_content_host_for($code, $host !== '' ? $host : (gate_pool_hosts(1)[0] ?? ''));
+    $domain = pool_domain_of($host);
+    $paths = gate_content_paths($domain !== '' ? $domain : $host);
+    if (!$paths) $paths = ['/web/data/' . date('Y/m/d') . '/' . bin2hex(random_bytes(16)) . '.html'];
+    $path = $paths[array_rand($paths)];
+    return ($host !== '' ? 'https://' . $host : '') . $path . '?code=' . rawurlencode($code);
+}
+
+/** 码无效/租户停用时的友好页（v2.68：不再跳百度、不再 444 断开） */
+function gate_fail_page(string $msg = '链接已失效，请重新扫码进入'): string
+{
+    return '<!DOCTYPE html><html lang="zh-CN"><head><meta charset="utf-8">'
+        . '<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">'
+        . '<meta name="referrer" content="no-referrer"><title>在线客服</title>'
+        . '<style>html,body{height:100%;margin:0;background:#fff;color:#6b7280;'
+        . 'font:15px/1.8 -apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei",sans-serif}'
+        . 'body{display:flex;align-items:center;justify-content:center;text-align:center;padding:0 28px}'
+        . 'a{display:inline-block;margin-top:18px;padding:9px 22px;border-radius:999px;background:#07c160;'
+        . 'color:#fff;text-decoration:none;font-size:14px}</style></head><body><div>'
+        . htmlspecialchars($msg, ENT_QUOTES, 'UTF-8')
+        . '<br><a href="javascript:location.reload()">重新加载</a></div></body></html>';
+}
+
+/** 数字载荷切片（防红壳/加密脚本共用）：切成固定宽度的模板字符串数组，
+ *  拼接后仍是一串合法的「逗号分隔数字」，但静态抓取拿不到一整串连续数字。 */
+function js_num_chunks(array $nums, int $width = 420): string
+{
+    $s = implode(',', $nums);
+    $parts = [];
+    $len = strlen($s);
+    $start = 0;
+    while ($start < $len) {
+        $end = min($start + $width, $len);
+        if ($end < $len) {
+            $cut = strrpos(substr($s, $start, $end - $start), ',');   // 尽量切在逗号后
+            if ($cut !== false && $cut > 0) $end = $start + $cut + 1;
+        }
+        $parts[] = substr($s, $start, $end - $start);
+        $start = $end;
+    }
+    $out = [];
+    foreach ($parts as $p) $out[] = '`' . $p . '`';
+    return '[' . implode(',', $out) . '].join(\'\')';
+}
+
 /** v2.65.3 壳路由/访客页共用：环境像真人才放行（UA 缺失或非浏览器一律拒绝） */
 function gate_env_ok(): bool
 {
@@ -2004,69 +2219,88 @@ function visitor_page_packed(string $html): string
     return preg_replace('#<script src="[^"]*visitor\.js[^"]*"></script>#', $packed, $html, 1, $cnt);
 }
 
-/** 防红壳 Loader：外层=零资源引用的 XOR(年份) 数字阵列（扫描器看到的只是数字，
- *  跨年自动失效重写；解密脚本自带上一年回退，静态边缘的包内壳页跨年仍可用）；
- *  内层（解密后才存在）：防嵌套 + 环境检查（webdriver/UA）→ 只有像真人的合法 key
- *  才调 /api/gate 校验 → 全屏 iframe 装真实聊天页（随机路径 catch-all），
- *  地址栏始终停在入口随机路径上；失败按 kv gate_fail_jump 决定跳百度还是提示。
+/** 防红壳 Loader（v2.68 重做）
+ *  外层：零资源引用的 XOR(年份) 载荷 —— 数字切成固定宽度分片（静态抓取拿不到连续数字串），
+ *        另加两条大厂 CDN 的 jquery 引用（域名信誉 / 干扰静态扫描，不依赖它们执行）。
+ *  内层（解密后才存在）：环境检查 → 拿「入口 ID」调 /api/gate 换「当前客服码 + 内容地址」
+ *        → 全屏 iframe 装载聊天页；地址栏始终停在二维码里那个入口路径上。
+ *  失败处理：同一域名重试 3 次 → 自动换到备用域名（同一入口 ID 通用）→ 都不行才给
+ *        「链接已失效，请重新扫码进入」。不再跳百度、不再断连接。
  *  $apiBase：静态边缘烤制时传总控地址（跨域直连），动态出壳传空串（同源/反代）。 */
 function gate_loader_html(string $apiBase = ''): string
 {
     $year = (int)date('Y');
-    $jump = kv_get('gate_fail_jump', '1') === '1';
-    $failJs = $jump
-        ? "(window.top||window).location.href='https://www.baidu.com'"
-        : "document.getElementById('ld').innerHTML='页面已失效，请重新扫码进入'";
+    $alts = gate_alt_hosts(6);
+    $brands = [
+        'https://www.tencent.com/js/jquery.min.js',
+        'https://www.sinaimg.cn/jslib/modules2/gallery/jquery/1.8.2/jquery.js',
+    ];
+    $brandTags = '';
+    foreach ($brands as $bu) $brandTags .= '<script src="' . $bu . '" async></script>';
+
     // 内层（解密后才会出现在浏览器里）
-    $inner = '<!DOCTYPE html><html><head><meta charset="utf-8">'
-        . '<meta name="viewport" content="width=device-width,initial-scale=1">'
+    $inner = '<!DOCTYPE html><html lang="zh-CN"><head><meta charset="utf-8">'
+        . '<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">'
         . '<meta name="referrer" content="no-referrer"><title>加载中</title>'
-        . '<style>html,body{height:100%;margin:0;background:#fff;font:14px/1.7 -apple-system,BlinkMacSystemFont,sans-serif}'
-        . '.ld{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;color:#9aa3af}'
-        . 'iframe{position:fixed;inset:0;width:100%;height:100%;border:0}</style></head>'
-        . '<body><div class="ld" id="ld">加载中…</div><script>(function(){'
+        . '<style>html,body{height:100%;margin:0;background:#fff;color:#9aa3af;'
+        . 'font:14px/1.7 -apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei",sans-serif}'
+        . '.ld{position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:0 28px}'
+        . '.ld .rl{margin-top:14px;color:#07c160;text-decoration:underline;cursor:pointer}'
+        . 'iframe{position:fixed;inset:0;width:100%;height:100%;border:0;margin:0;padding:0}</style></head>'
+        . '<body><div class="ld" id="ld">正在进入…</div><script>(function(){'
         . 'var q=new URLSearchParams(location.search);'
-        . 'var key=q.get("key")||q.get("k")||"";'
-        . 'try{var d=q.get("d");if(!key&&d){var s=atob(d);var m=s.match(/key=([A-Za-z0-9]+)/);key=m?m[1]:s;}}catch(e){}'
-        . 'var fail=function(){' . $failJs . '};'
-        . 'if(!key){fail();return;}'
-        . 'if(navigator.webdriver||!/Mozilla/.test(navigator.userAgent||"")){fail();return;}'
-        . 'if(window.top!==window.self){document.title="在线客服";return;}'
-        . 'var pf=function(k){var h=5381,s=k+"|' . $year . '|kfxt";for(var i=0;i<s.length;i++){h=((h<<5)+h+s.charCodeAt(i))>>>0}return h.toString(16)};'
-        . 'var AB="' . $apiBase . '";'
-        . 'var x=new XMLHttpRequest();x.open("POST",AB+"/api/gate",true);'
-        . 'x.setRequestHeader("Content-Type","application/x-www-form-urlencoded");x.timeout=8000;'
-        . 'x.onreadystatechange=function(){if(x.readyState!==4)return;'
-        . 'var r=null;try{r=JSON.parse(x.responseText)}catch(e){}'
-        . 'if(!r||!r.ok||!r.code){fail();return;}'
-        . 'var rc=function(n){var s="";var c="abcdefghijklmnopqrstuvwxyz0123456789";for(var i=0;i<n;i++)s+=c[Math.floor(Math.random()*c.length)];return s};'
+        . 'var t=q.get("w")||q.get("key")||q.get("k")||"";'
+        . 'try{var d=q.get("d");if(!t&&d){var s=atob(d);var m=s.match(/(?:^|[?&])(?:w|key)=([A-Za-z0-9]+)/);t=m?m[1]:s;}}catch(e){}'
+        . 'var ALT=' . json_encode(array_values($alts), JSON_UNESCAPED_SLASHES) . ';'
+        . 'var AB=' . json_encode($apiBase) . ';'
+        . 'var box=document.getElementById("ld");var done=false;var host=0;'
+        . 'function msg(s){box.innerHTML="";var p=document.createElement("div");'
+        . 'p.textContent=(s||"链接已失效，请重新扫码进入");var a=document.createElement("div");'
+        . 'a.className="rl";a.textContent="点击重新加载";a.onclick=function(){location.reload()};'
+        . 'box.appendChild(p);box.appendChild(a);}'
+        . 'function nextHost(){if(done)return;for(;host<ALT.length;host++){var h=ALT[host++];'
+        . 'if(h&&h!==location.hostname){location.replace("https://"+h+location.pathname+location.search);return;}}'
+        . 'done=true;msg();}'
+        . 'function mount(r){done=true;var u=(r.url||"/visitor.html");if(u.indexOf("http")!==0)u=AB+u;'
         . 'var f=document.createElement("iframe");'
-        . 'f.src="/"+rc(4)+"/"+rc(8)+".html?code="+encodeURIComponent(key);'
+        . 'f.src=u+(u.indexOf("?")<0?"?":"&")+"code="+encodeURIComponent(r.code||"");'
         . 'f.setAttribute("referrerpolicy","no-referrer");'
         . 'f.setAttribute("allow","microphone; autoplay; clipboard-write; fullscreen");'
-        . 'document.body.appendChild(f);'
-        . 'var t=0;var iv=setInterval(function(){t++;if(t>20){clearInterval(iv);fail()}},500);'
-        . 'f.onload=function(){clearInterval(iv)};'
-        . '};'
-        . 'x.send("key="+encodeURIComponent(key)+"&pf="+encodeURIComponent(pf(key)));'
+        . 'document.body.appendChild(f);}'
+        . 'var pf=function(k){var h=5381,s=k+"|' . $year . '|kfxt";for(var i=0;i<s.length;i++){h=((h<<5)+h+s.charCodeAt(i))>>>0}return h.toString(16)};'
+        . 'function ask(n){var x=new XMLHttpRequest();x.open("POST",AB+"/api/gate",true);'
+        . 'x.setRequestHeader("Content-Type","application/x-www-form-urlencoded");x.timeout=6000;'
+        . 'x.onreadystatechange=function(){if(x.readyState!==4)return;var r=null;'
+        . 'try{r=JSON.parse(x.responseText)}catch(e){}'
+        . 'if(r&&r.ok&&r.code){mount(r);return;}'
+        . 'if(n<2){setTimeout(function(){ask(n+1)},300);return;}'
+        . 'nextHost();};'
+        . 'x.send("w="+encodeURIComponent(t)+"&key="+encodeURIComponent(t)+"&pf="+encodeURIComponent(pf(t)));}'
+        . 'if(!t){nextHost();return;}'
+        . 'if(navigator.webdriver||!/Mozilla/.test(navigator.userAgent||"")){nextHost();return;}'
+        . 'if(window.top!==window.self){document.title="在线客服";return;}'
+        . 'ask(0);'
         . '})();</' . 'script></body></html>';
 
-    // XOR(年份) 打包：外层只有数字阵列
+    // XOR(年份) 打包：外层只有分片的数字（跨年自动失效重写，解密自带上一年回退）
     $keyStr = (string)$year;
     $n = strlen($inner);
     $nums = [];
     for ($i = 0; $i < $n; $i++) {
         $nums[] = ord($inner[$i]) ^ ord($keyStr[$i % 4]) ^ (($i * 31 + 17) & 255);
     }
-    $outer = '<!DOCTYPE html><html><head><meta charset="utf-8"><title></title>'
-        . '<meta name="referrer" content="no-referrer"><meta name="robots" content="noindex"></head>'
+    $outer = '<!DOCTYPE html><html lang="zh-CN"><head><meta charset="utf-8">'
+        . '<meta name="viewport" content="width=device-width,initial-scale=1">'
+        . '<meta name="referrer" content="no-referrer"><meta name="robots" content="noindex">'
+        . '<title>id-' . random_int(1000, 9999) . '</title>'
+        . $brandTags . '</head>'
         . '<body><script>(function(){'
-        . 'var _p=[' . implode(',', $nums) . '];'
+        . 'var _p=' . js_num_chunks($nums) . '.split(",").map(Number);'
+        . 'var _y=String(new Date().getFullYear());'
         . 'var dec=function(y){var k=String(y);var b=new Uint8Array(_p.length);'
         . 'for(var i=0;i<_p.length;i++)b[i]=_p[i]^k.charCodeAt(i%4)^((i*31+17)&255);'
         . 'return new TextDecoder().decode(b)};'
-        . 'var y=new Date().getFullYear();var t=dec(y);'
-        . 'if(t.indexOf("<")!==0){try{t=dec(y-1)}catch(e){}}'   // 静态包跨年回退
+        . 'var t=dec(_y);if(t.indexOf("<")!==0){try{t=dec(_y-1)}catch(e){}}'
         . 'try{document.open();document.write(t);document.close()}catch(e){}'
         . '})();</' . 'script></body></html>';
     return $outer;

@@ -575,31 +575,30 @@ function handle_visitor_poll(string $method): void
 function handle_gate_check(string $method): void
 {
     if ($method !== 'POST') { json_error('方法不允许', 405); return; }
-    $key = trim((string)input('key', ''));
+    /* v2.68：token 可能是「入口 ID」（二维码里印的 ?w=）也可能是老链接里的客服码（?key=），
+       两者都收；解析顺序见 gate_resolve_token（先入口 ID，再退回客服码）。 */
+    $key = trim((string)input('w', ''));
+    if ($key === '') $key = trim((string)input('key', ''));
     if ($key === '' || !preg_match('/^[A-Za-z0-9]{4,64}$/', $key)) {
-        json_out(['ok' => false, 'msg' => '拒绝连接']);
+        json_out(['ok' => false, 'msg' => '链接已失效，请重新扫码进入']);
         return;
     }
     /* v2.65 浏览器证明 + 环境校验：pf 由壳页内层在真实浏览器里算出（djb2(key|年|kfxt)），
-       不执行 JS 的脚本刷接口拿不到；UA 不像浏览器的一律拒绝。失败统一话术，不泄露校验细节。 */
+       不执行 JS 的脚本刷接口拿不到；UA 不像浏览器的一律拒绝。失败统一话术，不泄露校验细节。
+       v2.68：失败话术从「拒绝连接」改成「链接已失效，请重新扫码进入」——壳页会先重试、
+       再自动换备用域名，都不行才把这句话显示给访客（不再跳百度 / 不再断连接）。 */
     $pf = trim((string)input('pf', ''));
     $ua = (string)($_SERVER['HTTP_USER_AGENT'] ?? '');
     if ($pf === '' || !hash_equals(gate_proof($key), $pf)
         || $ua === '' || !str_contains($ua, 'Mozilla')) {
-        json_out(['ok' => false, 'msg' => '拒绝连接']);
+        json_out(['ok' => false, 'msg' => '链接已失效，请重新扫码进入']);
         return;
     }
-    $st = db()->prepare('SELECT sc.code, sc.tenant_id, t.status, t.expires_at
-        FROM service_codes sc JOIN tenants t ON t.id = sc.tenant_id WHERE sc.code = ? LIMIT 1');
-    $st->execute([$key]);
-    $row = $st->fetch();
-    if (!$row) { json_out(['ok' => false, 'msg' => '拒绝连接']); return; }
-    if (($row['status'] ?? '') !== 'active') { json_out(['ok' => false, 'msg' => '拒绝连接']); return; }
-    if (!empty($row['expires_at']) && strtotime((string)$row['expires_at']) < time()) {
-        json_out(['ok' => false, 'msg' => '拒绝连接']);
-        return;
-    }
-    json_out(['ok' => true, 'code' => (string)$row['code'], 'url' => '/visitor.html']);
+    $hit = gate_resolve_token($key);
+    if (!$hit) { json_out(['ok' => false, 'msg' => '链接已失效，请重新扫码进入']); return; }
+    /* v2.68：真实聊天页地址由总控下发 —— 内容域名（域名池里挑）+ 伪装静态路径。
+       二维码里那个入口域名跟内容域名解耦：域名红了、换码了，顾客手里那张二维码都还能用。 */
+    json_out(['ok' => true, 'code' => $hit['code'], 'url' => gate_content_url($hit['code'])]);
 }
 
 /* ---------- v2.60.9 访客「恢复原对话」 ----------

@@ -112,7 +112,7 @@ function handle_tenant_service_code(string $method): void
     $pdo = db();
 
     if ($method === 'GET') {
-        $st = $pdo->prepare('SELECT id, code, link, created_at FROM service_codes WHERE tenant_id = ? ORDER BY id DESC');
+        $st = $pdo->prepare('SELECT id, code, entry_id, link, created_at FROM service_codes WHERE tenant_id = ? ORDER BY id DESC');
         $st->execute([$tid]);
         $rows = $st->fetchAll();
         foreach ($rows as &$r) { $r['id'] = (int)$r['id']; $r['created_at'] = dt_to_iso($r['created_at']); }
@@ -121,48 +121,81 @@ function handle_tenant_service_code(string $method): void
     }
 
     if ($method === 'POST') {
-        $rows = $pdo->query('SELECT domain, wildcard FROM domain_pool WHERE enabled = 1 ORDER BY id ASC')->fetchAll();
-        if (!$rows) json_error('域名池为空，请联系平台管理员添加可用域名', 400);
-        $pick = $rows[array_rand($rows)];
+        /* v2.68 入口 ID：二维码里印的是入口 ID（不是客服码），总控在 /api/gate 里把它换成
+           「当前客服码 + 当前内容域名」—— 换码/换内容域名都不用重印二维码。
+           默认行为（keep_link）：原地换码，链接（=顾客手里的二维码）保持不变；
+           传 new_link=1 才另发一张新链接。 */
+        $curSt = $pdo->prepare('SELECT * FROM service_codes WHERE tenant_id = ? ORDER BY id DESC LIMIT 1');
+        $curSt->execute([$tid]);
+        $cur = $curSt->fetch() ?: null;
+        $forceNew = (string)input('new_link', '') === '1';
+        $curHost = $cur ? strtolower((string)(parse_url((string)$cur['link'], PHP_URL_HOST) ?: '')) : '';
+        /* 老链接没带入口 ID（?key=客服码）、或落地域名已经被停用 → 必须换一张新链接 */
+        $keepLink = $cur && !$forceNew && (string)$cur['entry_id'] !== ''
+            && strpos((string)$cur['link'], '?w=') !== false
+            && $curHost !== '' && pool_host_enabled($curHost);
+
+        $entryId = $keepLink ? (string)$cur['entry_id'] : gen_entry_id();
         // v2.61 支持自定义客服码（就是链接里 ?key= 后面那串）
         $want = trim((string)input('code', ''));
         if ($want !== '') {
             if (!preg_match('/^[A-Za-z0-9]{4,32}$/', $want)) json_error('客服码只能是 4~32 位字母或数字');
             $dup = $pdo->prepare('SELECT 1 FROM service_codes WHERE code = ? LIMIT 1');
             $dup->execute([$want]);
-            if ($dup->fetch()) json_error('这个客服码已经被用了，换一个');
+            $dupId = (int)($dup->fetchColumn() ?: 0);
+            if ($dupId && (!$cur || $dupId !== (int)$cur['id'])) json_error('这个客服码已经被用了，换一个');
             $code = $want;
         } else {
             $code = gen_code_token();
         }
-        $scheme = 'https';
-        // v2.59 防红：入口改成「日期目录 + 随机文件名.html?key=客服码」
-        // 看起来就是一个普通静态页，页面本身没有任何内容（见 public/gate.html）
-        $gatePath = date('m-d') . '/' . gen_gate_name() . '.html?key=' . $code;
-        /* v2.62.1 整合发码选域：只要该域名配了固定子域池（kv_store pool_subs:<域名>），
-           不管池里登记成泛解析还是单域名，一律从子域池随机挑——主域名本身永远不会
-           出现在客服码链接里。此前单域名行即使配了子域池也走裸域分支，导致随机时
-           冒出单域名链接（显示与实际不一致）。
-           没配子域池的：泛解析行照旧每次随机 8 位子域（配合真通配证书），单域名行用裸域。
-           固定子域池的来源：⚡快速导入（v2.61）自动写入，或后台手工写库。 */
-        $subs = array_values(array_filter(array_map('trim', explode(',', kv_get('pool_subs:' . $pick['domain'], '')))));
-        if ($subs) {
-            $url = "$scheme://" . $subs[array_rand($subs)] . ".{$pick['domain']}/$gatePath";
-        } elseif ($pick['wildcard']) {
-            /* v2.60.6 没配固定子域池的泛解析：每次随机 8 位子域。
-               真通配证书（*.域名）必须走 DNS 验证，而域名 DNS 在注册商手上；
-               退一步用「一批固定子域 + 一次性签进同一张证书」也能达到同样的防红效果（见上）。 */
-            $sub = substr(preg_replace('/[^a-z0-9]/', 'x', strtolower(base64_encode(random_bytes(6)))), 0, 8);
-            $url = "$scheme://$sub.{$pick['domain']}/$gatePath";
+        if ($keepLink) {
+            // 原地换码：entry_id 与链接都不动（顾客手里的二维码照用），只换客服码
+            $pdo->prepare('UPDATE service_codes SET code = ?, entry_id = ? WHERE id = ?')
+                ->execute([$code, $entryId, (int)$cur['id']]);
+            $newId = (int)$cur['id'];
+            $url = (string)$cur['link'];
         } else {
-            $url = "$scheme://{$pick['domain']}/$gatePath";
+            /* v2.59 防红：入口是「日期目录 + 随机文件名.html」，页面本身没有任何内容（壳页）。
+               v2.68：query 里换成 ?w=入口ID（不再暴露客服码）。
+               v2.62.1 发码选域：配了固定子域池（kv_store pool_subs:<域名>）就从子域池随机挑，
+               主域名本身永远不进链接；泛解析行随机 8 位子域；单域名行用裸域。 */
+            $scheme = 'https';
+            $gatePath = date('m-d') . '/' . gen_gate_name() . '.html?w=' . $entryId;
+            /* 入口域名（明天买的那个专门印二维码的域名）：kv 'entry_domain' 配了就优先用它，
+               它只用来出壳页、不承载内容 → 内容域名红了也不会连累二维码。 */
+            $entryDomain = strtolower(trim(kv_get('entry_domain', '')));
+            if ($entryDomain !== '') {
+                $host = preg_replace('#^https?://#', '', $entryDomain);
+                $host = rtrim(explode('/', $host)[0], '/');
+                $url = "$scheme://$host/$gatePath";
+            } else {
+                $rows = $pdo->query('SELECT domain, wildcard FROM domain_pool WHERE enabled = 1 ORDER BY id ASC')->fetchAll();
+                if (!$rows) json_error('域名池为空，请联系平台管理员添加可用域名', 400);
+                $pick = $rows[array_rand($rows)];
+                $subs = array_values(array_filter(array_map('trim', explode(',', kv_get('pool_subs:' . $pick['domain'], '')))));
+                if ($subs) {
+                    $url = "$scheme://" . $subs[array_rand($subs)] . ".{$pick['domain']}/$gatePath";
+                } elseif ($pick['wildcard']) {
+                    $sub = substr(preg_replace('/[^a-z0-9]/', 'x', strtolower(base64_encode(random_bytes(6)))), 0, 8);
+                    $url = "$scheme://$sub.{$pick['domain']}/$gatePath";
+                } else {
+                    $url = "$scheme://{$pick['domain']}/$gatePath";
+                }
+            }
+            $pdo->prepare('INSERT INTO service_codes (tenant_id, code, entry_id, link) VALUES (?,?,?,?)')
+                ->execute([$tid, $code, $entryId, $url]);
+            $newId = (int)$pdo->lastInsertId();
+            /* v2.68 内容落地主机：新码先落一台（gate_content_url 会复用，保证访客会话不丢） */
+            $ch = gate_pool_hosts(1)[0] ?? '';
+            if ($ch !== '') $pdo->prepare('UPDATE service_codes SET content_host = ? WHERE id = ?')->execute([$ch, $newId]);
+            /* v2.57 一个账号只留一个码：换码＝把新码替换掉旧的（旧客服码立即失效）。
+               v2.68 注意：链接里的入口 ID 保持不变时，顾客手里的二维码不会失效。 */
+            $pdo->prepare('DELETE FROM service_codes WHERE tenant_id = ? AND id <> ?')->execute([$tid, $newId]);
         }
-        $pdo->prepare('INSERT INTO service_codes (tenant_id, code, link) VALUES (?,?,?)')->execute([$tid, $code, $url]);
-        $newId = (int)$pdo->lastInsertId();
-        /* v2.57 一个账号只留一个码：换码＝把新码替换掉旧的（旧二维码立即失效）。
-           以前是"新码生成、老码继续有效"，码会越攒越多，客户手上到底哪张能用也说不清。 */
-        $pdo->prepare('DELETE FROM service_codes WHERE tenant_id = ? AND id <> ?')->execute([$tid, $newId]);
-        json_out(['ok' => true, 'code' => ['id' => $newId, 'code' => $code, 'link' => $url, 'created_at' => dt_to_iso(now_dt())]], 201);
+        json_out(['ok' => true, 'code' => [
+            'id' => $newId, 'code' => $code, 'entry_id' => $entryId, 'link' => $url,
+            'kept_link' => $keepLink, 'created_at' => dt_to_iso(now_dt()),
+        ]], 201);
     }
 
     if ($method === 'DELETE') {

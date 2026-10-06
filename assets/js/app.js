@@ -843,9 +843,9 @@ const app = createApp({
             '<div style="line-height:1.9;">检测到 <b>' + list.length + '</b> 个客服码已被微信拦截（俗称"红了"）：'
             + '<div style="margin:8px 0;padding:8px 10px;background:#fff8e6;border-radius:8px;font-size:13px;">' + detail
             + (list.length > 6 ? ('<br>…共 ' + list.length + ' 个') : '') + '</div>'
-            + '建议去「客服码」页点「立即换码 / 新码」换一条。<br>'
-            + '<b>注意：换码后旧码立即失效</b>，记得把新的二维码重新发给客户；<br>'
-            + '如果连域名都被拦（整批都红），那要换域名才行。</div>',
+            + '建议去「客服码」页点「立即换码」——会换一条新的链接（换掉被拦的域名），<br>'
+            + '<b>旧二维码同时作废，记得把新的重新发给客户</b>。<br>'
+            + '（链接里印的是「入口 ID」：以后正常换码不会再动二维码，只有真红了的这一下才需要重发。）</div>',
             '⚠️ 有客服码被微信拦截',
             { confirmButtonText: '去客服码页处理', type: 'warning', dangerouslyUseHTMLString: true });
           go = true;
@@ -1844,7 +1844,7 @@ const app = createApp({
     const copy = (s) => { navigator.clipboard && navigator.clipboard.writeText(s); ElementPlus.ElMessage.success('已复制'); };
     const createLink = async () => { try { await API.post('/api/tenant/link'); ElementPlus.ElMessage.success('已生成'); await loadLinks(); } catch (e) { ElementPlus.ElMessage.error(e.message); } };
     const renewLink = async () => { try { await API.post('/api/tenant/link/renew'); ElementPlus.ElMessage.success('已更换'); await loadLinks(); } catch (e) { ElementPlus.ElMessage.error(e.message); } };
-    const newCode = async () => { try { await API.post('/api/tenant/service-code'); ElementPlus.ElMessage.success('已生成新客服码（旧码已失效，请把新二维码重新发给客户）'); await loadLinks(); } catch (e) { ElementPlus.ElMessage.error(e.message); } };
+    const newCode = async () => { try { await API.post('/api/tenant/service-code'); ElementPlus.ElMessage.success('已换新码（二维码链接不变，顾客手里那张照用）'); await loadLinks(); } catch (e) { ElementPlus.ElMessage.error(e.message); } };
     const delCode = async (c) => { try { await API.del('/api/tenant/service-code?code=' + c.code); await loadLinks(); } catch (e) { ElementPlus.ElMessage.error(e.message); } };
     const blockSession = async () => {
       if (!currentId.value) return;
@@ -2813,15 +2813,23 @@ const app = createApp({
         document.body.appendChild(a); a.click(); a.remove();
       } catch (e) { ElementPlus.ElMessage.error('海报生成失败：' + (e.message || e)); }
     };
-    // v2.64 永远只生成新客服码（专属链接功能已废弃，不再走 renew 分支）
-    // v2.57 一个账号只留一个码：换码＝替换（旧码立即失效）
-    const codeRotateHint = Vue.computed(() => '换一条新的客服码？\n\n旧码会立即失效，客户手上那张旧二维码就打不开了——换完记得把新的重新发出去。');
+    /* v2.68 入口 ID：二维码链接里的 ?w= 是「入口 ID」（不是客服码），总控在 /api/gate 里
+       把它换成本次要用的客服码 + 内容域名 —— 所以：
+         ·「新码 / 立即换码」= 原地换码：链接（=顾客手里的二维码）**保持不变**，只是背后换了码；
+         ·「换新链接」= 真换一张二维码（旧二维码作废）。 */
+    const codeRotateHint = Vue.computed(() => '换一条新的客服码？\n\n顾客手里那张二维码不受影响（链接里是入口 ID，换码后照常能进），不用重新发。\n如果确实要换一张全新的二维码，用右边的「换新链接」。');
     const rotateCode = async () => {
       try {
-        await API.post('/api/tenant/service-code');
-        /* v2.60.22 文案修正：现在是「一人一码、换码即替换」，旧码**立刻失效**，
-           原来那句「老码仍可用」是旧逻辑留下来的，会误导人以为还能继续发旧二维码。 */
-        ElementPlus.ElMessage.success('已生成新客服码（旧码已失效，请把新二维码重新发给客户）');
+        await API.post('/api/tenant/service-code', { new_link: 0 });
+        ElementPlus.ElMessage.success('已换新码（二维码链接不变，顾客手里那张照用）');
+        await loadLinks(); renderMainQr(); checkCode(true);
+      } catch (e) { ElementPlus.ElMessage.error(e.message); }
+    };
+    /** 真换一张二维码：作废旧链接（顾客需要重新扫码） */
+    const rotateLink = async () => {
+      try {
+        await API.post('/api/tenant/service-code', { new_link: 1 });
+        ElementPlus.ElMessage.success('已生成新链接——旧二维码作废，请把新的重新发给客户');
         await loadLinks(); renderMainQr(); checkCode(true);
       } catch (e) { ElementPlus.ElMessage.error(e.message); }
     };
@@ -3067,7 +3075,7 @@ const app = createApp({
       presetPng, pickPosterPresetImg,
       POSTER_POS, qrFreeStyle, qrLayerStyle, textStyle,
       cropDlg, cropSrc, cropZoomPct, cropStage, cropStyle, cropImgLoaded, cropDown, cropMove, cropUp, cropWheel, cropClose, openCrop, cropConfirm, avatarPreview,
-      geoTag, visitorTag, visitorTagFull, visitorChnClass, copyQrImage, downloadQrImage, codeRotateHint, rotateCode, loadHistory, disableLink, saveCodeCfg, meAvatarUrl,
+      geoTag, visitorTag, visitorTagFull, visitorChnClass, copyQrImage, downloadQrImage, codeRotateHint, rotateCode, rotateLink, loadHistory, disableLink, saveCodeCfg, meAvatarUrl,
       quickFields, welcomeFields, autoFields, blFields, preqFields,
       shortTime, fmtTime, sourceText, contactLabel, barW, quotaW, trendW, trendDesc, dailyDesc,
       sessTime,
