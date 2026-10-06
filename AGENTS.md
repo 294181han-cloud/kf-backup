@@ -76,6 +76,8 @@
 ## 5. 协作与部署流程（两人 + AI）
 
 1. **开工先 `git pull`**——两人同时改 `assets/js/app.js` 之类热点文件时，先同步再改，改完尽快推。
+   - **发版前先合并同事的分支**：`git fetch --prune` → `git branch -r` 看 `origin/feat-*`，有未合并的先 `git merge origin/<分支>` 再发版。
+     漏合 = 下次 `git reset --hard origin/main` 会把同事的改动静默丢掉。（合并只动后台的改动对正在使用的客服码无影响，不会重置 `service_codes`。）
 2. **小步提交**：一个提交只做一件事（修 bug / 加功能 / 重构分开），message 用 `类型: 描述`（见 git log 惯例）。
 3. **推送 = 自动部署到生产**（webhook → 服务器 git pull）。禁止推送未验证的代码。
 4. **验证三步**（AI 改动后同样适用）：

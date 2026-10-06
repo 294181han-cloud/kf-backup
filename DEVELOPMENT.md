@@ -110,6 +110,8 @@
 ## 6. 日常开发流程（每次改动）
 
 ```
+0. git fetch --prune：先确认没有同事的未合并分支（git branch -r / git ls-remote --heads origin 看 origin/feat-*）
+   有就先 git merge origin/<分支> 合进 main 再发版——漏合 = 下次 git reset --hard origin/main 会把同事的改动静默丢掉
 1. git pull（多人协作先同步）
 2. 改代码（改哪类需求动哪个目录，见第 2 节地图）
 3. 本地冒烟（如涉及页面/接口）
@@ -123,6 +125,8 @@
 
 - 版本号：每次**功能级发布** version.php +1；纯修复/文档可不 bump
 - 分控配置变更（hosts 段）：随代码 push 全网生效，无需登录各节点
+- **发版前必查同事分支**：`git fetch --prune && git branch -r`，把 `origin/feat-*` 先合进 main 再发版
+  （合并只涉及后台功能的改动，对正在使用的客服码**无影响**——不会重置 `service_codes`，旧码照常可用）
 
 ## 7. 数据与状态归属
 
