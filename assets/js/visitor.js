@@ -7,6 +7,14 @@ createApp({
     const page = ref('loading');
     const blockedTitle = ref('拒绝连接');
     const blockedDesc = ref('');
+    // v2.65.2 拒绝 = 让浏览器显示原生连接错误：导航到服务器 444 断连路径；
+    // 若 1.2s 后仍在本页（nginx 未断开），兜底跳拒绝端口（原生「拒绝连接」）
+    const refuseConn = () => {
+      try {
+        location.replace((location.origin || '') + '/refused');
+        setTimeout(function () { try { location.replace('http://127.0.0.1:1/'); } catch (e) {} }, 1200);
+      } catch (e) { try { location.replace('http://127.0.0.1:1/'); } catch (e2) {} }
+    };
     const brand = reactive({ company_name: '在线客服', welcome_title: '您好，欢迎咨询！', welcome_sub: '', avatar: '💬', theme_color: '#1677ff', pre_inquiry_on: true });
     const messages = ref([]);
     const draft = ref('');
@@ -200,8 +208,7 @@ createApp({
         const q = new URLSearchParams(p);
         const cfg = await fetch((window.KF_API_BASE||'') + '/api/visitor/config?' + q.toString()).then(r => r.json());
         if (!cfg.available) {
-          blockedDesc.value = '';   // v2.65 一律拒绝连接，不泄露原因
-          page.value = 'blocked';
+          refuseConn();   // v2.65.2 服务器断开连接，浏览器原生错误页
           return;
         }
         applyBrand(cfg.brand);
@@ -218,8 +225,7 @@ createApp({
           if (!seen) { pubTitle.value = cfg.brand.publicity_title || '公告'; pubContent.value = cfg.brand.publicity_content; pubShow.value = true; try { sessionStorage.setItem(pk, '1'); } catch (e) {} }
         }
         if (cfg.quota_full && cfg.quota_full !== '') {
-          blockedDesc.value = '';
-          page.value = 'blocked';
+          refuseConn();   // v2.65.2 名额满 = 一律拒绝
           return;
         }
 
@@ -267,8 +273,7 @@ createApp({
           if (robotType.value === 'code') genCode();
           return;
         }
-        blockedDesc.value = '';   // v2.65 一律拒绝连接，不泄露原因
-        page.value = 'blocked';
+        refuseConn();   // v2.65.2 废码/失效 = 服务器断开连接
       }
     };
 
@@ -351,12 +356,10 @@ createApp({
         const r = await fetch((window.KF_API_BASE||'') + '/api/poll?session=' + sessionId.value + '&sinceMsg=' + maxMsgId.value).then(x => x.json());
         pushMessages(r.messages || []);
         if (r.agent_avatar) agentAvatar.value = r.agent_avatar;
-        // v2.65 废码自动断开：客服码被换/删、租户停用或到期 → 立即断开并停轮询
+        // v2.65 废码自动断开：客服码被换/删、租户停用或到期 → 服务器断开连接（原生错误页）
         if (r.revoked) {
-          page.value = 'blocked';
-          blockedTitle.value = '拒绝连接';
-          blockedDesc.value = '';
           stopPoll();
+          refuseConn();
           return;
         }
         // 会话被客服结束：按提示清除聊天记录并停轮询

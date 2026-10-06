@@ -218,6 +218,12 @@ $uri = parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH) ?: '/';
 $uri = rtrim($uri, '/');
 if ($uri === '') $uri = '/';
 
+/* ---------- v2.65.2 服务器断连拒绝：PHP 返回 444，nginx 对上游 444 直接断开连接不回任何字节，
+   浏览器显示原生「无法访问此页面 · 似乎服务器关闭了连接」（ERR_EMPTY_RESPONSE）。
+   拒绝入口统一走 /refused；PHP 内部拒绝也直接 http_response_code(444)。 ---------- */
+if ($uri === '/refused' || $uri === '/__refused__') { http_response_code(444); exit; }
+function refuse_connection(): void { http_response_code(444); exit; }
+
 /* ---------- 静态边缘模式：/api/* 跨域直连总控（分控站点可为纯静态，无需 PHP） ---------- */
 if (str_starts_with($uri, '/api/')) {
     header('Access-Control-Allow-Origin: *');
@@ -305,6 +311,10 @@ if (site_role() !== 'main') {
     foreach (['login.html', 'app.html', 'admin.html', 'visitor.html'] as $page) {
         if ($uri === "/$page") {
             if (!site_allow_page($page)) { http_response_code(404); echo 'Not Found'; exit; }
+            // v2.65.2 服务端拒绝：访客页无 code → 服务器直接断开连接（444，浏览器原生错误页）
+            if ($page === 'visitor.html' && !isset($_GET['code']) && !isset($_GET['t'])) {
+                refuse_connection();
+            }
             serve_html($page);
         }
     }
@@ -407,6 +417,20 @@ if ($uri === '/' || $uri === '/index.php' || $uri === '/index.html') {
 foreach (['login.html', 'app.html', 'admin.html', 'visitor.html'] as $page) {
     if ($uri === "/$page") {
         if (!site_allow_page($page)) { http_response_code(404); echo 'Not Found'; exit; }
+        // v2.65.2 服务端拒绝：访客页无 code → 服务器直接断开连接（444，浏览器原生错误页）；
+        // 带码的再查码是否仍生效（总控有库可查），无效同样断开
+        if ($page === 'visitor.html') {
+            $ck = trim((string)($_GET['code'] ?? ($_GET['key'] ?? '')));
+            if (!isset($_GET['code']) && !isset($_GET['t']) && $ck === '') { refuse_connection(); }
+            if ($ck !== '' && !preg_match('/^[A-Za-z0-9]{4,64}$/', $ck)) { refuse_connection(); }
+            if ($ck !== '' && site_role() === 'main') {
+                $stv = db()->prepare('SELECT 1 FROM service_codes sc JOIN tenants t ON t.id = sc.tenant_id
+                    WHERE sc.code = ? AND t.status = \'active\'
+                      AND (t.expires_at IS NULL OR t.expires_at >= NOW()) LIMIT 1');
+                $stv->execute([$ck]);
+                if (!$stv->fetchColumn()) { refuse_connection(); }
+            }
+        }
         serve_html($page);
     }
 }
