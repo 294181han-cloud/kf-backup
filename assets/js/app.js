@@ -2820,8 +2820,11 @@ const app = createApp({
     const codeRotateHint = Vue.computed(() => '换一条新的客服码？\n\n顾客手里那张二维码不受影响（链接里是入口 ID，换码后照常能进），不用重新发。\n如果确实要换一张全新的二维码，用右边的「换新链接」。');
     const rotateCode = async () => {
       try {
-        await API.post('/api/tenant/service-code', { new_link: 0 });
-        ElementPlus.ElMessage.success('已换新码（二维码链接不变，顾客手里那张照用）');
+        const r = await API.post('/api/tenant/service-code', { new_link: 0 });
+        const c = (r && r.code) || {};
+        ElementPlus.ElMessage.success(c.upgraded
+          ? '已升级为「永久入口链接」——二维码不变，顾客手里那张继续用'
+          : '已换新码（二维码链接不变，顾客手里那张照用）');
         await loadLinks(); renderMainQr(); checkCode(true);
       } catch (e) { ElementPlus.ElMessage.error(e.message); }
     };

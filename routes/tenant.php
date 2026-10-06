@@ -148,12 +148,27 @@ function handle_tenant_service_code(string $method): void
         } else {
             $code = gen_code_token();
         }
+        $upgraded = false;
         if ($keepLink) {
-            // 原地换码：entry_id 与链接都不动（顾客手里的二维码照用），只换客服码
-            $pdo->prepare('UPDATE service_codes SET code = ?, entry_id = ? WHERE id = ?')
-                ->execute([$code, $entryId, (int)$cur['id']]);
             $newId = (int)$cur['id'];
-            $url = (string)$cur['link'];
+            $oldLink = (string)$cur['link'];
+            if (strpos($oldLink, '?w=') === false && $want === '') {
+                /* 老链接（?key=客服码）第一次升级：**保留客服码**，只把链接换成 ?w=入口ID。
+                   这样顾客手里已经印出去的老二维码（?key=客服码）照样能用 —— 等于白送一次
+                   「二维码永不过期」的升级，不用重印就能换到新机制。 */
+                $url = preg_replace('/\?.*$/', '', $oldLink) . '?w=' . $entryId;
+                $pdo->prepare('UPDATE service_codes SET entry_id = ?, link = ? WHERE id = ?')
+                    ->execute([$entryId, $url, $newId]);
+                $code = (string)$cur['code'];
+                $upgraded = true;
+            } else {
+                /* 已经是入口链接：原地换码 —— 链接不动（顾客二维码照用），
+                   同时换一台内容落地主机（客服码链接里那个入口域名不用动）。 */
+                $ch = gate_pool_hosts(1)[0] ?? '';
+                $pdo->prepare('UPDATE service_codes SET code = ?, entry_id = ?, content_host = ? WHERE id = ?')
+                    ->execute([$code, $entryId, $ch, $newId]);
+                $url = $oldLink;
+            }
         } else {
             /* v2.59 防红：入口是「日期目录 + 随机文件名.html」，页面本身没有任何内容（壳页）。
                v2.68：query 里换成 ?w=入口ID（不再暴露客服码）。
@@ -194,7 +209,7 @@ function handle_tenant_service_code(string $method): void
         }
         json_out(['ok' => true, 'code' => [
             'id' => $newId, 'code' => $code, 'entry_id' => $entryId, 'link' => $url,
-            'kept_link' => $keepLink, 'created_at' => dt_to_iso(now_dt()),
+            'kept_link' => $keepLink, 'upgraded' => $upgraded, 'created_at' => dt_to_iso(now_dt()),
         ]], 201);
     }
 
