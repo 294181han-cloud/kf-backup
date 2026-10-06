@@ -482,13 +482,10 @@ createApp({
       if (!t) { toast('这条消息没有文字'); return; }
       try { await navigator.clipboard.writeText(t); toast('已复制'); } catch (e) { toast('复制失败'); }
     };
-    // 长按 600ms = 打开操作菜单（移动端没有右键）
-    let lpTimer = null;
-    const onMsgTouchStart = (m, ev) => {
-      clearTimeout(lpTimer);
-      lpTimer = setTimeout(() => { openActSheet(m); }, 600);
-    };
-    const onMsgTouchEnd = () => { clearTimeout(lpTimer); };
+    /* v2.60.21 不再用长按出菜单（部分手机长按会触发浏览器全选/拷贝，很难用）。
+       复制/回复/撤回统一走每条消息右下角的 ⋯ 按钮（点一下弹底部菜单）。 */
+    const onMsgTouchStart = () => {};
+    const onMsgTouchEnd = () => {};
     // Ctrl+V 粘贴图片直接发
     const onPaste = async (ev) => {
       if (!sessionId.value) return;

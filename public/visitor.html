@@ -7,7 +7,7 @@
 <title>在线咨询</title>
 <link rel="icon" href="/assets/img/mi-logo.png">
 <link rel="apple-touch-icon" href="/assets/img/mi-logo.png">
-<link rel="stylesheet" href="/assets/css/visitor.css?v=2.15.0">
+<link rel="stylesheet" href="/assets/css/visitor.css?v=2.15.1">
 </head>
 <body>
 <!-- v2.52 兜底：脚本没跑起来时（微信旧内核 document.write 不执行脚本 / 资源被缓存污染 / 网络抽风），
@@ -91,9 +91,7 @@
 
       <template v-for="(m, mi) in visibleMessages" :key="m.id">
       <div class="day-sep" v-if="needDaySep(mi)"><span>{{ dayText(m.time) }}</span></div>
-      <div class="msg-row" :id="'vm' + m.id" :class="[m.from === 'visitor' ? 'visitor' : 'agent', {flash: flashId === m.id}]"
-           @touchstart="onMsgTouchStart(m, $event)" @touchend="onMsgTouchEnd" @touchmove="onMsgTouchEnd"
-           @contextmenu.prevent="openActSheet(m)">
+      <div class="msg-row" :id="'vm' + m.id" :class="[m.from === 'visitor' ? 'visitor' : 'agent', {flash: flashId === m.id}]">
         <template v-if="m.recalled">
           <div class="msg-bubble recall-capsule">{{ m.from === 'visitor' ? '你撤回了一条消息' : '对方撤回了一条消息' }}</div>
         </template>
@@ -317,7 +315,7 @@
 </div>
 
 <script src="/assets/vendor/vue.global.js?v=2.0.1"></script>
-<script src="/assets/js/visitor.js?v=2.21.1"></script>
+<script src="/assets/js/visitor.js?v=2.21.2"></script>
 <script>
 /* v2.52 加载兜底：正常挂载后由 visitor.js 移除提示；8 秒还没挂载就提示"加载失败" */
 (function () {

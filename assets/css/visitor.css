@@ -925,3 +925,6 @@ body.dark .v-pending .vp-tip { color: #98a3b4; }
 .msg-more:active { background: #eef1f7; color: var(--theme, #1677ff); border-color: var(--theme, #1677ff); }
 /* 访客自己那条：⋯ 放左边一点，别贴着屏幕边 */
 .msg-row.visitor .msg-time { display: flex; justify-content: flex-end; align-items: center; gap: 6px; }
+
+/* v2.60.21 ⋯ 按钮稍微大一点更好点（长按出菜单已移除，复制/回复/撤回全靠它） */
+.msg-more { width: 26px !important; height: 26px !important; font-size: 16px !important; }
