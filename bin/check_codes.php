@@ -63,4 +63,23 @@ foreach ($codes as $c) {
     usleep(300000);   // 每条间隔 0.3s，别把接口打爆
 }
 
-echo date('Y-m-d H:i:s'), " 巡检完成：共 ", count($codes), " 个码 → 正常 {$ok}、红 {$red}、异常/未开通 {$other}；新增提醒 {$newAlerts} 条\n";
+/* v2.60.17 域名体检：域名池里某个域名被微信封了 → 自动下掉（enabled=0），
+   免得「换码」时又抽到一个已经红了的域名（现场踩过：moupz.cn 整域被封，换码还可能抽到它）。
+   恢复了**不会**自动开回来，要人工在「域名池」里确认后再启用。 */
+$pool = $pdo->query('SELECT id, domain, enabled FROM domain_pool ORDER BY id')->fetchAll();
+$disabled = 0; $poolRed = 0;
+foreach ($pool as $d) {
+    $r = wxcheck_single_run('https://' . $d['domain'] . '/', 'wx');
+    if (($r['state'] ?? '') === 'red') {
+        $poolRed++;
+        if ((int)$d['enabled'] === 1) {
+            $pdo->prepare('UPDATE domain_pool SET enabled = 0 WHERE id = ?')->execute([(int)$d['id']]);
+            $disabled++;
+            echo date('Y-m-d H:i:s'), " 域名 ", $d['domain'], " 已被微信拦截（", mb_substr((string)($r['msg'] ?? ''), 0, 30), "）→ 已从域名池下掉\n";
+        }
+    }
+    usleep(300000);
+}
+
+echo date('Y-m-d H:i:s'), " 巡检完成：共 ", count($codes), " 个码 → 正常 {$ok}、红 {$red}、异常/未开通 {$other}；新增提醒 {$newAlerts} 条",
+    "；域名池 ", count($pool), " 个域名 → 红 {$poolRed}、本次下掉 {$disabled} 个\n";
