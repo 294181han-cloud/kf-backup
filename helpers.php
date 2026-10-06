@@ -1421,6 +1421,9 @@ function wxcheck_cfg(): array
    返回 ['state' => ok|red|off|err, 'tag' => 中文, 'text' => 一句话, 'msg' => 详情]
    state=off 表示平台没开通/没配账号；err 表示接口异常。
    注意：**每次调用都会真实请求第三方接口（按次计费）**，调用方自己控制频率。 */
+/* v2.60.15 双源交叉检测：一次同时查「付费接口（麒麟/腾讯urlsec）」和「米人免费接口」，
+   任意一源报红就算红（宁误报不漏报——实测米人把一条真被微信拦的链接报成了"安全网站"）。
+   付费通道没配/没充值（-206）时自动只用米人，行为跟以前一样。 */
 function wxcheck_run(string $link, string $channel = 'wx'): array
 {
     $chName = $channel === 'qq' ? 'QQ' : '微信';
@@ -1429,8 +1432,40 @@ function wxcheck_run(string $link, string $channel = 'wx'): array
         return ['state' => 'off', 'tag' => '未开通', 'text' => $chName . '检测未开通',
             'msg' => '平台未开通拦截检测，请联系管理员'];
     }
+    $hasPaid = ($cfg['user'] !== '' && $cfg['key'] !== '');
+    $order = $hasPaid ? ['uouin', 'mir6'] : ['mir6'];
+    $res = [];
+    foreach ($order as $src) {
+        if ($src === 'mir6' && $channel !== 'wx') continue;   // 米人只做微信
+        $r = wxcheck_single_run($link, $channel, $src);
+        $r['source'] = $src;
+        $res[] = $r;
+        if (($r['state'] ?? '') === 'red') break;             // 已经确定红了，不用再烧第二次调用
+    }
+    if (!$res) {
+        return ['state' => 'off', 'tag' => '未开通', 'text' => $chName . '检测未开通',
+            'msg' => $chName . '检测通道未配置'];
+    }
+    foreach ($res as $r) if (($r['state'] ?? '') === 'red') return $r;      // 任一红 → 红
+    foreach ($res as $r) {
+        if (($r['state'] ?? '') === 'ok') {
+            $bad = '';
+            foreach ($res as $x) if (($x['state'] ?? '') === 'err') $bad = (string)($x['msg'] ?? '');
+            if ($bad !== '') $r['msg'] = (string)($r['msg'] ?? '') . '（另一检测源异常：' . $bad . '）';
+            return $r;
+        }
+    }
+    return $res[0];   // 全是异常/未开通
+}
+
+/** 单源检测（$forceProvider 用来指定走哪条通道；不传就按配置） */
+function wxcheck_single_run(string $link, string $channel = 'wx', ?string $forceProvider = null): array
+{
+    $chName = $channel === 'qq' ? 'QQ' : '微信';
+    $cfg = wxcheck_cfg();
+    $provider = $forceProvider ?? $cfg['provider'];
     // ---- 米人免费接口（v2.47）：GET /api/wxurl?url=… → type=安全网站/危险网站/未知状态 ----
-    if ($cfg['provider'] === 'mir6') {
+    if ($provider === 'mir6') {
         if ($channel !== 'wx') {
             return ['state' => 'off', 'tag' => '不支持', 'text' => $chName . '检测不支持',
                 'msg' => '米人接口只提供微信拦截检测，QQ 检测请改用付费通道'];
