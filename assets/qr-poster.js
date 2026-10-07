@@ -457,7 +457,10 @@
       brand: '#2E6BE6', dot: 'rounded', eye: 'rounded', logo: null, colorDots: false, scale: 2, font: ''
     }, opt || {});
 
-    var W = CARD_W, H = CARD_H, S = o.scale, f = o.font || 'bold %dpx "Microsoft YaHei","PingFang SC",Arial,sans-serif';
+    /* v2.81 纯码模式：上下文字都留空时，输出一张正方形白底二维码图（不带任何文字，中心 logo 更大）
+       —— 客服码页按需求去掉了图上的文字，只留一张干净的码。 */
+    var plain = !String(o.topText || '').trim() && !String(o.bottomText || '').trim();
+    var W = plain ? 560 : CARD_W, H = plain ? 560 : CARD_H, S = o.scale, f = o.font || 'bold %dpx "Microsoft YaHei","PingFang SC",Arial,sans-serif';
     canvas.width = W * S; canvas.height = H * S;
     var ctx = canvas.getContext('2d');
     ctx.setTransform(S, 0, 0, S, 0, 0);
@@ -469,15 +472,17 @@
     var report = {};
 
     // 顶部文案
-    ctx.fillStyle = '#17181c';
-    ctx.font = f.replace('%d', '44');
-    ctx.textAlign = 'center'; ctx.textBaseline = 'alphabetic';
-    report.topTextWidth = Math.round(ctx.measureText(o.topText).width);
-    report.topTextMax = W - 2 * 56;
-    ctx.fillText(o.topText, W / 2, 120);
+    if (!plain) {
+      ctx.fillStyle = '#17181c';
+      ctx.font = f.replace('%d', '44');
+      ctx.textAlign = 'center'; ctx.textBaseline = 'alphabetic';
+      report.topTextWidth = Math.round(ctx.measureText(o.topText).width);
+      report.topTextMax = W - 2 * 56;
+      ctx.fillText(o.topText, W / 2, 120);
+    }
 
     // 二维码（比例照参考图：码宽 = 卡宽 69%，码区 472×472）
-    var m = qrModel(o.link), qa = 472, qx = (W - qa) / 2, qy = 262;
+    var m = qrModel(o.link), qa = 472, qx = (W - qa) / 2, qy = plain ? 44 : 262;
     var box = Math.floor(qa / m.n);
     if (box % 2) box -= 1;                 // 偶数模块（不缩放，直接按 box 画）
     if (box < 2) box = 2;
@@ -513,18 +518,20 @@
       report.logoPct = Math.round((o.knock === 'square' ? L * (o.iconRatio || 0.86) : L * (o.iconRatio || 0.86) * 0.707) * 100);
     }
 
-    // 底部通栏
-    var barH = 131, by = H - barH;
-    ctx.save();
-    rr(ctx, 0, 0, W, H, 28); ctx.clip();
-    ctx.fillStyle = o.brand; ctx.fillRect(0, by, W, barH);
-    ctx.restore();
-    ctx.fillStyle = '#fff';
-    ctx.font = f.replace('%d', '40');
-    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-    report.bottomTextWidth = Math.round(ctx.measureText(o.bottomText).width);
-    report.bottomTextMax = W - 2 * 56;
-    ctx.fillText(o.bottomText, W / 2, by + barH / 2 + 2);
+    // 底部通栏（纯码模式不画）
+    if (!plain) {
+      var barH = 131, by = H - barH;
+      ctx.save();
+      rr(ctx, 0, 0, W, H, 28); ctx.clip();
+      ctx.fillStyle = o.brand; ctx.fillRect(0, by, W, barH);
+      ctx.restore();
+      ctx.fillStyle = '#fff';
+      ctx.font = f.replace('%d', '40');
+      ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      report.bottomTextWidth = Math.round(ctx.measureText(o.bottomText).width);
+      report.bottomTextMax = W - 2 * 56;
+      ctx.fillText(o.bottomText, W / 2, by + barH / 2 + 2);
+    }
 
     report.overflow = (report.topTextWidth > report.topTextMax) || (report.bottomTextWidth > report.bottomTextMax);
     report.scale = S;

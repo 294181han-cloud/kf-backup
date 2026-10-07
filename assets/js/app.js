@@ -2481,12 +2481,12 @@ const app = createApp({
       return codeIcons()[k] || '';
     };
     const codeCardOpts = (scale) => {
-      const big = codeStyle.logoSize === 'big';
+      /* v2.81 按需求：二维码图上不带文字、中心 logo 加大（"标准/加大"开关已去掉，统一用大号） */
       return {
         link: viewLink.value || currentLink.value || 'https://example.com/',
-        topText: codeStyle.topText || ' ', bottomText: codeStyle.bottomText || ' ',
+        topText: '', bottomText: '',
         brand: codeStyle.brand, dot: codeStyle.dot, eye: codeStyle.eye, colorDots: !!codeStyle.colorDots,
-        knock: big ? 'square' : 'circle', logoRatio: big ? 0.24 : undefined,
+        knock: 'square', logoRatio: 0.28,
         logo: codeLogoSrc(), logoShape: codeStyle.logo === 'avatar' ? 'circle' : 'round', scale: scale || 2,
       };
     };
