@@ -2087,6 +2087,9 @@ function domain_pick_for_tenant(): string
         $rows = db()->query('SELECT domain FROM domain_pool WHERE enabled = 1 ORDER BY id ASC')->fetchAll(PDO::FETCH_COLUMN);
     } catch (\Throwable $e) { return ''; }
     $rows = array_values(array_filter(array_map(fn($d) => strtolower(trim((string)$d)), $rows)));
+    /* 保险（很重要）：只要这台域名进过红名单（哪怕只是它的某个子域被拦），就整台不再分配。
+       微信封的是域名——"这个子域红了、换个兄弟子域还能用"是错觉，实测主域一起红。 */
+    $rows = array_values(array_filter($rows, fn($d) => !domain_in_red_list($d)));
     if (!$rows) return '';
     $cap = max(1, (int)kv_get('domain_tenant_cap', '1'));   // 一台域名默认只带 1 个租户
     for ($round = 0; $round < 6; $round++) {
@@ -2096,6 +2099,26 @@ function domain_pick_for_tenant(): string
         $cap++;                                             // 域名不够就放宽，别让租户发不出码
     }
     return $rows[array_rand($rows)];
+}
+
+/** 这台域名（或其任意子域）是否进过红名单 */
+function domain_in_red_list(string $domain): bool
+{
+    $domain = strtolower(trim($domain));
+    if ($domain === '') return false;
+    try {
+        $st = db()->prepare('SELECT 1 FROM red_domains WHERE main = ? OR host = ? LIMIT 1');
+        $st->execute([$domain, $domain]);
+        return (bool)$st->fetchColumn();
+    } catch (\Throwable $e) { return false; }   // 表不存在/查询失败：不当红处理
+}
+
+/** 落地主机是否还能用：域名池里启用的、且主域没进过红名单 */
+function pool_host_usable(string $host): bool
+{
+    $host = strtolower(trim($host));
+    if ($host === '' || !pool_host_enabled($host)) return false;
+    return !domain_in_red_list(pool_domain_of($host));
 }
 
 /** 这个租户的专属域名：已绑且在启用中就直接用；否则自动分配一台并落库 */
@@ -2169,7 +2192,7 @@ function gate_content_host_for(string $code, string $fallback = ''): string
         $row = $st->fetch();
         if ($row) {
             $cur = strtolower(trim((string)$row['content_host']));
-            if ($cur !== '' && pool_host_enabled($cur)) return $cur;
+            if ($cur !== '' && pool_host_usable($cur)) return $cur;
             /* 原主机已停用（红了）：换到「这个租户的专属域名」下的主机（没有就自动分配） */
             $dom = tenant_domain_for((int)$row['tenant_id']);
             $next = $dom !== '' ? pool_host_in($dom) : $fallback;
