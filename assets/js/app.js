@@ -755,6 +755,11 @@ const app = createApp({
       // v2.55 草稿/待发附件按会话隔离：给 A 打了一半的字（或贴好的图）不会跟着你跑到 B 的聊天框里
       saveSessionDraft(currentId.value);
       currentId.value = id;
+      /* v2.86 手机端：进会话压一条历史记录，手机返回键 / 返回手势先回会话列表（最多只压一条） */
+      try {
+        if (history.state && history.state.kfChat) history.replaceState({ kfChat: id }, '');
+        else history.pushState({ kfChat: id }, '');
+      } catch (e) {}
       restoreSessionDraft(id);
       msgs.value = [];
       maxMsgId.value = 0;
@@ -2921,21 +2926,21 @@ const app = createApp({
     const checkLoginSecurity = async () => {
       try {
         const r = await API.get('/api/login-notice');
-        const me = r && r.me;
-        if (!me) return;
-        loginInfo.value = me;
-        /* v2.81.1 只在"这台设备第一次登录 + 账号已经不止一台设备"时问一次；
-           默认把称呼填成你的客服名称，直接点「保存并继续」就行（也可以自己改） */
-        if (me.is_new && !me.note && !loginInfoDlg.value && Number(r.devices || 1) > 1) {
-          let skipped = false;
-          try { skipped = sessionStorage.getItem('kfxt_loginfo_skip') === '1'; } catch (e) {}
-          if (!skipped) {
-            loginInfoName.value = (me.value && me.value.nickname) || '';
-            loginInfoDlg.value = true;
-          }
+        const dev = r && r.me;
+        if (!dev) return;
+        loginInfo.value = dev;
+        /* v2.86 只在这台设备**第一次**登录时问一次「给这次登录起个称呼」；
+           同一个浏览器 / 同一台设备以后登录不再弹（保存过或跳过过都算问过了）。 */
+        const seenKey = 'kfxt_loginfo_ok';
+        const seenVal = dev.dev_id || '1';
+        let asked = false;
+        try { asked = localStorage.getItem(seenKey) === seenVal; } catch (e) {}
+        if (dev.is_new && !dev.note && !asked && !loginInfoDlg.value) {
+          loginInfoName.value = (me.value && me.value.nickname) || '';
+          loginInfoDlg.value = true;
         }
         const n = r.notice;
-        if (n && n.id && n.dev && n.dev !== me.dev_id) {
+        if (n && n.id && n.dev && n.dev !== dev.dev_id) {
           let shown = '';
           try { shown = localStorage.getItem('kfxt_login_notice') || ''; } catch (e) {}
           if (shown !== n.id) {
@@ -2944,7 +2949,7 @@ const app = createApp({
               title: '⚠️ 新登录通知', type: 'warning', duration: 300000, position: 'top-right',
               dangerouslyUseHTMLString: true,
               message: '<div style="line-height:1.95;font-size:13px;">'
-                + '登录身份：<b>' + (n.note || me.note || '同账号') + '</b><br>'
+                + '登录身份：<b>' + (n.note || dev.note || '同账号') + '</b><br>'
                 + '登录信息：<b>' + (n.ip || '') + '</b>　' + (n.geo || '') + '<br>'
                 + '登录来源：<b>' + (n.device || '') + '</b><br>'
                 + '<span style="color:#86909c;font-size:12px;">' + (n.at || '') + '　5 分钟后自动关闭</span></div>'
@@ -2953,6 +2958,10 @@ const app = createApp({
         }
       } catch (e) { /* 静默：登录安全接口失败不影响使用 */ }
     };
+    /* v2.86 记住了就不再问：同一台设备（同一个浏览器）只问一次 */
+    const markLoginInfoAsked = () => {
+      try { localStorage.setItem('kfxt_loginfo_ok', (loginInfo.value && loginInfo.value.dev_id) || '1'); } catch (e) {}
+    };
     const saveLoginInfoName = async () => {
       try {
         if (loginInfo.value && loginInfoName.value.trim() !== '') {
@@ -2960,10 +2969,11 @@ const app = createApp({
           ElementPlus.ElMessage.success('已保存，可在「设置 → 安全与维护 → 登录设备」里改');
         }
       } catch (e) { ElementPlus.ElMessage.error(e.message); }
+      markLoginInfoAsked();
       loginInfoDlg.value = false;
     };
     const skipLoginInfo = () => {
-      try { sessionStorage.setItem('kfxt_loginfo_skip', '1'); } catch (e) {}
+      markLoginInfoAsked();
       loginInfoDlg.value = false;
     };
     const loadCodes = async () => {
@@ -3141,10 +3151,21 @@ const app = createApp({
     // 打开菜单的地方都做了 stopPropagation，所以这里只要无脑全关就不会误伤刚打开的菜单。
     const onDocClick = () => closeAllMenus();
     const onDocCtx = (ev) => { if (ev && ev.target && ev.target.closest && ev.target.closest('.ctx-menu')) return; closeAllMenus(); };
+    /* ===== v2.86 手机端返回 =====
+       以前进了会话，只能点顶栏那个小「‹」才回得去；手机返回键 / 返回手势
+       会直接退出工作台。现在进会话时压一条历史记录，返回键先回会话列表。 */
+    const backToSessList = () => {
+      const hadChat = !!currentId.value;
+      if (hadChat) currentId.value = null;
+      /* 压过历史记录的话顺手回退一格，免得下次按返回直接退出工作台 */
+      try { if (history.state && history.state.kfChat) history.back(); } catch (e) {}
+    };
+    const onPopState = () => { if (currentId.value) currentId.value = null; };
     onMounted(async () => {
       document.addEventListener('click', onDocClick);
       document.addEventListener('contextmenu', onDocCtx);
       window.addEventListener('keydown', imgKey);   // v2.69 图片查看器：← → 翻页 / Esc 关闭
+      window.addEventListener('popstate', onPopState);
       try {
         await loadMe();
         if (me.value.role === 'admin') { location.href = '/admin.html'; return; }
@@ -3173,11 +3194,12 @@ const app = createApp({
       if (alertTimer) clearInterval(alertTimer);
       document.removeEventListener('click', onDocClick);
       document.removeEventListener('contextmenu', onDocCtx);
+      window.removeEventListener('popstate', onPopState);
     });
 
     return {
       tab, tabTitle, booted, me, expireText, stats, sessions, sessSearch, filteredSessions, currentId, current,
-      navTo, navRefresh, meExpired, fmtDay,
+      navTo, navRefresh, meExpired, fmtDay, backToSessList,
       msgs, draft, sending, chatBody, viewing, profile, contactList, noteDraft, transferDlg, transferTo, agentOptions,
       pinBottom, onMediaLoad,
       chatAtBottom, onChatScroll, toBottom,
@@ -3226,7 +3248,7 @@ const app = createApp({
       cropDlg, cropSrc, cropZoomPct, cropStage, cropStyle, cropImgLoaded, cropDown, cropMove, cropUp, cropWheel, cropClose, openCrop, cropConfirm, avatarPreview,
       geoTag, visitorTag, visitorTagFull, visitorChnClass, copyQrImage, downloadQrImage, codeRotateHint, rotateCode, rotateLink, loadHistory, disableLink, saveCodeCfg, meAvatarUrl,
       manageDlgOpen, codeList, codeListLoading, openManageCodes, toggleCode, delCodeRow, ownDlg, ownContact,
-      loginInfoDlg, loginInfo, loginInfoName, loginHost, saveLoginInfoName, skipLoginInfo,
+      loginInfoDlg, loginInfo, loginInfoName, loginHost, saveLoginInfoName, skipLoginInfo, markLoginInfoAsked,
       codeTextDlg,
       codeCreatedAt, codeExpiresAt,
       quickFields, welcomeFields, autoFields, blFields, preqFields,

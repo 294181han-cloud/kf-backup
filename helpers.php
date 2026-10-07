@@ -2228,6 +2228,68 @@ function pool_host_in(string $domain): string
     return $domain;
 }
 
+/* ===================== v2.86 客服码：发码 / 自动发码 =====================
+   「新码 / 更换码」和「新用户第一次登录自动发一条」共用这一份发码逻辑，
+   免得两处各写一遍、以后改漏一处。 */
+
+/** 发一条新的客服码（新域名 + 新随机路径）。失败返回 ['ok'=>false,'msg'=>...] */
+function tenant_mint_service_code(int $tid, string $want = ''): array
+{
+    $pdo = db();
+    $entryId = gen_entry_id();
+    $want = trim($want);
+    if ($want !== '') {
+        if (!preg_match('/^[A-Za-z0-9]{4,32}$/', $want)) return ['ok' => false, 'msg' => '客服码只能是 4~32 位字母或数字'];
+        $dup = $pdo->prepare('SELECT 1 FROM service_codes WHERE code = ? LIMIT 1');
+        $dup->execute([$want]);
+        if ($dup->fetch()) return ['ok' => false, 'msg' => '这个客服码已经被用了，换一个'];
+        $code = $want;
+    } else {
+        $code = gen_code_token();
+    }
+    /* v2.59 防红：入口是「日期目录 + 随机文件名.html」，页面本身没有内容（壳页）。
+       v2.68：query 里用 ?w=入口ID，不暴露客服码。
+       v2.62.1 域名：配了固定子域池就从池里随机挑；泛解析行随机 8 位子域；单域名行用裸域。 */
+    $scheme = 'https';
+    $gatePath = date('m-d') . '/' . gen_gate_name() . '.html?w=' . $entryId;
+    $entryDomain = strtolower(trim(kv_get('entry_domain', '')));
+    if ($entryDomain !== '') {
+        /* 入口域名（专门印二维码那个）：只用来出壳页，内容域名红了也不连累二维码 */
+        $host = preg_replace('#^https?://#', '', $entryDomain);
+        $host = rtrim(explode('/', $host)[0], '/');
+        $url = "$scheme://$host/$gatePath";
+    } else {
+        /* v2.70 专属落地域名（自动分配）：这个租户固定用一台域名，红了只影响它自己 */
+        $bound = tenant_domain_for($tid);
+        if ($bound === '') return ['ok' => false, 'msg' => '域名池为空，请联系平台管理员添加可用域名'];
+        $host = pool_host_in($bound);
+        if ($host === '') return ['ok' => false, 'msg' => '域名池为空，请联系平台管理员添加可用域名'];
+        $url = "$scheme://$host/$gatePath";
+    }
+    $pdo->prepare('INSERT INTO service_codes (tenant_id, code, entry_id, link, enabled) VALUES (?,?,?,?,1)')
+        ->execute([$tid, $code, $entryId, $url]);
+    $newId = (int)$pdo->lastInsertId();
+    /* v2.68 内容落地主机：新码先落一台（gate_content_url 会复用，保证访客会话不丢） */
+    $ch = pool_host_in(tenant_domain_for($tid));
+    if ($ch !== '') $pdo->prepare('UPDATE service_codes SET content_host = ? WHERE id = ?')->execute([$ch, $newId]);
+    return ['ok' => true, 'code' => [
+        'id' => $newId, 'code' => $code, 'entry_id' => $entryId, 'link' => $url,
+        'enabled' => true, 'created_at' => dt_to_iso(now_dt()),
+    ]];
+}
+
+/** 一条能用的客服码都没有时，自动发一条 —— 新用户第一次登录就有码，不用自己去点「生成」。
+    已有码（哪怕只是历史遗留的一条）就什么都不做，绝不重复发。 */
+function tenant_ensure_service_code(int $tid): void
+{
+    try {
+        $st = db()->prepare('SELECT COUNT(*) FROM service_codes WHERE tenant_id = ? AND enabled = 1');
+        $st->execute([$tid]);
+        if ((int)$st->fetchColumn() > 0) return;
+        tenant_mint_service_code($tid);
+    } catch (\Throwable $e) { /* 发码失败不影响登录 */ }
+}
+
 /** 从落地主机反查它属于哪个域名池域名（f5ma20.shop / xxxxx.f5ma20.shop → f5ma20.shop） */
 function pool_domain_of(string $host): string
 {

@@ -98,6 +98,8 @@ function handle_auth_login(string $method): void
     login_fail_clear($ip);
     $pdo->prepare('UPDATE tenants SET last_login_at = ? WHERE id = ?')->execute([now_dt(), $t['id']]);
     log_tenant_login((int)$t['id'], 'tenant', $t['kami']);
+    /* v2.86 新用户第一次登录就自动给一条客服码（不用自己去点「发码」） */
+    tenant_ensure_service_code((int)$t['id']);
     $chk = device_register(device_owner_key('tenant', (int)$t['id'], (int)$t['id']), (int)$t['id'], $devId, $ip,
         mb_substr((string)($_SERVER['HTTP_USER_AGENT'] ?? ''), 0, 200), device_limit_for($t));
     if (empty($chk['ok'])) json_error((string)$chk['msg'], 403);
@@ -145,7 +147,15 @@ function handle_login_devices(string $method): void
     $pdo = db();
     $st = $pdo->prepare('SELECT * FROM login_devices WHERE owner_key = ? ORDER BY last_seen DESC LIMIT 50');
     $st->execute([$key]);
-    $list = array_map('device_row_out', $st->fetchAll());
+    /* v2.86 标出「这台就是我正在用的设备」——列表里一眼认出自己，不会手滑把自己踢下线 */
+    $tok = bearer_token();
+    $dec = $tok ? jwt_decode($tok) : null;
+    $myDev = device_norm_id((string)(is_array($dec) ? ($dec['dev'] ?? '') : ''));
+    $list = array_map(function ($r) use ($myDev) {
+        $o = device_row_out($r);
+        $o['current'] = ($myDev !== '' && device_norm_id((string)$r['dev_id']) === $myDev);
+        return $o;
+    }, $st->fetchAll());
     $limit = tenant_device_limit((int)$ctx['tenant_id']);
     json_out(['devices' => $list, 'limit' => $limit, 'count' => count($list)]);
 }

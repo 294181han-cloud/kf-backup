@@ -7,9 +7,9 @@
 <link rel="icon" href="/assets/img/mi-logo.png">
 <link rel="apple-touch-icon" href="/assets/img/mi-logo.png">
 <link rel="stylesheet" href="/assets/vendor/element-plus.css">
-<link rel="stylesheet" href="/assets/css/app.css?v=3.53.0">
-<script src="/assets/ui/ui-registry.js?v=2.9.2"></script>
-<script src="/assets/ui/ui-loader.js?v=2.9.2" data-ui-cat="auto"></script>
+<link rel="stylesheet" href="/assets/css/app.css?v=3.54.0">
+<script src="/assets/ui/ui-registry.js?v=2.10.0"></script>
+<script src="/assets/ui/ui-loader.js?v=2.10.0" data-ui-cat="auto"></script>
 </head>
 <body>
 <!-- 注意：#app 是挂载容器，写在这里的 @click 不会被绑定（模板取的是它的 innerHTML）。
@@ -129,7 +129,7 @@
     <div class="main" :class="{'has-setmenu': tab==='setting'}">
       <div class="topbar">
         <button class="m-menu-btn" title="菜单" @click="mSideOpen = !mSideOpen">☰</button>
-        <button class="m-back-btn" v-if="tab==='work' && currentId" title="返回会话列表" @click="currentId = null">‹</button>
+        <button class="m-back-btn" v-if="tab==='work' && currentId" title="返回会话列表" @click="backToSessList">‹</button>
         <div class="title">{{ tabTitle }}</div>
         <div style="margin-left:auto;display:flex;align-items:center;gap:14px;">
           <span v-if="unreadTotal > 0" class="unread-chip">{{ unreadTotal }} 条未读</span>
@@ -192,10 +192,7 @@
             <button class="scope-tab" v-if="!sessCollapsed" :class="{on: sessScope==='closed'}" @click="setScope('closed')">
               已结束<span class="scope-n" v-if="sessCounts.closed">{{ sessCounts.closed }}</span>
             </button>
-            <!-- v2.60.11 回收站：删掉的会话 30 天内可以自己恢复 -->
-            <button class="scope-tab" :class="{on: sessScope==='trash'}" @click="setScope('trash')">
-              已删除<span class="scope-n" v-if="sessCounts.trash">{{ sessCounts.trash }}</span>
-            </button>
+            <!-- v2.86 去掉「已删除」页签：删除会话就是删掉了，不再单独开一个回收站页签 -->
             <!-- v2.45 收起＝把「已归档 / 已结束」收起来，只留在线聊天（列表和搜索一直都在） -->
             <button class="sess-tabs-toggle" @click="toggleSessTabs"
                     :title="sessCollapsed ? '展开「已归档 / 已结束」' : '收起「已归档 / 已结束」，只留在线聊天'">{{ sessCollapsed ? '»' : '«' }}</button>
@@ -227,7 +224,7 @@
             <div v-if="!filteredSessions.length" style="padding:40px;text-align:center;color:#a0a6ad;font-size:13px;">暂无会话</div>
             <div class="sess-item" v-for="s in filteredSessions" :key="s.id"
                  :class="{active: currentId===s.id, pinned: s.pinned, checked: sessMulti && sessChecked.includes(s.id)}"
-                 @click="sessMulti ? toggleSessCheck(s.id) : (sessScope==='trash' ? null : openSession(s.id))" @contextmenu="openCtxMenu(s, $event)">
+                 @click="sessMulti ? toggleSessCheck(s.id) : openSession(s.id)" @contextmenu="openCtxMenu(s, $event)">
               <span class="sess-check" v-if="sessMulti" :class="{on: sessChecked.includes(s.id)}"></span>
               <div class="sess-ava" :class="{on: s.status==='online'}">
                 <span>{{ s.visitor_avatar || sessIcon(s) }}</span>
@@ -247,13 +244,6 @@
                 </div>
               </div>
               <button type="button" class="sess-more" v-if="!sessMulti" title="更多操作（拉黑 / 置顶 / 归档 / 结束 / 删除）" @click.stop="openCtxMenuFromBtn(s, $event)">⋯</button>
-              <!-- v2.60.11 回收站：删掉的会话在这条里直接给「恢复 / 彻底删除」 -->
-              <div class="sess-trash-ops" v-if="sessScope==='trash'">
-                <button type="button" class="sto-btn" @click.stop="restoreSession(s)">↩ 恢复</button>
-                <el-popconfirm title="彻底删除？不可恢复！" @confirm="purgeSession(s)">
-                  <template #reference><button type="button" class="sto-btn danger" @click.stop>🗑 彻底删除</button></template>
-                </el-popconfirm>
-              </div>
             </div>
           </div>
         </div>
@@ -286,8 +276,7 @@
                         :title="'渠道：访客从「' + profile.channel + '」里进来的' + (profile.browser ? '（' + profile.browser + '）' : '')">渠道：{{ profile.channel }}</span>
                   <span class="ch-chip" v-if="profile && profile.dev_tag">📱 {{ profile.dev_tag }}</span>
                   <span v-if="profile">📍 {{ profile.region || profile.city || geoTag(profile.geo) || '未知' }}</span>
-                  <span class="m-hide" title="访客 IP">🌐 {{ current.ip || '—' }}</span>
-                  <span v-if="profile" class="m-hide">👣 访问 {{ profile.visit_count }} 次</span>
+                  <!-- v2.86 IP / 访问次数不在这里重复显示（右侧「访客信息」里有） -->
                   <span v-if="profile" class="m-hide">💬 消息 {{ profile.message_count }}</span>
                   <span v-if="profile" class="m-hide" title="首次进入时间">🕒 首次 {{ shortTime(profile.first_time) }}</span>
                   <span v-if="current.lastTime" class="m-hide" title="最近活跃">⏱ 最近 {{ shortTime(current.lastTime) }}</span>
@@ -752,7 +741,7 @@
               </div>
               <div class="cc-top-r">
                 <el-popconfirm :title="codeRotateHint" @confirm="rotateCode">
-                  <template #reference><el-button type="primary" size="small">新码</el-button></template>
+                  <template #reference><el-button type="primary" size="small">更换码</el-button></template>
                 </el-popconfirm>
                 <el-button size="small" @click="openManageCodes">管理码</el-button>
               </div>
@@ -861,7 +850,7 @@
         </div>
 
         <!-- v2.80 新设备登录：确认本次登录信息（给这台设备起个称呼，方便同账号成员识别） -->
-        <el-dialog v-model="loginInfoDlg" title="确认本次登录信息" width="460px" align-center :close-on-click-modal="false">
+        <el-dialog v-model="loginInfoDlg" title="确认本次登录信息" width="460px" align-center :close-on-click-modal="false" @close="markLoginInfoAsked">
           <p class="muted" style="font-size:12.5px;line-height:1.7;margin:0 0 12px;">
             为本次登录添加一个称呼，方便同账号成员识别。此项可以跳过，保存后可在「设置 → 安全与维护 → 登录设备」里查看或修改。
           </p>
@@ -1317,11 +1306,6 @@
 
           <div class="panel">
             <div class="panel-title">数据清理（不可恢复，谨慎操作）</div>
-            <!-- v2.60.12 回收站入口：删掉的会话在这里找回（按条恢复） -->
-            <div class="link-line">
-              <span style="flex:1;">会话回收站（{{ sessCounts.trash || 0 }} 条，删除后 30 天内可恢复）</span>
-              <el-button size="small" plain @click="tab='work'; setScope('trash')">去回收站</el-button>
-            </div>
             <div class="link-line" v-for="opt in cleanupOpts" :key="opt.label">
               <span style="flex:1;">{{ opt.label }}</span>
               <el-popconfirm :title="'确认' + opt.label + '？不可恢复！'" @confirm="doCleanup(opt.days, 'sessions')">
@@ -1346,11 +1330,15 @@
             <p class="muted" style="margin:0 0 10px;font-size:12px;line-height:1.7;">
               同一账号最多 {{ deviceLimit }} 台设备同时在线（一个浏览器算一台）。满了别人就登不进来，做卡密的尤其要盯这里：
               发现不认识的设备，先点「备注」认一下，再「踢掉」——被踢的设备立刻掉线，要重新登录。
+              标着「本机」的那台就是你正在用的，不会被踢错。
             </p>
             <el-table :data="devices" size="small" stripe>
               <el-table-column label="设备" min-width="150">
                 <template #default="{row}">
-                  <div>{{ row.device }}</div>
+                  <div>
+                    {{ row.device }}
+                    <span v-if="row.current" class="dev-cur">本机</span>
+                  </div>
                   <div class="muted" style="font-size:11px;">ID {{ row.dev_id }}</div>
                 </template>
               </el-table-column>
@@ -1362,7 +1350,8 @@
               <el-table-column label="操作" width="150">
                 <template #default="{row}">
                   <el-button size="small" text type="primary" @click="renameDevice(row)">备注</el-button>
-                  <el-popconfirm title="踢掉这台设备？对方会立刻掉线" @confirm="kickDevice(row)">
+                  <span v-if="row.current" class="muted" style="font-size:12px;">当前设备</span>
+                  <el-popconfirm v-else title="踢掉这台设备？对方会立刻掉线" @confirm="kickDevice(row)">
                     <template #reference><el-button size="small" text type="danger">踢掉</el-button></template>
                   </el-popconfirm>
                 </template>
@@ -1749,7 +1738,7 @@
 <script src="/assets/qr-poster.js?v=2.3.0"></script>
 <script src="/assets/api.js?v=2.1.1"></script>
 <script src="/assets/js/app-components.js?v=2.6.2"></script>
-<script src="/assets/js/app.js?v=3.54.0"></script>
+<script src="/assets/js/app.js?v=3.55.0"></script>
 <script src="/assets/js/app-boot.js?v=2.1.1"></script>
 </body>
 </html>

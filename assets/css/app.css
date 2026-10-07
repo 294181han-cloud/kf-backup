@@ -718,7 +718,7 @@ body.dark .info-item .k { color: #8b95a7; }
 body.dark .chat-body { background: transparent; }
 body.dark .msg-row.sys .msg-bubble { background: rgba(255, 255, 255, .10); color: #a9b3bd; }
 body.dark .code-stage-hint, body.dark .cp-link, body.dark .muted { color: #8b95a7; }
-body.dark .topbar .clock { background: #262c34; color: #9aa4b5; }
+body.dark .topbar .clock { background: #262c34; color: #b9c3d2; border-color: #333b46; }
 body.dark .unread-chip { background: linear-gradient(135deg, #ff7a7a, #f5455c); }
 body.dark .bar-row .bar { background: #2b313a; }
 body.dark .guide-progress { background: #2b313a; }
@@ -975,7 +975,16 @@ body.dark .me-btn.danger:hover { background: #3a2124; border-color: #5a3236; col
 /* ---------- 顶栏 ---------- */
 .topbar { height: 58px; padding: 0 22px; background: #fff; border-bottom: 1px solid var(--v-line); }
 .topbar .title { font-size: 15.5px; font-weight: 700; letter-spacing: .2px; }
-.clock { background: #f5f7fb; border-radius: 999px; padding: 4px 12px; font-size: 12px; color: var(--v-ink-3); }
+/* v2.86 右上角时间：做大一点、做成一个好看的胶囊（等宽数字不跳动） */
+.clock {
+  background: linear-gradient(135deg, color-mix(in srgb, var(--theme, #1677ff) 10%, #fff), #f7f9fc);
+  border: 1px solid color-mix(in srgb, var(--theme, #1677ff) 18%, var(--v-line));
+  border-radius: 999px; padding: 6px 16px;
+  font-size: 15px; font-weight: 600; letter-spacing: .4px;
+  color: var(--v-ink-2); font-variant-numeric: tabular-nums;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  box-shadow: 0 2px 10px color-mix(in srgb, var(--theme, #1677ff) 12%, transparent);
+}
 .unread-chip { background: linear-gradient(135deg, #ff7a7a, #f5455c); box-shadow: 0 4px 12px rgba(245, 69, 92, .28); }
 
 /* ---------- 内容区 / 面板 ---------- */
@@ -1198,7 +1207,7 @@ body.dark .msg-row.mine .vb-asr-btn { background: rgba(0, 0, 0, .22); color: #ea
 body.dark .msg-row.mine .vb-sec { color: #ffffff; }
 body.dark .info-item { border-bottom-color: #2b313a; }
 body.dark .el-table th.el-table__cell { background: #232830 !important; }
-body.dark .clock { background: #262b33; }
+body.dark .clock { background: #232830; border-color: #333b46; color: #c2cbd9; box-shadow: none; }
 
 /* =====================================================================
    v3.6 侧栏放大（一级菜单 / 左下账号卡） + 设置页重排铺满
@@ -1558,6 +1567,15 @@ body.dark .msg-sheet .ms-item.ghost { border-top-color: #2b313a; color: #8b95a7;
 @media (max-width: 900px) {
   /* 手机浏览器地址栏会吃掉 100vh，用 dvh 让输入框不被顶到屏幕外 */
   .layout { height: 100dvh; }
+  /* ===== v2.86 手机上「整页跟着滑」的根治 =====
+     以前 html/body 还能滚一点点，聊天记录滑到顶/底就带着整页一起动（看着像"总页面在动"）；
+     现在页面本身锁死，只有列表 / 聊天记录 / 快捷消息这些内部区域能滚。 */
+  html, body { height: 100%; overflow: hidden; overscroll-behavior: none; }
+  #app, .layout { height: 100dvh; max-height: 100dvh; }
+  .chat-body, .sess-list, .info-col, .set-menu, .side .nav, .quick-bar .quick-scroll {
+    overscroll-behavior: contain;
+    -webkit-overflow-scrolling: touch;
+  }
   /* 去掉"双击才生效"：默认双击是缩放，浏览器要等 ~300ms 判断，导致第一次点像没反应 */
   html, body { touch-action: manipulation; -webkit-text-size-adjust: 100%; }
   * { -webkit-tap-highlight-color: rgba(0, 0, 0, .06); }
@@ -1579,20 +1597,28 @@ body.dark .msg-sheet .ms-item.ghost { border-top-color: #2b313a; color: #8b95a7;
   }
   .m-menu-btn {
     display: inline-flex; align-items: center; justify-content: center;
-    width: 34px; height: 34px; border: 0; background: #f2f5fa; color: #46506a;
+    width: 38px; height: 38px; border: 0; background: #f2f5fa; color: #46506a;
     border-radius: 10px; font-size: 16px; cursor: pointer; flex-shrink: 0;
   }
   .m-back-btn {
     display: inline-flex; align-items: center; justify-content: center;
-    width: 34px; height: 34px; border: 0; background: #f2f5fa; color: #46506a;
-    border-radius: 10px; font-size: 20px; line-height: 1; cursor: pointer; flex-shrink: 0;
+    width: 38px; height: 38px; border: 0;
+    background: color-mix(in srgb, var(--theme, #1677ff) 12%, #fff);
+    color: var(--theme, #1677ff);
+    border-radius: 10px; font-size: 22px; font-weight: 700; line-height: 1;
+    cursor: pointer; flex-shrink: 0;
   }
   body.dark .m-menu-btn, body.dark .m-back-btn { background: #262c34; color: #c6ccd8; }
+  body.dark .m-back-btn { background: color-mix(in srgb, var(--theme, #1677ff) 26%, #1d2126); color: #cfe1ff; }
 
   /* ---------- 顶栏 ---------- */
   .topbar { height: 50px; padding: 0 10px; gap: 8px; }
   .topbar .title { font-size: 15px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .topbar .clock { display: none; }
+  /* v2.86 手机上时间也显示（小一号的胶囊），别占太多宽度 */
+  .topbar .clock {
+    display: inline-flex; align-items: center;
+    font-size: 12.5px; padding: 4px 10px; letter-spacing: 0; white-space: nowrap;
+  }
   .m-only { display: inline-flex !important; }
 
   /* ---------- 会话列表 ↔ 聊天：两屏切换 ---------- */

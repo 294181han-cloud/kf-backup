@@ -39,7 +39,12 @@ function session_scope_sql(string $scope): string
  *  人还没开口时列表里不该出现 —— 等他一发消息（messages.from_type='visitor'）自然就进来了。 */
 function session_spoken_sql(): string
 {
-    return " AND EXISTS (SELECT 1 FROM messages m WHERE m.session_id = s.id AND m.from_type = 'visitor')";
+    /* v2.86 访客刚扫码进来、人还在线（有心跳）就出现在列表里 —— 不用等对方先发消息；
+       点了下就走的（一句话没说、心跳也过期了）不再占列表位置。
+       以前是「必须访客说过话才显示」，客户扫码后客服这边要等半天才看到人。 */
+    $secs = (int)(config()['session_online_secs'] ?? 180);
+    return " AND (EXISTS (SELECT 1 FROM messages m WHERE m.session_id = s.id AND m.from_type = 'visitor')
+        OR (s.last_online_at IS NOT NULL AND s.last_online_at > DATE_SUB(NOW(), INTERVAL " . $secs . " SECOND)))";
 }
 
 /** 已结束会话自动清理（poll 时懒执行；closed_keep_days=0 表示永久保留） */

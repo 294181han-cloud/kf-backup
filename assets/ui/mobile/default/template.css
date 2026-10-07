@@ -234,23 +234,25 @@ html[data-ui-cat="mobile"][data-ui-template="default"] .quick-bar .quick-scroll 
 html[data-ui-cat="mobile"][data-ui-template="default"] .quick-bar .quick-scroll::-webkit-scrollbar { height: 0; display: none; }
 /* 一行横滑就没法再用手势排序了（排序改到「设置 → 快捷消息」里拖动） */
 html[data-ui-cat="mobile"][data-ui-template="default"] .quick-scroll .quick-btn {
-  touch-action: pan-x; opacity: 1; transform: none; padding: 6px 12px; font-size: 12.5px;
+  touch-action: pan-x; opacity: 1; transform: none; padding: 7px 13px; font-size: 13px;
 }
 html[data-ui-cat="mobile"][data-ui-template="default"] .chat-tools {
   gap: 12px; margin-bottom: 6px !important; overflow-x: auto; scrollbar-width: none; -ms-overflow-style: none;
 }
 html[data-ui-cat="mobile"][data-ui-template="default"] .chat-tools::-webkit-scrollbar { height: 0; display: none; }
-html[data-ui-cat="mobile"][data-ui-template="default"] .tool-btn { width: 30px; height: 30px; flex-shrink: 0; }
-html[data-ui-cat="mobile"][data-ui-template="default"] .tool-btn svg { width: 19px; height: 19px; }
+/* v2.86 工具栏按钮做大一点（手指好按），一行放不下就横滑 */
+html[data-ui-cat="mobile"][data-ui-template="default"] .tool-btn { width: 34px; height: 34px; border-radius: 10px; flex-shrink: 0; }
+html[data-ui-cat="mobile"][data-ui-template="default"] .tool-btn svg { width: 20px; height: 20px; }
+html[data-ui-cat="mobile"][data-ui-template="default"] .chat-tools { gap: 8px; }
 /* 输入框 + 发送键一行（原来发送键独占一行，白吃掉 50px 高度） */
 html[data-ui-cat="mobile"][data-ui-template="default"] .ci-row { display: flex; align-items: flex-end; gap: 8px; }
 html[data-ui-cat="mobile"][data-ui-template="default"] .ci-row textarea {
-  flex: 1 1 auto; min-width: 0; width: auto; height: 44px; min-height: 44px; max-height: 132px;
-  padding: 9px 12px; border: 1px solid var(--line); border-radius: 12px;
+  flex: 1 1 auto; min-width: 0; width: auto; height: 46px; min-height: 46px; max-height: 132px;
+  padding: 10px 14px; border: 1px solid var(--line); border-radius: 14px;
   background: var(--bg); font-size: 16px; line-height: 1.4; box-sizing: border-box; overflow-y: auto;
 }
 html[data-ui-cat="mobile"][data-ui-template="default"] .ci-row .send-btn {
-  flex: 0 0 auto; width: 44px; height: 44px; min-width: 44px; margin: 0; padding: 0;
+  flex: 0 0 auto; width: 46px; height: 46px; min-width: 46px; margin: 0; padding: 0;
   border-radius: 50%; display: inline-flex; align-items: center; justify-content: center;
   box-shadow: 0 5px 14px -7px color-mix(in srgb, var(--theme, #1677ff) 75%, transparent);
 }

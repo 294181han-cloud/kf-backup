@@ -142,56 +142,12 @@ function handle_tenant_service_code(string $method): void
     if ($method === 'POST') {
         /* v2.79 发新码 = **新增一条客服码**（新域名 + 新的随机路径），旧码保留、不失效；
            旧码要停用/删除请到「管理码」里操作。这样随时能换新的，客户手里那张旧二维码也不会突然打不开。
-           链接格式：https://<主机>/MM-DD/<随机>.html?w=<入口ID>（入口 ID 只指向客服码，不暴露它本身） */
-        $entryId = gen_entry_id();
-        // v2.61 支持自定义客服码（就是链接里 ?key= 后面那串）
-        $want = trim((string)input('code', ''));
-        if ($want !== '') {
-            if (!preg_match('/^[A-Za-z0-9]{4,32}$/', $want)) json_error('客服码只能是 4~32 位字母或数字');
-            $dup = $pdo->prepare('SELECT 1 FROM service_codes WHERE code = ? LIMIT 1');
-            $dup->execute([$want]);
-            if ($dup->fetch()) json_error('这个客服码已经被用了，换一个');
-            $code = $want;
-        } else {
-            $code = gen_code_token();
-        }
-        {
-            /* v2.59 防红：入口是「日期目录 + 随机文件名.html」，页面本身没有任何内容（壳页）。
-               v2.68：query 里换成 ?w=入口ID（不再暴露客服码）。
-               v2.62.1 发码选域：配了固定子域池（kv_store pool_subs:<域名>）就从子域池随机挑，
-               主域名本身永远不进链接；泛解析行随机 8 位子域；单域名行用裸域。 */
-            $scheme = 'https';
-            $gatePath = date('m-d') . '/' . gen_gate_name() . '.html?w=' . $entryId;
-            /* 入口域名（明天买的那个专门印二维码的域名）：kv 'entry_domain' 配了就优先用它，
-               它只用来出壳页、不承载内容 → 内容域名红了也不会连累二维码。 */
-            $entryDomain = strtolower(trim(kv_get('entry_domain', '')));
-            if ($entryDomain !== '') {
-                $host = preg_replace('#^https?://#', '', $entryDomain);
-                $host = rtrim(explode('/', $host)[0], '/');
-                $url = "$scheme://$host/$gatePath";
-            } else {
-                /* v2.70 专属落地域名（自动分配）：这个租户固定用一台域名，
-                   某台域名红了只影响它自己，不再全体陪葬。全程不用人工分配。 */
-                $bound = tenant_domain_for($tid);
-                if ($bound === '') json_error('域名池为空，请联系平台管理员添加可用域名', 400);
-                $host = pool_host_in($bound);
-                if ($host === '') json_error('域名池为空，请联系平台管理员添加可用域名', 400);
-                $url = "$scheme://$host/$gatePath";
-            }
-            $pdo->prepare('INSERT INTO service_codes (tenant_id, code, entry_id, link, enabled) VALUES (?,?,?,?,1)')
-                ->execute([$tid, $code, $entryId, $url]);
-            $newId = (int)$pdo->lastInsertId();
-            /* v2.68 内容落地主机：新码先落一台（gate_content_url 会复用，保证访客会话不丢）
-               v2.70：落在该租户的专属域名下 */
-            $ch = pool_host_in(tenant_domain_for($tid));
-            if ($ch !== '') $pdo->prepare('UPDATE service_codes SET content_host = ? WHERE id = ?')->execute([$ch, $newId]);
-            /* v2.79 旧码不再自动失效：换码只新增一条，旧码保留、可到「管理码」里单独停用或删除。
-               （链接里的入口 ID 不变时，顾客手里那张二维码本来就还能用） */
-        }
-        json_out(['ok' => true, 'code' => [
-            'id' => $newId, 'code' => $code, 'entry_id' => $entryId, 'link' => $url,
-            'enabled' => true, 'created_at' => dt_to_iso(now_dt()),
-        ]], 201);
+           链接格式：https://<主机>/MM-DD/<随机>.html?w=<入口ID>（入口 ID 只指向客服码，不暴露它本身）
+           v2.86：发码逻辑抽到 helpers.php 的 tenant_mint_service_code()，
+                 跟「新用户第一次登录自动发码」共用一份，避免两处改漏。 */
+        $r = tenant_mint_service_code($tid, (string)input('code', ''));
+        if (empty($r['ok'])) json_error((string)($r['msg'] ?? '发码失败'), 400);
+        json_out(['ok' => true, 'code' => $r['code']], 201);
     }
 
     if ($method === 'DELETE') {
@@ -608,6 +564,8 @@ function handle_tenant_links(string $method): void
     $pdo = db();
 
     $root = kv_get('root_domain', '');
+    /* v2.86 新用户第一次进「客服码」页就该看到码：一条能用的都没有就自动发一条 */
+    tenant_ensure_service_code($tid);
     $st = $pdo->prepare('SELECT link, subdomain, created_at FROM domain_links WHERE tenant_id = ? AND active = 1 ORDER BY id DESC LIMIT 1');
     $st->execute([$tid]);
     $dl = $st->fetch();
