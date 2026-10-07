@@ -2174,3 +2174,7 @@ body.dark .sess-resume-entry .sme-box { background: #3a2f1a; color: #f0b45c; }
 /* v2.83 客服码卡片里的两个显示开关 */
 .cc-chk { display: inline-flex; align-items: center; gap: 5px; font-size: 13px; color: #4e5969; cursor: pointer; margin-right: 14px; }
 .cc-chk input { width: 15px; height: 15px; accent-color: #1677ff; }
+
+/* v2.84 二维码文字设置弹窗里的色块 */
+.cc-sw { display: inline-block; width: 18px; height: 18px; border-radius: 50%; margin-left: 6px; vertical-align: -3px; cursor: pointer; border: 2px solid transparent; }
+.cc-sw.on { border-color: #1677ff; box-shadow: 0 0 0 2px rgba(22,119,255,.18); }

@@ -2497,8 +2497,9 @@ const app = createApp({
       /* v2.83 二维码图上带上下文字（跟人家一样）：
          上 = 客服名称（「昵称显示」开关控制）  下 = 支持说明（「支持显示」开关控制）
          两个都关掉就输出一张纯二维码（无文字、中心 logo 加大） */
-      const topLine = codeCfg.nicknameOn ? ((me.value && me.value.nickname) || '在线客服') : '';
-      const bottomLine = codeCfg.supportOn ? '支持微信、支付宝、浏览器等通道扫码进入' : '';
+      /* v2.84 文字可自定义（存 code_top_text / code_bottom_text），默认「微信扫码咨询 / 官方客服」 */
+      const topLine = codeCfg.nicknameOn ? (codeStyle.topText || '微信扫码咨询') : '';
+      const bottomLine = codeCfg.supportOn ? (codeStyle.bottomText || '官方客服') : '';
       return {
         link: viewLink.value || currentLink.value || 'https://example.com/',
         topText: topLine, bottomText: bottomLine,
@@ -2893,6 +2894,7 @@ const app = createApp({
     const codeList = ref([]);
     const codeListLoading = ref(false);
     const ownDlg = ref(false);
+    const codeTextDlg = ref(false);
     const ownContact = ref('@xiaomifuwu');   // 联系上级（平台客服）的账号，可改
     /* ===== v2.80 登录安全 =====
        ① 新设备第一次登录：弹「确认本次登录信息」，让用户给这台设备起个称呼（存进登录设备备注）
@@ -3211,6 +3213,7 @@ const app = createApp({
       geoTag, visitorTag, visitorTagFull, visitorChnClass, copyQrImage, downloadQrImage, codeRotateHint, rotateCode, rotateLink, loadHistory, disableLink, saveCodeCfg, meAvatarUrl,
       manageDlgOpen, codeList, codeListLoading, openManageCodes, toggleCode, delCodeRow, ownDlg, ownContact,
       loginInfoDlg, loginInfo, loginInfoName, loginHost, saveLoginInfoName, skipLoginInfo,
+      codeTextDlg,
       codeCreatedAt, codeExpiresAt,
       quickFields, welcomeFields, autoFields, blFields, preqFields,
       shortTime, fmtTime, sourceText, contactLabel, barW, quotaW, trendW, trendDesc, dailyDesc,
