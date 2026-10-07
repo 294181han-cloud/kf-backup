@@ -222,7 +222,7 @@ createApp({
           return;
         }
         applyBrand(cfg.brand);
-        const tplKey = cfg.brand.template || 'whatsapp';
+        const tplKey = cfg.brand.template || 'default';   // v2.74 默认「默认客服」
         window.__tpl = applyTemplate(tplKey);
         navTitle.value = TEMPLATES[tplKey] ? TEMPLATES[tplKey].nav : '在线客服';
         robotType.value = cfg.brand.robot || 'no';

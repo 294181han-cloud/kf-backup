@@ -293,7 +293,7 @@ function handle_tenant_settings(string $method): void
             'brand_color'    => ts_get($tid, 'brand_color', '#1677ff'),
             'brand_position' => ts_get($tid, 'brand_position', 'right-bottom'),
             'pre_inquiry_on' => ts_get($tid, 'pre_inquiry_on', '0') === '1',
-            'visitor_template' => ts_get($tid, 'visitor_template', 'whatsapp'),
+            'visitor_template' => ts_get($tid, 'visitor_template', 'default'),   // v2.74 默认改成「默认客服」
             // 验证策略
             'robot'          => ts_get($tid, 'robot', 'no'),
             'robot_frequency' => ts_get($tid, 'robot_frequency', 'first'),

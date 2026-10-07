@@ -149,7 +149,7 @@ const app = createApp({
     // 租户
     const links = ref(null);
     const agents = ref([]);
-    const brand = reactive({ company_name: '', title: '', sub: '', avatar: '💬', color: '#1677ff', tpl: 'whatsapp', tpl_nav_on: true, tpl_nav_title: '', vip_badge: '', footer_text: '', agent_avatar_on: true });
+    const brand = reactive({ company_name: '', title: '', sub: '', avatar: '💬', color: '#1677ff', tpl: 'default', tpl_nav_on: true, tpl_nav_title: '', vip_badge: '', footer_text: '', agent_avatar_on: true });
     const bcText = ref('');
     const bcSending = ref(false);
 
@@ -474,7 +474,7 @@ const app = createApp({
       try {
         const b = await API.get('/api/tenant/settings');
         brand.company_name = b.brand_company; brand.title = b.brand_title; brand.sub = b.brand_sub;
-        brand.avatar = b.brand_avatar; brand.color = b.brand_color; brand.tpl = b.visitor_template || 'whatsapp';
+        brand.avatar = b.brand_avatar; brand.color = b.brand_color; brand.tpl = b.visitor_template || 'default';   // v2.74 默认「默认客服」
         brand.tpl_nav_on = b.tpl_nav_on !== false; brand.tpl_nav_title = b.tpl_nav_title || '';
         brand.agent_avatar_on = b.agent_avatar_on !== false;
         codeCfg.nicknameOn = b.code_nickname_on !== false;
@@ -2133,8 +2133,8 @@ const app = createApp({
 
     // 访客端模板列表（与 visitor.js TEMPLATES 对齐；只保留有真实界面结构的模板）
     const tplList = [
-      { k: 'whatsapp', label: 'WhatsApp（默认）', g1: '#008069' },
-      { k: 'default', label: '默认客服', g1: '#1677ff' },
+      { k: 'whatsapp', label: 'WhatsApp', g1: '#008069' },
+      { k: 'default', label: '默认客服（默认）', g1: '#1677ff' },
     ];
     // ===== 后台UI（模板+配色选择；注册表 assets/ui/ui-registry.js，加载器 ui-loader.js） =====
     // pc 分类由本页加载器实例管理（即时生效）；mobile 分类写 localStorage 供访客页本机预览。

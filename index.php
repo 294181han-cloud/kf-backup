@@ -97,6 +97,14 @@ function ensure_upgrade(): void
                 }
             }
         } catch (\Throwable $e) { /* 迁移失败下轮再试 */ }
+        /* v2.74 访客端默认模板统一改成「默认客服」：所有租户（含之前手动选过 WhatsApp 的）
+           一次性切过来，用 kv 标记保证只跑一次；之后租户想用 WhatsApp 自己在「访客端模板」里改。 */
+        try {
+            if (kv_get('mig_visitor_tpl_default', '') !== '1') {
+                $pdo->exec("UPDATE tenant_settings SET sval = 'default' WHERE skey = 'visitor_template' AND sval <> 'default'");
+                kv_set('mig_visitor_tpl_default', '1');
+            }
+        } catch (\Throwable $e) { /* 表还没建好：下一轮请求再试 */ }
         try {
             $needIds = $pdo->query("SELECT id FROM service_codes WHERE entry_id IS NULL OR entry_id = ''")->fetchAll(PDO::FETCH_COLUMN);
             if ($needIds) {
