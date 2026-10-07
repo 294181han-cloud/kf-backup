@@ -79,9 +79,15 @@ function handle_auth_login(string $method): void
         $chk = device_register(device_owner_key('agent', (int)$a['id'], (int)$t['id']), (int)$t['id'], $devId, $ip,
             mb_substr((string)($_SERVER['HTTP_USER_AGENT'] ?? ''), 0, 200), device_limit_for($t));
         if (empty($chk['ok'])) json_error((string)$chk['msg'], 403);
+        $uaRaw = (string)($_SERVER['HTTP_USER_AGENT'] ?? '');
+        if (!empty($chk['is_new'])) {
+            login_notice_push(device_owner_key('agent', (int)$a['id'], (int)$t['id']), $devId, (string)$a['nickname'], $ip, $uaRaw);
+        }
         json_out(['token' => jwt_encode(['role' => 'agent', 'id' => (int)$a['id'], 'tenant_id' => (int)$t['id'], 'dev' => $devId]),
             'user' => ['role' => 'agent', 'id' => (int)$a['id'], 'tenant_id' => (int)$t['id'],
                 'nickname' => $a['nickname'], 'avatar' => $a['avatar'], 'work_status' => 'online'],
+            'device' => ['is_new' => !empty($chk['is_new']), 'note' => (string)($chk['dev']['note'] ?? ''),
+                'ip' => $ip, 'geo' => lookup_geo($ip), 'device' => ua_label($uaRaw)],
             'redirect' => '/app.html']);
     }
 
@@ -95,9 +101,16 @@ function handle_auth_login(string $method): void
     $chk = device_register(device_owner_key('tenant', (int)$t['id'], (int)$t['id']), (int)$t['id'], $devId, $ip,
         mb_substr((string)($_SERVER['HTTP_USER_AGENT'] ?? ''), 0, 200), device_limit_for($t));
     if (empty($chk['ok'])) json_error((string)$chk['msg'], 403);
+    /* v2.80 新设备登录 → 给同账号的其他设备写一条「新登录通知」 */
+    $uaRaw = (string)($_SERVER['HTTP_USER_AGENT'] ?? '');
+    if (!empty($chk['is_new'])) {
+        login_notice_push(device_owner_key('tenant', (int)$t['id'], (int)$t['id']), $devId, (string)$t['nickname'], $ip, $uaRaw);
+    }
     json_out(['token' => jwt_encode(['role' => 'tenant', 'id' => (int)$t['id'], 'dev' => $devId]),
         'user' => ['role' => 'tenant', 'id' => (int)$t['id'], 'kami' => $t['kami'],
             'nickname' => $t['nickname'], 'expires_at' => $t['expires_at']],
+        'device' => ['is_new' => !empty($chk['is_new']), 'note' => (string)($chk['dev']['note'] ?? ''),
+            'ip' => $ip, 'geo' => lookup_geo($ip), 'device' => ua_label($uaRaw)],
         'redirect' => '/app.html']);
 }
 
@@ -113,16 +126,7 @@ function login_device_owner(): array
 function device_row_out(array $r): array
 {
     $ua = (string)($r['ua'] ?? '');
-    $dev = '未知设备';
-    if (preg_match('/iPhone|iPad|iPod/i', $ua)) $dev = 'iPhone/iPad';
-    elseif (preg_match('/Android/i', $ua)) $dev = '安卓手机';
-    elseif (preg_match('/Windows/i', $ua)) $dev = 'Windows 电脑';
-    elseif (preg_match('/Macintosh|Mac OS/i', $ua)) $dev = 'Mac';
-    elseif (preg_match('/Linux/i', $ua)) $dev = 'Linux';
-    if (preg_match('/MicroMessenger/i', $ua)) $dev .= ' · 微信';
-    elseif (preg_match('/Edg\//i', $ua)) $dev .= ' · Edge';
-    elseif (preg_match('/Chrome/i', $ua)) $dev .= ' · Chrome';
-    elseif (preg_match('/Safari/i', $ua)) $dev .= ' · Safari';
+    $dev = ua_label($ua);   // v2.80 抽到 helpers.php，登录通知里共用同一套标签
     return [
         'id' => (int)$r['id'],
         'dev_id' => substr((string)$r['dev_id'], 0, 8),
@@ -144,6 +148,39 @@ function handle_login_devices(string $method): void
     $list = array_map('device_row_out', $st->fetchAll());
     $limit = tenant_device_limit((int)$ctx['tenant_id']);
     json_out(['devices' => $list, 'limit' => $limit, 'count' => count($list)]);
+}
+
+/** v2.80 登录安全：返回 ①我这次登录的设备信息（新设备要不要让用户起个称呼）
+ *  ②最新的一条「新登录通知」（同账号别的设备登录时写的，前端弹提醒用）。 */
+function handle_login_notice(string $method): void
+{
+    if ($method !== 'GET') { json_error('方法不允许', 405); return; }
+    [$ctx, $key] = login_device_owner();
+    $pdo = db();
+    $ua = (string)($_SERVER['HTTP_USER_AGENT'] ?? '');
+    $tok = bearer_token();
+    $dec = $tok ? jwt_decode($tok) : null;
+    $myDev = device_norm_id((string)(is_array($dec) ? ($dec['dev'] ?? '') : ''));
+    $me = null;
+    if ($myDev !== '') {
+        $st = $pdo->prepare('SELECT * FROM login_devices WHERE owner_key = ? AND dev_id = ? LIMIT 1');
+        $st->execute([$key, $myDev]);
+        $row = $st->fetch();
+        if ($row) {
+            $isNew = (time() - strtotime((string)$row['created_at'])) < 120;   // 本次刚登记的设备
+            $me = [
+                'id' => (int)$row['id'],
+                'dev_id' => $myDev,
+                'note' => (string)$row['note'],
+                'is_new' => $isNew,
+                'ip' => (string)$row['ip'] ?: get_client_ip(),
+                'geo' => lookup_geo((string)$row['ip'] ?: get_client_ip()),
+                'device' => ua_label($ua),
+                'at' => dt_to_iso((string)$row['created_at']),
+            ];
+        }
+    }
+    json_out(['notice' => login_notice_get($key), 'me' => $me]);
 }
 
 function handle_login_device_kick(string $method): void

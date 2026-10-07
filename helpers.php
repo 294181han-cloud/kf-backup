@@ -292,10 +292,63 @@ function device_register(string $ownerKey, int $tenantId, string $devId, string 
         }
         $pdo->prepare('INSERT INTO login_devices (owner_key, tenant_id, dev_id, note, ip, ua, created_at, last_seen) VALUES (?,?,?,\'\',?,?,?,?)')
             ->execute([$ownerKey, $tenantId, $devId, $ip, mb_substr($ua, 0, 200), now_dt(), now_dt()]);
-        return ['ok' => true, 'dev' => ['id' => (int)$pdo->lastInsertId(), 'dev_id' => $devId]];
+        $id = (int)$pdo->lastInsertId();
+        return ['ok' => true, 'is_new' => true, 'dev' => [
+            'id' => $id, 'dev_id' => $devId, 'note' => '', 'ip' => $ip, 'ua' => mb_substr($ua, 0, 200),
+            'owner_key' => $ownerKey, 'created_at' => now_dt(), 'last_seen' => now_dt(),
+        ]];
     } catch (\Throwable $e) {
         return ['ok' => true, 'dev' => null];   // 老库没建表时别把登录堵死
     }
+}
+
+/* ===================== v2.80 登录安全：设备称呼 + 异地/新设备登录提醒 =====================
+   ① 新设备第一次登录 → 前端弹「确认本次登录信息」，让用户给这台设备起个称呼（存进备注）；
+   ② 同时把这次登录写成一条"新登录通知"，同账号的其他在线设备轮询到就会弹提醒
+      （谁、在哪、什么设备、什么时候）—— 防盗用、防共享。 */
+
+/** 设备外观标签（跟「登录设备」列表里那个「Windows 电脑 · Chrome」一致） */
+function ua_label(string $ua): string
+{
+    $dev = '未知设备';
+    if (preg_match('/iPhone|iPad|iPod/i', $ua)) $dev = 'iPhone/iPad';
+    elseif (preg_match('/Android/i', $ua)) $dev = '安卓手机';
+    elseif (preg_match('/Windows/i', $ua)) $dev = 'Windows 电脑';
+    elseif (preg_match('/Macintosh|Mac OS/i', $ua)) $dev = 'Mac';
+    elseif (preg_match('/Linux/i', $ua)) $dev = 'Linux';
+    if (preg_match('/MicroMessenger/i', $ua)) $dev .= ' · 微信';
+    elseif (preg_match('/Edg\//i', $ua)) $dev .= ' · Edge';
+    elseif (preg_match('/Chrome/i', $ua)) $dev .= ' · Chrome';
+    elseif (preg_match('/Safari/i', $ua)) $dev .= ' · Safari';
+    return $dev;
+}
+
+/** 写一条「新登录通知」（同账号的其他设备下次轮询就会看到） */
+function login_notice_push(string $ownerKey, string $devId, string $note, string $ip, string $ua): void
+{
+    try {
+        $payload = [
+            'id' => bin2hex(random_bytes(6)),
+            'ts' => time(),
+            'dev' => device_norm_id($devId),
+            'note' => mb_substr($note, 0, 32),
+            'ip' => $ip,
+            'geo' => lookup_geo($ip),
+            'device' => ua_label($ua),
+            'at' => date('Y-m-d H:i:s'),
+        ];
+        kv_set('login_notice:' . $ownerKey, json_encode($payload, JSON_UNESCAPED_UNICODE));
+    } catch (\Throwable $e) { /* 通知写失败不影响登录 */ }
+}
+
+function login_notice_get(string $ownerKey): ?array
+{
+    try {
+        $raw = kv_get('login_notice:' . $ownerKey, '');
+        if ($raw === '') return null;
+        $j = json_decode($raw, true);
+        return is_array($j) ? $j : null;
+    } catch (\Throwable $e) { return null; }
 }
 
 /** 每次带 token 的请求都核对设备还在不在（被踢掉 → token 立刻失效）；last_seen 最多 2 分钟写一次 */

@@ -7,7 +7,7 @@
 <link rel="icon" href="/assets/img/mi-logo.png">
 <link rel="apple-touch-icon" href="/assets/img/mi-logo.png">
 <link rel="stylesheet" href="/assets/vendor/element-plus.css">
-<link rel="stylesheet" href="/assets/css/app.css?v=3.48.0">
+<link rel="stylesheet" href="/assets/css/app.css?v=3.49.0">
 <script src="/assets/ui/ui-registry.js?v=2.9.2"></script>
 <script src="/assets/ui/ui-loader.js?v=2.9.2" data-ui-cat="auto"></script>
 </head>
@@ -852,6 +852,24 @@
               </div>
             </div>
           </div>
+
+          <!-- v2.80 新设备登录：确认本次登录信息（给这台设备起个称呼，方便同账号成员识别） -->
+          <el-dialog v-model="loginInfoDlg" title="确认本次登录信息" width="460px" align-center :close-on-click-modal="false">
+            <p class="muted" style="font-size:12.5px;line-height:1.7;margin:0 0 12px;">
+              为本次登录添加一个称呼，方便同账号成员识别。此项可以跳过，保存后可在「设置 → 安全与维护 → 登录设备」里查看或修改。
+            </p>
+            <div class="lg-grid" v-if="loginInfo">
+              <div class="lg-c"><div class="lg-k">登录 IP</div><div class="lg-v mono">{{ loginInfo.ip || '—' }}</div></div>
+              <div class="lg-c"><div class="lg-k">登录地址</div><div class="lg-v">{{ loginInfo.geo || '—' }}</div></div>
+              <div class="lg-c"><div class="lg-k">登录入口</div><div class="lg-v mono">{{ loginHost }}</div></div>
+              <div class="lg-c"><div class="lg-k">设备 / 浏览器</div><div class="lg-v">{{ loginInfo.device }}</div></div>
+            </div>
+            <el-input v-model="loginInfoName" maxlength="20" placeholder="登录人称呼，例如：张三（选填）" style="margin-top:12px;"></el-input>
+            <template #footer>
+              <el-button @click="skipLoginInfo">跳过</el-button>
+              <el-button type="primary" @click="saveLoginInfoName">保存并继续</el-button>
+            </template>
+          </el-dialog>
 
           <!-- v2.79 专属码：独占域名（只给自己用，别人被拦不连累你）→ 联系上级购买 -->
           <div class="own-card">
@@ -1733,7 +1751,7 @@
 <script src="/assets/qr-poster.js?v=2.1.03"></script>
 <script src="/assets/api.js?v=2.1.0"></script>
 <script src="/assets/js/app-components.js?v=2.6.2"></script>
-<script src="/assets/js/app.js?v=3.46.0"></script>
+<script src="/assets/js/app.js?v=3.47.0"></script>
 <script src="/assets/js/app-boot.js?v=2.1.1"></script>
 </body>
 </html>

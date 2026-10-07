@@ -2125,3 +2125,9 @@ body.dark .sess-resume-entry .sme-box { background: #3a2f1a; color: #f0b45c; }
 .own-card .own-body { flex: 1; min-width: 0; }
 .own-card .own-t { font-size: 14.5px; font-weight: 700; color: #1d2129; margin-bottom: 4px; }
 .own-card .own-s { font-size: 12px; color: #86909c; line-height: 1.7; }
+
+/* ===== v2.80 「确认本次登录信息」弹窗的键值网格 ===== */
+.lg-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.lg-grid .lg-c { background: #f7f8fa; border-radius: 10px; padding: 10px 12px; min-width: 0; }
+.lg-grid .lg-k { font-size: 11.5px; color: #86909c; margin-bottom: 3px; }
+.lg-grid .lg-v { font-size: 13.5px; color: #1d2129; font-weight: 600; word-break: break-all; }

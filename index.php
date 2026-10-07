@@ -609,6 +609,7 @@ function dispatch_api(string $method, string $uri): void
     if ($uri === '/api/login-devices')      handle_login_devices($method);
     if ($uri === '/api/login-devices/kick') handle_login_device_kick($method);
     if ($uri === '/api/login-devices/note') handle_login_device_note($method);
+    if ($uri === '/api/login-notice')      handle_login_notice($method);
 
     // ---- 访客端（公开） ----
     if ($uri === '/api/visitor/config')      handle_visitor_config($method);

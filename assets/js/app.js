@@ -2877,6 +2877,57 @@ const app = createApp({
     const codeListLoading = ref(false);
     const ownDlg = ref(false);
     const ownContact = ref('@xiaomifuwu');   // 联系上级（平台客服）的账号，可改
+    /* ===== v2.80 登录安全 =====
+       ① 新设备第一次登录：弹「确认本次登录信息」，让用户给这台设备起个称呼（存进登录设备备注）
+       ② 同账号别处登录：轮询到「新登录通知」就弹提醒（谁/在哪/什么设备/什么时候），5 分钟自动关 */
+    const loginInfoDlg = ref(false);
+    const loginInfo = ref(null);
+    const loginInfoName = ref('');
+    const loginHost = ref(location.hostname);
+    let loginNoticeTimer = null;
+    const checkLoginSecurity = async () => {
+      try {
+        const r = await API.get('/api/login-notice');
+        const me = r && r.me;
+        if (!me) return;
+        loginInfo.value = me;
+        if (me.is_new && !me.note && !loginInfoDlg.value) {
+          let skipped = false;
+          try { skipped = sessionStorage.getItem('kfxt_loginfo_skip') === '1'; } catch (e) {}
+          if (!skipped) { loginInfoName.value = ''; loginInfoDlg.value = true; }
+        }
+        const n = r.notice;
+        if (n && n.id && n.dev && n.dev !== me.dev_id) {
+          let shown = '';
+          try { shown = localStorage.getItem('kfxt_login_notice') || ''; } catch (e) {}
+          if (shown !== n.id) {
+            try { localStorage.setItem('kfxt_login_notice', n.id); } catch (e) {}
+            ElementPlus.ElNotification({
+              title: '⚠️ 新登录通知', type: 'warning', duration: 300000, position: 'top-right',
+              dangerouslyUseHTMLString: true,
+              message: '<div style="line-height:1.95;font-size:13px;">'
+                + '登录身份：<b>' + (n.note || me.note || '同账号') + '</b><br>'
+                + '登录信息：<b>' + (n.ip || '') + '</b>　' + (n.geo || '') + '<br>'
+                + '登录来源：<b>' + (n.device || '') + '</b><br>'
+                + '<span style="color:#86909c;font-size:12px;">' + (n.at || '') + '　5 分钟后自动关闭</span></div>'
+            });
+          }
+        }
+      } catch (e) { /* 静默：登录安全接口失败不影响使用 */ }
+    };
+    const saveLoginInfoName = async () => {
+      try {
+        if (loginInfo.value && loginInfoName.value.trim() !== '') {
+          await API.post('/api/login-devices/note', { id: loginInfo.value.id, note: loginInfoName.value.trim() });
+          ElementPlus.ElMessage.success('已保存，可在「设置 → 安全与维护 → 登录设备」里改');
+        }
+      } catch (e) { ElementPlus.ElMessage.error(e.message); }
+      loginInfoDlg.value = false;
+    };
+    const skipLoginInfo = () => {
+      try { sessionStorage.setItem('kfxt_loginfo_skip', '1'); } catch (e) {}
+      loginInfoDlg.value = false;
+    };
     const loadCodes = async () => {
       codeListLoading.value = true;
       try { codeList.value = await API.get('/api/tenant/service-code'); }
@@ -3067,6 +3118,10 @@ const app = createApp({
         startPoll();
         startExpireWatch();   // v2.57 到期提醒（5 分钟提示 / 2 分钟弹窗）
         startIdleWatch();     // v2.76 1 小时不操作自动退出登录
+        // v2.80 登录安全：进来先查一次（新设备弹"确认登录信息"），之后每 30 秒查新登录通知
+        checkLoginSecurity();
+        if (loginNoticeTimer) clearInterval(loginNoticeTimer);
+        loginNoticeTimer = setInterval(checkLoginSecurity, 30000);
         checkCodeAlerts();    // v2.64 红码提醒（服务端每小时巡检）
         alertTimer = setInterval(checkCodeAlerts, 10 * 60 * 1000);
       } catch (e) {
@@ -3133,6 +3188,7 @@ const app = createApp({
       cropDlg, cropSrc, cropZoomPct, cropStage, cropStyle, cropImgLoaded, cropDown, cropMove, cropUp, cropWheel, cropClose, openCrop, cropConfirm, avatarPreview,
       geoTag, visitorTag, visitorTagFull, visitorChnClass, copyQrImage, downloadQrImage, codeRotateHint, rotateCode, rotateLink, loadHistory, disableLink, saveCodeCfg, meAvatarUrl,
       manageDlgOpen, codeList, codeListLoading, openManageCodes, toggleCode, delCodeRow, ownDlg, ownContact,
+      loginInfoDlg, loginInfo, loginInfoName, loginHost, saveLoginInfoName, skipLoginInfo,
       quickFields, welcomeFields, autoFields, blFields, preqFields,
       shortTime, fmtTime, sourceText, contactLabel, barW, quotaW, trendW, trendDesc, dailyDesc,
       sessTime,
