@@ -305,6 +305,15 @@ createApp({
       try { await API.del('/api/admin/domain-pool/' + row.id); await loadDomains(); }
       catch (e) { ElementPlus.ElMessage.error(e.message); }
     };
+    /* v2.73 人工判红：检测接口（麒麟/urlsec）测不出"微信客户端拦截"，
+       所以拿微信实扫一遍，打不开的在这里标记一下 —— 停用 + 进红名单 + 通知租户换码。 */
+    const blockDomain = async (row) => {
+      try {
+        const r = await API.post('/api/admin/domain-pool/' + row.id + '/block', {});
+        ElementPlus.ElMessage.success('已标记并停用 ' + (r.domain || row.domain) + '（影响 ' + (r.affected || 0) + ' 个客服码，已通知对应租户）');
+        await loadDomains(); if (typeof loadReds === 'function') await loadReds();
+      } catch (e) { ElementPlus.ElMessage.error(e.message); }
+    };
 
     // 子域明细 · 状态表：拉这个主域下每个子域的实时状态（红码/使用中/已作废/待分配）
     const subVisible = ref(false);
@@ -414,7 +423,7 @@ createApp({
       barWidth, locationOrigin,
       dlgVisible, dlgMode, dlg, dlgSaving, openCreate, openEdit, saveTenant, toggleTenant, delTenant,
       createdVisible, created, copyCreated, openGen, genVisible, genPair, doGen, fillGenKami, openTrial,
-      addDomain, toggleDomain, delDomain, saveRootDomain, saveDefaults, changePw, logout,
+      addDomain, toggleDomain, delDomain, blockDomain, saveRootDomain, saveDefaults, changePw, logout,
     };
   }
 }).use(ElementPlus).mount('#app');

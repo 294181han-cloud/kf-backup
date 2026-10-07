@@ -166,10 +166,14 @@
                   <el-tag :type="row.enabled ? 'success' : 'info'" size="small">{{ row.enabled ? '启用' : '停用' }}</el-tag>
                 </template>
               </el-table-column>
-              <el-table-column label="操作" width="220">
+              <el-table-column label="操作" width="330">
                 <template #default="{row}">
                   <el-button v-if="row.subs_count" size="small" @click="showSubs(row)">子域明细</el-button>
                   <el-button size="small" @click="toggleDomain(row)">{{ row.enabled ? '停用' : '启用' }}</el-button>
+                  <!-- v2.73 人工判红：检测接口测不出"微信客户端拦截"，拿微信实扫一遍，打不开的点这里 -->
+                  <el-popconfirm v-if="row.enabled" title="确认这台域名在微信里也打不开？标记后：停用 + 进红名单 + 通知该域名上的租户换码" @confirm="blockDomain(row)">
+                    <template #reference><el-button size="small" type="danger" plain>微信打不开·标记</el-button></template>
+                  </el-popconfirm>
                   <el-popconfirm title="删除该域名？" @confirm="delDomain(row)">
                     <template #reference><el-button size="small" type="danger">删除</el-button></template>
                   </el-popconfirm>
@@ -648,6 +652,6 @@
 <script src="/assets/vendor/vue.global.js?v=2.0.1"></script>
 <script src="/assets/vendor/element-plus.js?v=2.0.1"></script>
 <script src="/assets/api.js?v=2.0.3"></script>
-<script src="/assets/js/admin.js?v=2.8.0"></script>
+<script src="/assets/js/admin.js?v=2.9.0"></script>
 </body>
 </html>

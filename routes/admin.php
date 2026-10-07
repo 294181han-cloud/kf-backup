@@ -300,6 +300,41 @@ function handle_admin_domain_pool_id(string $method, int $id): void
     json_error('方法不允许', 405);
 }
 
+/** v2.73 人工标记「微信里打不开」：检测接口（麒麟/urlsec）测不出来的拦截，由人工实扫判定。
+ *  一键做完四件事：①停用池行 ②写红名单（发码/自动分配都会跳过）③该域名上的租户写红码提醒
+ *  ④清掉这些租户的专属域名与内容主机（下次发码自动换到别的域名）。
+ *  与自动退役的区别：这是"人工判红"，因为微信客户端侧的拦截 API 查不到。 */
+function handle_admin_domain_pool_block(string $method, int $id): void
+{
+    require_admin_ctx();
+    if ($method !== 'POST') json_error('方法不允许', 405);
+    $pdo = db();
+    $st = $pdo->prepare('SELECT * FROM domain_pool WHERE id = ? LIMIT 1');
+    $st->execute([$id]);
+    $row = $st->fetch();
+    if (!$row) json_error('域名不存在', 404);
+    $dom = strtolower((string)$row['domain']);
+    $pdo->prepare('UPDATE domain_pool SET enabled = 0 WHERE id = ?')->execute([$id]);
+    try {
+        $pdo->prepare("INSERT IGNORE INTO red_domains (host, main, kind, code, channel) VALUES (?,?,?,?, 'wx')")
+            ->execute([$dom, $dom, 'main', '']);
+    } catch (\Throwable $e) { /* 名单写失败不影响停用 */ }
+    $n = 0;
+    try {
+        $st2 = $pdo->prepare('SELECT tenant_id, code, link FROM service_codes WHERE link LIKE ?');
+        $st2->execute(['%' . $dom . '%']);
+        foreach ($st2->fetchAll() as $sc) {
+            $pdo->prepare('INSERT INTO code_alerts (tenant_id, code, link, msg) VALUES (?,?,?,?)')
+                ->execute([(int)$sc['tenant_id'], (string)$sc['code'], (string)$sc['link'],
+                    '域名 ' . $dom . ' 在微信里已打不开（人工标记），请到「客服码」页点「换新链接」重新发给客户']);
+            $n++;
+        }
+        $pdo->prepare('UPDATE tenants SET content_domain = \'\' WHERE content_domain = ?')->execute([$dom]);
+        $pdo->prepare('UPDATE service_codes SET content_host = \'\' WHERE content_host LIKE ?')->execute(['%.' . $dom]);
+    } catch (\Throwable $e) { /* 提醒写失败不影响停用 */ }
+    json_out(['ok' => true, 'domain' => $dom, 'affected' => $n]);
+}
+
 /* ---------- aaPanel 快速导入（v2.61）----------
    用途：泛解析证书麻烦（真通配要 DNS 验证），改为「一批固定随机子域 + 主域」共用一张
    Let's Encrypt SAN 证书（一张最多 100 个域名，避开 LE 每周 50 张限额）。

@@ -671,6 +671,7 @@ function dispatch_api(string $method, string $uri): void
     if ($uri === '/api/admin/domain-pool')       handle_admin_domain_pool($method);
     if ($uri === '/api/admin/domain-pool/subs')  handle_admin_pool_subs($method);
     if (preg_match('#^/api/admin/domain-pool/(\d+)$#', $uri, $m)) handle_admin_domain_pool_id($method, (int)$m[1]);
+    if (preg_match('#^/api/admin/domain-pool/(\d+)/block$#', $uri, $m)) handle_admin_domain_pool_block($method, (int)$m[1]);
     if ($uri === '/api/admin/aa-test')           handle_admin_aa_test($method);
     if ($uri === '/api/admin/aa-import')         handle_admin_aa_import($method);
     if ($uri === '/api/admin/red-domains')       handle_admin_red_domains($method);
