@@ -826,6 +826,22 @@ const app = createApp({
       tick();
       expireTimer = setInterval(tick, 15000);
     };
+    /* ===== v2.76 1 小时不操作 → 自动退出登录（防卡密共享；租户/子客服都适用）=====
+       鼠标/键盘/触摸/滚动都算"操作"；到点强制退出登录，回登录页并说明原因。 */
+    const IDLE_LIMIT_MS = 60 * 60 * 1000;
+    let idleTimer = null;
+    let lastActiveAt = Date.now();
+    const startIdleWatch = () => {
+      const markActive = () => { lastActiveAt = Date.now(); };
+      ['mousemove', 'mousedown', 'keydown', 'touchstart', 'touchmove', 'click', 'scroll', 'wheel']
+        .forEach(function (ev) { document.addEventListener(ev, markActive, { passive: true }); });
+      idleTimer = setInterval(function () {
+        if (Date.now() - lastActiveAt >= IDLE_LIMIT_MS) {
+          if (idleTimer) { clearInterval(idleTimer); idleTimer = null; }
+          forceLogout('超过 1 小时未操作，已自动退出登录');
+        }
+      }, 30000);
+    };
     /* ===== v2.64 红码提醒：服务端每小时巡检所有客服码，这里轮询并把红的弹窗告诉租户 =====
        同一批提醒只弹一次（弹完就标记已读）；某条码恢复正常后服务端会清掉未读提醒，
        所以「红了→修好→又红了」会重新提醒，一直红着则不会每小时骚扰。 */
@@ -3023,6 +3039,7 @@ const app = createApp({
         booted.value = true;
         startPoll();
         startExpireWatch();   // v2.57 到期提醒（5 分钟提示 / 2 分钟弹窗）
+        startIdleWatch();     // v2.76 1 小时不操作自动退出登录
         checkCodeAlerts();    // v2.64 红码提醒（服务端每小时巡检）
         alertTimer = setInterval(checkCodeAlerts, 10 * 60 * 1000);
       } catch (e) {

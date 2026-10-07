@@ -83,7 +83,7 @@ body {
 <div class="footer">Powered by 客服系统</div>
 <script src="/assets/vendor/vue.global.js?v=2.0.1"></script>
 <script src="/assets/vendor/element-plus.js?v=2.0.1"></script>
-<script src="/assets/api.js?v=2.0.4"></script>
+<script src="/assets/api.js?v=2.1.0"></script>
 <script>
 const { createApp, ref } = Vue;
 createApp({
@@ -102,7 +102,9 @@ createApp({
       loading.value = true;
       try {
         const r = await API.login(account.value.trim(), password.value);
-        API.setToken(r.token);
+        /* v2.76 不再长期保存登录状态：用一次性「交接」把 token 带进工作台，
+           页面加载后就只剩内存里有 —— 刷新/关闭再打开都要重新输卡密密码（防共享）。 */
+        API.handoff(r.token);
         ElementPlus.ElMessage.success('登录成功');
         setTimeout(() => location.href = r.redirect || '/app.html', 400);
       } catch (e) {
@@ -115,8 +117,7 @@ createApp({
        现在：有效才跳；无效就清掉并留在本页（顺便把原因显示出来）。 */
     (async () => {
       try {
-        if (!localStorage.getItem('kfxt_token')) return;
-        API.loadToken();
+        if (!API.token) return;      // api.js 启动时已经按规则恢复过（只有管理员会保留）
         const m = await API.me();
         if (m && (m.role === 'tenant' || m.role === 'agent' || m.role === 'admin')) location.replace('/app.html');
       } catch (e) {
