@@ -1991,12 +1991,14 @@ function gate_resolve_token(string $token): ?array
         $pdo = db();
         $row = null;
         $st = $pdo->prepare('SELECT sc.code, sc.tenant_id, t.status, t.expires_at
-            FROM service_codes sc JOIN tenants t ON t.id = sc.tenant_id WHERE sc.entry_id = ? LIMIT 1');
+            FROM service_codes sc JOIN tenants t ON t.id = sc.tenant_id
+            WHERE sc.entry_id = ? AND sc.enabled = 1 LIMIT 1');
         $st->execute([$token]);
         $row = $st->fetch();
         if (!$row) {
             $st = $pdo->prepare('SELECT sc.code, sc.tenant_id, t.status, t.expires_at
-                FROM service_codes sc JOIN tenants t ON t.id = sc.tenant_id WHERE sc.code = ? LIMIT 1');
+                FROM service_codes sc JOIN tenants t ON t.id = sc.tenant_id
+                WHERE sc.code = ? AND sc.enabled = 1 LIMIT 1');
             $st->execute([$token]);
             $row = $st->fetch();
         }

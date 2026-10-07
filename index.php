@@ -81,6 +81,10 @@ function ensure_upgrade(): void
         try { $pdo->exec("ALTER TABLE service_codes ADD UNIQUE KEY uk_entry_id (entry_id)"); } catch (\Throwable $e) { /* 索引已存在 */ }
         // v2.68 内容落地主机：一张码固定一台（访客 localStorage 按域隔离，换域会丢会话）
         try { $pdo->exec("ALTER TABLE service_codes ADD COLUMN content_host VARCHAR(120) NOT NULL DEFAULT ''"); } catch (\Throwable $e) { /* 列已存在 */ }
+        /* v2.79 管理码：一个租户可同时存在多条客服码（发新码不再让旧码失效），
+           每条码可单独启用/停用（停用后立刻打不开，等价于旧版的"作废"）。 */
+        try { $pdo->exec("ALTER TABLE service_codes ADD COLUMN enabled TINYINT NOT NULL DEFAULT 1"); } catch (\Throwable $e) { /* 列已存在 */ }
+        try { $pdo->exec("ALTER TABLE service_codes ADD INDEX idx_tenant_enabled (tenant_id, enabled)"); } catch (\Throwable $e) { /* 索引已存在 */ }
         /* v2.70 租户专属落地域名（自动分配）：把一个租户固定在同一台域名上，
            某台域名红了只影响它自己，不再"一个域名红了全体陪葬"。
            存量租户按他现在正在用的域名回填（不打扰、不用重发二维码）。 */
@@ -659,6 +663,7 @@ function dispatch_api(string $method, string $uri): void
     if ($uri === '/api/tenant/agents')           handle_tenant_agents($method);
     if (preg_match('#^/api/tenant/agents/(\d+)$#', $uri, $m)) handle_tenant_agents_id($method, (int)$m[1]);
     if ($uri === '/api/tenant/service-code')     handle_tenant_service_code($method);
+    if ($uri === '/api/tenant/service-code/toggle') handle_tenant_service_code_toggle($method);
     if ($uri === '/api/tenant/link')             handle_tenant_link($method);
     if ($uri === '/api/tenant/link/renew')       handle_tenant_link_renew($method);
     if ($uri === '/api/tenant/settings')         handle_tenant_settings($method);

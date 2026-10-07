@@ -7,7 +7,7 @@
 <link rel="icon" href="/assets/img/mi-logo.png">
 <link rel="apple-touch-icon" href="/assets/img/mi-logo.png">
 <link rel="stylesheet" href="/assets/vendor/element-plus.css">
-<link rel="stylesheet" href="/assets/css/app.css?v=3.47.0">
+<link rel="stylesheet" href="/assets/css/app.css?v=3.48.0">
 <script src="/assets/ui/ui-registry.js?v=2.9.2"></script>
 <script src="/assets/ui/ui-loader.js?v=2.9.2" data-ui-cat="auto"></script>
 </head>
@@ -744,8 +744,8 @@
       <div class="content" v-if="tab==='links' && me.role==='tenant'">
         <div class="code-page-card">
           <div class="code-head">
-            <div class="code-head-t">客服码管理</div>
-            <div class="code-head-sub">统一管理客服码链接与二维码样式：中心 Logo、上下文案、码点码眼可自由设置；换标会检测该渠道的拦截状态。</div>
+            <div class="code-head-t">客服码</div>
+            <div class="code-head-sub">扫码即可咨询。换新码不会让旧码失效 —— 旧码可在「管理码」里停用或删除。</div>
           </div>
 
           <div class="code-bar">
@@ -756,9 +756,7 @@
             <el-popconfirm :title="codeRotateHint" @confirm="rotateCode">
               <template #reference><el-button type="primary" size="small">新码</el-button></template>
             </el-popconfirm>
-            <el-popconfirm title="会重新生成一条链接（顾客手里那张旧二维码就作废了），确定吗？" @confirm="rotateLink">
-              <template #reference><el-button size="small">换新链接</el-button></template>
-            </el-popconfirm>
+            <el-button size="small" @click="openManageCodes">管理码</el-button>
           </div>
 
           <!-- 拦截检测：微信 logo 就查微信能不能打开 / 有没有被拦截（红了） -->
@@ -767,9 +765,9 @@
             <div class="ra-ic">🔴</div>
             <div class="ra-body">
               <div class="ra-t">当前客服码已被微信拦截（俗称"红了"），客户扫码进不来</div>
-              <div class="ra-s">点右边「立即换码」会换一条全新的链接（换掉被拦的域名），<b>旧二维码会作废，记得把新的重新发给客户</b>。<br>如果只是想升级成「二维码永不过期」的入口链接，点上面的「新码」——它不会改二维码。</div>
+              <div class="ra-s">点右边「立即换码」会新增一条全新的链接（换掉被拦的域名），<b>把新链接发给客户即可</b>；旧码不会失效，需要的话可以在「管理码」里停用或删除。</div>
             </div>
-            <el-popconfirm title="换一条全新的链接（旧二维码作废，客户要重新扫码），确定吗？" @confirm="rotateLink">
+            <el-popconfirm title="新增一条全新的链接（换掉被拦的域名），旧码保留，确定吗？" @confirm="rotateLink">
               <template #reference><el-button type="danger" size="small" style="font-weight:700;">立即换码</el-button></template>
             </el-popconfirm>
           </div>
@@ -828,37 +826,8 @@
               </div>
               </div>
               <div class="cp-right">
-              <div class="cp-row">
-                <span class="cp-lbl">码点</span>
-                <div class="cp-seg">
-                  <button type="button" :class="{on: codeStyle.dot==='rounded'}" @click="setCodeStyle('dot','rounded')">圆角</button>
-                  <button type="button" :class="{on: codeStyle.dot==='dot'}" @click="setCodeStyle('dot','dot')">圆点</button>
-                  <button type="button" :class="{on: codeStyle.dot==='square'}" @click="setCodeStyle('dot','square')">方形</button>
-                </div>
-                <span class="cp-lbl">码眼</span>
-                <div class="cp-seg">
-                  <button type="button" :class="{on: codeStyle.eye==='rounded'}" @click="setCodeStyle('eye','rounded')">圆角</button>
-                  <button type="button" :class="{on: codeStyle.eye==='square'}" @click="setCodeStyle('eye','square')">方形</button>
-                </div>
-                <span class="cp-lbl">主色</span>
-                <div class="cp-sw">
-                  <span v-for="c in CODE_BRANDS" :key="c.c" class="cp-sw-i" :class="{on: codeStyle.brand===c.c}" :title="c.n" :style="{background: c.c}" @click="setCodeStyle('brand', c.c)"></span>
-                </div>
-                <span class="cp-lbl">Logo 大小</span>
-                <div class="cp-seg">
-                  <button type="button" :class="{on: codeStyle.logoSize==='std'}" @click="setCodeStyle('logoSize','std')">标准</button>
-                  <button type="button" :class="{on: codeStyle.logoSize==='big'}" @click="setCodeStyle('logoSize','big')" title="更醒目；部分长链接下扫码识别率会下降">加大</button>
-                </div>
-              </div>
-  
-              <div class="cp-row">
-                <span class="cp-lbl">上方文字</span>
-                <el-input v-model="codeStyle.topText" maxlength="12" placeholder="扫码咨询" style="width:132px" @change="renderCodeCard"></el-input>
-                <span class="cp-lbl">下方文字</span>
-                <el-input v-model="codeStyle.bottomText" maxlength="12" placeholder="官方客服" style="width:132px" @change="renderCodeCard"></el-input>
-                <el-button size="small" @click="resetCodeStyle">恢复默认</el-button>
-              </div>
-  
+              <!-- v2.79 按需求做减法：只留「中心 Logo（决定检测渠道）」+ 两个显示开关，
+                   码点/码眼/主色/Logo大小/上下文字的设置项全部去掉（都用默认值出图） -->
               <div class="cp-row">
                 <span class="cp-lbl">中心 Logo</span>
                 <div class="cp-logos">
@@ -869,12 +838,74 @@
                   </button>
                 </div>
                 <input type="file" accept="image/*" style="display:none" ref="logoFile" @change="onLogoFile">
-                <label class="cp-chk"><input type="checkbox" v-model="codeStyle.colorDots" @change="renderCodeCard"> 码点跟随主色</label>
               </div>
-  
+
+              <div class="cp-row">
+                <span class="cp-lbl">二维码上显示</span>
+                <label class="cp-chk"><input type="checkbox" v-model="codeCfg.nicknameOn" @change="saveCodeCfg(); renderCodeCard();"> 客服名称</label>
+                <label class="cp-chk"><input type="checkbox" v-model="codeCfg.supportOn" @change="saveCodeCfg(); renderCodeCard();"> 说明文字</label>
+              </div>
+
+              <div class="cp-row" style="color:#86909c;font-size:12px;line-height:1.7;">
+                换新码不会让旧码失效；旧码在「管理码」里可随时停用或删除。
+              </div>
               </div>
             </div>
           </div>
+
+          <!-- v2.79 专属码：独占域名（只给自己用，别人被拦不连累你）→ 联系上级购买 -->
+          <div class="own-card">
+            <div class="own-ic">💎</div>
+            <div class="own-body">
+              <div class="own-t">专属码 · 独占域名</div>
+              <div class="own-s">现在大家共用一批落地域名，别人被举报、被微信拦，你的码可能跟着打不开。专属域名只给你一个人用，风险完全隔离。</div>
+            </div>
+            <el-button type="primary" size="small" @click="ownDlg = true">联系上级购买</el-button>
+          </div>
+
+          <!-- 管理码：该账号的全部客服码（旧码默认保留、不失效；可单独停用/删除） -->
+          <el-dialog v-model="manageDlgOpen" title="管理码" width="760px" align-center>
+            <p class="muted" style="font-size:12.5px;line-height:1.7;margin:0 0 12px;">
+              旧码默认保留、不会失效。停用后这条码立刻打不开，但记录还在，随时可以再启用。
+            </p>
+            <el-table :data="codeList" size="small" v-loading="codeListLoading">
+              <el-table-column label="客服码" width="150">
+                <template #default="{row}"><span class="mono">{{ row.code }}</span></template>
+              </el-table-column>
+              <el-table-column label="域名" min-width="180">
+                <template #default="{row}"><span class="mono" style="font-size:12px;">{{ row.domain || '—' }}</span></template>
+              </el-table-column>
+              <el-table-column label="启用" width="80">
+                <template #default="{row}">
+                  <el-switch :model-value="row.enabled" @change="toggleCode(row, $event)"></el-switch>
+                </template>
+              </el-table-column>
+              <el-table-column label="创建时间" width="140">
+                <template #default="{row}"><span style="font-size:12px;color:#86909c;">{{ (row.created_at || '').slice(0, 16) }}</span></template>
+              </el-table-column>
+              <el-table-column label="操作" width="150">
+                <template #default="{row}">
+                  <el-button size="small" @click="viewQrOf(row)">查看</el-button>
+                  <el-popconfirm title="删除这条码？删除后无法恢复" @confirm="delCodeRow(row)">
+                    <template #reference><el-button size="small" type="danger" text>删除</el-button></template>
+                  </el-popconfirm>
+                </template>
+              </el-table-column>
+            </el-table>
+          </el-dialog>
+
+          <!-- 专属码说明 -->
+          <el-dialog v-model="ownDlg" title="专属码 · 购买专属域名" width="480px" align-center>
+            <div style="line-height:1.9;font-size:13.5px;color:#4e5969;">
+              <p style="margin:0 0 10px;"><b>专属域名是什么？</b><br>现在是一批落地域名大家共用 —— 别人被举报、被微信拦，你的码可能跟着打不开。专属域名只给你一个人用，风险完全隔离。</p>
+              <p style="margin:0 0 10px;"><b>怎么开通？</b><br>联系你的上级（平台客服）购买，开通后系统会自动把这个域名分给你，之后发码就直接用它。</p>
+              <p style="margin:0 0 6px;"><b>联系方式</b></p>
+            </div>
+            <div style="display:flex;gap:8px;align-items:center;">
+              <span class="mono" style="flex:1;padding:9px 12px;background:#f7f8fa;border-radius:8px;">{{ ownContact }}</span>
+              <el-button size="small" @click="copy(ownContact)">复制</el-button>
+            </div>
+          </el-dialog>
 
           <!-- 预览 / 查看码：同一张卡片，带全套操作。查看历史码时下面会多出码与链接 -->
           <el-dialog v-model="previewDlg" @close="closePreview" :title="viewCode ? ('查看码 · ' + viewCode) : '预览大图（长按或右键保存）'" width="440px" align-center>
@@ -1702,7 +1733,7 @@
 <script src="/assets/qr-poster.js?v=2.1.03"></script>
 <script src="/assets/api.js?v=2.1.0"></script>
 <script src="/assets/js/app-components.js?v=2.6.2"></script>
-<script src="/assets/js/app.js?v=3.44.0"></script>
+<script src="/assets/js/app.js?v=3.45.0"></script>
 <script src="/assets/js/app-boot.js?v=2.1.1"></script>
 </body>
 </html>

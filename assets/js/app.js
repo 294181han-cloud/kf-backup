@@ -868,9 +868,8 @@ const app = createApp({
             '<div style="line-height:1.9;">检测到 <b>' + list.length + '</b> 个客服码已被微信拦截（俗称"红了"）：'
             + '<div style="margin:8px 0;padding:8px 10px;background:#fff8e6;border-radius:8px;font-size:13px;">' + detail
             + (list.length > 6 ? ('<br>…共 ' + list.length + ' 个') : '') + '</div>'
-            + '建议去「客服码」页点「立即换码」——会换一条新的链接（换掉被拦的域名），<br>'
-            + '<b>旧二维码同时作废，记得把新的重新发给客户</b>。<br>'
-            + '（链接里印的是「入口 ID」：以后正常换码不会再动二维码，只有真红了的这一下才需要重发。）</div>',
+            + '建议去「客服码」页点「立即换码」——会新增一条链接（换掉被拦的域名），把新的发给客户即可。<br>'
+            + '<b>旧码不会失效</b>，可以在「管理码」里停用或删除。</div>',
             '⚠️ 有客服码被微信拦截',
             { confirmButtonText: '去客服码页处理', type: 'warning', dangerouslyUseHTMLString: true });
           go = true;
@@ -2843,14 +2842,11 @@ const app = createApp({
        把它换成本次要用的客服码 + 内容域名 —— 所以：
          ·「新码 / 立即换码」= 原地换码：链接（=顾客手里的二维码）**保持不变**，只是背后换了码；
          ·「换新链接」= 真换一张二维码（旧二维码作废）。 */
-    const codeRotateHint = Vue.computed(() => '换一条新的客服码？\n\n顾客手里那张二维码不受影响（链接里是入口 ID，换码后照常能进），不用重新发。\n如果确实要换一张全新的二维码，用右边的「换新链接」。');
+    const codeRotateHint = Vue.computed(() => '新增一条客服码？\n\n会生成一条全新的链接（通常换一台域名），方便客户扫新的。\n旧码不会失效 —— 想停用旧码可以去「管理码」里关掉。');
     const rotateCode = async () => {
       try {
-        const r = await API.post('/api/tenant/service-code', { new_link: 0 });
-        const c = (r && r.code) || {};
-        ElementPlus.ElMessage.success(c.upgraded
-          ? '已升级为「永久入口链接」——二维码不变，顾客手里那张继续用'
-          : '已换新码（二维码链接不变，顾客手里那张照用）');
+        await API.post('/api/tenant/service-code', {});
+        ElementPlus.ElMessage.success('已新增一条客服码（旧码继续有效，可在「管理码」里停用）');
         await loadLinks(); renderMainQr(); checkCode(true);
       } catch (e) { ElementPlus.ElMessage.error(e.message); }
     };
@@ -2858,7 +2854,7 @@ const app = createApp({
     const rotateLink = async () => {
       try {
         await API.post('/api/tenant/service-code', { new_link: 1 });
-        ElementPlus.ElMessage.success('已生成新链接——旧二维码作废，请把新的重新发给客户');
+        ElementPlus.ElMessage.success('已新增一条客服码（旧码继续有效）——把新链接发给客户即可');
         await loadLinks(); renderMainQr(); checkCode(true);
       } catch (e) { ElementPlus.ElMessage.error(e.message); }
     };
@@ -2872,6 +2868,36 @@ const app = createApp({
     const saveCodeCfg = async () => {
       try { await API.put('/api/tenant/settings', { code_nickname_on: codeCfg.nicknameOn, code_support_on: codeCfg.supportOn }); }
       catch (e) { ElementPlus.ElMessage.error(e.message); }
+    };
+
+    /* ===== v2.79 管理码：列出该租户的全部客服码，可单独启用/停用/删除 =====
+       旧码默认保留、不失效（换新码只新增一条）；停用等于"这条码改用不了"，随时可恢复。 */
+    const manageDlgOpen = ref(false);
+    const codeList = ref([]);
+    const codeListLoading = ref(false);
+    const ownDlg = ref(false);
+    const ownContact = ref('@xiaomifuwu');   // 联系上级（平台客服）的账号，可改
+    const loadCodes = async () => {
+      codeListLoading.value = true;
+      try { codeList.value = await API.get('/api/tenant/service-code'); }
+      catch (e) { ElementPlus.ElMessage.error(e.message || '加载失败'); }
+      finally { codeListLoading.value = false; }
+    };
+    const openManageCodes = async () => { manageDlgOpen.value = true; await loadCodes(); };
+    const toggleCode = async (row, val) => {
+      try {
+        await API.post('/api/tenant/service-code/toggle', { code: row.code, enabled: !!val });
+        row.enabled = !!val;
+        ElementPlus.ElMessage.success(val ? '已启用' : '已停用（这条码立刻打不开，随时能再启用）');
+        await loadLinks();
+      } catch (e) { ElementPlus.ElMessage.error(e.message); }
+    };
+    const delCodeRow = async (row) => {
+      try {
+        await API.del('/api/tenant/service-code?code=' + encodeURIComponent(row.code));
+        ElementPlus.ElMessage.success('已删除');
+        await loadCodes(); await loadLinks();
+      } catch (e) { ElementPlus.ElMessage.error(e.message); }
     };
 
     // 顶栏时钟 + 未读总数
@@ -3106,6 +3132,7 @@ const app = createApp({
       POSTER_POS, qrFreeStyle, qrLayerStyle, textStyle,
       cropDlg, cropSrc, cropZoomPct, cropStage, cropStyle, cropImgLoaded, cropDown, cropMove, cropUp, cropWheel, cropClose, openCrop, cropConfirm, avatarPreview,
       geoTag, visitorTag, visitorTagFull, visitorChnClass, copyQrImage, downloadQrImage, codeRotateHint, rotateCode, rotateLink, loadHistory, disableLink, saveCodeCfg, meAvatarUrl,
+      manageDlgOpen, codeList, codeListLoading, openManageCodes, toggleCode, delCodeRow, ownDlg, ownContact,
       quickFields, welcomeFields, autoFields, blFields, preqFields,
       shortTime, fmtTime, sourceText, contactLabel, barW, quotaW, trendW, trendDesc, dailyDesc,
       sessTime,

@@ -112,7 +112,9 @@ function handle_tenant_service_code(string $method): void
     $pdo = db();
 
     if ($method === 'GET') {
-        $st = $pdo->prepare('SELECT id, code, entry_id, link, created_at FROM service_codes WHERE tenant_id = ? ORDER BY id DESC');
+        /* v2.79 管理码：一次返回该租户的全部客服码（含已停用的），前台「管理码」列表用 */
+        $st = $pdo->prepare('SELECT id, code, entry_id, link, enabled, created_at
+            FROM service_codes WHERE tenant_id = ? ORDER BY id DESC');
         $st->execute([$tid]);
         $rows = $st->fetchAll();
         $dom = '';
@@ -123,6 +125,8 @@ function handle_tenant_service_code(string $method): void
         } catch (\Throwable $e) { }
         foreach ($rows as &$r) {
             $r['id'] = (int)$r['id'];
+            $r['enabled'] = (int)($r['enabled'] ?? 1) === 1;
+            $r['domain'] = (string)(parse_url((string)$r['link'], PHP_URL_HOST) ?: '');
             $r['created_at'] = dt_to_iso($r['created_at']);
             $r['content_domain'] = $dom;   // v2.70 该租户的专属落地域名（自动分配）
         }
@@ -131,56 +135,22 @@ function handle_tenant_service_code(string $method): void
     }
 
     if ($method === 'POST') {
-        /* v2.68 入口 ID：二维码里印的是入口 ID（不是客服码），总控在 /api/gate 里把它换成
-           「当前客服码 + 当前内容域名」—— 换码/换内容域名都不用重印二维码。
-           默认行为（keep_link）：原地换码，链接（=顾客手里的二维码）保持不变；
-           传 new_link=1 才另发一张新链接。 */
-        $curSt = $pdo->prepare('SELECT * FROM service_codes WHERE tenant_id = ? ORDER BY id DESC LIMIT 1');
-        $curSt->execute([$tid]);
-        $cur = $curSt->fetch() ?: null;
-        $forceNew = (string)input('new_link', '') === '1';
-        $curHost = $cur ? strtolower((string)(parse_url((string)$cur['link'], PHP_URL_HOST) ?: '')) : '';
-        /* 只要这一行已经有入口 ID、且落地域名还在用，就原地换码（链接不动）。
-           注意：老链接（?key=客服码）也走这条 —— 首次会「保留客服码、只把链接升级成 ?w=入口ID」，
-           顾客手里已经印出去的老二维码因此不失效。只有落地域名被停用或要求换新链接才另发一张。 */
-        $keepLink = $cur && !$forceNew && (string)$cur['entry_id'] !== ''
-            && $curHost !== '' && pool_host_enabled($curHost);
-
-        $entryId = $keepLink ? (string)$cur['entry_id'] : gen_entry_id();
+        /* v2.79 发新码 = **新增一条客服码**（新域名 + 新的随机路径），旧码保留、不失效；
+           旧码要停用/删除请到「管理码」里操作。这样随时能换新的，客户手里那张旧二维码也不会突然打不开。
+           链接格式：https://<主机>/MM-DD/<随机>.html?w=<入口ID>（入口 ID 只指向客服码，不暴露它本身） */
+        $entryId = gen_entry_id();
         // v2.61 支持自定义客服码（就是链接里 ?key= 后面那串）
         $want = trim((string)input('code', ''));
         if ($want !== '') {
             if (!preg_match('/^[A-Za-z0-9]{4,32}$/', $want)) json_error('客服码只能是 4~32 位字母或数字');
             $dup = $pdo->prepare('SELECT 1 FROM service_codes WHERE code = ? LIMIT 1');
             $dup->execute([$want]);
-            $dupId = (int)($dup->fetchColumn() ?: 0);
-            if ($dupId && (!$cur || $dupId !== (int)$cur['id'])) json_error('这个客服码已经被用了，换一个');
+            if ($dup->fetch()) json_error('这个客服码已经被用了，换一个');
             $code = $want;
         } else {
             $code = gen_code_token();
         }
-        $upgraded = false;
-        if ($keepLink) {
-            $newId = (int)$cur['id'];
-            $oldLink = (string)$cur['link'];
-            if (strpos($oldLink, '?w=') === false && $want === '') {
-                /* 老链接（?key=客服码）第一次升级：**保留客服码**，只把链接换成 ?w=入口ID。
-                   这样顾客手里已经印出去的老二维码（?key=客服码）照样能用 —— 等于白送一次
-                   「二维码永不过期」的升级，不用重印就能换到新机制。 */
-                $url = preg_replace('/\?.*$/', '', $oldLink) . '?w=' . $entryId;
-                $pdo->prepare('UPDATE service_codes SET entry_id = ?, link = ? WHERE id = ?')
-                    ->execute([$entryId, $url, $newId]);
-                $code = (string)$cur['code'];
-                $upgraded = true;
-            } else {
-                /* 已经是入口链接：原地换码 —— 链接不动（顾客二维码照用），
-                   同时换一台内容落地主机（客服码链接里那个入口域名不用动）。 */
-                $ch = pool_host_in(tenant_domain_for($tid));
-                $pdo->prepare('UPDATE service_codes SET code = ?, entry_id = ?, content_host = ? WHERE id = ?')
-                    ->execute([$code, $entryId, $ch, $newId]);
-                $url = $oldLink;
-            }
-        } else {
+        {
             /* v2.59 防红：入口是「日期目录 + 随机文件名.html」，页面本身没有任何内容（壳页）。
                v2.68：query 里换成 ?w=入口ID（不再暴露客服码）。
                v2.62.1 发码选域：配了固定子域池（kv_store pool_subs:<域名>）就从子域池随机挑，
@@ -203,20 +173,19 @@ function handle_tenant_service_code(string $method): void
                 if ($host === '') json_error('域名池为空，请联系平台管理员添加可用域名', 400);
                 $url = "$scheme://$host/$gatePath";
             }
-            $pdo->prepare('INSERT INTO service_codes (tenant_id, code, entry_id, link) VALUES (?,?,?,?)')
+            $pdo->prepare('INSERT INTO service_codes (tenant_id, code, entry_id, link, enabled) VALUES (?,?,?,?,1)')
                 ->execute([$tid, $code, $entryId, $url]);
             $newId = (int)$pdo->lastInsertId();
             /* v2.68 内容落地主机：新码先落一台（gate_content_url 会复用，保证访客会话不丢）
                v2.70：落在该租户的专属域名下 */
             $ch = pool_host_in(tenant_domain_for($tid));
             if ($ch !== '') $pdo->prepare('UPDATE service_codes SET content_host = ? WHERE id = ?')->execute([$ch, $newId]);
-            /* v2.57 一个账号只留一个码：换码＝把新码替换掉旧的（旧客服码立即失效）。
-               v2.68 注意：链接里的入口 ID 保持不变时，顾客手里的二维码不会失效。 */
-            $pdo->prepare('DELETE FROM service_codes WHERE tenant_id = ? AND id <> ?')->execute([$tid, $newId]);
+            /* v2.79 旧码不再自动失效：换码只新增一条，旧码保留、可到「管理码」里单独停用或删除。
+               （链接里的入口 ID 不变时，顾客手里那张二维码本来就还能用） */
         }
         json_out(['ok' => true, 'code' => [
             'id' => $newId, 'code' => $code, 'entry_id' => $entryId, 'link' => $url,
-            'kept_link' => $keepLink, 'upgraded' => $upgraded, 'created_at' => dt_to_iso(now_dt()),
+            'enabled' => true, 'created_at' => dt_to_iso(now_dt()),
         ]], 201);
     }
 
@@ -228,6 +197,24 @@ function handle_tenant_service_code(string $method): void
     }
 
     json_error('方法不允许', 405);
+}
+
+/** v2.79 管理码：单独启用/停用某一条客服码（停用 = 立刻打不开，但记录保留、随时可恢复） */
+function handle_tenant_service_code_toggle(string $method): void
+{
+    $ctx = require_tenant();
+    $tid = $ctx['id'];
+    if ($method !== 'POST') json_error('方法不允许', 405);
+    $code = trim((string)input('code', ''));
+    $enabled = input('enabled', true) ? 1 : 0;
+    if ($code === '') json_error('缺少 code');
+    $pdo = db();
+    $st = $pdo->prepare('SELECT id FROM service_codes WHERE code = ? AND tenant_id = ? LIMIT 1');
+    $st->execute([$code, $tid]);
+    $id = (int)($st->fetchColumn() ?: 0);
+    if (!$id) json_error('客服码不存在', 404);
+    $pdo->prepare('UPDATE service_codes SET enabled = ? WHERE id = ?')->execute([$enabled, $id]);
+    json_out(['ok' => true, 'code' => $code, 'enabled' => (bool)$enabled]);
 }
 
 /* ---------- 专属链接 ---------- */
