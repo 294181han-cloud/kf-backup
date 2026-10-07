@@ -7,7 +7,7 @@
 // - 模板：可整体改变界面结构/布局的完整 UI；配色：模板之下的颜色方案，data-ui = 配色 id。
 // 新增模板/配色步骤见 UI-DEV.md（根目录）。改完任何内容后把 version +1（缓存破坏）。
 window.UI_STYLES = {
-  version: '2.10.1',
+  version: '2.10.2',
 
   categories: {
     // ===== 电脑端后台（工作台 app.html / 管理台 admin.html）=====

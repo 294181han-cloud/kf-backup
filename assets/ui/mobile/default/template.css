@@ -219,6 +219,9 @@ html[data-ui-cat="mobile"][data-ui-template="default"] .chat-head-btns {
 }
 html[data-ui-cat="mobile"][data-ui-template="default"] .chat-head-btns .m-hide-btn { display: none !important; }
 html[data-ui-cat="mobile"][data-ui-template="default"] .chat-head-btns .cbtn { padding: 5px 8px; }
+/* v2.86.2 手机端按钮做大一点，手指好按（聊天头这排 + 访客信息抽屉的 ✕） */
+html[data-ui-cat="mobile"][data-ui-template="default"] .chat-head-btns .cbtn { padding: 8px 10px; }
+html[data-ui-cat="mobile"][data-ui-template="default"] .info-close { width: 34px; height: 34px; border-radius: 10px; font-size: 15px; }
 html[data-ui-cat="mobile"][data-ui-template="default"] .chat-search { padding: 6px 10px; }
 
 /* ---------- ② 输入区：快捷栏一行横滑 + 输入框和发送键并排 ---------- */
