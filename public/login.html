@@ -109,8 +109,21 @@ createApp({
         ElementPlus.ElMessage.error(e.message);
       } finally { loading.value = false; }
     };
-    // 已登录直接进工作台（token 失效时工作台会清除并回到本页，不会死循环）
-    try { if (localStorage.getItem('kfxt_token')) { location.replace('/app.html'); return; } } catch (e) {}
+    /* v2.75 已登录时直接进工作台 —— 但**先验证 token 真的有效**：
+       以前只看 localStorage 里有没有 token 就跳，遇到「卡密到期/停用」会
+       登录页→工作台→被踢回登录页→又跳走……死循环，用户连换账号登录都进不来。
+       现在：有效才跳；无效就清掉并留在本页（顺便把原因显示出来）。 */
+    (async () => {
+      try {
+        if (!localStorage.getItem('kfxt_token')) return;
+        API.loadToken();
+        const m = await API.me();
+        if (m && (m.role === 'tenant' || m.role === 'agent' || m.role === 'admin')) location.replace('/app.html');
+      } catch (e) {
+        try { API.clearToken(); } catch (e2) {}
+        if (e && e.message && e.message !== '登录已失效') kickMsg.value = e.message;
+      }
+    })();
     return { account, password, loading, doLogin, kickMsg };
   }
 }).use(ElementPlus).mount('#app');
