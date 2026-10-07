@@ -180,7 +180,14 @@ function handle_login_notice(string $method): void
             ];
         }
     }
-    json_out(['notice' => login_notice_get($key), 'me' => $me]);
+    /* v2.81.1 count：该账号登记了几台设备 —— 只有一台时不弹"确认登录信息"（起名字没意义） */
+    $count = 0;
+    try {
+        $st = $pdo->prepare('SELECT COUNT(*) FROM login_devices WHERE owner_key = ?');
+        $st->execute([$key]);
+        $count = (int)$st->fetchColumn();
+    } catch (\Throwable $e) { }
+    json_out(['notice' => login_notice_get($key), 'me' => $me, 'devices' => $count]);
 }
 
 function handle_login_device_kick(string $method): void

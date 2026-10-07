@@ -2891,10 +2891,15 @@ const app = createApp({
         const me = r && r.me;
         if (!me) return;
         loginInfo.value = me;
-        if (me.is_new && !me.note && !loginInfoDlg.value) {
+        /* v2.81.1 只在"这台设备第一次登录 + 账号已经不止一台设备"时问一次；
+           默认把称呼填成你的客服名称，直接点「保存并继续」就行（也可以自己改） */
+        if (me.is_new && !me.note && !loginInfoDlg.value && Number(r.devices || 1) > 1) {
           let skipped = false;
           try { skipped = sessionStorage.getItem('kfxt_loginfo_skip') === '1'; } catch (e) {}
-          if (!skipped) { loginInfoName.value = ''; loginInfoDlg.value = true; }
+          if (!skipped) {
+            loginInfoName.value = (me.value && me.value.nickname) || '';
+            loginInfoDlg.value = true;
+          }
         }
         const n = r.notice;
         if (n && n.id && n.dev && n.dev !== me.dev_id) {
