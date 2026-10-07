@@ -83,7 +83,7 @@ body {
 <div class="footer">Powered by 客服系统</div>
 <script src="/assets/vendor/vue.global.js?v=2.0.1"></script>
 <script src="/assets/vendor/element-plus.js?v=2.0.1"></script>
-<script src="/assets/api.js?v=2.1.0"></script>
+<script src="/assets/api.js?v=2.1.1"></script>
 <script>
 const { createApp, ref } = Vue;
 createApp({
@@ -102,8 +102,8 @@ createApp({
       loading.value = true;
       try {
         const r = await API.login(account.value.trim(), password.value);
-        /* v2.76 不再长期保存登录状态：用一次性「交接」把 token 带进工作台，
-           页面加载后就只剩内存里有 —— 刷新/关闭再打开都要重新输卡密密码（防共享）。 */
+        /* v2.85 登录状态长期保存：刷新 / 关闭再打开都不用重新登录，
+           只有 1 小时不操作或账号到期 / 停用 / 被踢才会退出。 */
         API.handoff(r.token);
         ElementPlus.ElMessage.success('登录成功');
         setTimeout(() => location.href = r.redirect || '/app.html', 400);

@@ -6,10 +6,9 @@
     setToken(t) { this.token = t; try { localStorage.setItem('kfxt_token', t); } catch (e) {} },
     loadToken() { try { this.token = localStorage.getItem('kfxt_token'); } catch (e) {} return this.token; },
     clearToken() { this.token = null; try { localStorage.removeItem('kfxt_token'); } catch (e) {} },
-    /* v2.76 防卡密共享：登录后不再把 token 长期存在浏览器里 ——
-       登录页跳转时用 sessionStorage 交接一次（取完立刻删），之后只活在内存里。
-       结果：刷新 / 关闭页面再打开 都要重新输卡密密码；只有平台管理员例外
-       （admin 仍然长期保持登录，免得平台自己每次刷新都要登录）。 */
+    /* 登录页跳转时用 sessionStorage 交接一次 token（取完立刻删），兼容老流程。
+       v2.85 起登录状态长期保存在 localStorage：刷新 / 关闭再打开都不用重新登录，
+       只有「1 小时不操作」（工作台 startIdleWatch）或账号到期 / 停用 / 被踢才退出登录。 */
     handoff(t) { try { sessionStorage.setItem('kfxt_handoff', t); } catch (e) {} },
 
     async request(method, path, data) {
@@ -99,28 +98,11 @@
     updateProfile(data) { return this.put('/api/auth/profile', data); },
   };
   window.API = API;
-  /* v2.76 启动时的 token 恢复规则（防卡密共享）：
-     · 有「登录交接」→ 说明是刚登录完跳过来的：用一次就删，之后只留在内存里；
-     · 否则看 localStorage：只有**平台管理员**保持登录；租户/子客服一律丢弃，
-       于是刷新/关闭再打开都必须重新输卡密密码。 */
-  (function () {
-    const roleOf = (t) => {
-      try {
-        const p = JSON.parse(atob(String(t).split('.')[1].replace(/-/g, '+').replace(/_/g, '/')));
-        return p && p.role ? String(p.role) : '';
-      } catch (e) { return ''; }
-    };
-    try {
-      const h = sessionStorage.getItem('kfxt_handoff');
-      if (h) {
-        sessionStorage.removeItem('kfxt_handoff');
-        API.token = h;
-        if (roleOf(h) === 'admin') { try { localStorage.setItem('kfxt_token', h); } catch (e) {} }
-        return;
-      }
-      API.loadToken();
-      const t = API.token || '';
-      if (t && roleOf(t) !== 'admin') API.clearToken();   // 租户/子客服：不保持登录
-    } catch (e) { /* 出错按未登录处理 */ }
-  })();
+  /* v2.85 登录状态恢复：直接读 localStorage —— 刷新 / 关闭再打开都保持登录。
+     只有「1 小时不操作」（工作台里的 startIdleWatch）或账号到期/停用/被踢，才会退出登录。 */
+  try {
+    const h = sessionStorage.getItem('kfxt_handoff');   // 兼容：登录跳转时的一次性交接
+    if (h) { sessionStorage.removeItem('kfxt_handoff'); API.setToken(h); }
+    else API.loadToken();
+  } catch (e) { /* 出错按未登录处理 */ }
 })();
