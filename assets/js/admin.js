@@ -23,6 +23,23 @@ createApp({
 
     const loadOverview = async () => { ov.value = await API.get('/api/admin/overview'); };
     const loadTenants = async () => { tenants.value = await API.get('/api/admin/tenants'); };
+    /* v2.77 「是否已到期」改成前端实时算：
+       原来用的是列表接口返回的 expired 快照 —— 只有重新拉列表（刷新/增删改）才会变，
+       所以卡密到点了、页面还显示"正常"，得手动刷新一下才对。
+       现在每 30 秒重算一次 nowTick，配合 expires_at 实时判断，到点立刻变红。 */
+    const nowTick = ref(Date.now());
+    setInterval(() => { nowTick.value = Date.now(); }, 30000);
+    const isExpired = (row) => {
+      void nowTick.value;                       // 依赖它 → 每 30 秒触发一次重渲染
+      const t = row && row.expires_at;
+      if (!t) return false;
+      const ts = new Date(String(t).replace(/-/g, '/')).getTime();
+      return !!ts && ts < Date.now();
+    };
+    /* 管理员开着页面时也别看到旧数据：租户页每 60 秒自动拉一次（状态/到期/额度） */
+    setInterval(() => {
+      if (tab.value === 'tenants') { loadTenants(); loadOverview(); }
+    }, 60000);
     const loadDomains = async () => { domains.value = await API.get('/api/admin/domain-pool'); };
     const loadSettings = async () => {
       const r = await API.get('/api/admin/root-domain'); rootDomain.value = r.root_domain;
@@ -423,7 +440,7 @@ createApp({
       barWidth, locationOrigin,
       dlgVisible, dlgMode, dlg, dlgSaving, openCreate, openEdit, saveTenant, toggleTenant, delTenant,
       createdVisible, created, copyCreated, openGen, genVisible, genPair, doGen, fillGenKami, openTrial,
-      addDomain, toggleDomain, delDomain, blockDomain, saveRootDomain, saveDefaults, changePw, logout,
+      addDomain, toggleDomain, delDomain, blockDomain, saveRootDomain, saveDefaults, changePw, logout, isExpired,
     };
   }
 }).use(ElementPlus).mount('#app');

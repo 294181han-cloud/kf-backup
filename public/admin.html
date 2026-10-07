@@ -105,13 +105,13 @@
               <el-table-column label="状态" width="90">
                 <template #default="{row}">
                   <el-tag v-if="row.status!=='active'" type="danger" size="small">已停用</el-tag>
-                  <el-tag v-else-if="row.expired" type="warning" size="small">已到期</el-tag>
+                  <el-tag v-else-if="isExpired(row)" type="warning" size="small">已到期</el-tag>
                   <el-tag v-else type="success" size="small">正常</el-tag>
                 </template>
               </el-table-column>
               <el-table-column label="有效期至" width="150">
                 <template #default="{row}">
-                  <span v-if="row.expires_at" :style="row.expired?'color:#f53f3f':''">{{ row.expires_at.slice(0,16) }}</span>
+                  <span v-if="row.expires_at" :style="isExpired(row)?'color:#f53f3f':''">{{ row.expires_at.slice(0,16) }}</span>
                   <span v-else style="color:#86909c;">永久</span>
                 </template>
               </el-table-column>
@@ -652,6 +652,6 @@
 <script src="/assets/vendor/vue.global.js?v=2.0.1"></script>
 <script src="/assets/vendor/element-plus.js?v=2.0.1"></script>
 <script src="/assets/api.js?v=2.1.0"></script>
-<script src="/assets/js/admin.js?v=2.9.0"></script>
+<script src="/assets/js/admin.js?v=2.10.0"></script>
 </body>
 </html>
