@@ -35,6 +35,7 @@ body {
 .f-label { font-size: 15px; color: #333; margin: 0 0 8px; font-weight: 500; }
 .f-label .req { color: #f53f3f; margin-right: 2px; }
 .f-gap { margin-bottom: 22px; }
+.kick-msg { margin: 0 0 18px; padding: 10px 14px; border-radius: 10px; background: #fff1f0; border: 1px solid #ffccc7; color: #cf1322; font-size: 13.5px; line-height: 1.65; }
 .el-input__wrapper { padding: 5px 16px; border-radius: 12px; box-shadow: 0 0 0 1px #dcdfe6 inset; }
 .el-input__wrapper.is-focus { box-shadow: 0 0 0 1.5px #2b6fff inset; }
 .el-input__inner { height: 38px; font-size: 15px; }
@@ -62,6 +63,8 @@ body {
         <div class="brand-sub">扫码咨询 · 多端接入客服系统</div>
       </div>
     </div>
+    <!-- v2.75 被迫退出登录时（到期/停用/被踢下线）在这里说明原因 -->
+    <div v-if="kickMsg" class="kick-msg">{{ kickMsg }}</div>
     <div class="f-gap">
       <div class="f-label"><span class="req">*</span>卡密</div>
       <el-input v-model="account" size="large" placeholder="请输入登录卡密" clearable @keyup.enter="doLogin">
@@ -80,7 +83,7 @@ body {
 <div class="footer">Powered by 客服系统</div>
 <script src="/assets/vendor/vue.global.js?v=2.0.1"></script>
 <script src="/assets/vendor/element-plus.js?v=2.0.1"></script>
-<script src="/assets/api.js?v=2.0.3"></script>
+<script src="/assets/api.js?v=2.0.4"></script>
 <script>
 const { createApp, ref } = Vue;
 createApp({
@@ -88,6 +91,12 @@ createApp({
     const account = ref('');
     const password = ref('');
     const loading = ref(false);
+    /* v2.75 被强制退出（到期/停用/被踢下线）→ 在这里把原因显示出来 */
+    const kickMsg = ref('');
+    try {
+      const km = sessionStorage.getItem('kfxt_kick');
+      if (km) { kickMsg.value = km; sessionStorage.removeItem('kfxt_kick'); }
+    } catch (e) {}
     const doLogin = async () => {
       if (!account.value || !password.value) { ElementPlus.ElMessage.warning('请输入账号和密码'); return; }
       loading.value = true;
@@ -102,7 +111,7 @@ createApp({
     };
     // 已登录直接进工作台（token 失效时工作台会清除并回到本页，不会死循环）
     try { if (localStorage.getItem('kfxt_token')) { location.replace('/app.html'); return; } } catch (e) {}
-    return { account, password, loading, doLogin };
+    return { account, password, loading, doLogin, kickMsg };
   }
 }).use(ElementPlus).mount('#app');
 </script>

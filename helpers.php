@@ -37,6 +37,14 @@ function json_error(string $msg, int $code = 400): void
     json_out(['error' => $msg], $code);
 }
 
+/** v2.75 「账号状态」类错误（到期/停用/被踢）：带上机器可读的 code，
+ *  前端据此**强制退出登录**并说明原因，而不是停在页面里一直报错。
+ *  code: expired=已到期 / disabled=已停用 / kicked=被踢下线 */
+function json_error_auth(string $msg, string $reason, int $status = 403): void
+{
+    json_out(['error' => $msg, 'code' => $reason], $status);
+}
+
 function body(): array
 {
     static $cached = null;
@@ -184,10 +192,10 @@ function require_auth(): array
         $st->execute([(int)$p['id']]);
         $t = $st->fetch();
         if (!$t) json_error('账号不存在', 401);
-        if ($t['status'] !== 'active') json_error('账号已被停用，请联系平台管理员', 403);
-        if ($t['expires_at'] && strtotime($t['expires_at']) < time()) json_error('账号已到期，请联系平台管理员续期', 403);
+        if ($t['status'] !== 'active') json_error_auth('账号已被停用，请联系平台管理员', 'disabled');
+        if ($t['expires_at'] && strtotime($t['expires_at']) < time()) json_error_auth('账号已到期，请联系平台管理员续期', 'expired');
         if (!empty($p['dev']) && !device_touch(device_owner_key('tenant', (int)$t['id'], (int)$t['id']), (string)$p['dev'])) {
-            json_error('这台设备已被踢下线，请重新登录', 401);
+            json_error_auth('这台设备已被踢下线，请重新登录', 'kicked', 401);
         }
         return ['role' => 'tenant', 'id' => (int)$t['id'], 'kami' => $t['kami'], 'name' => $t['nickname'], 'row' => $t];
     }
@@ -197,11 +205,11 @@ function require_auth(): array
         $st->execute([(int)$p['id']]);
         $a = $st->fetch();
         if (!$a) json_error('账号不存在', 401);
-        if ($a['status'] !== 'active') json_error('客服账号已被停用', 403);
-        if ($a['tenant_status'] !== 'active') json_error('所属账号已被停用', 403);
-        if ($a['tenant_expires'] && strtotime($a['tenant_expires']) < time()) json_error('所属账号已到期，请联系客服续期', 403);
+        if ($a['status'] !== 'active') json_error_auth('客服账号已被停用', 'disabled');
+        if ($a['tenant_status'] !== 'active') json_error_auth('所属账号已被停用', 'disabled');
+        if ($a['tenant_expires'] && strtotime($a['tenant_expires']) < time()) json_error_auth('所属账号已到期，请联系客服续期', 'expired');
         if (!empty($p['dev']) && !device_touch(device_owner_key('agent', (int)$a['id'], (int)$a['tenant_id']), (string)$p['dev'])) {
-            json_error('这台设备已被踢下线，请重新登录', 401);
+            json_error_auth('这台设备已被踢下线，请重新登录', 'kicked', 401);
         }
         return ['role' => 'agent', 'id' => (int)$a['id'], 'tenant_id' => (int)$a['tenant_id'], 'name' => $a['nickname'], 'row' => $a];
     }

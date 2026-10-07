@@ -781,6 +781,12 @@ const app = createApp({
        每 15 秒对一次表，页面开着就一定会响；打开时就已进入窗口也会立刻提示。 */
     let expireTimer = null;
     const expireDone = { at5: false, at2: false, end: false };
+    /* v2.75 强制退出登录：清 token + 回登录页 + 把原因带过去显示 */
+    const forceLogout = (reason) => {
+      try { sessionStorage.setItem('kfxt_kick', typeof reason === 'string' && reason ? reason : '账号已到期，请联系平台管理员续期'); } catch (e) {}
+      try { API.clearToken(); } catch (e) {}
+      location.href = '/login.html';
+    };
     const startExpireWatch = () => {
       if (!me.value || me.value.role !== 'tenant' || !me.value.expires_at) return;
       // Safari 不认 "YYYY-MM-DD HH:mm:ss"，换成斜杠格式
@@ -793,8 +799,11 @@ const app = createApp({
           clearInterval(expireTimer); expireTimer = null;
           if (!expireDone.end) {
             expireDone.end = true;
+            /* v2.75 到期不再只是弹个提示：提示确认后直接退出登录，回到登录页并说明原因
+               （否则页面停在工作台，接口一直报 403，用户也不知道发生了什么） */
             ElementPlus.ElMessageBox.alert('账号已到期，工作台将无法继续使用。请联系平台管理员续期。',
-              '⏰ 账号已到期', { confirmButtonText: '知道了', type: 'error' });
+              '⏰ 账号已到期', { confirmButtonText: '重新登录', type: 'error' })
+              .then(forceLogout).catch(forceLogout);
           }
           return;
         }

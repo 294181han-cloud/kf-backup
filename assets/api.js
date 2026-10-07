@@ -37,6 +37,21 @@
           if (!isLogin) { location.href = '/login.html'; throw new Error('登录已失效'); }
         }
       }
+      /* v2.75 账号状态类 403（已到期 / 已停用 / 被踢下线）也要强制退出登录并说明原因，
+         否则用户会停在页面里，接口一直报错却不知道发生了什么。 */
+      if (res.status === 403) {
+        let jj = null;
+        try { jj = JSON.parse(await res.clone().text()); } catch (e) {}
+        const reason = (jj && jj.code) || '';
+        if (reason === 'expired' || reason === 'disabled' || reason === 'kicked') {
+          this.clearToken();
+          if (!location.pathname.startsWith('/visitor') && !location.pathname.includes('login')) {
+            try { sessionStorage.setItem('kfxt_kick', (jj && jj.error) || '账号状态异常，请重新登录'); } catch (e) {}
+            location.href = '/login.html';
+            throw new Error((jj && jj.error) || '账号状态异常');
+          }
+        }
+      }
       const ct = res.headers.get('Content-Type') || '';
       if (ct.includes('text/csv') || ct.includes('octet-stream')) return res;
       let j;
