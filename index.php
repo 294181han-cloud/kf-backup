@@ -361,6 +361,7 @@ if (site_role() !== 'main') {
         if (gate_token_from_query() === '' || !gate_env_ok()) refuse_connection();
         header('Cache-Control: no-store');
         echo gate_loader_html();
+        exit;   // v2.69.5 修：这里原来没有 exit，壳页后面被拼了一句 "Not Found" 且状态码是 404
     }
     /* v2.68 内容页伪装路径：静态节点上更新包已烤成真文件（nginx 直接命中，走不到这里）；
        PHP 型访客节点由这里兜底，保证 /api/gate 下发的地址一定能出访客页。 */
