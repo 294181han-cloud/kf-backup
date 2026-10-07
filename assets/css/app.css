@@ -2204,3 +2204,13 @@ body.dark .sess-resume-entry .sme-box { background: #3a2f1a; color: #f0b45c; }
 /* v2.84 二维码文字设置弹窗里的色块 */
 .cc-sw { display: inline-block; width: 18px; height: 18px; border-radius: 50%; margin-left: 6px; vertical-align: -3px; cursor: pointer; border: 2px solid transparent; }
 .cc-sw.on { border-color: #1677ff; box-shadow: 0 0 0 2px rgba(22,119,255,.18); }
+
+/* v2.86 登录设备列表里「本机」的小标签 */
+.dev-cur {
+  display: inline-block; margin-left: 6px; padding: 1px 7px; border-radius: 999px;
+  font-size: 11px; line-height: 17px; font-weight: 600;
+  background: color-mix(in srgb, var(--theme, #1677ff) 14%, #fff);
+  color: var(--theme, #1677ff);
+  border: 1px solid color-mix(in srgb, var(--theme, #1677ff) 30%, #fff);
+}
+body.dark .dev-cur { background: color-mix(in srgb, var(--theme, #1677ff) 30%, #161a20); color: #cfe1ff; border-color: #2f4a72; }

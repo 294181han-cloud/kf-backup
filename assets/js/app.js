@@ -2112,6 +2112,16 @@ const app = createApp({
         deviceLimit.value = r.limit || 3;
       } catch (e) {}
     };
+    /* v2.86 「这台就是我正在用的设备」：服务端按登录令牌里的设备号标记；
+       令牌里没有设备号（老登录态）时，用本机自己的设备号前 8 位兜底对一下。 */
+    const isCurDevice = (row) => {
+      if (!row) return false;
+      if (row.current) return true;
+      try {
+        const mine = String(API.deviceId() || '').slice(0, 8);
+        return !!mine && row.dev_id === mine;
+      } catch (e) { return false; }
+    };
     const kickDevice = async (d) => {
       try {
         await API.post('/api/login-devices/kick', { id: d.id });
@@ -3212,7 +3222,7 @@ const app = createApp({
       guide, guideDone, dark, toggleDark, renameVisitor, renderCodeQrs, tplList,
       uiCatList, uiCurrentCat, uiActiveCat, uiActiveList, uiSel, uiTplList, uiColorList, uiPick, sideCollapsed, mSideOpen,
       blockSession, blockIp, kwList, kwInput, kwSaving, addKw, removeKw, saveFilter, agentCmd, restartPoll,
-      devices, deviceLimit, loadDevices, kickDevice, renameDevice,
+      devices, deviceLimit, loadDevices, kickDevice, renameDevice, isCurDevice,
       chatSearchOn, chatSearchKw, searchHit, visibleMsgs, canRecall, recallMsg, isRead,
       pol, savePolicy, uploadPolHead, clock, unreadTotal, sessCollapsed,
       toggleSessTabs, setScope,
