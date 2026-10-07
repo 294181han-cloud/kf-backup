@@ -115,7 +115,17 @@ function handle_tenant_service_code(string $method): void
         $st = $pdo->prepare('SELECT id, code, entry_id, link, created_at FROM service_codes WHERE tenant_id = ? ORDER BY id DESC');
         $st->execute([$tid]);
         $rows = $st->fetchAll();
-        foreach ($rows as &$r) { $r['id'] = (int)$r['id']; $r['created_at'] = dt_to_iso($r['created_at']); }
+        $dom = '';
+        try {
+            $d2 = $pdo->prepare('SELECT content_domain FROM tenants WHERE id = ?');
+            $d2->execute([$tid]);
+            $dom = (string)($d2->fetchColumn() ?: '');
+        } catch (\Throwable $e) { }
+        foreach ($rows as &$r) {
+            $r['id'] = (int)$r['id'];
+            $r['created_at'] = dt_to_iso($r['created_at']);
+            $r['content_domain'] = $dom;   // v2.70 该租户的专属落地域名（自动分配）
+        }
         unset($r);
         json_out($rows);
     }
