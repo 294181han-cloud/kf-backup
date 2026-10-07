@@ -607,7 +607,9 @@ function handle_tenant_links(string $method): void
     $st->execute([$tid]);
     $dl = $st->fetch();
 
-    $st = $pdo->prepare('SELECT code, link, created_at FROM service_codes WHERE tenant_id = ? ORDER BY id DESC');
+    /* v2.79 主码 = 最新一条**启用中**的客服码（停用的不参与展示，随时可再启用） */
+    $st = $pdo->prepare('SELECT code, link, created_at FROM service_codes
+        WHERE tenant_id = ? AND enabled = 1 ORDER BY id DESC');
     $st->execute([$tid]);
     $codes = $st->fetchAll();
 
