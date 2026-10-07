@@ -474,8 +474,13 @@
     // 顶部文案
     if (!plain) {
       ctx.fillStyle = '#17181c';
-      ctx.font = f.replace('%d', '44');
       ctx.textAlign = 'center'; ctx.textBaseline = 'alphabetic';
+      /* v2.83 自动缩字号：昵称太长时不会顶出卡片（原来固定 44px 会溢出） */
+      var topFs = 44;
+      ctx.font = f.replace('%d', String(topFs));
+      while (ctx.measureText(o.topText).width > W - 2 * 56 && topFs > 26) {
+        topFs -= 2; ctx.font = f.replace('%d', String(topFs));
+      }
       report.topTextWidth = Math.round(ctx.measureText(o.topText).width);
       report.topTextMax = W - 2 * 56;
       ctx.fillText(o.topText, W / 2, 120);
@@ -526,8 +531,13 @@
       ctx.fillStyle = o.brand; ctx.fillRect(0, by, W, barH);
       ctx.restore();
       ctx.fillStyle = '#fff';
-      ctx.font = f.replace('%d', '40');
       ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      /* v2.83 底部那行字也自动缩字号（"支持微信、支付宝、浏览器等通道扫码进入" 40px 会被切掉） */
+      var botFs = 40;
+      ctx.font = f.replace('%d', String(botFs));
+      while (ctx.measureText(o.bottomText).width > W - 2 * 40 && botFs > 22) {
+        botFs -= 2; ctx.font = f.replace('%d', String(botFs));
+      }
       report.bottomTextWidth = Math.round(ctx.measureText(o.bottomText).width);
       report.bottomTextMax = W - 2 * 56;
       ctx.fillText(o.bottomText, W / 2, by + barH / 2 + 2);
