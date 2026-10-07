@@ -7,7 +7,7 @@
 <title>在线咨询</title>
 <link rel="icon" href="/assets/img/mi-logo.png">
 <link rel="apple-touch-icon" href="/assets/img/mi-logo.png">
-<link rel="stylesheet" href="/assets/css/visitor.css?v=2.15.1">
+<link rel="stylesheet" href="/assets/css/visitor.css?v=2.16.0">
 </head>
 <body>
 <!-- v2.52 兜底：脚本没跑起来时（微信旧内核 document.write 不执行脚本 / 资源被缓存污染 / 网络抽风），
@@ -105,7 +105,10 @@
               <div class="ac-ic">🖼️</div>
               <div class="ac-t">客服请求您上传图片</div>
               <div class="ac-s">{{ m.text }}</div>
-              <button class="ac-btn" @click="pickImage">上传图片</button>
+              <span class="v-file-wrap">
+                <button class="ac-btn" @click="pickImage">上传图片</button>
+                <input class="v-file-ghost" type="file" accept="image/*" multiple @change="onImage">
+              </span>
             </div>
             <div class="msg-bubble" v-else>
               <!-- 引用回复：显示被引用的那条（点一下跳到原消息） -->
@@ -208,10 +211,15 @@
         <button class="v-icon-btn" @click="toggleVoice" title="切换成按住说话">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0"/><path d="M12 18v3"/></svg>
         </button>
-        <button class="v-icon-btn" @click="pickImage" title="发送图片">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="3"/><circle cx="9" cy="10" r="1.6"/><path d="M21 16.5 16.5 12l-6 6"/></svg>
-        </button>
-        <input ref="imgInput" type="file" accept="image/png,image/jpeg,image/gif,image/webp" multiple style="display:none" @change="onImage">
+        <!-- v2.72 手机浏览器必须"原生点击"：把隐藏的 file 框做成按钮上的一层透明覆盖，
+             手指直接点在 input 上，iOS Safari / 安卓浏览器才会打开相册
+             （原来 display:none + JS .click() 只有微信内核认，手机浏览器不认） -->
+        <span class="v-file-wrap">
+          <button class="v-icon-btn" @click="pickImage" title="发送图片">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="3"/><circle cx="9" cy="10" r="1.6"/><path d="M21 16.5 16.5 12l-6 6"/></svg>
+          </button>
+          <input class="v-file-ghost" ref="imgInput" type="file" accept="image/*" multiple @change="onImage">
+        </span>
         <textarea class="v-input" ref="inputRef" rows="1" v-model="draft"
           @focus="scrollBottom" placeholder="请输入您的问题…" @input="onDraftInput"
           @paste="onPaste" @keydown="onInputKey"></textarea>

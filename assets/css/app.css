@@ -2102,3 +2102,13 @@ body.dark .sess-resume-entry .sme-box { background: #3a2f1a; color: #f0b45c; }
   .chat-head .ch-sub { flex-wrap: nowrap; overflow-x: auto; overflow-y: hidden; row-gap: 0; }
   .chat-head .ch-sub .m-hide { display: none !important; }
 }
+
+/* ===== v2.72 手机浏览器发图：透明覆盖的 file 框 =====
+   原因：file 框原来 display:none + JS .click() 触发，微信内核认，iOS Safari / 安卓系统浏览器不认
+   （它们要求"手指直接点在 input 上"）。这里把它做成按钮上方一层透明覆盖，原生点击 → 能打开相册/文件。 */
+.v-file-wrap { position: relative; display: inline-flex; }
+.v-file-ghost {
+  position: absolute; inset: 0; width: 100%; height: 100%;
+  opacity: 0; cursor: pointer; font-size: 100px; z-index: 3;
+  -webkit-appearance: none; appearance: none;
+}
