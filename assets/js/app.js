@@ -3218,7 +3218,7 @@ const app = createApp({
       manageDlg, history, codeCfg, qrWrap, currentLink, renderMainQr,
       codeCanvas, logoFile, previewDlg, previewSrc, codeValue, codeStyle, codeCheck,
       checkChannel, checkChannelLabel, checkLogoName, checkUseDefaultChannel,
-      CODE_LOGOS, CODE_BRANDS, pickLogo, setCodeStyle, renderCodeCard, resetCodeStyle, onLogoFile,
+      CODE_LOGOS, CODE_BRANDS, pickLogo, setCodeStyle, saveCodeStyle, renderCodeCard, resetCodeStyle, onLogoFile,
       logoThumb, previewBig, checkCode,
       posterCfg, posterQrBox, posterBgInput, pickPosterBg, onPosterBg, downloadPoster2,
       presetPng, pickPosterPresetImg,
