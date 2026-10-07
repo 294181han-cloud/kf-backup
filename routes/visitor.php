@@ -93,7 +93,9 @@ function tenant_brand(array $tenant): array
         'pre_inquiry_on' => ts_get($tid, 'pre_inquiry_on', '0') === '1',
         'show_position' => ts_get($tid, 'brand_position', 'right-bottom'),
         'notice_on'     => ts_get($tid, 'notice_on', '0') === '1',
-        'template'      => ts_get($tid, 'visitor_template', 'whatsapp'),
+        // v2.77.1 默认值必须和后台（routes/tenant.php）一致 —— 之前这里还是 whatsapp，
+        // 于是"没单独设过模板"的租户：后台显示「默认客服」，访客端却渲染成 WhatsApp。
+        'template'      => ts_get($tid, 'visitor_template', 'default'),
         'notice_text'   => ts_get($tid, 'notice_text', ''),
         // 验证策略
         'robot'          => ts_get($tid, 'robot', 'no'),
