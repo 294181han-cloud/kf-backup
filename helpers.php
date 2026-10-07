@@ -2262,6 +2262,89 @@ function gate_env_ok(): bool
     return $ua !== '' && str_contains($ua, 'Mozilla');
 }
 
+/* ===================== v2.71 反爬 / 反采集（三层） =====================
+   目的：让「微信的自动检测」（爬虫预检、内容审核、安全扫描）尽量拿不到东西，
+   同时不误伤真人访客。三层判断，命中任一层就给一张纯白纸（200，不跳转、不断连接）：
+     ① UA 特征：爬虫/扫描器/自动化框架的关键字
+     ② IP 段：后台可配 `gate_bot_ips`（逗号分隔 CIDR），例如腾讯/微信爬虫段
+     ③ 一次性票据：/api/gate 发的票据，内容页凭票进入（防扒到链接后重复访问）
+   注意：这些都只挡「自动检测」，挡不住真人举报——举报只能靠多域名摊。 */
+
+/** 白纸页：比 444 断连接更"正常"（断连本身算异常特征），爬虫/SDK 拿到的就是一张空页 */
+function gate_blank_page(): void
+{
+    header('Cache-Control: no-store');
+    header('Content-Type: text/html; charset=utf-8');
+    echo '<!DOCTYPE html><html lang="zh-CN"><head><meta charset="utf-8">'
+        . '<meta name="viewport" content="width=device-width,initial-scale=1">'
+        . '<meta name="referrer" content="no-referrer"><title>id-' . random_int(1000, 9999) . '</title>'
+        . '</head><body></body></html>';
+    exit;
+}
+
+/** 客户端 IP 是否落在某个 CIDR 列表里（IPv4；列表形如 "1.2.3.0/24,5.6.7.8"） */
+function ip_in_cidrs(string $ip, string $list): bool
+{
+    if ($ip === '' || $list === '') return false;
+    $ipn = ip2long($ip);
+    if ($ipn === false) return false;
+    foreach (array_map('trim', explode(',', $list)) as $cidr) {
+        if ($cidr === '') continue;
+        if (!str_contains($cidr, '/')) { if ($ip === $cidr) return true; continue; }
+        [$net, $bits] = array_pad(explode('/', $cidr, 2), 2, '32');
+        $netn = ip2long($net);
+        $bits = (int)$bits;
+        if ($netn === false || $bits < 0 || $bits > 32) continue;
+        $mask = $bits === 0 ? 0 : (-1 << (32 - $bits));
+        if (($ipn & $mask) === ($netn & $mask)) return true;
+    }
+    return false;
+}
+
+/** 爬虫/扫描器判断：UA 关键字 + 可配置 IP 段（`gate_bot_ips`） */
+function gate_is_bot(): bool
+{
+    $ua = strtolower(trim((string)($_SERVER['HTTP_USER_AGENT'] ?? '')));
+    if ($ua === '') return true;
+    static $bad = ['bot', 'spider', 'crawler', 'slurp', 'curl/', 'wget', 'python', 'java/', 'go-http',
+        'okhttp', 'headless', 'phantom', 'selenium', 'puppeteer', 'playwright', 'scrapy', 'requests/',
+        'httpclient', 'libwww', 'httrack', 'winhttp', 'aria2', 'axios/', 'node-fetch', 'postman',
+        'insomnia', 'zgrab', 'masscan', 'nmap', 'nuclei', 'sqlmap', 'dirbuster', 'gobuster',
+        'facebookexternalhit', 'whatsapp', 'telegrambot', 'bytespider', 'baiduspider', 'sogou',
+        '360spider', 'yisouspider', 'applebot', 'petalbot', 'semrush', 'ahrefs', 'mj12', 'dotbot',
+        'censys', 'shodan', 'expanse', 'internetmeasurement'];
+    foreach ($bad as $b) { if (str_contains($ua, $b)) return true; }
+    if (!str_contains($ua, 'mozilla')) return true;
+    $crawlerIps = kv_get('gate_bot_ips', '');
+    if ($crawlerIps !== '' && ip_in_cidrs(get_client_ip(), $crawlerIps)) return true;
+    return false;
+}
+
+/** v2.71 一次性票据：/api/gate 发，内容页凭票进入（5 分钟内、最多 5 次，防扒链接复用） */
+function gate_token_issue(string $code): string
+{
+    $tk = bin2hex(random_bytes(8));
+    try { kv_set('gtok:' . $tk, $code . '|' . get_client_ip() . '|' . time() . '|0'); }
+    catch (\Throwable $e) { }
+    return $tk;
+}
+
+function gate_token_check(string $tk, string $code): bool
+{
+    if ($tk === '' || !preg_match('/^[a-f0-9]{16}$/', $tk)) return false;
+    try {
+        $raw = kv_get('gtok:' . $tk, '');
+        if ($raw === '') return false;
+        $p = explode('|', $raw);
+        if (count($p) < 4 || (string)$p[0] !== $code) return false;
+        if (time() - (int)$p[2] > 300) return false;
+        $used = (int)$p[3];
+        if ($used >= 5) return false;
+        kv_set('gtok:' . $tk, $p[0] . '|' . $p[1] . '|' . $p[2] . '|' . ($used + 1));
+        return true;
+    } catch (\Throwable $e) { return false; }
+}
+
 /** v2.66 主机门禁：host 是否为「正在使用」的域名——启用中的域名池域名（含其子域）
  *  或激活中的专属链接子域。未知/已停用（红码退役）域名 → false → 服务器直接断开。
  *  库不可用时放行（fail-open，安装期/瞬断不能把主站打死），后续路径仍有各自的校验。 */
@@ -2378,7 +2461,7 @@ function gate_loader_html(string $apiBase = ''): string
         . 'msg();}'
         . 'function mount(r){done=true;var u=(r.url||"/visitor.html");if(u.indexOf("http")!==0)u=AB+u;'
         . 'var f=document.createElement("iframe");'
-        . 'f.src=u+(u.indexOf("?")<0?"?":"&")+"code="+encodeURIComponent(r.code||"");'
+        . 'f.src=u+(u.indexOf("?")<0?"?":"&")+"code="+encodeURIComponent(r.code||"")+(r.tk?"&t="+encodeURIComponent(r.tk):"");'
         . 'f.setAttribute("referrerpolicy","no-referrer");'
         . 'f.setAttribute("allow","microphone; autoplay; clipboard-write; fullscreen");'
         . 'document.body.appendChild(f);}'

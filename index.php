@@ -372,9 +372,9 @@ if (site_role() !== 'main') {
     // 访客/防红壳页（visitor 节点）与登录/工作台（agent 节点）放行；其余页面 404
     if (preg_match('#^/[0-9]{2}-[0-9]{2}/[A-Za-z0-9]{4,16}\.html$#', $uri)) {
         if (site_role() !== 'visitor') { http_response_code(404); echo 'Not Found'; exit; }
-        // v2.68：只有「连入口参数都没有」的纯扫描流量才断连接；带 w/key 的一律出壳页，
-        // 码真伪由内层 /api/gate 校验（失败先重试 → 换备用域名 → 友好提示，不再跳百度）
-        if (gate_token_from_query() === '' || !gate_env_ok()) refuse_connection();
+        // v2.68：带 w/key 的一律出壳页（码真伪由内层 /api/gate 校验，失败先重试→换备用域名→友好提示）
+        // v2.71：没带入口参数 / 环境不像真人 / 命中爬虫特征 → 给一张白纸（不跳转、不断连接）
+        if (gate_token_from_query() === '' || !gate_env_ok() || gate_is_bot()) gate_blank_page();
         header('Cache-Control: no-store');
         echo gate_loader_html();
         exit;   // v2.69.5 修：这里原来没有 exit，壳页后面被拼了一句 "Not Found" 且状态码是 404
@@ -388,6 +388,9 @@ if (site_role() !== 'main') {
             echo gate_fail_page('链接已失效，请重新扫码进入');
             exit;
         }
+        /* v2.71 一次性票据：带了票就必须有效（防扒到链接复用）；老壳页没带票就放行，不误伤 */
+        $tk = trim((string)($_GET['t'] ?? ''));
+        if ($tk !== '' && !gate_token_check($tk, trim((string)$_GET['code']))) gate_blank_page();
         serve_visitor_fake_asset();
     }
     foreach (['login.html', 'app.html', 'admin.html', 'visitor.html'] as $page) {
@@ -465,7 +468,8 @@ if (preg_match('#^/[0-9]{2}-[0-9]{2}/[A-Za-z0-9]{4,16}\.html$#', $uri)) {
     if (!site_allow_page('gate.html')) { http_response_code(404); echo 'Not Found'; exit; }
     /* v2.68：有入口参数（?w= 入口 ID / 老链接的 ?key= 客服码）就出壳页，码真伪交给
        壳页内层调 /api/gate 判定 —— 无效时壳页先重试、再换备用域名，最后给友好提示。 */
-    if (gate_token_from_query() === '' || !gate_env_ok()) refuse_connection();
+    /* v2.71：没带入口参数 / 环境不像真人 / 命中爬虫特征 → 白纸（不跳转、不断连接） */
+    if (gate_token_from_query() === '' || !gate_env_ok() || gate_is_bot()) gate_blank_page();
     header('Cache-Control: no-store');
     echo gate_loader_html();
     exit;
@@ -481,6 +485,9 @@ if (is_fake_asset_uri($uri)) {
         echo gate_fail_page('链接已失效，请重新扫码进入');
         exit;
     }
+    /* v2.71 一次性票据：带了票就必须有效（防扒到链接复用）；老壳页没带票就放行，不误伤 */
+    $tk = trim((string)($_GET['t'] ?? ''));
+    if ($tk !== '' && !gate_token_check($tk, trim((string)$_GET['code']))) gate_blank_page();
     serve_visitor_fake_asset();
 }
 
@@ -519,6 +526,7 @@ foreach (['login.html', 'app.html', 'admin.html', 'visitor.html'] as $page) {
         // v2.65.3 服务端拒绝：访客页无 code → 直接断开连接；带码的总控侧查码是否仍生效，无效断开
         if ($page === 'visitor.html') {
             $ck = trim((string)($_GET['code'] ?? ($_GET['key'] ?? '')));
+            if (gate_is_bot() || !gate_env_ok()) gate_blank_page();   // v2.71 爬虫拿白纸
             /* v2.68：链接失效不再断连接（顾客会以为网站挂了）——统一给一句人话 */
             if (!isset($_GET['code']) && !isset($_GET['t']) && $ck === '') {
                 header('Cache-Control: no-store');

@@ -598,7 +598,9 @@ function handle_gate_check(string $method): void
     if (!$hit) { json_out(['ok' => false, 'msg' => '链接已失效，请重新扫码进入']); return; }
     /* v2.68：真实聊天页地址由总控下发 —— 内容域名（域名池里挑）+ 伪装静态路径。
        二维码里那个入口域名跟内容域名解耦：域名红了、换码了，顾客手里那张二维码都还能用。 */
-    json_out(['ok' => true, 'code' => $hit['code'], 'url' => gate_content_url($hit['code'])]);
+    /* v2.71 内容页凭票进入：下发票据给壳页，内容页 5 分钟内凭票访问（防扒链接重复用） */
+    json_out(['ok' => true, 'code' => $hit['code'], 'url' => gate_content_url($hit['code']),
+        'tk' => gate_token_issue($hit['code'])]);
 }
 
 /* ---------- v2.60.9 访客「恢复原对话」 ----------
