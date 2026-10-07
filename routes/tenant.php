@@ -118,10 +118,13 @@ function handle_tenant_service_code(string $method): void
         $st->execute([$tid]);
         $rows = $st->fetchAll();
         $dom = '';
+        $tExpires = '';
         try {
-            $d2 = $pdo->prepare('SELECT content_domain FROM tenants WHERE id = ?');
+            $d2 = $pdo->prepare('SELECT content_domain, expires_at FROM tenants WHERE id = ?');
             $d2->execute([$tid]);
-            $dom = (string)($d2->fetchColumn() ?: '');
+            $trow = $d2->fetch() ?: [];
+            $dom = (string)($trow['content_domain'] ?? '');
+            $tExpires = (string)($trow['expires_at'] ?? '');
         } catch (\Throwable $e) { }
         foreach ($rows as &$r) {
             $r['id'] = (int)$r['id'];
@@ -129,6 +132,8 @@ function handle_tenant_service_code(string $method): void
             $r['domain'] = (string)(parse_url((string)$r['link'], PHP_URL_HOST) ?: '');
             $r['created_at'] = dt_to_iso($r['created_at']);
             $r['content_domain'] = $dom;   // v2.70 该租户的专属落地域名（自动分配）
+            // v2.82 到期时间跟卡密一致（卡密到期，码就不能用了）
+            $r['expires_at'] = $tExpires !== '' ? dt_to_iso($tExpires) : '';
         }
         unset($r);
         json_out($rows);
@@ -607,11 +612,18 @@ function handle_tenant_links(string $method): void
     $st->execute([$tid]);
     $dl = $st->fetch();
 
-    /* v2.79 主码 = 最新一条**启用中**的客服码（停用的不参与展示，随时可再启用） */
+    /* v2.79 主码 = 最新一条**启用中**的客服码（停用的不参与展示，随时可再启用）
+       v2.82 带上创建时间 / 到期时间：到期时间跟卡密一致（卡密到期，码也就不能用） */
     $st = $pdo->prepare('SELECT code, link, created_at FROM service_codes
         WHERE tenant_id = ? AND enabled = 1 ORDER BY id DESC');
     $st->execute([$tid]);
     $codes = $st->fetchAll();
+    $tExpires = (string)($ctx['row']['expires_at'] ?? '');
+    foreach ($codes as &$c) {
+        $c['created_at'] = dt_to_iso((string)$c['created_at']);
+        $c['expires_at'] = $tExpires !== '' ? dt_to_iso($tExpires) : '';
+    }
+    unset($c);
 
     // 卡密直链：本站直接挂参数
     $scheme = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';

@@ -7,7 +7,7 @@
 <link rel="icon" href="/assets/img/mi-logo.png">
 <link rel="apple-touch-icon" href="/assets/img/mi-logo.png">
 <link rel="stylesheet" href="/assets/vendor/element-plus.css">
-<link rel="stylesheet" href="/assets/css/app.css?v=3.50.0">
+<link rel="stylesheet" href="/assets/css/app.css?v=3.51.0">
 <script src="/assets/ui/ui-registry.js?v=2.9.2"></script>
 <script src="/assets/ui/ui-loader.js?v=2.9.2" data-ui-cat="auto"></script>
 </head>
@@ -794,6 +794,16 @@
             </div>
 
             <div class="cc-row">
+              <span class="cc-k">创建时间</span>
+              <span class="cc-v">{{ codeCreatedAt }}</span>
+            </div>
+
+            <div class="cc-row">
+              <span class="cc-k">到期时间</span>
+              <span class="cc-v">{{ codeExpiresAt }}</span>
+            </div>
+
+            <div class="cc-row">
               <span class="cc-k">码状态</span>
               <span class="cc-state" :class="'is-' + codeCheck.state">
                 <i class="cc-dot"></i>
@@ -856,6 +866,9 @@
             </el-table-column>
             <el-table-column label="创建时间" width="140">
               <template #default="{row}"><span style="font-size:12px;color:#86909c;">{{ (row.created_at || '').slice(0, 16) }}</span></template>
+            </el-table-column>
+            <el-table-column label="到期时间" width="150">
+              <template #default="{row}"><span style="font-size:12px;color:#86909c;">{{ row.expires_at ? row.expires_at.slice(0, 16).replace('T', ' ') : '永久有效' }}</span></template>
             </el-table-column>
             <el-table-column label="操作" width="150">
               <template #default="{row}">
@@ -1705,7 +1718,7 @@
 <script src="/assets/qr-poster.js?v=2.2.0"></script>
 <script src="/assets/api.js?v=2.1.0"></script>
 <script src="/assets/js/app-components.js?v=2.6.2"></script>
-<script src="/assets/js/app.js?v=3.49.0"></script>
+<script src="/assets/js/app.js?v=3.50.0"></script>
 <script src="/assets/js/app-boot.js?v=2.1.1"></script>
 </body>
 </html>

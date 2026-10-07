@@ -2469,6 +2469,19 @@ const app = createApp({
       const cs = ((links.value && links.value.codes) || []).filter(x => x.code);
       return cs.length ? cs[0].code : '—';
     });
+    /* v2.82 当前主码的创建时间 / 到期时间（到期时间跟卡密一致，永久卡显示"永久有效"） */
+    const fmtDt = (s) => {
+      const t = String(s || '');
+      return t ? t.slice(0, 16).replace('T', ' ') : '';
+    };
+    const codeCreatedAt = Vue.computed(() => {
+      const cs = ((links.value && links.value.codes) || []);
+      return (cs.length && fmtDt(cs[0].created_at)) || '—';
+    });
+    const codeExpiresAt = Vue.computed(() => {
+      const cs = ((links.value && links.value.codes) || []);
+      return (cs.length && fmtDt(cs[0].expires_at)) || '永久有效';
+    });
     const codeIcons = () => (window.KFQCard && window.KFQCard.ICONS) || {};
     const codeLogoSrc = () => {
       if (codeStyle.logo === 'none') return null;
@@ -3194,6 +3207,7 @@ const app = createApp({
       geoTag, visitorTag, visitorTagFull, visitorChnClass, copyQrImage, downloadQrImage, codeRotateHint, rotateCode, rotateLink, loadHistory, disableLink, saveCodeCfg, meAvatarUrl,
       manageDlgOpen, codeList, codeListLoading, openManageCodes, toggleCode, delCodeRow, ownDlg, ownContact,
       loginInfoDlg, loginInfo, loginInfoName, loginHost, saveLoginInfoName, skipLoginInfo,
+      codeCreatedAt, codeExpiresAt,
       quickFields, welcomeFields, autoFields, blFields, preqFields,
       shortTime, fmtTime, sourceText, contactLabel, barW, quotaW, trendW, trendDesc, dailyDesc,
       sessTime,
