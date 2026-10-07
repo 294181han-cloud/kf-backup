@@ -77,6 +77,7 @@ function tenant_fields(array $t, ?int $sessions = null): array
         'quota_web' => (int)$t['quota_web'], 'quota_app' => (int)$t['quota_app'], 'max_agents' => (int)$t['max_agents'],
         'max_devices' => (int)($t['max_devices'] ?? 3),   // v2.60.10 登录设备上限（默认 3，最高 8）
         'closed_keep_days' => (int)($t['closed_keep_days'] ?? 3), 'max_sessions' => (int)($t['max_sessions'] ?? 0),
+        'content_domain' => (string)($t['content_domain'] ?? ''),   // v2.70 专属落地域名（自动分配）
         'created_at' => $t['created_at'], 'last_login_at' => $t['last_login_at'],
         'expired' => $t['expires_at'] && strtotime($t['expires_at']) < time(),
         'sessions' => $sessions,

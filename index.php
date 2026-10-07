@@ -81,6 +81,22 @@ function ensure_upgrade(): void
         try { $pdo->exec("ALTER TABLE service_codes ADD UNIQUE KEY uk_entry_id (entry_id)"); } catch (\Throwable $e) { /* 索引已存在 */ }
         // v2.68 内容落地主机：一张码固定一台（访客 localStorage 按域隔离，换域会丢会话）
         try { $pdo->exec("ALTER TABLE service_codes ADD COLUMN content_host VARCHAR(120) NOT NULL DEFAULT ''"); } catch (\Throwable $e) { /* 列已存在 */ }
+        /* v2.70 租户专属落地域名（自动分配）：把一个租户固定在同一台域名上，
+           某台域名红了只影响它自己，不再"一个域名红了全体陪葬"。
+           存量租户按他现在正在用的域名回填（不打扰、不用重发二维码）。 */
+        try { $pdo->exec("ALTER TABLE tenants ADD COLUMN content_domain VARCHAR(120) NOT NULL DEFAULT ''"); } catch (\Throwable $e) { /* 列已存在 */ }
+        try {
+            $unbound = $pdo->query("SELECT t.id, sc.link FROM tenants t
+                JOIN service_codes sc ON sc.tenant_id = t.id
+                WHERE t.content_domain = ''")->fetchAll();
+            if ($unbound) {
+                $upDom = $pdo->prepare('UPDATE tenants SET content_domain = ? WHERE id = ? AND content_domain = \'\'');
+                foreach ($unbound as $ub) {
+                    $dom = pool_domain_of((string)(parse_url((string)$ub['link'], PHP_URL_HOST) ?: ''));
+                    if ($dom !== '') $upDom->execute([$dom, (int)$ub['id']]);
+                }
+            }
+        } catch (\Throwable $e) { /* 迁移失败下轮再试 */ }
         try {
             $needIds = $pdo->query("SELECT id FROM service_codes WHERE entry_id IS NULL OR entry_id = ''")->fetchAll(PDO::FETCH_COLUMN);
             if ($needIds) {

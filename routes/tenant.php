@@ -165,7 +165,7 @@ function handle_tenant_service_code(string $method): void
             } else {
                 /* 已经是入口链接：原地换码 —— 链接不动（顾客二维码照用），
                    同时换一台内容落地主机（客服码链接里那个入口域名不用动）。 */
-                $ch = gate_pool_hosts(1)[0] ?? '';
+                $ch = pool_host_in(tenant_domain_for($tid));
                 $pdo->prepare('UPDATE service_codes SET code = ?, entry_id = ?, content_host = ? WHERE id = ?')
                     ->execute([$code, $entryId, $ch, $newId]);
                 $url = $oldLink;
@@ -185,24 +185,20 @@ function handle_tenant_service_code(string $method): void
                 $host = rtrim(explode('/', $host)[0], '/');
                 $url = "$scheme://$host/$gatePath";
             } else {
-                $rows = $pdo->query('SELECT domain, wildcard FROM domain_pool WHERE enabled = 1 ORDER BY id ASC')->fetchAll();
-                if (!$rows) json_error('域名池为空，请联系平台管理员添加可用域名', 400);
-                $pick = $rows[array_rand($rows)];
-                $subs = array_values(array_filter(array_map('trim', explode(',', kv_get('pool_subs:' . $pick['domain'], '')))));
-                if ($subs) {
-                    $url = "$scheme://" . $subs[array_rand($subs)] . ".{$pick['domain']}/$gatePath";
-                } elseif ($pick['wildcard']) {
-                    $sub = substr(preg_replace('/[^a-z0-9]/', 'x', strtolower(base64_encode(random_bytes(6)))), 0, 8);
-                    $url = "$scheme://$sub.{$pick['domain']}/$gatePath";
-                } else {
-                    $url = "$scheme://{$pick['domain']}/$gatePath";
-                }
+                /* v2.70 专属落地域名（自动分配）：这个租户固定用一台域名，
+                   某台域名红了只影响它自己，不再全体陪葬。全程不用人工分配。 */
+                $bound = tenant_domain_for($tid);
+                if ($bound === '') json_error('域名池为空，请联系平台管理员添加可用域名', 400);
+                $host = pool_host_in($bound);
+                if ($host === '') json_error('域名池为空，请联系平台管理员添加可用域名', 400);
+                $url = "$scheme://$host/$gatePath";
             }
             $pdo->prepare('INSERT INTO service_codes (tenant_id, code, entry_id, link) VALUES (?,?,?,?)')
                 ->execute([$tid, $code, $entryId, $url]);
             $newId = (int)$pdo->lastInsertId();
-            /* v2.68 内容落地主机：新码先落一台（gate_content_url 会复用，保证访客会话不丢） */
-            $ch = gate_pool_hosts(1)[0] ?? '';
+            /* v2.68 内容落地主机：新码先落一台（gate_content_url 会复用，保证访客会话不丢）
+               v2.70：落在该租户的专属域名下 */
+            $ch = pool_host_in(tenant_domain_for($tid));
             if ($ch !== '') $pdo->prepare('UPDATE service_codes SET content_host = ? WHERE id = ?')->execute([$ch, $newId]);
             /* v2.57 一个账号只留一个码：换码＝把新码替换掉旧的（旧客服码立即失效）。
                v2.68 注意：链接里的入口 ID 保持不变时，顾客手里的二维码不会失效。 */

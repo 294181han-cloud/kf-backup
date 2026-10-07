@@ -2062,6 +2062,85 @@ function gate_content_paths(string $domain, int $count = 6): array
     try { kv_set($key, implode(',', $list)); } catch (\Throwable $e) { /* 存不下就本次生效 */ }
     return $list;
 }
+/* ===================== v2.70 租户专属落地域名（全自动分配） =====================
+   以前：所有租户发码都从域名池里随机挑一台 → 一台域名红了，落在它上面的所有租户一起死。
+   现在：每个租户固定绑一台专属域名，系统自动挑（不用人工分配）：
+     · 发码时如果这个租户还没绑，就选「当前绑定租户最少」的启用域名给他；
+     · 绑定的域名被停用（红了）→ 下次发码自动换一台没红的；
+     · 全池都满了他也不会发不出码（自动把单台承载上限放宽）。
+   存量租户在升级时按"他当前正在用的域名"回填，不打扰、不用重发二维码。 */
+
+/** 这台域名目前绑了几个租户（只算启用中的租户） */
+function domain_tenant_count(string $domain): int
+{
+    try {
+        $st = db()->prepare("SELECT COUNT(*) FROM tenants WHERE content_domain = ? AND status = 'active'");
+        $st->execute([$domain]);
+        return (int)$st->fetchColumn();
+    } catch (\Throwable $e) { return 0; }
+}
+
+/** 从域名池挑一台给租户用：优先"绑定人数最少"的（同数量随机）；都被占满就把每台上限 +1 再挑 */
+function domain_pick_for_tenant(): string
+{
+    try {
+        $rows = db()->query('SELECT domain FROM domain_pool WHERE enabled = 1 ORDER BY id ASC')->fetchAll(PDO::FETCH_COLUMN);
+    } catch (\Throwable $e) { return ''; }
+    $rows = array_values(array_filter(array_map(fn($d) => strtolower(trim((string)$d)), $rows)));
+    if (!$rows) return '';
+    $cap = max(1, (int)kv_get('domain_tenant_cap', '1'));   // 一台域名默认只带 1 个租户
+    for ($round = 0; $round < 6; $round++) {
+        $free = [];
+        foreach ($rows as $d) { if (domain_tenant_count($d) < $cap) $free[] = $d; }
+        if ($free) return $free[array_rand($free)];
+        $cap++;                                             // 域名不够就放宽，别让租户发不出码
+    }
+    return $rows[array_rand($rows)];
+}
+
+/** 这个租户的专属域名：已绑且在启用中就直接用；否则自动分配一台并落库 */
+function tenant_domain_for(int $tenantId): string
+{
+    $cur = '';
+    try {
+        $st = db()->prepare('SELECT content_domain FROM tenants WHERE id = ?');
+        $st->execute([$tenantId]);
+        $cur = strtolower(trim((string)($st->fetchColumn() ?: '')));
+    } catch (\Throwable $e) { }
+    if ($cur !== '') {
+        try {
+            $st = db()->prepare('SELECT enabled FROM domain_pool WHERE domain = ? LIMIT 1');
+            $st->execute([$cur]);
+            $en = $st->fetchColumn();
+            if ($en !== false && (int)$en === 1) return $cur;   // 还活着，继续用
+        } catch (\Throwable $e) { return $cur; }
+    }
+    $pick = domain_pick_for_tenant();
+    if ($pick !== '') {
+        try { db()->prepare('UPDATE tenants SET content_domain = ? WHERE id = ?')->execute([$pick, $tenantId]); }
+        catch (\Throwable $e) { }
+    }
+    return $pick;
+}
+
+/** 在指定域名下挑一个落地主机（固定子域池随机 / 泛解析随机 8 位 / 裸域） */
+function pool_host_in(string $domain): string
+{
+    $domain = strtolower(trim($domain));
+    if ($domain === '') return '';
+    $subs = array_values(array_filter(array_map('trim', explode(',', kv_get('pool_subs:' . $domain, '')))));
+    if ($subs) return $subs[array_rand($subs)] . '.' . $domain;
+    try {
+        $st = db()->prepare('SELECT wildcard FROM domain_pool WHERE domain = ? LIMIT 1');
+        $st->execute([$domain]);
+        $w = $st->fetchColumn();
+    } catch (\Throwable $e) { $w = false; }
+    if ((int)$w === 1) {
+        $sub = substr(preg_replace('/[^a-z0-9]/', 'x', strtolower(base64_encode(random_bytes(6)))), 0, 8);
+        return $sub . '.' . $domain;
+    }
+    return $domain;
+}
 
 /** 从落地主机反查它属于哪个域名池域名（f5ma20.shop / xxxxx.f5ma20.shop → f5ma20.shop） */
 function pool_domain_of(string $host): string
@@ -2085,16 +2164,20 @@ function gate_content_host_for(string $code, string $fallback = ''): string
 {
     try {
         $pdo = db();
-        $st = $pdo->prepare('SELECT id, content_host FROM service_codes WHERE code = ? LIMIT 1');
+        $st = $pdo->prepare('SELECT id, tenant_id, content_host FROM service_codes WHERE code = ? LIMIT 1');
         $st->execute([$code]);
         $row = $st->fetch();
         if ($row) {
             $cur = strtolower(trim((string)$row['content_host']));
             if ($cur !== '' && pool_host_enabled($cur)) return $cur;
-            if ($fallback !== '' && $fallback !== $cur) {
+            /* 原主机已停用（红了）：换到「这个租户的专属域名」下的主机（没有就自动分配） */
+            $dom = tenant_domain_for((int)$row['tenant_id']);
+            $next = $dom !== '' ? pool_host_in($dom) : $fallback;
+            if ($next !== '' && $next !== $cur) {
                 $pdo->prepare('UPDATE service_codes SET content_host = ? WHERE id = ?')
-                    ->execute([$fallback, (int)$row['id']]);
+                    ->execute([$next, (int)$row['id']]);
             }
+            return $next !== '' ? $next : $fallback;
         }
     } catch (\Throwable $e) { /* 无库/写失败：本次仍用 fallback */ }
     return $fallback;

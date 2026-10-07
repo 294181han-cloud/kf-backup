@@ -88,6 +88,12 @@
                 <template #default="{row}"><span class="mono" style="font-weight:600;">{{ row.kami }}</span></template>
               </el-table-column>
               <el-table-column prop="nickname" label="名称" width="110"></el-table-column>
+              <el-table-column label="专属落地域名" width="160">
+                <template #default="{row}">
+                  <span v-if="row.content_domain" class="mono" style="font-size:12px;color:#165dff;">{{ row.content_domain }}</span>
+                  <span v-else style="font-size:12px;color:#86909c;">未分配（发码时自动选）</span>
+                </template>
+              </el-table-column>
               <el-table-column label="TG 用户" width="140">
                 <template #default="{row}">
                   <a v-if="row.tg_user && row.tg_user.charAt(0)==='@'" :href="'https://t.me/' + row.tg_user.slice(1)"
