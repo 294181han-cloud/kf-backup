@@ -85,18 +85,20 @@ function tenant_brand(array $tenant): array
 {
     $tid = (int)$tenant['id'];
     return [
-        'company_name'  => ts_get($tid, 'brand_company', $tenant['nickname'] ?: '在线客服'),
+        // v2.78 品牌名称默认固定「在线客服」（不再跟着卡密的名称走——卡密名 ≠ 品牌名）
+        'company_name'  => ts_get($tid, 'brand_company', '在线客服'),
         'welcome_title' => ts_get($tid, 'brand_title', '您好，欢迎咨询！'),
         'welcome_sub'   => ts_get($tid, 'brand_sub', '请简单描述您的问题，客服会尽快回复'),
         'avatar'        => ts_get($tid, 'brand_avatar', '💬'),
         'theme_color'   => ts_get($tid, 'brand_color', '#1677ff'),
         'pre_inquiry_on' => ts_get($tid, 'pre_inquiry_on', '0') === '1',
         'show_position' => ts_get($tid, 'brand_position', 'right-bottom'),
-        'notice_on'     => ts_get($tid, 'notice_on', '0') === '1',
+        // v2.78 公告默认开 + 默认文案
+        'notice_on'     => ts_get($tid, 'notice_on', '1') === '1',
         // v2.77.1 默认值必须和后台（routes/tenant.php）一致 —— 之前这里还是 whatsapp，
         // 于是"没单独设过模板"的租户：后台显示「默认客服」，访客端却渲染成 WhatsApp。
         'template'      => ts_get($tid, 'visitor_template', 'default'),
-        'notice_text'   => ts_get($tid, 'notice_text', ''),
+        'notice_text'   => ts_get($tid, 'notice_text', '不要关闭此网页，若退出请先复制浏览器打开'),
         // 验证策略
         'robot'          => ts_get($tid, 'robot', 'no'),
         'robot_frequency' => ts_get($tid, 'robot_frequency', 'first'),

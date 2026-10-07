@@ -2081,7 +2081,8 @@ const app = createApp({
       } catch (e) { ElementPlus.ElMessage.error(e.message); }
     };
     // ===== 安全与维护 / 访客资源 / 引导 / 深色 =====
-    const sec = reactive({ notice_on: false, notice_text: '', filter_keywords: '', auto_blacklist: false, dedup_on: false, ip_limit_on: false, ip_limit_count: 5 });
+    // v2.78 公告默认开 + 默认文案（与后端 routes/visitor.php 的默认值保持一致）
+    const sec = reactive({ notice_on: true, notice_text: '不要关闭此网页，若退出请先复制浏览器打开', filter_keywords: '', auto_blacklist: false, dedup_on: false, ip_limit_on: false, ip_limit_count: 5 });
     const loginLogs = ref([]);
     const visitors = ref([]);
     const cleanupOpts = [

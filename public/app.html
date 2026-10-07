@@ -949,7 +949,7 @@
         <div class="panel" style="max-width:960px;margin:0 auto;">
           <div class="panel-title">访客端外观</div>
           <el-form label-width="100px">
-            <el-form-item label="品牌名称"><el-input v-model="brand.company_name" maxlength="30"></el-input></el-form-item>
+            <el-form-item label="品牌名称"><el-input v-model="brand.company_name" maxlength="30" placeholder="默认：在线客服"></el-input></el-form-item>
             <el-form-item label="欢迎标题"><el-input v-model="brand.title" maxlength="50"></el-input></el-form-item>
             <el-form-item label="欢迎副标题"><el-input v-model="brand.sub" maxlength="80"></el-input></el-form-item>
             <el-form-item label="访客端头像">
@@ -971,20 +971,14 @@
             <el-form-item label="平台导航条">
               <el-switch v-model="brand.tpl_nav_on" active-text="显示仿 App 导航条"></el-switch>
             </el-form-item>
-            <!-- v2.60.20 去掉「导航标题」：只有带仿 App 顶栏的模板才用得到，多数人填了不生效，反而困惑 -->
-            <el-form-item label="VIP 标识">
-              <el-input v-model="brand.vip_badge" placeholder="如：VIP / 官方 / 认证，留空不显示" maxlength="10" style="max-width:200px;"></el-input>
-            </el-form-item>
-            <el-form-item label="底部标识">
-              <el-input v-model="brand.footer_text" placeholder="页面底部平台标识文字，留空不显示" maxlength="20" style="max-width:260px;"></el-input>
-            </el-form-item>
+            <!-- v2.78 按需求去掉「VIP 标识」「底部标识」两个设置项（已设置过的租户仍按原值渲染，不受影响） -->
             <!-- v2.60.20 「公告」从「安全与维护」挪到这里（都是访客端外观相关，放一起更好找） -->
             <el-form-item label="公告横幅">
               <div style="width:100%;">
                 <el-switch v-model="sec.notice_on" active-text="在访客聊天窗口顶部展示公告"></el-switch>
                 <div style="margin-top:8px;max-width:460px;">
                   <el-input type="textarea" :rows="2" v-model="sec.notice_text" maxlength="200" show-word-limit
-                    placeholder="例如：办理过程中 禁止离线 否则入金无效！" :disabled="!sec.notice_on"></el-input>
+                    placeholder="默认：不要关闭此网页，若退出请先复制浏览器打开" :disabled="!sec.notice_on"></el-input>
                 </div>
                 <div style="margin-top:8px;">
                   <el-button size="small" type="primary" @click="saveSecurity">保存公告</el-button>
@@ -1708,7 +1702,7 @@
 <script src="/assets/qr-poster.js?v=2.1.03"></script>
 <script src="/assets/api.js?v=2.1.0"></script>
 <script src="/assets/js/app-components.js?v=2.6.2"></script>
-<script src="/assets/js/app.js?v=3.43.0"></script>
+<script src="/assets/js/app.js?v=3.44.0"></script>
 <script src="/assets/js/app-boot.js?v=2.1.1"></script>
 </body>
 </html>

@@ -286,7 +286,8 @@ function handle_tenant_settings(string $method): void
     if ($method === 'GET') {
         $t = $ctx['row'];
         json_out([
-            'brand_company'  => ts_get($tid, 'brand_company', $t['nickname'] ?: '在线客服'),
+            // v2.78 品牌名称默认固定「在线客服」（卡密的名称 ≠ 访客端品牌名）
+            'brand_company'  => ts_get($tid, 'brand_company', '在线客服'),
             'brand_title'    => ts_get($tid, 'brand_title', '您好，欢迎咨询！'),
             'brand_sub'      => ts_get($tid, 'brand_sub', '请简单描述您的问题，客服会尽快回复'),
             'brand_avatar'   => ts_get($tid, 'brand_avatar', '💬'),
@@ -329,9 +330,9 @@ function handle_tenant_settings(string $method): void
             'footer_text'     => ts_get($tid, 'footer_text', ''),
             // 「请求访客上传图片」话术（客服在工作台点该按钮时发给访客的文案）
             'ask_image_text'  => ts_get($tid, 'ask_image_text', '方便的话，请上传一下相关图片，帮您更快定位问题～'),
-            // 公告（访客端顶部横幅）
-            'notice_on'      => ts_get($tid, 'notice_on', '0') === '1',
-            'notice_text'    => ts_get($tid, 'notice_text', ''),
+            // 公告（访客端顶部横幅）—— v2.78 默认开 + 默认文案
+            'notice_on'      => ts_get($tid, 'notice_on', '1') === '1',
+            'notice_text'    => ts_get($tid, 'notice_text', '不要关闭此网页，若退出请先复制浏览器打开'),
             // 访客过滤：关键词自动拉黑
             'filter_keywords' => ts_get($tid, 'filter_keywords', ''),
             'auto_blacklist' => ts_get($tid, 'auto_blacklist', '0') === '1',
