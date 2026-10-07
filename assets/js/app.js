@@ -2494,10 +2494,14 @@ const app = createApp({
       return codeIcons()[k] || '';
     };
     const codeCardOpts = (scale) => {
-      /* v2.81 按需求：二维码图上不带文字、中心 logo 加大（"标准/加大"开关已去掉，统一用大号） */
+      /* v2.83 二维码图上带上下文字（跟人家一样）：
+         上 = 客服名称（「昵称显示」开关控制）  下 = 支持说明（「支持显示」开关控制）
+         两个都关掉就输出一张纯二维码（无文字、中心 logo 加大） */
+      const topLine = codeCfg.nicknameOn ? ((me.value && me.value.nickname) || '在线客服') : '';
+      const bottomLine = codeCfg.supportOn ? '支持微信、支付宝、浏览器等通道扫码进入' : '';
       return {
         link: viewLink.value || currentLink.value || 'https://example.com/',
-        topText: '', bottomText: '',
+        topText: topLine, bottomText: bottomLine,
         brand: codeStyle.brand, dot: codeStyle.dot, eye: codeStyle.eye, colorDots: !!codeStyle.colorDots,
         knock: 'square', logoRatio: 0.28,
         logo: codeLogoSrc(), logoShape: codeStyle.logo === 'avatar' ? 'circle' : 'round', scale: scale || 2,

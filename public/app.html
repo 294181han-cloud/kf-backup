@@ -7,7 +7,7 @@
 <link rel="icon" href="/assets/img/mi-logo.png">
 <link rel="apple-touch-icon" href="/assets/img/mi-logo.png">
 <link rel="stylesheet" href="/assets/vendor/element-plus.css">
-<link rel="stylesheet" href="/assets/css/app.css?v=3.51.0">
+<link rel="stylesheet" href="/assets/css/app.css?v=3.52.0">
 <script src="/assets/ui/ui-registry.js?v=2.9.2"></script>
 <script src="/assets/ui/ui-loader.js?v=2.9.2" data-ui-cat="auto"></script>
 </head>
@@ -791,6 +791,12 @@
                 <el-button size="small" type="primary" plain @click="copy(currentLink)">复制链接</el-button>
                 <span class="mono cc-link-t" :title="currentLink">{{ currentLink || '尚未生成' }}</span>
               </div>
+            </div>
+
+            <div class="cc-row">
+              <span class="cc-k">码设置</span>
+              <label class="cc-chk"><input type="checkbox" v-model="codeCfg.nicknameOn" @change="saveCodeCfg(); renderMainQr();"> 昵称显示</label>
+              <label class="cc-chk"><input type="checkbox" v-model="codeCfg.supportOn" @change="saveCodeCfg(); renderMainQr();"> 支持显示</label>
             </div>
 
             <div class="cc-row">
@@ -1718,7 +1724,7 @@
 <script src="/assets/qr-poster.js?v=2.2.0"></script>
 <script src="/assets/api.js?v=2.1.0"></script>
 <script src="/assets/js/app-components.js?v=2.6.2"></script>
-<script src="/assets/js/app.js?v=3.50.0"></script>
+<script src="/assets/js/app.js?v=3.51.0"></script>
 <script src="/assets/js/app-boot.js?v=2.1.1"></script>
 </body>
 </html>

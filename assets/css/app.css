@@ -2170,3 +2170,7 @@ body.dark .sess-resume-entry .sme-box { background: #3a2f1a; color: #f0b45c; }
 
 /* v2.82 客服码卡片里的纯文本值 */
 .cc-v { font-size: 13px; color: #1d2129; }
+
+/* v2.83 客服码卡片里的两个显示开关 */
+.cc-chk { display: inline-flex; align-items: center; gap: 5px; font-size: 13px; color: #4e5969; cursor: pointer; margin-right: 14px; }
+.cc-chk input { width: 15px; height: 15px; accent-color: #1677ff; }
