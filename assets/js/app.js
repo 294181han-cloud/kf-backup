@@ -2450,6 +2450,15 @@ const app = createApp({
       { c: '#2E6BE6', n: '蓝色' }, { c: '#0E7A5F', n: '深绿' }, { c: '#6B3FE0', n: '紫色' }, { c: '#C2410C', n: '橙色' },
     ];
     // 中心 Logo → 检测渠道：微信/QQ 有独立检测通道，其余走微信通道
+    // v2.84 中心 Logo → 主色（选哪个图标，二维码就用哪个品牌色）
+    const LOGO_BRAND = {
+      wechat: '#07C160',   // 微信绿
+      alipay: '#1677FF',   // 支付宝蓝
+      qq: '#12B7F5',       // QQ 蓝
+      taobao: '#FF5000',   // 淘宝橙
+      douyin: '#16181d',   // 抖音黑
+      all: '#07C160',      // 聚合（默认微信绿）
+    };
     const CODE_CHANNEL = { wechat: 'wx', qq: 'qq', all: 'wx', alipay: 'wx', douyin: 'wx', avatar: 'wx', none: 'wx', custom: 'wx' };
     // 当前中心 Logo 对应的拦截检测通道（微信 logo → 查微信是否拦截；QQ logo → 查 QQ）
     const checkChannel = computed(() => CODE_CHANNEL[codeStyle.logo] || 'wx');
@@ -2544,7 +2553,12 @@ const app = createApp({
     const setCodeStyle = (k, v) => { codeStyle[k] = v; renderCodeCard(); };
     const pickLogo = (k) => {
       if (k === 'upload') { if (logoFile.value) logoFile.value.click(); return; }
-      codeStyle.logo = k; renderCodeCard();
+      /* v2.84 主色跟着码头像走：微信→微信绿、支付宝→支付宝蓝、QQ→QQ 蓝、淘宝→淘宝橙、抖音→黑，
+         并且自动打开「码点同色」（整张码是同一个主色，跟参考图一样） */
+      codeStyle.logo = k;
+      var bc = LOGO_BRAND[k];
+      if (bc) { codeStyle.brand = bc; codeStyle.colorDots = true; saveCodeStyle(); }
+      renderCodeCard(); renderMainQr();
       if (CODE_CHANNEL[k]) checkCode(false);
     };
     const onLogoFile = (e) => {
