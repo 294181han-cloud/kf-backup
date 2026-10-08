@@ -98,7 +98,8 @@ function tenant_brand(array $tenant): array
         // v2.77.1 默认值必须和后台（routes/tenant.php）一致 —— 之前这里还是 whatsapp，
         // 于是"没单独设过模板"的租户：后台显示「默认客服」，访客端却渲染成 WhatsApp。
         'template'      => ts_get($tid, 'visitor_template', 'default'),
-        'notice_text'   => ts_get($tid, 'notice_text', '不要关闭此网页，若退出请先复制浏览器打开'),
+        /* v2.87 公告文案固定（租户只能开关，不能自己改字） */
+        'notice_text'   => '不要关闭此网页，若退出请先复制浏览器打开',
         // 验证策略
         'robot'          => ts_get($tid, 'robot', 'no'),
         'robot_frequency' => ts_get($tid, 'robot_frequency', 'first'),
@@ -359,6 +360,8 @@ function visitor_session_out(array $s): array
         'from' => $s['from_url'], 'lastMsg' => $s['last_msg'], 'lastTime' => dt_to_iso($s['last_time']),
         'status' => $s['status'],
         'avatar' => visitor_avatar_resolve((int)$s['id'], (string)($s['visitor_avatar'] ?? '')),
+        /* v2.87 续聊链接要用它：访客端把这个码拼进链接，退出后打开就直接回到本对话 */
+        'resume_code' => (string)($s['resume_code'] ?? ''),
     ];
 }
 

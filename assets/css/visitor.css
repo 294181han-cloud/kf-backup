@@ -27,10 +27,28 @@ body {
   background: var(--theme-grad);
   color: #fff;
   padding: 16px 18px calc(16px);
-  display: flex; align-items: center; gap: 13px;
+  /* v2.87 公告并进蓝色横幅：原来一行变成「头部一行 + 公告一行」 */
+  display: flex; flex-direction: column; align-items: stretch; gap: 10px;
   flex-shrink: 0;
   z-index: 10;
 }
+.v-head-row { display: flex; align-items: center; gap: 13px; min-width: 0; }
+/* 横幅里的公告条：点一下复制续聊链接 */
+.v-notice {
+  display: flex; align-items: center; gap: 6px;
+  background: rgba(255, 255, 255, .16);
+  border: 1px solid rgba(255, 255, 255, .24);
+  border-radius: 10px; padding: 6px 10px;
+  font-size: 12px; line-height: 1.5; color: #fff;
+  cursor: pointer; user-select: none;
+}
+.v-notice .vn-ic { flex-shrink: 0; }
+.v-notice .vn-t { flex: 1; min-width: 0; opacity: .96; }
+.v-notice .vn-copy {
+  flex-shrink: 0; font-size: 11px; padding: 2px 8px; border-radius: 999px;
+  background: rgba(255, 255, 255, .26); white-space: nowrap;
+}
+.v-notice:active { background: rgba(255, 255, 255, .24); }
 .v-header::after {
   content: '';
   position: absolute; left: 0; right: 0; bottom: -18px; height: 18px;
@@ -122,11 +140,7 @@ body[data-tpl="whatsapp"] .v-input {
 body[data-tpl="whatsapp"] .v-input:focus { background: #fff; }
 body[data-tpl="whatsapp"] .v-btn { border-radius: 999px; }
 body[data-tpl="whatsapp"] .v-footer-text { background: transparent; }
-/* 公告/滚动通知：WhatsApp 样式圆角提示卡 */
-body[data-tpl="whatsapp"] .notice-bar {
-  margin: 8px 12px; border-radius: 10px; border: none;
-  background: #fdf4c9; color: #54656d; box-shadow: 0 1px 1px rgba(11,20,26,.08);
-}
+/* 滚动通知：WhatsApp 样式圆角提示卡（公告 v2.87 起并进蓝色横幅，不再单独成条） */
 body[data-tpl="whatsapp"] .inform-bar {
   background: #fdf4c9; border-bottom: none; color: #54656d;
 }
@@ -138,14 +152,7 @@ body[data-tpl="whatsapp"] .inform-bar {
 }
 .recall-link { color: var(--theme); margin-left: 8px; cursor: pointer; }
 
-/* ================= 公告 ================= */
-.notice-bar {
-  background: linear-gradient(90deg, #fff8e8, #fffdf6);
-  border-bottom: 1px solid #ffe9b8;
-  color: #9a6d1b; padding: 9px 16px; font-size: 12.5px; line-height: 1.55;
-  flex-shrink: 0; display: flex; gap: 7px; align-items: flex-start;
-}
-.notice-bar .n-ic { flex-shrink: 0; }
+/* ================= 公告（v2.87 起并进蓝色横幅 .v-header 里的 .v-notice，不再单独成条） ================= */
 
 /* ================= 消息区 ================= */
 .v-body { flex: 1; overflow-y: auto; padding: 14px 14px 6px; -webkit-overflow-scrolling: touch; }

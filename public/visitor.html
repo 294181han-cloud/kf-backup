@@ -7,7 +7,7 @@
 <title>在线咨询</title>
 <link rel="icon" href="/assets/img/mi-logo.png">
 <link rel="apple-touch-icon" href="/assets/img/mi-logo.png">
-<link rel="stylesheet" href="/assets/css/visitor.css?v=2.16.0">
+<link rel="stylesheet" href="/assets/css/visitor.css?v=2.17.0">
 </head>
 <body>
 <!-- v2.52 兜底：脚本没跑起来时（微信旧内核 document.write 不执行脚本 / 资源被缓存污染 / 网络抽风），
@@ -39,17 +39,26 @@
   <template v-else>
     <div class="nav-bar" v-if="ui.navOn"><span class="nav-back">‹</span><span class="nav-title">{{ ui.navTitle }}</span><span class="nav-menu">···</span></div>
     <div class="v-header">
-      <div class="v-avatar">
-        <img v-if="isImg(brand.avatar)" :src="brand.avatar"><template v-else>{{ brand.avatar }}</template>
-        <span class="online-dot"></span>
+      <div class="v-head-row">
+        <div class="v-avatar">
+          <img v-if="isImg(brand.avatar)" :src="brand.avatar"><template v-else>{{ brand.avatar }}</template>
+          <span class="online-dot"></span>
+        </div>
+        <div class="v-id">
+          <div class="v-title" v-if="brand.show_nickname">{{ brand.company_name }}<span v-if="brand.vip_badge" class="vip-badge">{{ brand.vip_badge }}</span></div>
+          <div class="v-sub" v-if="brand.show_support">{{ brand.welcome_sub }}</div>
+        </div>
+        <div class="v-status"><i class="st-dot"></i>{{ onlineText }}</div>
+        <!-- v2.60.9 换手机/换浏览器后接回原对话 -->
+        <button type="button" class="v-resume-btn" title="换设备后恢复原对话" @click="openResume">恢复对话</button>
       </div>
-      <div class="v-id">
-        <div class="v-title" v-if="brand.show_nickname">{{ brand.company_name }}<span v-if="brand.vip_badge" class="vip-badge">{{ brand.vip_badge }}</span></div>
-        <div class="v-sub" v-if="brand.show_support">{{ brand.welcome_sub }}</div>
+      <!-- v2.87 公告并进蓝色横幅（原来是下面单独一条黄色横幅）；
+           点一下 = 复制「续聊链接」，退出后用这个链接直接回到这段对话，不用输恢复码 -->
+      <div class="v-notice" v-if="brand.notice_on" @click="copyResumeLink" title="点一下复制续聊链接">
+        <span class="vn-ic">📢</span>
+        <span class="vn-t">{{ brand.notice_text }}</span>
+        <span class="vn-copy">复制链接</span>
       </div>
-      <div class="v-status"><i class="st-dot"></i>{{ onlineText }}</div>
-      <!-- v2.60.9 换手机/换浏览器后接回原对话 -->
-      <button type="button" class="v-resume-btn" title="换设备后恢复原对话" @click="openResume">恢复对话</button>
     </div>
 
     <!-- v2.60.9 恢复原对话弹窗 -->
@@ -70,11 +79,6 @@
     <!-- 滚动通知 -->
     <div class="inform-bar" v-if="brand.inform_on && brand.inform_text">
       <span class="inform-track">📢 {{ brand.inform_text }}</span>
-    </div>
-
-    <!-- 公告横幅 -->
-    <div class="notice-bar" v-if="brand.notice_on && brand.notice_text">
-      <span class="n-ic">📢</span><span>{{ brand.notice_text }}</span>
     </div>
 
     <div class="v-body" ref="bodyRef" @scroll.passive="onBodyScroll">
@@ -323,7 +327,7 @@
 </div>
 
 <script src="/assets/vendor/vue.global.js?v=2.0.1"></script>
-<script src="/assets/js/visitor.js?v=2.26.0"></script>
+<script src="/assets/js/visitor.js?v=2.27.0"></script>
 <script>
 /* v2.52 加载兜底：正常挂载后由 visitor.js 移除提示；8 秒还没挂载就提示"加载失败" */
 (function () {

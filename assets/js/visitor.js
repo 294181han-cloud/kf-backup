@@ -176,6 +176,48 @@ createApp({
     const resumeCode = ref('');
     const resumeErr = ref('');
     const resumeBusy = ref(false);
+    /* v2.87 这段对话的「恢复码」→ 拿它拼一条续聊链接给访客（点一下复制，
+       退出后打开链接直接回到原对话，不用再输恢复码） */
+    const myResumeCode = ref('');
+    const noteResume = (r) => {
+      const rc = (r && (r.resume_code || (r.session && r.session.resume_code))) || '';
+      if (rc) myResumeCode.value = String(rc).toLowerCase();
+    };
+    const cleanUrlResumeParam = () => {
+      try {
+        const u = new URL(location.href);
+        if (!u.searchParams.has('r')) return;
+        u.searchParams.delete('r');
+        history.replaceState(null, '', u.pathname + (u.search || '') + u.hash);
+      } catch (e) {}
+    };
+    const resumeLink = () => {
+      try {
+        const u = new URL(location.href);
+        u.searchParams.delete('r');
+        if (myResumeCode.value) u.searchParams.set('r', myResumeCode.value);
+        return u.toString();
+      } catch (e) { return location.href; }
+    };
+    const copyResumeLink = async () => {
+      if (!myResumeCode.value) { toast('还没有进入对话，等进入后再复制'); return; }
+      const link = resumeLink();
+      let ok = false;
+      try { await navigator.clipboard.writeText(link); ok = true; } catch (e) { ok = false; }
+      if (!ok) {
+        /* 微信内置浏览器 / 老 WebView 没有 clipboard API：用隐藏输入框兜底 */
+        try {
+          const ta = document.createElement('textarea');
+          ta.value = link; ta.setAttribute('readonly', '');
+          ta.style.cssText = 'position:fixed;left:-9999px;top:0;';
+          document.body.appendChild(ta);
+          ta.select(); ta.setSelectionRange(0, link.length);
+          ok = document.execCommand('copy');
+          document.body.removeChild(ta);
+        } catch (e) { ok = false; }
+      }
+      toast(ok ? '续聊链接已复制，退出后打开这个链接就能回到本对话' : '复制失败，请手动复制地址栏链接');
+    };
     const openResume = () => { resumeErr.value = ''; resumeOpen.value = true; };
     const doResume = async () => {
       const rc = (resumeCode.value || '').trim().toLowerCase();
@@ -190,6 +232,7 @@ createApp({
         if (r && r.ok) {
           storeToken(r.visitor_token);
           sessionId.value = r.session_id;
+          noteResume(r);
           // 关键：换会话前先清空消息游标，否则新会话（消息 id 更大）会让原会话的历史被当成"更旧的"跳过
           messages.value = [];
           maxMsgId.value = 0;
@@ -239,6 +282,30 @@ createApp({
           return;
         }
 
+        /* v2.87 续聊链接（?r=<恢复码>）：点开就直接接回原来那段对话，不用手动输恢复码。
+           失败（码过期 / 对话已结束）就照常走「老访客 token → 新会话」的流程。 */
+        const rk = (qs.get('r') || '').trim().toLowerCase();
+        if (rk) {
+          try {
+            const rr = await fetch((window.KF_API_BASE||'') + '/api/visitor/resume', {
+              method: 'POST', headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ code: p.code || p.t || '', resume: rk })
+            }).then(x => x.json());
+            if (rr && rr.ok && rr.session_id) {
+              sessionId.value = rr.session_id;
+              storeToken(rr.visitor_token);
+              noteResume(rr);
+              if (!myResumeCode.value) myResumeCode.value = rk;
+              cleanUrlResumeParam();
+              page.value = 'chat';
+              await loadHistory();
+              await sendWelcome({});
+              startPoll();
+              return;
+            }
+          } catch (e) { /* 链接失效 → 走普通流程 */ }
+        }
+
         // 已有会话则直接恢复
         const vt = loadToken();
         if (vt) {
@@ -250,6 +317,7 @@ createApp({
             if (r && r.session_id) {
               sessionId.value = r.session_id;
               storeToken(r.visitor_token);
+              noteResume(r);
               page.value = 'chat';
               await loadHistory();
               // v2.53 修 bug：这条「恢复已有会话」的分支原来**完全不调欢迎语接口**，
@@ -312,6 +380,7 @@ createApp({
       if (!r.session_id) throw new Error(r.error || '接入失败');
       sessionId.value = r.session_id;
       storeToken(r.visitor_token);
+      noteResume(r);
       if (r.visitor_avatar) myAvatar.value = r.visitor_avatar;
       page.value = 'chat';
       await loadHistory();
@@ -898,6 +967,7 @@ createApp({
       genCode, codeVerify, verifyGo, slideStart, slideMove, slideEnd, doEnter,
       pubShow, pubTitle, pubContent, linkMode, linkSegs, copyLink, myAvatar,
       resumeOpen, resumeCode, resumeErr, resumeBusy, openResume, doResume,
+      myResumeCode, resumeLink, copyResumeLink,
       ended, handleEnded, restartChat,
       replyTo, quoteOf, quoteWho, quoteText, fmtSize, mapUrl, jumpTo, startReply,
       actSheet, openActSheet, copyMsg, onMsgTouchStart, onMsgTouchEnd, onPaste, flashId,
