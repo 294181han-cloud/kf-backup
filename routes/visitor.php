@@ -335,6 +335,10 @@ function handle_visitor_init(string $method): void
         $pdo->prepare('INSERT INTO contacts (tenant_id, session_id, type, value, updated_at) VALUES (?,?,?,?,?) ON DUPLICATE KEY UPDATE value = VALUES(value)')
             ->execute([$tid, $sid, 'mobile', $phone, $now]);
     }
+    /* v2.87.1 新访客一进来，客服端就显示一条「客户已接入，请用心接待哦」——
+       不用等访客先发消息才知道有人来了。系统消息只在客服端显示，访客端看不到。 */
+    $pdo->prepare("INSERT INTO messages (tenant_id, session_id, from_type, sender_name, text, msg_type, created_at) VALUES (?,?,'system','系统',?,'text',?)")
+        ->execute([$tid, $sid, '客户已接入，请用心接待哦', $now]);
     if ($question !== '') {
         $pdo->prepare('INSERT INTO messages (tenant_id, session_id, from_type, text, msg_type, created_at) VALUES (?,?,\'visitor\',?,?,?)')
             ->execute([$tid, $sid, $question, 'text', $now]);
