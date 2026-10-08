@@ -221,6 +221,8 @@ html[data-ui-cat="mobile"][data-ui-template="default"] .chat-head .ch-sub {
      （要看就去右侧「访客信息」抽屉），头部更清爽、聊天区更大 */
   display: none;
 }
+/* 恢复码在手机端也收起来（⋯ 菜单里和「访客信息」里都有，顶部留白给名字和状态） */
+html[data-ui-cat="mobile"][data-ui-template="default"] .chat-head .ch-top .ch-resume { display: none; }
 html[data-ui-cat="mobile"][data-ui-template="default"] .chat-head .ch-sub::-webkit-scrollbar { height: 0; display: none; }
 html[data-ui-cat="mobile"][data-ui-template="default"] .chat-head-btns {
   flex: 0 0 auto; order: 0; flex-wrap: nowrap; gap: 6px; margin-left: 0; overflow: visible; padding-bottom: 0;
