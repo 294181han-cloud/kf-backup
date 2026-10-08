@@ -7,7 +7,7 @@
 <link rel="icon" href="/assets/img/mi-logo.png">
 <link rel="apple-touch-icon" href="/assets/img/mi-logo.png">
 <link rel="stylesheet" href="/assets/vendor/element-plus.css">
-<link rel="stylesheet" href="/assets/css/app.css?v=3.57.0">
+<link rel="stylesheet" href="/assets/css/app.css?v=3.58.0">
 <script src="/assets/ui/ui-registry.js?v=2.10.4"></script>
 <script src="/assets/ui/ui-loader.js?v=2.10.4" data-ui-cat="auto"></script>
 </head>
@@ -146,6 +146,14 @@
         <span class="gr-t">你的客服码已被微信拦截（俗称"红了"），客户扫码进不来 —— 请尽快换码，把新的二维码重新发出去</span>
         <span class="gr-sp"></span>
         <button type="button" class="gr-btn" @click="tab='links'">去换码 →</button>
+      </div>
+
+      <!-- v2.88.2 名额提醒：快满/已满就在顶部说一声，别等客户说「扫码进不来」 -->
+      <div class="global-red quota-warn" :class="quotaWarn.level" v-if="quotaWarn">
+        <span class="gr-ic">{{ quotaWarn.level === 'full' ? '🔴' : '🟠' }}</span>
+        <span class="gr-t">{{ quotaWarn.text }}</span>
+        <span class="gr-sp"></span>
+        <button type="button" class="gr-btn" @click="tab='stats'; loadStats()">看额度 →</button>
       </div>
 
       <!-- ============ 会话工作台 ============ -->
@@ -1743,7 +1751,7 @@
 <script src="/assets/qr-poster.js?v=2.3.0"></script>
 <script src="/assets/api.js?v=2.1.1"></script>
 <script src="/assets/js/app-components.js?v=2.6.2"></script>
-<script src="/assets/js/app.js?v=3.58.0"></script>
+<script src="/assets/js/app.js?v=3.59.0"></script>
 <script src="/assets/js/app-boot.js?v=2.1.1"></script>
 </body>
 </html>

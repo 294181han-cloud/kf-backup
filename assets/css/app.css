@@ -1933,6 +1933,13 @@ body.dark .red-alert .ra-s { color: #ffa39e; }
 .global-red .gr-btn:hover { background: #d92c2c; }
 body.dark .global-red { background: linear-gradient(90deg, #3a1c1c, #341a1a); border-color: #5c2727; }
 body.dark .global-red .gr-t { color: #ff8b8b; }
+/* v2.88.2 名额「快满」是橙色提醒，「已满」用原来的红色 */
+.global-red.quota-warn.near { background: linear-gradient(90deg, #fff8ec, #fff3dd); border-color: #ffe0ac; }
+.global-red.quota-warn.near .gr-t { color: #b8620a; }
+.global-red.quota-warn.near .gr-btn { background: #f59a23; }
+.global-red.quota-warn.near .gr-btn:hover { background: #dd870f; }
+body.dark .global-red.quota-warn.near { background: linear-gradient(90deg, #3a2c14, #332710); border-color: #5c451f; }
+body.dark .global-red.quota-warn.near .gr-t { color: #ffc978; }
 @media (max-width: 900px) {
   .global-red { margin: 8px 10px 0; padding: 9px 12px; flex-wrap: wrap; }
   .global-red .gr-t { font-size: 12.5px; }

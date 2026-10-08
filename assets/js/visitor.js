@@ -278,7 +278,11 @@ createApp({
           if (!seen) { pubTitle.value = cfg.brand.publicity_title || '公告'; pubContent.value = cfg.brand.publicity_content; pubShow.value = true; try { sessionStorage.setItem(pk, '1'); } catch (e) {} }
         }
         if (cfg.quota_full && cfg.quota_full !== '') {
-          refuseConn();   // v2.65.2 名额满 = 一律拒绝
+          /* v2.88.2 名额满别再甩浏览器原生错误页了 —— 客户会以为「链接失效」，还会来投诉。
+             给一句人话说明现在接不进来，让他们稍后再试。 */
+          page.value = 'blocked';
+          blockedTitle.value = '暂时无法接入';
+          blockedDesc.value = '当前咨询人数已满，请稍后再试；也可以稍晚重新扫码进入。';
           return;
         }
 

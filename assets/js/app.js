@@ -312,6 +312,26 @@ const app = createApp({
     const contactLabel = (t) => ({ note: '备注', mobile: '手机', qq: 'QQ', wechat: '微信', email: '邮箱', other: '其他' }[t] || t);
     const barW = (v, list) => { const max = Math.max(1, ...list.map(x => x.count)); return Math.round(v / max * 100) + '%'; };
     const quotaW = (u, l) => Math.min(100, l > 0 ? Math.round(u / l * 100) : 100) + '%';
+    /* v2.88.2 名额提醒：客服码/网页名额快满或已满时，工作台顶部自己提醒一条 ——
+       原来要等客户反馈「扫码进不来」才知道额度用完了。 */
+    const quotaWarn = computed(() => {
+      const m = me.value;
+      if (!m || m.role !== 'tenant') return null;
+      const list = [
+        { k: '客服码', u: Number(m.used_app || 0), l: Number(m.quota_app || 0) },
+        { k: '网页', u: Number(m.used_web || 0), l: Number(m.quota_web || 0) },
+      ].filter(x => x.l > 0);
+      const fmt = (arr) => arr.map(x => x.k + ' ' + x.u + ' / ' + x.l).join('、');
+      const full = list.filter(x => x.u >= x.l);
+      if (full.length) {
+        return { level: 'full', text: fmt(full) + ' 名额已满 —— 新客户从这些渠道进来会被挡在外面（客户会看到「暂时无法接入」）' };
+      }
+      const near = list.filter(x => x.u >= Math.floor(x.l * 0.9));
+      if (near.length) {
+        return { level: 'near', text: fmt(near) + ' 名额快满了，满了以后新客户就进不来' };
+      }
+      return null;
+    });
     // v2.47 趋势图：新会话 / 活跃会话 两条共用同一刻度（取两者最大值），否则两条没法比
     const trendMax = Vue.computed(() => Math.max(1, ...((stats.value && stats.value.trend7) || [])
         .map(d => Math.max(d.count || 0, d.active || 0))));
@@ -3262,7 +3282,7 @@ const app = createApp({
       codeTextDlg,
       codeCreatedAt, codeExpiresAt,
       quickFields, welcomeFields, autoFields, blFields, preqFields,
-      shortTime, fmtTime, sourceText, contactLabel, barW, quotaW, trendW, trendDesc, dailyDesc,
+      shortTime, fmtTime, sourceText, contactLabel, barW, quotaW, trendW, trendDesc, dailyDesc, quotaWarn,
       sessTime,
       sessIcon, sessPreview,
       setTab, setGroups, openSetting, switchSetting,
