@@ -7,7 +7,7 @@
 <link rel="icon" href="/assets/img/mi-logo.png">
 <link rel="apple-touch-icon" href="/assets/img/mi-logo.png">
 <link rel="stylesheet" href="/assets/vendor/element-plus.css">
-<link rel="stylesheet" href="/assets/css/app.css?v=3.56.0">
+<link rel="stylesheet" href="/assets/css/app.css?v=3.57.0">
 <script src="/assets/ui/ui-registry.js?v=2.10.2"></script>
 <script src="/assets/ui/ui-loader.js?v=2.10.2" data-ui-cat="auto"></script>
 </head>
@@ -316,7 +316,11 @@
                 <button type="button" @click="imgOnly = false">显示全部</button>
               </div>
               <template v-for="m in visibleMsgs" :key="m.id">
-                <div class="msg-row sys" v-if="m.recalled && m.from === 'agent'">
+                <!-- v2.87.2 系统消息（客户已接入 / 会话已结束之类）居中灰色胶囊，跟微信一样 -->
+                <div class="msg-row sys" v-if="m.from === 'system'">
+                  <div class="msg-bubble">{{ m.text }}</div>
+                </div>
+                <div class="msg-row sys" v-else-if="m.recalled && m.from === 'agent'">
                   <div class="msg-bubble">{{ m.sender_name ? m.sender_name + ' 撤回了一条消息' : '消息已撤回' }}</div>
                 </div>
                 <div class="msg-row" v-else-if="!(m.recalled && m.from === 'visitor') && m.recalled" :class="m.from==='agent'?'mine':'from-them'">
@@ -1739,7 +1743,7 @@
 <script src="/assets/qr-poster.js?v=2.3.0"></script>
 <script src="/assets/api.js?v=2.1.1"></script>
 <script src="/assets/js/app-components.js?v=2.6.2"></script>
-<script src="/assets/js/app.js?v=3.57.0"></script>
+<script src="/assets/js/app.js?v=3.58.0"></script>
 <script src="/assets/js/app-boot.js?v=2.1.1"></script>
 </body>
 </html>
