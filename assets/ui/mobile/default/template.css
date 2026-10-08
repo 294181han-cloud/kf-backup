@@ -170,8 +170,14 @@ html[data-ui-cat="mobile"][data-ui-template="default"] body:not(.dark) .chat-hea
 html[data-ui-cat="mobile"][data-ui-template="default"] body:not(.dark) .chat-input { background: var(--card); border-top-color: var(--line); }
 html[data-ui-cat="mobile"][data-ui-template="default"] body:not(.dark) .msg-bubble { background: var(--card); color: var(--ink); }
 html[data-ui-cat="mobile"][data-ui-template="default"] body:not(.dark) .msg-ava { background: var(--card); }
+/* v2.88 客服自己发的气泡在手机上也要是微信那种绿色 —— 原来用的是没定义的
+   var(--bubble-mine)，变量取不到 → 整条声明作废 → 气泡背景变成透明（用户反馈：不是绿色） */
 html[data-ui-cat="mobile"][data-ui-template="default"] body:not(.dark) .msg-row.mine .msg-bubble {
-  background: var(--bubble-mine); color: var(--bubble-mine-ink);
+  background: #95ec69; color: #10321c;
+}
+html[data-ui-cat="mobile"][data-ui-template="default"] body:not(.dark) .msg-row.mine .msg-bubble a,
+html[data-ui-cat="mobile"][data-ui-template="default"] body:not(.dark) .msg-row.mine .msg-link {
+  color: #0b5d2a;
 }
 html[data-ui-cat="mobile"][data-ui-template="default"] body:not(.dark) .chat-search { background: var(--card); }
 html[data-ui-cat="mobile"][data-ui-template="default"] body:not(.dark) .quick-toggle-btn { background: var(--card); color: var(--ink); }
@@ -204,14 +210,16 @@ html[data-ui-cat="mobile"][data-ui-template="default"] .chat-head .ch-ava {
 html[data-ui-cat="mobile"][data-ui-template="default"] .chat-head .ch-info {
   flex: 1 1 auto; order: 0; min-width: 0; display: flex; flex-direction: column; gap: 2px;
 }
-html[data-ui-cat="mobile"][data-ui-template="default"] .chat-head .ch-top { flex-wrap: nowrap; gap: 6px; row-gap: 0; }
+html[data-ui-cat="mobile"][data-ui-template="default"] .chat-head .ch-top { flex-wrap: wrap; gap: 6px; row-gap: 2px; }
+/* v2.88 改过名字的长名字在手机端不要被截断成「…」，允许换行显示完整 */
 html[data-ui-cat="mobile"][data-ui-template="default"] .chat-head .ch-top .name {
-  flex: 1 1 auto; min-width: 0; max-width: none; font-size: 15px; line-height: 1.25;
-  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  flex: 1 1 60%; min-width: 0; max-width: 100%; font-size: 15px; line-height: 1.3;
+  white-space: normal; overflow: visible; text-overflow: clip; word-break: break-word;
 }
 html[data-ui-cat="mobile"][data-ui-template="default"] .chat-head .ch-sub {
-  flex-wrap: nowrap; overflow-x: auto; overflow-y: hidden; row-gap: 0; padding-bottom: 0;
-  scrollbar-width: none; -ms-overflow-style: none;
+  /* v2.88 手机端聊天头只留「在线状态 + 最后上线」，渠道/设备/地区/IP 这些不显示了
+     （要看就去右侧「访客信息」抽屉），头部更清爽、聊天区更大 */
+  display: none;
 }
 html[data-ui-cat="mobile"][data-ui-template="default"] .chat-head .ch-sub::-webkit-scrollbar { height: 0; display: none; }
 html[data-ui-cat="mobile"][data-ui-template="default"] .chat-head-btns {
