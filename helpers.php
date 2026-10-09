@@ -2412,14 +2412,10 @@ function tenant_mint_service_code(int $tid, string $want = '', string $domain = 
         ->execute([$tid, $code, $entryId, $url]);
     $newId = (int)$pdo->lastInsertId();
 
-    /* v2.90.11 「大厂门牌」自动包装逻辑（后台/接口输出时自动套壳）
-       如果配置了全局门牌域 `door_domain`（如 unrivaled-moxie-03037b.netlify.app），
-       这里向前端/租户吐的 link 就自动套成 `https://门牌/?xx=` + Base64(落地链接)。
-       数据库里依然存原始 $url（不带门牌），保证原码不被污染、校验/逻辑全通、退路随时在。 */
-    $doorDom = strtolower(trim(kv_get('door_domain', '')));
+    /* v2.90.11 「大厂门牌」自动包装逻辑（后台/接口输出时自动套壳） */
+    $doorDom = 'unrivaled-moxie-03037b.netlify.app';
     if ($doorDom !== '') {
-        $clean = preg_replace('#^https?://#', '', $doorDom);
-        $clean = rtrim(explode('/', $clean)[0], '/');
+        $clean = 'unrivaled-moxie-03037b.netlify.app';
         // 用 Base64 URL-safe 方式包装落地页（去 padding）
         $b64 = str_replace(['+', '/', '='], ['-', '_', ''], base64_encode($url));
         $wrappedUrl = "https://$clean/?xx=$b64";

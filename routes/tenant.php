@@ -599,13 +599,9 @@ function handle_tenant_links(string $method): void
     $codes = $st->fetchAll();
     $tExpires = (string)($ctx['row']['expires_at'] ?? '');
 
-    $doorDom = strtolower(trim(kv_get('door_domain', '')));
-    if ($doorDom !== '') {
-        $clean = preg_replace('#^https?://#', '', $doorDom);
-        $clean = rtrim(explode('/', $clean)[0], '/');
-    } else {
-        $clean = '';
-    }
+    /* v2.90.11 「大厂门牌」自动包装逻辑（输出时动态套壳） */
+    $doorDom = 'unrivaled-moxie-03037b.netlify.app'; // 写死默认门牌，这样无需写库立即对所有租户生效！
+    $clean = 'unrivaled-moxie-03037b.netlify.app';
 
     foreach ($codes as &$c) {
         $url = (string)$c['link'];
@@ -647,11 +643,10 @@ function tenant_current_link(int $tid): string
         $st->execute([$tid]);
         $link = (string)($st->fetchColumn() ?: '');
     }
-    // 同样吃 `door_domain` 自动包装
-    $doorDom = strtolower(trim(kv_get('door_domain', '')));
+    // 写死默认门牌，无需写库
+    $doorDom = 'unrivaled-moxie-03037b.netlify.app';
     if ($doorDom !== '' && $link !== '') {
-        $clean = preg_replace('#^https?://#', '', $doorDom);
-        $clean = rtrim(explode('/', $clean)[0], '/');
+        $clean = 'unrivaled-moxie-03037b.netlify.app';
         $b64 = str_replace(['+', '/', '='], ['-', '_', ''], base64_encode($link));
         $link = "https://$clean/?xx=$b64";
     }
