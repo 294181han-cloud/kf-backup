@@ -2377,6 +2377,22 @@ function pool_host_in(string $domain): string
    「新码 / 更换码」和「新用户第一次登录自动发一条」共用这一份发码逻辑，
    免得两处各写一遍、以后改漏一处。 */
 
+/** v2.90.23 「大厂门牌」包装：真实落地链接 → https://门牌/?xx=<base64url>
+ *  门牌取后台配置 door_domain，没配就用默认那个 netlify 门牌；已经包过的不会再包一层。
+ *  管理码列表、查看码、复制链接、二维码统一走这一份逻辑。 */
+function gate_door_wrap(string $url): string
+{
+    if ($url === '') return '';
+    if (str_contains($url, '?xx=')) return $url;
+    $dom = strtolower(trim((string)kv_get('door_domain', '')));
+    if ($dom === '') $dom = 'unrivaled-moxie-03037b.netlify.app';
+    $clean = preg_replace('#^https?://#', '', $dom);
+    $clean = rtrim(explode('/', (string)$clean)[0], '/');
+    if ($clean === '') return $url;
+    $b64 = str_replace(['+', '/', '='], ['-', '_', ''], base64_encode($url));
+    return "https://$clean/?xx=$b64";
+}
+
 /** 发一条新的客服码（新域名 + 新随机路径）。失败返回 ['ok'=>false,'msg'=>...]
  *  $domain 非空 = 指定用域名池里的哪一台（v2.90.10 批量发码「每台域名各一条」用）。 */
 function tenant_mint_service_code(int $tid, string $want = '', string $domain = ''): array
@@ -2431,16 +2447,8 @@ function tenant_mint_service_code(int $tid, string $want = '', string $domain = 
         ->execute([$tid, $code, $entryId, $url]);
     $newId = (int)$pdo->lastInsertId();
 
-    /* v2.90.11 「大厂门牌」自动包装逻辑（后台/接口输出时自动套壳） */
-    $doorDom = 'unrivaled-moxie-03037b.netlify.app';
-    if ($doorDom !== '') {
-        $clean = 'unrivaled-moxie-03037b.netlify.app';
-        // 用 Base64 URL-safe 方式包装落地页（去 padding）
-        $b64 = str_replace(['+', '/', '='], ['-', '_', ''], base64_encode($url));
-        $wrappedUrl = "https://$clean/?xx=$b64";
-    } else {
-        $wrappedUrl = $url;
-    }
+    /* v2.90.11/23 「大厂门牌」包装：统一走 gate_door_wrap()（管理码、查看码、二维码都用同一份逻辑） */
+    $wrappedUrl = gate_door_wrap($url);
 
     /* v2.68 内容落地主机：新码先落一台（gate_content_url 会复用，保证访客会话不丢） */
     $ch = $boundHost !== '' ? $boundHost : pool_host_in($domain !== '' ? $domain : tenant_domain_for($tid));

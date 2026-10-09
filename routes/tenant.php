@@ -134,6 +134,10 @@ function handle_tenant_service_code(string $method): void
             $r['content_domain'] = $dom;   // v2.70 该租户的专属落地域名（自动分配）
             // v2.82 到期时间跟卡密一致（卡密到期，码就不能用了）
             $r['expires_at'] = $tExpires !== '' ? dt_to_iso($tExpires) : '';
+            /* v2.90.23 管理码里的链接也套「大厂门牌」：查看码 / 复制链接 / 二维码都用同一份链接，
+               跟客户实际扫的完全一致（原来这里吐的是没套壳的原始链接）。 */
+            $r['link_raw'] = (string)$r['link'];
+            $r['link'] = gate_door_wrap((string)$r['link']);
         }
         unset($r);
         json_out($rows);
@@ -605,16 +609,8 @@ function handle_tenant_links(string $method): void
     $codes = $st->fetchAll();
     $tExpires = (string)($ctx['row']['expires_at'] ?? '');
 
-    /* v2.90.11 「大厂门牌」自动包装逻辑（输出时动态套壳） */
-    $doorDom = 'unrivaled-moxie-03037b.netlify.app'; // 写死默认门牌，这样无需写库立即对所有租户生效！
-    $clean = 'unrivaled-moxie-03037b.netlify.app';
-
     foreach ($codes as &$c) {
-        $url = (string)$c['link'];
-        if ($clean !== '' && $url !== '') {
-            $b64 = str_replace(['+', '/', '='], ['-', '_', ''], base64_encode($url));
-            $c['link'] = "https://$clean/?xx=$b64";
-        }
+        $c['link'] = gate_door_wrap((string)$c['link']);   // v2.90.23 统一走门牌包装
         $c['created_at'] = dt_to_iso((string)$c['created_at']);
         $c['expires_at'] = $tExpires !== '' ? dt_to_iso($tExpires) : '';
     }
