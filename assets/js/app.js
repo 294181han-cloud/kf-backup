@@ -3162,7 +3162,7 @@ const app = createApp({
     /* v2.89.5 工作台布局自定义：左侧栏收起 / 会话列表拖宽 / 访客信息收起，都记在本地 */
     const sideCollapsed = ref((function () { try { return localStorage.getItem('kfxt_side_collapsed') === '1'; } catch (e) { return false; } })());
     const sessW = ref((function () {
-      try { return Math.min(560, Math.max(240, parseInt(localStorage.getItem('kfxt_sess_w') || '326', 10) || 326)); }
+      try { return Math.min(560, Math.max(200, parseInt(localStorage.getItem('kfxt_sess_w') || '326', 10) || 326)); }
       catch (e) { return 326; }
     })());
     const sessResizing = ref(false);
@@ -3174,7 +3174,7 @@ const app = createApp({
       sessDragFrom = { x: e.clientX, w: sessW.value };
       const mv = (ev) => {
         if (!sessDragFrom) return;
-        sessW.value = Math.min(560, Math.max(240, sessDragFrom.w + (ev.clientX - sessDragFrom.x)));
+        sessW.value = Math.min(560, Math.max(200, sessDragFrom.w + (ev.clientX - sessDragFrom.x)));
       };
       const up = () => {
         sessDragFrom = null;

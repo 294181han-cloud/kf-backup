@@ -2254,3 +2254,34 @@ body.resizing-col { cursor: col-resize !important; user-select: none; }
 @media (max-width: 900px) {
   .side-toggle, .sess-resizer { display: none !important; }   /* 手机上侧栏是抽屉、列表满宽 */
 }
+
+/* v2.89.7 会话列表「窄模式」：拖到 300px 以内自动少显示（渠道标签/预览/客服标签都收起） */
+.sess-col.slim .geo-tag,
+.sess-col.slim .last,
+.sess-col.slim .tag-agent,
+.sess-col.slim .sess-multi-entry .sme-text { display: none; }
+.sess-col.slim .sess-item { gap: 8px; padding: 9px 30px 9px 8px; }
+.sess-col.slim .sess-ava { width: 32px; height: 32px; font-size: 16px; }
+.sess-col.slim .sess-body .row1 .name { font-size: 13.5px; }
+.sess-col.slim .sess-multi-entry { justify-content: center; }
+
+/* 访客信息：面板上直接收起 + 收起后右侧的竖条可以点开 */
+.info-collapse {
+  border: 0; background: #f2f5fa; color: #6b7688; width: 26px; height: 26px;
+  border-radius: 8px; font-size: 14px; line-height: 1; cursor: pointer; margin: 0 0 0 auto;
+}
+.info-collapse:hover { color: var(--theme, #1677ff); }
+body.dark .info-collapse { background: #262c34; color: #c6ccd8; }
+.content.workbench { position: relative; }
+.info-reopen {
+  position: absolute; right: 0; top: 50%; transform: translateY(-50%); z-index: 8;
+  border: 1px solid var(--v-line, #e5e6eb); border-right: 0; border-radius: 10px 0 0 10px;
+  background: #fff; color: #4e5969; padding: 12px 6px; cursor: pointer;
+  writing-mode: vertical-rl; font-size: 12px; letter-spacing: 1px;
+  box-shadow: -2px 0 10px -6px rgba(16, 40, 80, .35);
+}
+.info-reopen:hover { color: var(--theme, #1677ff); border-color: var(--theme, #1677ff); }
+body.dark .info-reopen { background: #23272e; color: #b6bfcd; border-color: #333b46; }
+@media (max-width: 900px) {
+  .info-collapse, .info-reopen { display: none !important; }
+}
