@@ -55,6 +55,7 @@ function init_schema(): void
         max_sessions INT UNSIGNED NOT NULL DEFAULT 0,
         max_agents INT UNSIGNED NOT NULL DEFAULT 5,
         content_domain VARCHAR(120) NOT NULL DEFAULT '',
+        content_host VARCHAR(120) NOT NULL DEFAULT '',
         created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
         last_login_at DATETIME NULL
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");

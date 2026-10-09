@@ -90,8 +90,13 @@
               <el-table-column prop="nickname" label="名称" width="110"></el-table-column>
               <el-table-column label="专属落地域名" width="160">
                 <template #default="{row}">
-                  <span v-if="row.content_domain" class="mono" style="font-size:12px;color:#165dff;">{{ row.content_domain }}</span>
-                  <span v-else style="font-size:12px;color:#86909c;">未分配（发码时自动选）</span>
+                  <div v-if="row.content_domain" class="mono" style="font-size:12px;color:#165dff;">{{ row.content_domain }}</div>
+                  <div v-else style="font-size:12px;color:#86909c;">未分配（发码时自动选）</div>
+                  <div v-if="row.content_host" class="mono" style="font-size:11.5px;color:#00b42a;" :title="'专属主机：' + row.content_host">主机 {{ row.content_host }}</div>
+                  <div v-if="(row.code_hosts||[]).length" style="font-size:11.5px;color:#86909c;"
+                       :title="'这个账号的客服码分布在这些主机上：\n' + (row.code_hosts||[]).join('\n')">
+                    码在 {{ (row.code_hosts||[]).length }} 台主机：{{ (row.code_hosts||[]).slice(0,2).join('、') }}{{ (row.code_hosts||[]).length>2 ? ' 等' : '' }}
+                  </div>
                 </template>
               </el-table-column>
               <el-table-column label="TG 用户" width="140">
@@ -126,10 +131,11 @@
                 <template #default="{row}"><span style="font-size:12px;color:#86909c;">{{ row.last_login_at ? row.last_login_at.slice(0,16) : '从未' }}</span></template>
               </el-table-column>
               <el-table-column label="备注" prop="remark" min-width="100" show-overflow-tooltip></el-table-column>
-              <el-table-column label="操作" width="280" fixed="right">
+              <el-table-column label="操作" width="400" fixed="right">
                 <template #default="{row}">
                   <el-button size="small" @click="openEdit(row)">编辑</el-button>
                   <el-button size="small" type="primary" plain @click="openMint(row)">批量发码</el-button>
+                  <el-button size="small" @click="openHost(row)">专属主机</el-button>
                   <el-button size="small" :type="row.status==='active' ? 'warning' : 'success'" @click="toggleTenant(row)">
                     {{ row.status==='active' ? '停用' : '启用' }}
                   </el-button>
@@ -678,11 +684,31 @@
       <el-button type="primary" :loading="mintBusy" @click="doMint">开始发码</el-button>
     </template>
   </el-dialog>
+
+  <!-- v2.90.14 专属主机：把这个账号的码固定发在同一台主机上（如 f1kov5q6.hi6o7e.shop） -->
+  <el-dialog v-model="hostVisible" title="专属主机" width="520px">
+    <div style="font-size:14px;line-height:1.9;">
+      给「<b>{{ hostRow ? (hostRow.nickname || hostRow.kami) : '' }}</b>」指定一台专属主机：
+      绑了之后他以后发的客服码**都发在这一台上**，而且这颗子域会从随机池里摘掉（别人不会随机到它）。
+    </div>
+    <div v-if="hostRow && hostRow.code_hosts && hostRow.code_hosts.length" style="margin-top:10px;font-size:12px;color:#86909c;line-height:1.8;">
+      他现在的码分布在：<span class="mono">{{ hostRow.code_hosts.join('、') }}</span>
+    </div>
+    <el-input v-model="hostValue" placeholder="例如 f1kov5q6.hi6o7e.shop" style="margin-top:12px;">
+      <template #prepend>专属主机</template>
+    </el-input>
+    <div v-if="hostMsg" style="margin-top:10px;font-size:12.5px;" :style="hostOk ? 'color:#00b42a;' : 'color:#f53f3f;'">{{ hostMsg }}</div>
+    <template #footer>
+      <el-button @click="clearHost" :disabled="!hostRow || !hostRow.content_host">解绑</el-button>
+      <el-button @click="hostVisible=false">关闭</el-button>
+      <el-button type="primary" :loading="hostBusy" @click="saveHost">绑定</el-button>
+    </template>
+  </el-dialog>
 </div>
 
 <script src="/assets/vendor/vue.global.js?v=2.0.1"></script>
 <script src="/assets/vendor/element-plus.js?v=2.0.1"></script>
 <script src="/assets/api.js?v=2.1.1"></script>
-<script src="/assets/js/admin.js?v=2.10.3"></script>
+<script src="/assets/js/admin.js?v=2.10.4"></script>
 </body>
 </html>

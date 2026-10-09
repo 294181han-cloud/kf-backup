@@ -2313,6 +2313,21 @@ function pool_host_usable(string $host): bool
     return !domain_in_red_list(pool_domain_of($host));
 }
 
+/** v2.90.14 这个租户的「专属主机」（可选，形如 f1kov5q6.hi6o7e.shop）：
+ *  后台可以给某个账号指定一台主机，绑了之后他的码都发在这一台上（别人不再随机到他这台）。 */
+function tenant_host_for(int $tenantId): string
+{
+    try {
+        $st = db()->prepare('SELECT content_host FROM tenants WHERE id = ?');
+        $st->execute([$tenantId]);
+        $h = strtolower(trim((string)($st->fetchColumn() ?: '')));
+    } catch (\Throwable $e) {
+        return '';
+    }
+    if ($h === '' || !pool_host_enabled($h)) return '';
+    return $h;
+}
+
 /** 这个租户的专属域名：已绑且在启用中就直接用；否则自动分配一台并落库 */
 function tenant_domain_for(int $tenantId): string
 {
@@ -2384,6 +2399,7 @@ function tenant_mint_service_code(int $tid, string $want = '', string $domain = 
     $scheme = 'https';
     /* v2.89 入口 ID 放进随机参数名里（老链接的 ?w= 仍然有效，见 gate_token_from_query） */
     $gatePath = date('m-d') . '/' . gen_gate_name() . '.html?' . gate_rand_param() . '=' . $entryId;
+    $boundHost = '';   // v2.90.14 专属主机（见下）
     $entryDomain = strtolower(trim(kv_get('entry_domain', '')));
     if ($entryDomain !== '') {
         /* 入口域名（专门印二维码那个）：只用来出壳页，内容域名红了也不连累二维码 */
@@ -2404,7 +2420,9 @@ function tenant_mint_service_code(int $tid, string $want = '', string $domain = 
             if (!$ok) return ['ok' => false, 'msg' => '域名 ' . $domain . ' 不在域名池里或已停用'];
         }
         if ($bound === '') return ['ok' => false, 'msg' => '域名池为空，请联系平台管理员添加可用域名'];
-        $host = pool_host_in($bound);
+        /* v2.90.14：这个账号绑了「专属主机」就直接用它（批量铺码指定域名时以指定域名为准） */
+        $boundHost = $domain === '' ? tenant_host_for($tid) : '';
+        $host = $boundHost !== '' ? $boundHost : pool_host_in($bound);
         if ($host === '') return ['ok' => false, 'msg' => '域名池为空，请联系平台管理员添加可用域名'];
         $url = "$scheme://$host/$gatePath";
     }
@@ -2424,7 +2442,7 @@ function tenant_mint_service_code(int $tid, string $want = '', string $domain = 
     }
 
     /* v2.68 内容落地主机：新码先落一台（gate_content_url 会复用，保证访客会话不丢） */
-    $ch = pool_host_in($domain !== '' ? $domain : tenant_domain_for($tid));
+    $ch = $boundHost !== '' ? $boundHost : pool_host_in($domain !== '' ? $domain : tenant_domain_for($tid));
     if ($ch !== '') $pdo->prepare('UPDATE service_codes SET content_host = ? WHERE id = ?')->execute([$ch, $newId]);
     return ['ok' => true, 'code' => [
         'id' => $newId, 'code' => $code, 'entry_id' => $entryId, 'link' => $wrappedUrl,

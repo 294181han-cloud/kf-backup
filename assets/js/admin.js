@@ -19,6 +19,13 @@ createApp({
     const mintReplace = ref(false);
     const mintBusy = ref(false);
     const mintResult = ref(null);
+    /* v2.90.14 专属主机弹窗 */
+    const hostVisible = ref(false);
+    const hostRow = ref(null);
+    const hostValue = ref('');
+    const hostBusy = ref(false);
+    const hostMsg = ref('');
+    const hostOk = ref(true);
 
     const tabTitle = computed(() => ({ overview: '平台概览', tenants: '租户管理', domains: '域名池', nodes: '节点管理', tg: '发卡机器人', settings: '全局设置' }[tab.value]));
     const locationOrigin = location.origin;
@@ -324,6 +331,33 @@ createApp({
       } catch (e) { ElementPlus.ElMessage.error(e.message); }
       finally { mintBusy.value = false; }
     };
+    /* v2.90.14 专属主机：绑一台主机给这个账号（他的码都发这台），或者解绑 */
+    const openHost = (row) => {
+      hostRow.value = row; hostValue.value = row.content_host || ''; hostMsg.value = ''; hostOk.value = true;
+      hostVisible.value = true;
+    };
+    const saveHost = async () => {
+      if (!hostRow.value) return;
+      hostBusy.value = true; hostMsg.value = '';
+      try {
+        const r = await API.post('/api/admin/tenants/' + hostRow.value.id + '/host', { host: hostValue.value.trim() });
+        hostOk.value = true; hostMsg.value = r.msg || '已绑定';
+        ElementPlus.ElMessage.success(r.msg || '已绑定');
+        await loadTenants();
+      } catch (e) { hostOk.value = false; hostMsg.value = e.message; }
+      finally { hostBusy.value = false; }
+    };
+    const clearHost = async () => {
+      if (!hostRow.value) return;
+      hostBusy.value = true; hostMsg.value = '';
+      try {
+        const r = await API.post('/api/admin/tenants/' + hostRow.value.id + '/host', { host: '' });
+        hostOk.value = true; hostMsg.value = r.msg || '已解绑'; hostValue.value = '';
+        ElementPlus.ElMessage.success(r.msg || '已解绑');
+        await loadTenants();
+      } catch (e) { hostOk.value = false; hostMsg.value = e.message; }
+      finally { hostBusy.value = false; }
+    };
     const copyCreated = () => {
       const s = `卡密：${created.kami}\n密码：${created.password}\n登录入口：${entranceText.value}`;
       navigator.clipboard && navigator.clipboard.writeText(s);
@@ -464,6 +498,7 @@ createApp({
       barWidth, locationOrigin,
       dlgVisible, dlgMode, dlg, dlgSaving, openCreate, openEdit, saveTenant, toggleTenant, delTenant,
       mintVisible, mintRow, mintSkipRed, mintReplace, mintBusy, mintResult, openMint, doMint,
+      hostVisible, hostRow, hostValue, hostBusy, hostMsg, hostOk, openHost, saveHost, clearHost,
       createdVisible, created, copyCreated, openGen, genVisible, genPair, doGen, fillGenKami, openTrial,
       addDomain, toggleDomain, delDomain, blockDomain, saveRootDomain, saveDefaults, changePw, logout, isExpired,
     };

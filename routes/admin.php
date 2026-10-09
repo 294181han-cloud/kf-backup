@@ -71,6 +71,72 @@ function handle_admin_tenant_mint_codes(string $method, int $id): void
     ]);
 }
 
+/** v2.90.14 给租户指定「专属主机」（形如 f1kov5q6.hi6o7e.shop）：绑了之后这个账号的码都发这一台上；
+ *  这颗子域会从域名池的随机池里摘掉（别人不会随机到），传空 host 就是解绑并还回池子。 */
+function handle_admin_tenant_host(string $method, int $id): void
+{
+    if ($method !== 'POST') { json_error('方法不允许', 405); return; }
+    require_admin_ctx();
+    $pdo = db();
+    $st = $pdo->prepare('SELECT id, kami, content_host FROM tenants WHERE id = ?');
+    $st->execute([$id]);
+    $t = $st->fetch();
+    if (!$t) json_error('租户不存在', 404);
+
+    $host = strtolower(trim((string)input('host', '')));
+    $host = preg_replace('#^https?://#', '', $host);
+    $host = rtrim(explode('/', (string)$host)[0], '/');
+    $old = strtolower(trim((string)($t['content_host'] ?? '')));
+
+    // 解绑：把子域还回池子
+    if ($host === '') {
+        if ($old !== '') {
+            $od = pool_domain_of($old);
+            if ($od !== '') {
+                $key = 'pool_subs:' . $od;
+                $subs = array_values(array_filter(array_map('trim', explode(',', kv_get($key, '')))));
+                $short = (str_ends_with($old, '.' . $od)) ? substr($old, 0, -strlen('.' . $od)) : '';
+                if ($short !== '' && !in_array($short, $subs, true)) $subs[] = $short;
+                kv_set($key, implode(',', $subs));
+            }
+        }
+        $pdo->prepare('UPDATE tenants SET content_host = ? WHERE id = ?')->execute(['', $id]);
+        json_out(['ok' => true, 'host' => '', 'msg' => '已解绑，子域还回域名池']);
+    }
+
+    if (!preg_match('/^[a-z0-9][a-z0-9.\-]{3,118}$/', $host)) json_error('主机名格式不对');
+    $dom = pool_domain_of($host);
+    $chk = $pdo->prepare('SELECT enabled FROM domain_pool WHERE domain = ? LIMIT 1');
+    $chk->execute([$dom]);
+    $en = $chk->fetchColumn();
+    if ($en === false) json_error('这台主机所属的域名不在域名池里：' . $dom);
+    if ((int)$en !== 1) json_error('这台主机所属的域名已停用：' . $dom);
+
+    // 别人已经绑了同一台？
+    $other = $pdo->prepare('SELECT kami FROM tenants WHERE content_host = ? AND id <> ? LIMIT 1');
+    $other->execute([$host, $id]);
+    $oc = (string)($other->fetchColumn() ?: '');
+    if ($oc !== '') json_error('这台主机已经绑给别的账号（' . $oc . '）了');
+
+    $pdo->prepare('UPDATE tenants SET content_host = ? WHERE id = ?')->execute([$host, $id]);
+    /* 从随机池摘掉这颗子域 → 别的账号不会随机到（真「专属」）；同时把这个租户的专属域名也指到这台所属域名 */
+    if ($host !== $dom) {
+        $key = 'pool_subs:' . $dom;
+        $subs = array_values(array_filter(array_map('trim', explode(',', kv_get($key, '')))));
+        $short = substr($host, 0, -strlen('.' . $dom));
+        if (in_array($short, $subs, true)) {
+            $subs = array_values(array_diff($subs, [$short]));
+            kv_set($key, implode(',', $subs));
+        }
+    } else {
+        // 裸域绑走 = 这台域名的固定子域也不能再随机给别人 → 清空子域池
+        kv_set('pool_subs:' . $dom, '');
+    }
+    try { $pdo->prepare('UPDATE tenants SET content_domain = ? WHERE id = ?')->execute([$dom, $id]); } catch (\Throwable $e) { }
+    json_out(['ok' => true, 'host' => $host, 'domain' => $dom,
+        'msg' => '已绑定：这个账号以后的码都发在 ' . $host . ' 上']);
+}
+
 /* ---------- 平台概览 ---------- */
 function handle_admin_overview(string $method): void
 {
@@ -140,6 +206,7 @@ function tenant_fields(array $t, ?int $sessions = null): array
         'max_devices' => (int)($t['max_devices'] ?? 3),   // v2.60.10 登录设备上限（默认 3，最高 8）
         'closed_keep_days' => (int)($t['closed_keep_days'] ?? 3), 'max_sessions' => (int)($t['max_sessions'] ?? 0),
         'content_domain' => (string)($t['content_domain'] ?? ''),   // v2.70 专属落地域名（自动分配）
+        'content_host' => (string)($t['content_host'] ?? ''),       // v2.90.14 专属主机（可选，绑了码都发这台上）
         'created_at' => $t['created_at'], 'last_login_at' => $t['last_login_at'],
         'expired' => $t['expires_at'] && strtotime($t['expires_at']) < time(),
         'sessions' => $sessions,
@@ -158,11 +225,26 @@ function handle_admin_tenants(string $method): void
             u.username AS tg_username, u.first_name AS tg_name
             FROM tenants t LEFT JOIN tg_users u ON u.tg_id = t.tg_id
             ORDER BY t.id DESC')->fetchAll();
-        $out = array_map(function ($t) {
+        /* v2.90.14 每个租户的码实际落在哪些域名/主机上（跑过「批量发码」之后一眼能看出来） */
+        $domOf = []; $hostOf = [];
+        try {
+            foreach ($pdo->query('SELECT tenant_id, link FROM service_codes') as $r2) {
+                $h = strtolower((string)(parse_url((string)$r2['link'], PHP_URL_HOST) ?: ''));
+                if ($h === '') continue;
+                $tid2 = (int)$r2['tenant_id'];
+                $hostOf[$tid2][$h] = true;
+                $d2 = pool_domain_of($h);
+                if ($d2 !== '') $domOf[$tid2][$d2] = true;
+            }
+        } catch (\Throwable $e) { /* 查不到就不显示 */ }
+        $out = array_map(function ($t) use ($domOf, $hostOf) {
             $o = tenant_out($t, (int)$t['sessions_cnt']);
             $o['agents_cnt'] = (int)$t['agents_cnt'];
             $o['tg_id'] = (int)($t['tg_id'] ?? 0);
             $o['tg_user'] = tenant_tg_user($t);
+            $tid3 = (int)$t['id'];
+            $o['code_domains'] = array_keys($domOf[$tid3] ?? []);
+            $o['code_hosts'] = array_keys($hostOf[$tid3] ?? []);
             return $o;
         }, $rows);
         json_out($out);

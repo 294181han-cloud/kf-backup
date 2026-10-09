@@ -95,6 +95,8 @@ function ensure_upgrade(): void
            某台域名红了只影响它自己，不再"一个域名红了全体陪葬"。
            存量租户按他现在正在用的域名回填（不打扰、不用重发二维码）。 */
         try { $pdo->exec("ALTER TABLE tenants ADD COLUMN content_domain VARCHAR(120) NOT NULL DEFAULT ''"); } catch (\Throwable $e) { /* 列已存在 */ }
+        /* v2.90.14 租户的「专属主机」（可选，形如 f1kov5q6.hi6o7e.shop）：绑了之后这个账号的码都发在这台上 */
+        try { $pdo->exec("ALTER TABLE tenants ADD COLUMN content_host VARCHAR(120) NOT NULL DEFAULT ''"); } catch (\Throwable $e) { /* 列已存在 */ }
         try {
             $unbound = $pdo->query("SELECT t.id, sc.link FROM tenants t
                 JOIN service_codes sc ON sc.tenant_id = t.id
@@ -701,6 +703,7 @@ function dispatch_api(string $method, string $uri): void
     if ($uri === '/api/admin/tenants/gen')       handle_admin_tenants_gen($method);
     if (preg_match('#^/api/admin/tenants/(\d+)$#', $uri, $m)) handle_admin_tenants_id($method, (int)$m[1]);
 if (preg_match('#^/api/admin/tenants/(\d+)/mint-codes$#', $uri, $m)) handle_admin_tenant_mint_codes($method, (int)$m[1]);
+if (preg_match('#^/api/admin/tenants/(\d+)/host$#', $uri, $m)) handle_admin_tenant_host($method, (int)$m[1]);
     if ($uri === '/api/admin/domain-pool')       handle_admin_domain_pool($method);
     if ($uri === '/api/admin/domain-pool/subs')  handle_admin_pool_subs($method);
     if (preg_match('#^/api/admin/domain-pool/(\d+)$#', $uri, $m)) handle_admin_domain_pool_id($method, (int)$m[1]);
