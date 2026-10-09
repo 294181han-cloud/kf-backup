@@ -3282,6 +3282,11 @@ const app = createApp({
       try {
         await loadMe();
         if (me.value.role === 'admin') { location.href = '/admin.html'; return; }
+        /* v2.89.11 登录安全检查（新设备弹「确认本次登录信息」）放到最前面：
+           一登录马上弹，不用等工作台下面的会话/数据/快捷消息全部加载完（以前要等好几秒）。 */
+        checkLoginSecurity();
+        if (loginNoticeTimer) clearInterval(loginNoticeTimer);
+        loginNoticeTimer = setInterval(checkLoginSecurity, 30000);
         await Promise.all([pollOnce(), loadQuick(), loadWelcome(), loadAuto(), loadStats()]);
         if (me.value.role === 'tenant') {
           await Promise.all([loadLinks(), loadAgents(), loadBrand(), loadBlacklist(), loadPreInq(), loadAgentOptions()]);
@@ -3290,10 +3295,6 @@ const app = createApp({
         startPoll();
         startExpireWatch();   // v2.57 到期提醒（5 分钟提示 / 2 分钟弹窗）
         startIdleWatch();     // v2.76 1 小时不操作自动退出登录
-        // v2.80 登录安全：进来先查一次（新设备弹"确认登录信息"），之后每 30 秒查新登录通知
-        checkLoginSecurity();
-        if (loginNoticeTimer) clearInterval(loginNoticeTimer);
-        loginNoticeTimer = setInterval(checkLoginSecurity, 30000);
         checkCodeAlerts();    // v2.64 红码提醒（服务端每小时巡检）
         alertTimer = setInterval(checkCodeAlerts, 10 * 60 * 1000);
       } catch (e) {
