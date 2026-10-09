@@ -1331,6 +1331,13 @@
                 <template #reference><el-button size="small" type="danger" plain>清空</el-button></template>
               </el-popconfirm>
             </div>
+            <!-- v2.89.4 归属地库升级后用这个把老会话的地区重算一遍 -->
+            <div class="link-line">
+              <span style="flex:1;">重新解析访客地区（清空后由工作台自动慢慢补全）</span>
+              <el-popconfirm title="把已有会话的地区清空、按新算法重新解析？" @confirm="refreshGeo">
+                <template #reference><el-button size="small" plain>重新解析</el-button></template>
+              </el-popconfirm>
+            </div>
           </div>
 
           <div class="panel wide">
@@ -1751,7 +1758,7 @@
 <script src="/assets/qr-poster.js?v=2.3.0"></script>
 <script src="/assets/api.js?v=2.1.1"></script>
 <script src="/assets/js/app-components.js?v=2.6.2"></script>
-<script src="/assets/js/app.js?v=3.61.0"></script>
+<script src="/assets/js/app.js?v=3.62.0"></script>
 <script src="/assets/js/app-boot.js?v=2.1.1"></script>
 </body>
 </html>

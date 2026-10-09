@@ -1353,7 +1353,9 @@ function geo_lookup_cn(string $ip): string
     if ($body === '') return '';
     if (function_exists('mb_convert_encoding')) $body = mb_convert_encoding($body, 'UTF-8', 'GBK,GB2312,UTF-8');
     $d = json_decode($body, true);
-    if (!is_array($d) || ($d['err'] ?? '') !== '' || ($d['pro'] ?? '') === '') return '';
+    /* v2.89.4 以前 err=nocity（移动/城域网 IP 拿不到市）就整条丢掉，连省都浪费了；
+       现在只要拿到省就返回，市留空 —— 交给多源投票去补。海外（err=noprovince，pro 为空）仍算无数据。 */
+    if (!is_array($d) || ($d['pro'] ?? '') === '') return '';
     $pro  = geo_clean((string)$d['pro']);
     $city = geo_clean((string)$d['city']);
     $reg  = geo_clean((string)$d['region']);       // 区县（如 普宁市）
@@ -1362,6 +1364,84 @@ function geo_lookup_cn(string $ip): string
     if ($city === '' && $reg !== '') $city = $reg;  // 只有区县时用区县
     return implode('|', ['中国', $pro !== '' ? $pro : '0', $city !== '' ? $city : '0',
         $isp !== '' ? $isp : '0', 'CN']);
+}
+
+/** v2.89.4 国内第二源：纯真 IP 库（ip.zxinc.org，免费）。省市分辨率稳，海外偶尔会误判成国内。 */
+function geo_lookup_zxinc(string $ip): string
+{
+    $body = geo_http_get('https://ip.zxinc.org/api.php?type=json&ip=' . urlencode($ip), 3);
+    if ($body === '') return '';
+    $d = json_decode($body, true);
+    if (!is_array($d) || (int)($d['code'] ?? -1) !== 0 || !is_array($d['data'] ?? null)) return '';
+    $loc = (string)($d['data']['location'] ?? '');
+    if ($loc === '') return '';
+    $loc = str_replace(['–', '—'], '-', $loc);
+    $seg = array_values(array_filter(array_map('trim', explode('-', $loc)), fn($v) => $v !== ''));
+    if (!$seg) return '';
+    /* 纯真的 location 形如「中国-河南-洛阳 联通」「中国-山西 移动」：末段末尾常常缀着运营商，
+       先把它拆出来，否则会被当成省份/城市名（省份投票会因此投错）。 */
+    $ispRaw = '';
+    $lastIdx = count($seg) - 1;
+    if ($lastIdx > 0 && preg_match('/^(.*?)\s+(\S+)$/u', (string)$seg[$lastIdx], $m)
+        && preg_match('/电信|联通|移动|铁通|广电|教育网|鹏博士|BGP|IDC|数据中心/u', (string)$m[2])) {
+        $ispRaw = (string)$m[2];
+        $seg[$lastIdx] = trim((string)$m[1]);
+    }
+    $countryRaw = geo_clean((string)$seg[0]);
+    $isCn = $countryRaw === '' || mb_strpos($countryRaw, '中国') !== false;
+    $prov = geo_clean((string)($seg[1] ?? ''));
+    $city = geo_clean((string)($seg[2] ?? ''));
+    $extra = (string)($seg[3] ?? '');
+    if ($ispRaw === '' && $extra !== '') {
+        $sp = preg_split('/\s+/u', $extra);
+        $ispRaw = (string)end($sp);
+    }
+    if (!preg_match('/电信|联通|移动|铁通|广电|教育网|鹏博士/u', $ispRaw)) {
+        $ispRaw = (string)($d['data']['local'] ?? '');
+    }
+    $isp = geo_isp_norm($ispRaw);
+    if (!$isCn && $prov === '' && $city === '') return '';
+    return implode('|', [$isCn ? '中国' : ($countryRaw !== '' ? $countryRaw : '0'),
+        $prov !== '' ? $prov : '0', $city !== '' ? $city : '0', $isp !== '' ? $isp : '0', $isCn ? 'CN' : '0']);
+}
+
+/** v2.89.4 多个国内源合并：省份取多数票（平票优先太平洋），城市只在「同省且不冲突」时才给。
+ *  $a=太平洋 $b=纯真 $c=ip-api（可为 null）。返回统一的 国家|省|市|运营商|国家码 */
+function geo_merge_cn(?array $a, ?array $b, ?array $c): string
+{
+    $k = function (?array $r, int $i): string {
+        if (!$r) return '';
+        $v = (string)($r[$i] ?? '');
+        return ($v === '' || $v === '0') ? '' : geo_name_key($v);
+    };
+    $pa = $k($a, 1); $pb = $k($b, 1); $pc = $k($c, 1);
+    $cnt = [];
+    foreach ([$pa, $pb, $pc] as $p) { if ($p !== '') $cnt[$p] = ($cnt[$p] ?? 0) + 1; }
+    if (!$cnt) return '';
+    arsort($cnt);
+    $keys = array_keys($cnt);
+    $prov = $keys[0];
+    if (count($keys) > 1 && $cnt[$keys[0]] === $cnt[$keys[1]] && $pa !== '') $prov = $pa;   // 平票：太平洋优先
+
+    $cities = [];
+    foreach ([[$a, $pa], [$b, $pb], [$c, $pc]] as $pair) {
+        [$r, $pk] = $pair;
+        if (!$r || $pk === '' || $pk !== $prov) continue;
+        $ck = $k($r, 2);
+        if ($ck !== '') $cities[$ck] = (string)$r[2];
+    }
+    $city = count($cities) === 1 ? (string)array_values($cities)[0] : '0';   // 同省不同市 → 宁可不给市
+
+    $isp = '0';
+    $provShow = '';
+    foreach ([[$a, $pa], [$b, $pb], [$c, $pc]] as $pair) {
+        [$r, $pk] = $pair;
+        if (!$r || $pk !== $prov) continue;
+        if ($provShow === '') $provShow = (string)$r[1];
+        if ($isp === '0' && (string)($r[3] ?? '0') !== '0') $isp = (string)$r[3];
+    }
+    if ($provShow === '') $provShow = $prov;
+    return implode('|', ['中国', $provShow, $city, $isp, 'CN']);
 }
 
 /** 国外库回退（ip-api.com 免费接口） */
@@ -1442,37 +1522,49 @@ function geo_lookup_ipip(string $ip): string
 function lookup_geo(string $ip): string
 {
     if (!$ip || $ip === '127.0.0.1') return '';
-    $cacheFile = sys_get_temp_dir() . '/kfxt_geo_v2_' . md5($ip) . '.json';
+    /* v2.89.4 缓存代号升 v3：算法换了两源交叉 + 第三票，老缓存里那些不准的结果直接作废重查 */
+    $cacheFile = sys_get_temp_dir() . '/kfxt_geo_v3_' . md5($ip) . '.json';
     if (is_file($cacheFile) && (time() - filemtime($cacheFile)) < 86400) {
         $v = @file_get_contents($cacheFile);
         if ($v !== false && $v !== '') return $v;
     }
-    // 国内 IP 走国内库（城市/区县/运营商更准），海外或失败再走 ip-api
-    // ① 有 ipip token 就优先用（城域网/手机 IP 最准）
+    /* v2.89.4 归属地重做（原来是 太平洋 + 淘宝，淘宝那个公开接口已经废了 → 等于单源，所以经常不准）：
+       ① 有 ipip token 还是优先（最准）；
+       ② 国内：太平洋（能到区县）+ 纯真 两个国内源交叉，省份取多数票；
+          城市只在两个源同省且不冲突时才给（移动/城域网 IP 各库城市差别大，宁可不给也不报错城市）；
+       ③ 两个国内源省份打架 / 都没有 → 拿 ip-api 投第三票；ip-api 说在海外就以它为准（纯真偶尔把海外判成国内）。 */
     $out = geo_lookup_ipip($ip);
     if ($out !== '') { @file_put_contents($cacheFile, $out); return $out; }
-    $cn1 = geo_lookup_cn($ip);        // 太平洋（可到区县）
-    $cn2 = geo_lookup_taobao($ip);    // 淘宝/阿里
+    $cn1 = geo_lookup_cn($ip);          // 太平洋（省/市/区县/运营商）
+    $cn2 = geo_lookup_zxinc($ip);       // 纯真
+    $a = $cn1 !== '' ? explode('|', $cn1) : null;
+    $b = $cn2 !== '' ? explode('|', $cn2) : null;
     $out = '';
-    if ($cn1 !== '' || $cn2 !== '') {
-        $a = $cn1 !== '' ? explode('|', $cn1) : null;
-        $b = $cn2 !== '' ? explode('|', $cn2) : null;
-        if ($a && $b) {
-            $ca = geo_name_key($a[2]); $cb = geo_name_key($b[2]);
-            $pa = geo_name_key($a[1]); $pb = geo_name_key($b[1]);
-            $prov = $a[1] !== '0' ? $a[1] : $b[1];
-            $isp  = $a[3] !== '0' ? $a[3] : $b[3];
-            if ($ca !== '' && $cb !== '' && $ca === $cb) {
-                // 两个库城市一致 → 可信，用城市
-                $out = implode('|', ['中国', $prov, $a[2] !== '0' ? $a[2] : $b[2], $isp, 'CN']);
-            } elseif ($pa !== '' && $pa === $pb) {
-                // 省级一致但市级不一致（多为移动/城域网 IP）→ 只显示到省，不给错城市
-                $out = implode('|', ['中国', $prov, '0', $isp, 'CN']);
-            } else {
-                $out = $a[4] === 'CN' ? $cn1 : $cn2;   // 连省都不一致 → 取国内库原值
-            }
+    if ($a || $b) {
+        $pa = $a ? geo_name_key((string)$a[1]) : '';
+        $pb = $b ? geo_name_key((string)$b[1]) : '';
+        if ($pa !== '' && $pb !== '' && $pa === $pb) {
+            $out = geo_merge_cn($a, $b, null);                    // 两个国内源省份一致 → 直接交叉
         } else {
-            $out = $cn1 !== '' ? $cn1 : $cn2;
+            $w = geo_lookup_world($ip);                           // 打架 / 缺省：请 ip-api 投票
+            $c = $w !== '' ? explode('|', $w) : null;
+            $cCn = $c && (string)($c[4] ?? '') === 'CN';
+            $cnAgree = ($pa !== '' && $pb !== '' && $pa === $pb);
+            if ($c && !$cCn && !$cnAgree) {
+                $out = $w;                                        // 两个国内源自己都不一致、ip-api 说海外 → 信 ip-api
+            } else {
+                /* 只有一个国内源有数据（另一个源没查到/连不上）且 ip-api 同省 → 保留这个源的市，
+                   别因为第二源缺数据把本来有的城市也丢了 */
+                $one = null;
+                if ($pa !== '' && $pb === '') $one = $a;
+                elseif ($pb !== '' && $pa === '') $one = $b;
+                if ($one && $cCn && geo_name_key((string)$one[1]) === geo_name_key((string)$c[1])) {
+                    $out = implode('|', ['中国', $one[1], $one[2],
+                        (string)($one[3] ?? '0') !== '0' ? $one[3] : $c[3], 'CN']);
+                } else {
+                    $out = geo_merge_cn($a, $b, $c);
+                }
+            }
         }
     }
     if ($out === '') $out = geo_lookup_world($ip);

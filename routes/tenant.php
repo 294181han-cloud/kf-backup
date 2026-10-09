@@ -451,6 +451,23 @@ function handle_tenant_cleanup(string $method): void
 }
 
 /* ---------- 访客资源（原「访客管理」做真：按访客聚合） ---------- */
+/** v2.89.4 「重新解析访客地区」：把老会话里用旧库算出来的地区清空，
+    之后工作台轮询会按新算法（太平洋+纯真+ip-api 三源交叉）慢慢补回来。
+    清空是瞬时的，补全在轮询时做（每轮补 2 条），不阻塞、不超时。 */
+function handle_tenant_geo_refresh(string $method): void
+{
+    if ($method !== 'POST') { json_error('方法不允许', 405); return; }
+    $ctx = require_tenant();
+    $tid = $ctx['id'];
+    $pdo = db();
+    try {
+        $st = $pdo->prepare("UPDATE v_sessions SET geo = '' WHERE tenant_id = ? AND geo <> ''");
+        $st->execute([$tid]);
+        $cleared = $st->rowCount();
+    } catch (\Throwable $e) { json_error('清空失败：' . $e->getMessage(), 500); return; }
+    json_out(['ok' => true, 'cleared' => $cleared]);
+}
+
 function handle_tenant_visitors(string $method): void
 {
     if ($method !== 'GET') { json_error('方法不允许', 405); return; }

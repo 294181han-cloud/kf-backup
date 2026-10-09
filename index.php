@@ -674,6 +674,7 @@ function dispatch_api(string $method, string $uri): void
     if (preg_match('#^/api/tenant/link/disable/(\d+)$#', $uri, $m)) handle_tenant_link_disable($method, $m);
     if ($uri === '/api/tenant/login-logs')       handle_tenant_login_logs($method);
     if ($uri === '/api/tenant/cleanup')          handle_tenant_cleanup($method);
+    if ($uri === '/api/tenant/geo-refresh')      handle_tenant_geo_refresh($method);
     if ($uri === '/api/tenant/visitors')         handle_tenant_visitors($method);
     if ($uri === '/api/tenant/code/check')       handle_tenant_code_check($method);
     if ($uri === '/api/tenant/code/alerts')      handle_tenant_code_alerts($method);

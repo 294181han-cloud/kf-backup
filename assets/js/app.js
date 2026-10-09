@@ -2186,6 +2186,14 @@ const app = createApp({
         ElementPlus.ElMessage.success('已保存');
       } catch (e) { ElementPlus.ElMessage.error(e.message); }
     };
+    /* v2.89.4 归属地重算：清空已有地区，工作台轮询会按新库慢慢补全（每轮 2 条） */
+    const refreshGeo = async () => {
+      try {
+        const r = await API.post('/api/tenant/geo-refresh', {});
+        ElementPlus.ElMessage.success('已清空 ' + (r.cleared || 0) + ' 条地区，正在按新库重新解析（列表里会陆续刷新出来）');
+        await pollOnce();
+      } catch (e) { ElementPlus.ElMessage.error(e.message); }
+    };
     const doCleanup = async (days, scope) => {
       try {
         const r = await API.post('/api/tenant/cleanup', { days, scope });
@@ -3272,7 +3280,7 @@ const app = createApp({
       posterUrl, posterOpts, downloadPoster, pickPosterLogo, onQrOpen, downloadQrBox,
       waNumber, tgUser, waQrBox, tgQrBox, genWaQr, genTgQr,
       uploadAvatar, isImg,
-      sec, loginLogs, visitors, cleanupOpts, loadSecurityPage, saveSecurity, doCleanup, loadVisitors, openVisitorSessions,
+      sec, loginLogs, visitors, cleanupOpts, loadSecurityPage, saveSecurity, doCleanup, refreshGeo, loadVisitors, openVisitorSessions,
       guide, guideDone, dark, toggleDark, renameVisitor, renderCodeQrs, tplList,
       uiCatList, uiCurrentCat, uiActiveCat, uiActiveList, uiSel, uiTplList, uiColorList, uiPick, sideCollapsed, mSideOpen,
       blockSession, blockIp, kwList, kwInput, kwSaving, addKw, removeKw, saveFilter, agentCmd, restartPoll,
