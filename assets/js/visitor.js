@@ -157,6 +157,16 @@ createApp({
       let added = false;
       let gotAgent = false;
       for (const m of (list || [])) {
+        /* v2.89.12 客服在工作台点了「刷新」→ 这里收到 sys_reload 指令就刷新整个页面
+           （客户页面卡住、图片不显示、样式错乱时用；这条指令本身不显示） */
+        if (m && m.msg_type === 'sys_reload') {
+          let done = '';
+          try { done = sessionStorage.getItem('kfxt_reload_done') || ''; } catch (e) {}
+          if (done === String(m.id)) continue;      // 这条指令已经刷过了（否则刷新后会无限循环）
+          try { sessionStorage.setItem('kfxt_reload_done', String(m.id)); } catch (e) {}
+          location.reload();
+          return;
+        }
         if (m.id > maxMsgId.value) {
           maxMsgId.value = m.id;
           messages.value.push(m);

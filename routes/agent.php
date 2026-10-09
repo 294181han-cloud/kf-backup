@@ -150,6 +150,22 @@ function handle_sessions(string $method): void
     ]]);
 }
 
+/** v2.89.12「刷新访客端」：客服点一下刷新，客户那边的页面会自动刷新一次。
+    做法：往会话里插一条 msg_type='sys_reload' 的系统消息 —— 两端都不显示这条消息，
+    访客端轮询收到就执行 location.reload()（用于客户页面卡住、样式错乱、图片不显示等）。 */
+function handle_session_reload(string $method, array $m): void
+{
+    if ($method !== 'POST') { json_error('方法不允许', 405); return; }
+    $sid = (int)$m[1];
+    $ctx = require_workspace();
+    session_of($ctx, $sid);
+    $pdo = db();
+    $pdo->prepare("INSERT INTO messages (tenant_id, session_id, from_type, sender_name, text, msg_type, created_at)
+        VALUES (?,?,'system','系统','刷新访客页面','sys_reload',?)")
+        ->execute([(int)$ctx['tenant_id'], $sid, now_dt()]);
+    json_out(['ok' => true]);
+}
+
 /* ---------- 同租户客服列表（转接用） ---------- */
 function handle_agents_list(string $method): void
 {

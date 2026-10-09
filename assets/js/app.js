@@ -671,7 +671,10 @@ const app = createApp({
         msgs.value = r.messages || [];
         maxMsgId.value = msgs.value.length ? msgs.value[msgs.value.length - 1].id : 0;
     pinBottom(1400);
-        ElementPlus.ElMessage.success('已刷新聊天记录');
+        /* v2.89.12 顺手把客户（访客端）的页面也叫刷新一次：客户那边卡住/图片不显示时最有用 */
+        let visitorOk = false;
+        try { await API.post('/api/sessions/' + currentId.value + '/reload', {}); visitorOk = true; } catch (e) {}
+        ElementPlus.ElMessage.success(visitorOk ? '已刷新聊天记录，并通知访客端刷新' : '已刷新聊天记录');
       } catch (e) { ElementPlus.ElMessage.error(e.message); }
       finally { refreshing.value = false; }
     };
@@ -1197,7 +1200,10 @@ const app = createApp({
     /* v2.60.11 聊天记录快速查找：① 只看图片 ② 按日期跳转 */
     const imgOnly = ref(false);
     const dateOpen = ref(false);
-    const visibleMsgs = Vue.computed(() => (imgOnly.value ? msgs.value.filter(m => ((m && m.attachments) || []).some(a => a && (!a.type || a.type === 'image') && a.url)) : msgs.value));
+    /* v2.89.12 sys_reload（让访客端刷新的指令）不显示在聊天里 */
+    const visibleMsgs = Vue.computed(() => (imgOnly.value
+      ? msgs.value.filter(m => ((m && m.attachments) || []).some(a => a && (!a.type || a.type === 'image') && a.url))
+      : msgs.value.filter(m => m && m.msg_type !== 'sys_reload')));
     const imgCount = Vue.computed(() => msgs.value.filter(m => ((m && m.attachments) || []).some(a => a && (!a.type || a.type === 'image') && a.url)).length);
     const toggleImgOnly = () => { imgOnly.value = !imgOnly.value; };
     /* 这段对话里出现过的日期（倒序），点一下跳到当天第一条 */

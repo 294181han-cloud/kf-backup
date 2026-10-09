@@ -647,6 +647,7 @@ function dispatch_api(string $method, string $uri): void
     if (preg_match('#^/api/sessions/(\d+)/transfer$#', $uri, $m))  handle_session_transfer($method, $m);
     if (preg_match('#^/api/sessions/(\d+)/block$#', $uri, $m))   handle_session_block($method, $m);
     if (preg_match('#^/api/sessions/(\d+)/recall$#', $uri, $m))  handle_session_recall($method, $m);
+    if (preg_match('#^/api/sessions/(\d+)/reload$#', $uri, $m))  handle_session_reload($method, $m);
     if (preg_match('#^/api/sessions/(\d+)/messages/(\d+)/edit$#', $uri, $m)) handle_message_edit($method, $m);
     if (preg_match('#^/api/sessions/(\d+)/pin$#', $uri, $m))     handle_session_pin($method, $m);
     if ($uri === '/api/quick-msgs/reorder')                       handle_quick_reorder($method);
