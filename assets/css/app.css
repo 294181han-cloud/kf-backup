@@ -2233,6 +2233,12 @@ body.dark .dev-cur { background: color-mix(in srgb, var(--theme, #1677ff) 30%, #
 .side-toggle:hover { color: var(--theme, #1677ff); border-color: var(--theme, #1677ff); }
 body.dark .side-toggle { background: #262c34; border-color: #333b46; color: #a9b3c2; }
 .side.collapsed .logo { padding: 16px 0 12px; }
+/* 收起后底部账号区也跟着收：只留头像，两个按钮竖排，别被切掉半截 */
+.side.collapsed .me { padding: 10px 6px; }
+.side.collapsed .me-top { justify-content: center; }
+.side.collapsed .me-id, .side.collapsed .me-copy { display: none; }
+.side.collapsed .me-row { flex-direction: column; gap: 6px; }
+.side.collapsed .me-btn { padding: 6px 0; font-size: 11.5px; text-align: center; }
 
 /* 会话列表右侧的拖动手把 */
 .sess-resizer {
