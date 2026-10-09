@@ -854,15 +854,6 @@
             <div class="cc-tip">检测通道：{{ checkChannelLabel }} · 最近检测：{{ codeCheck.atText || '—' }}</div>
             <div class="cc-tip" v-if="codeCheck.msg">{{ codeCheck.msg }}</div>
 
-            <div class="cc-own">
-              <div class="cc-own-ic">💎</div>
-              <div class="cc-own-body">
-                <div class="cc-own-t">专属码 · 独占域名</div>
-                <div class="cc-own-s">专属域名只给你一个人用：别人被举报、被拦，都不会连累到你。</div>
-              </div>
-              <el-button type="primary" size="small" @click="ownDlg = true">联系上级购买</el-button>
-            </div>
-
           </div>
         </div>
 
@@ -898,19 +889,6 @@
               </template>
             </el-table-column>
           </el-table>
-        </el-dialog>
-
-        <!-- 专属码说明 -->
-        <el-dialog v-model="ownDlg" title="专属码 · 购买专属域名" width="480px" align-center>
-          <div style="line-height:1.9;font-size:13.5px;color:#4e5969;">
-            <p style="margin:0 0 10px;"><b>专属域名是什么？</b><br>现在是一批落地域名大家共用 —— 别人被举报、被微信拦，你的码可能跟着打不开。专属域名只给你一个人用，风险完全隔离。</p>
-            <p style="margin:0 0 10px;"><b>怎么开通？</b><br>联系你的上级（平台客服）购买，开通后系统会自动把这个域名分给你，之后发码就直接用它。</p>
-            <p style="margin:0 0 6px;"><b>联系方式</b></p>
-          </div>
-          <div style="display:flex;gap:8px;align-items:center;">
-            <span class="mono" style="flex:1;padding:9px 12px;background:#f7f8fa;border-radius:8px;">{{ ownContact }}</span>
-            <el-button size="small" @click="copy(ownContact)">复制</el-button>
-          </div>
         </el-dialog>
 
         <!-- 预览 / 查看码 -->
@@ -1780,7 +1758,7 @@
 <script src="/assets/qr-poster.js?v=2.3.0"></script>
 <script src="/assets/api.js?v=2.1.1"></script>
 <script src="/assets/js/app-components.js?v=2.6.2"></script>
-<script src="/assets/js/app.js?v=3.67.1"></script>
+<script src="/assets/js/app.js?v=3.67.2"></script>
 <script src="/assets/js/app-boot.js?v=2.1.1"></script>
 </body>
 </html>

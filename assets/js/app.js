@@ -3004,9 +3004,7 @@ const app = createApp({
     const manageDlgOpen = ref(false);
     const codeList = ref([]);
     const codeListLoading = ref(false);
-    const ownDlg = ref(false);
     const codeTextDlg = ref(false);
-    const ownContact = ref('@xiaomifuwu');   // 联系上级（平台客服）的账号，可改
     /* ===== v2.80 登录安全 =====
        ① 新设备第一次登录：弹「确认本次登录信息」，让用户给这台设备起个称呼（存进登录设备备注）
        ② 同账号别处登录：轮询到「新登录通知」就弹提醒（谁/在哪/什么设备/什么时候），5 分钟自动关 */
@@ -3382,7 +3380,7 @@ const app = createApp({
       POSTER_POS, qrFreeStyle, qrLayerStyle, textStyle,
       cropDlg, cropSrc, cropZoomPct, cropStage, cropStyle, cropImgLoaded, cropDown, cropMove, cropUp, cropWheel, cropClose, openCrop, cropConfirm, avatarPreview,
       geoTag, visitorTag, visitorTagFull, visitorChnClass, copyQrImage, downloadQrImage, codeRotateHint, rotateCode, rotateLink, loadHistory, disableLink, saveCodeCfg, meAvatarUrl,
-      manageDlgOpen, codeList, codeListLoading, openManageCodes, toggleCode, delCodeRow, ownDlg, ownContact,
+      manageDlgOpen, codeList, codeListLoading, openManageCodes, toggleCode, delCodeRow,
       loginInfoDlg, loginInfo, loginInfoName, loginHost, saveLoginInfoName, skipLoginInfo, markLoginInfoAsked,
       codeTextDlg,
       codeCreatedAt, codeExpiresAt,
