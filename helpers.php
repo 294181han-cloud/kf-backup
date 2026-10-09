@@ -2031,7 +2031,32 @@ function gate_token_from_query(): string
 {
     $t = trim((string)($_GET['w'] ?? ''));
     if ($t !== '' && preg_match('/^[A-Za-z0-9]{6,32}$/', $t)) return $t;
+    /* v2.89 新码把入口 ID 放在随机参数名后面（二维码里没有固定特征 ?w=），
+       固定名都认不出来时，退回到「任意一个看起来像入口 ID 的参数」。老链接照旧走前面那条。 */
+    $skip = ['w' => 1, 'key' => 1, 'k' => 1, 'd' => 1, 't' => 1, 'r' => 1, 'code' => 1, 'pf' => 1, 'tk' => 1, '_t' => 1];
+    foreach ($_GET as $k => $v) {
+        if (is_array($v)) continue;
+        $k = (string)$k;
+        if (isset($skip[strtolower($k)]) || ($k !== '' && $k[0] === '_')) continue;
+        $v = trim((string)$v);
+        if (preg_match('/^[A-Za-z0-9]{6,32}$/', $v)) return $v;
+    }
     return gate_key_from_query();
+}
+
+/** v2.89 随机参数名：新发的码用 ?<随机名>=<入口ID>，链接里不再有固定的 ?w= 特征。
+ *  同一个码仍可换参数名重发（入口 ID 才是身份），老二维码的 ?w= 一直有效。 */
+function gate_rand_param(): string
+{
+    $bad = ['w' => 1, 'k' => 1, 'key' => 1, 'd' => 1, 't' => 1, 'r' => 1, 'code' => 1, 'pf' => 1, 'tk' => 1, 'u' => 1, 'id' => 1];
+    $ab = 'abcdefghijklmnopqrstuvwxyz0123456789';
+    for ($i = 0; $i < 30; $i++) {
+        $len = random_int(5, 7);
+        $n = '';
+        for ($j = 0; $j < $len; $j++) $n .= $ab[random_int(0, strlen($ab) - 1)];
+        if (!isset($bad[$n]) && !ctype_digit($n)) return $n;
+    }
+    return 'q' . bin2hex(random_bytes(3));
 }
 
 /** 入口令牌 → 真实客服码（先按入口 ID 找，再退回当客服码解析）。
@@ -2251,7 +2276,8 @@ function tenant_mint_service_code(int $tid, string $want = ''): array
        v2.68：query 里用 ?w=入口ID，不暴露客服码。
        v2.62.1 域名：配了固定子域池就从池里随机挑；泛解析行随机 8 位子域；单域名行用裸域。 */
     $scheme = 'https';
-    $gatePath = date('m-d') . '/' . gen_gate_name() . '.html?w=' . $entryId;
+    /* v2.89 入口 ID 放进随机参数名里（老链接的 ?w= 仍然有效，见 gate_token_from_query） */
+    $gatePath = date('m-d') . '/' . gen_gate_name() . '.html?' . gate_rand_param() . '=' . $entryId;
     $entryDomain = strtolower(trim(kv_get('entry_domain', '')));
     if ($entryDomain !== '') {
         /* 入口域名（专门印二维码那个）：只用来出壳页，内容域名红了也不连累二维码 */
@@ -2565,6 +2591,11 @@ function gate_loader_html(string $apiBase = ''): string
         . '<body><div class="ld" id="ld">正在进入…</div><script>(function(){'
         . 'var q=new URLSearchParams(location.search);'
         . 'var t=q.get("w")||q.get("key")||q.get("k")||"";'
+        /* v2.89 随机参数名：固定名认不出来时，取任意一个「看起来像入口 ID」的参数值 */
+        . 'if(!t){var SK={w:1,key:1,k:1,d:1,t:1,r:1,code:1,pf:1,tk:1};var it=q.entries();var c;'
+        . 'while(!(c=it.next()).done){var kk=c.value[0],vv=c.value[1];'
+        . 'if(SK[kk.toLowerCase()]||kk.charAt(0)==="_")continue;'
+        . 'if(/^[A-Za-z0-9]{6,32}$/.test(vv)){t=vv;break;}}}'
         . 'try{var d=q.get("d");if(!t&&d){var s=atob(d);var m=s.match(/(?:^|[?&])(?:w|key)=([A-Za-z0-9]+)/);t=m?m[1]:s;}}catch(e){}'
         . 'var ALT=' . json_encode(array_values($alts), JSON_UNESCAPED_SLASHES) . ';'
         . 'var AB=' . json_encode($apiBase) . ';'
