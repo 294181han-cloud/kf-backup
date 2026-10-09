@@ -83,7 +83,10 @@
 
     <div class="v-body" ref="bodyRef" @scroll.passive="onBodyScroll">
       <!-- 欢迎屏（暂无消息） -->
-      <div class="welcome-card" v-if="!messages.length">
+      <!-- v2.90.19 修 bug：新访客进来时系统会插一条「客户已接入」系统消息，
+           原来这里判的是 messages.length，被那条系统消息顶掉 → 新访客看不到欢迎卡和快捷提问。
+           改成按"看得见的消息"来判。 -->
+      <div class="welcome-card" v-if="!visibleMessages.length">
         <div class="w-ava"><img v-if="isImg(brand.avatar)" :src="brand.avatar"><template v-else>{{ brand.avatar }}</template></div>
         <h3>{{ brand.welcome_title }}</h3>
         <p>{{ brand.welcome_sub }}</p>
@@ -327,7 +330,7 @@
 </div>
 
 <script src="/assets/vendor/vue.global.js?v=2.0.1"></script>
-<script src="/assets/js/visitor.js?v=2.30.1"></script>
+<script src="/assets/js/visitor.js?v=2.30.2"></script>
 <script>
 /* v2.52 加载兜底：正常挂载后由 visitor.js 移除提示；8 秒还没挂载就提示"加载失败" */
 (function () {
