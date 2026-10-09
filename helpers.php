@@ -2601,7 +2601,7 @@ function gate_loader_html(string $apiBase = ''): string
         . 'var AB=' . json_encode($apiBase) . ';'
         . 'var box=document.getElementById("ld");var done=false;'
         /* v2.89 进入成功判定 + 内容主机连不上时的自愈：
-           访客页挂载后会 postMessage 报到（kf=ready）；9 秒没报到就认为这台内容主机不行 ——
+           访客页挂载后会 postMessage 报到（kf=ready）；7 秒没报到就认为这台内容主机不行 ——
            上报服务端（复核后会把这台退役换一台），自己再要一次地址重试一次。 */
         . 'var okIn=false;var rdy=null;var retried=false;var CD="";'
         . 'function hideLoad(){okIn=true;if(rdy){clearTimeout(rdy);rdy=null;}if(box)box.style.display="none";}'
@@ -2636,9 +2636,11 @@ function gate_loader_html(string $apiBase = ''): string
         . 'f.setAttribute("allow","microphone; autoplay; clipboard-write; fullscreen");'
         . 'document.body.appendChild(f);'
         . 'if(rdy)clearTimeout(rdy);'
+        /* v2.89.2 4.5 秒还在转就先说一句「网络较慢，正在重试」，别让人对着「正在进入…」发呆 */
+        . 'setTimeout(function(){if(okIn)return;if(box){var p1=box.querySelector("div");if(p1&&!done)p1.textContent="网络较慢，正在重试…";}},4500);'
         . 'rdy=setTimeout(function(){if(okIn)return;reportErr("frame-timeout",chost);'
         . 'if(!retried){retried=true;try{f.parentNode.removeChild(f)}catch(e){}ask(0);return;}'
-        . 'msg("网络较慢，没能进入聊天页，请点击重试");},9000);}'
+        . 'msg("网络较慢，没能进入聊天页，请点击重试");},7000);}'
         . 'var pf=function(k){var h=5381,s=k+"|' . $year . '|kfxt";for(var i=0;i<s.length;i++){h=((h<<5)+h+s.charCodeAt(i))>>>0}return h.toString(16)};'
         . 'function ask(n){var x=new XMLHttpRequest();x.open("POST",AB+"/api/gate",true);'
         . 'x.setRequestHeader("Content-Type","application/x-www-form-urlencoded");x.timeout=6000;'
