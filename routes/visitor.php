@@ -311,12 +311,23 @@ function handle_visitor_init(string $method): void
        客户那边看到的也是同一段完整记录）。开关：访客策略 → ip_merge_on（默认开）；
        同一个 WiFi / 同一个基站出口下如果有很多不同客户，把这些客户串成一段是有风险的，
        所以那个开关可以关掉（关掉后只能手动「合并同 IP 的会话」）。 */
-    if (ts_get($tid, 'ip_merge_on', '1') === '1') {
+    if (ts_get($tid, 'ip_merge_on', '1') === '1' && $ip !== '') {
         try {
+            /* v2.90.2 判定收紧成「同 IP + 同设备」：运营商大内网（移动/联通很多出口 IP 是几千人共用）
+               只看 IP 会把互不相识的两个客户串成一段、互相看到聊天记录。
+               同一个人 微信↔浏览器 互跳时系统版本/机型是同一个，所以照样能接回。 */
             $st = $pdo->prepare("SELECT * FROM v_sessions WHERE tenant_id = ? AND deleted_at IS NULL AND ip = ?
-                AND status <> 'closed' AND last_time >= ? ORDER BY last_time DESC LIMIT 1");
+                AND status <> 'closed' AND last_time >= ? ORDER BY last_time DESC LIMIT 5");
             $st->execute([$tid, $ip, now_dt(time() - 86400)]);
-            $same = $st->fetch();
+            $newTag = (string)(parse_ua($uaStr)['dev_tag'] ?? '');
+            $same = null;
+            foreach ($st->fetchAll() as $row) {
+                $oldTag = (string)(parse_ua((string)($row['ua'] ?? ''))['dev_tag'] ?? '');
+                $newKnown = ($newTag !== '' && $newTag !== '未知');
+                $oldKnown = ($oldTag !== '' && $oldTag !== '未知');
+                if ($newKnown && $oldKnown && $oldTag === $newTag) { $same = $row; break; }
+                if (!$newKnown && !$oldKnown) { $same = $row; break; }
+            }
             if ($same) {
                 $sidSame = (int)$same['id'];
                 $pdo->prepare('UPDATE v_sessions SET visitor_token = ?, last_online_at = ? WHERE id = ?')
@@ -439,6 +450,7 @@ function handle_visitor_welcome(string $method): void
     $sid = (int)input('session_id', 0);
     $name = mb_substr((string)input('name', ''), 0, 30);
     if (!$sid) json_error('缺少 session_id');
+    $sid = session_alias_follow($sid);   // v2.90.2 老窗口（已被合并）也能发欢迎语到合并后的会话
 
     $pdo = db();
     $st = $pdo->prepare('SELECT tenant_id, ip FROM v_sessions WHERE id = ?');
@@ -490,6 +502,7 @@ function handle_visitor_messages(string $method): void
     $sid = (int)input('session_id', 0);
     $since = (int)input('since', 0);
     if (!$sid) json_error('缺少 session_id');
+    $sid = session_alias_follow($sid);   // v2.90.2 老窗口照样能拉到合并后的完整记录
     $pdo = db();
     $sql = 'SELECT id, session_id, from_type AS `from`, sender_name, text, msg_type, attachments, reply_to, recalled_at, edited_at, read_at, created_at FROM messages WHERE session_id = ?' . ($since > 0 ? ' AND id > ?' : '') . ' ORDER BY id ASC';
     $st = $pdo->prepare($sql);
@@ -513,6 +526,7 @@ function handle_visitor_upload(string $method): void
     $kind = (string)input('kind', '');
     $filename = (string)input('filename', '');
     if (!$sid || $data === '' || $kind === '') json_error('参数缺失');
+    $sid = session_alias_follow($sid);   // v2.90.2 老窗口上传也落到合并后的会话
     $pdo = db();
     $st = $pdo->prepare('SELECT tenant_id, ip FROM v_sessions WHERE id = ?');
     $st->execute([$sid]);
@@ -531,10 +545,15 @@ function handle_visitor_poll(string $method): void
     $sinceMsg = (int)input('sinceMsg', 0);
     /* v2.67 会话绑定：轮询（含轻量探针）必须携带与会话匹配的 visitor_token，防枚举偷聊天记录 */
     $vt = trim((string)input('visitor_token', ''));
+    /* v2.90.2 会话被合并后，客户端可能还攥着老 session_id：顺着别名走到合并后的会话，
+       并把老窗口当时的 visitor_token 一并认下来，不然客户那边会突然「会话已失效」。 */
+    $sidRaw = $sid;
+    $aliasTok = '';
+    if ($sid > 0) { [$sid, $aliasTok] = visitor_sid_resolve($sid); }
     $stTok = db()->prepare('SELECT visitor_token FROM v_sessions WHERE id = ?');
     $stTok->execute([$sid]);
     $sessTok = (string)($stTok->fetchColumn() ?: '');
-    if ($sessTok !== '' && $vt !== $sessTok) json_error('会话已失效', 403);
+    if ($sessTok !== '' && $vt !== $sessTok && ($aliasTok === '' || $vt !== $aliasTok)) json_error('会话已失效', 403);
     // 轻量探针（访客闲置/暂停期专用）：只答"有无新消息"，一条索引查询；有新消息前端立即恢复全量轮询
     if (input('light')) {
         if (!$sid) json_out(['new' => false]);
@@ -779,6 +798,10 @@ function handle_visitor_send(string $method): void
     $attachArr = input('attachments', []);
     $attachArr = is_array($attachArr) ? $attachArr : [];
     if (!$sid || ($text === '' && !$attachArr)) json_error('参数缺失');
+    /* v2.90.2 老窗口（会话已被合并掉）发消息：顺着别名落到合并后的会话上 */
+    $sidRaw = $sid;
+    $aliasTok = '';
+    if ($sid > 0) { [$sid, $aliasTok] = visitor_sid_resolve($sid); }
 
     $pdo = db();
     $st = $pdo->prepare('SELECT * FROM v_sessions WHERE id = ?');
@@ -786,7 +809,9 @@ function handle_visitor_send(string $method): void
     $s = $st->fetch();
     if (!$s) json_error('会话不存在', 400);
     /* v2.67 会话绑定：发送必须携带与会话匹配的 visitor_token（防冒用会话发消息） */
-    if ((string)($s['visitor_token'] ?? '') !== '' && trim((string)input('visitor_token', '')) !== (string)$s['visitor_token']) {
+    $inTok = trim((string)input('visitor_token', ''));
+    if ((string)($s['visitor_token'] ?? '') !== '' && $inTok !== (string)$s['visitor_token']
+        && ($aliasTok === '' || $inTok !== $aliasTok)) {
         json_error('会话已失效', 403);
     }
     $tid = (int)$s['tenant_id'];
@@ -867,6 +892,7 @@ function handle_visitor_recall(string $method): void
     $sid = (int)input('session_id', 0);
     $msgId = (int)input('msg_id', 0);
     if (!$sid || !$msgId) json_error('参数缺失');
+    $sid = session_alias_follow($sid);   // v2.90.2 老窗口撤回也对得上合并后的会话
     $st = db()->prepare("SELECT * FROM messages WHERE id = ? AND session_id = ? AND from_type = 'visitor'");
     $st->execute([$msgId, $sid]);
     $msg = $st->fetch();

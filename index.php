@@ -251,6 +251,14 @@ function ensure_upgrade(): void
             note VARCHAR(200) NOT NULL DEFAULT '',
             created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+        // v2.90.2 会话合并别名（老会话 id → 合并后的目标 id；被并掉的窗口不用刷新也能接着聊）
+        $pdo->exec("CREATE TABLE IF NOT EXISTS session_merge_alias (
+            old_id INT UNSIGNED NOT NULL PRIMARY KEY,
+            new_id INT UNSIGNED NOT NULL,
+            token VARCHAR(64) NOT NULL DEFAULT '',
+            created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            KEY idx_new (new_id)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
     } catch (\Throwable $e) { /* 忽略 */ }
 }
 $method = $_SERVER['REQUEST_METHOD'] ?? 'GET';

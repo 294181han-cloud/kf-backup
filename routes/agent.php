@@ -351,6 +351,15 @@ function session_merge_into(array $ctx, int $target, int $from): array
         }
         $pdo->prepare('DELETE FROM contacts WHERE session_id = ? AND tenant_id = ?')->execute([$from, $tid]);
         $pdo->prepare('DELETE FROM welcome_sent WHERE session_id = ? AND tenant_id = ?')->execute([$from, $tid]);
+        /* v2.90.2 记别名：客户那边可能还开着被并掉的这个窗口（用老 session_id 轮询），
+           记下 老 id → 新 id 和它当时的 visitor_token，访客端接口顺着别名走到新会话上。 */
+        try {
+            $pdo->prepare('INSERT INTO session_merge_alias (old_id, new_id, token) VALUES (?,?,?)
+                ON DUPLICATE KEY UPDATE new_id = VALUES(new_id), token = VALUES(token)')
+                ->execute([$from, $target, (string)($fa['visitor_token'] ?? '')]);
+            // 以前并到 from 的那些老 id，现在跟着指向 target（别追丢了）
+            $pdo->prepare('UPDATE session_merge_alias SET new_id = ? WHERE new_id = ?')->execute([$target, $from]);
+        } catch (\Throwable $e) { /* 别名失败不影响合并本身 */ }
         $pdo->prepare('DELETE FROM v_sessions WHERE id = ? AND tenant_id = ?')->execute([$from, $tid]);
         // 目标会话的最后消息/时间跟着更新成合并后的最新一条
         $last = $pdo->prepare('SELECT text, msg_type, created_at FROM messages WHERE session_id = ? ORDER BY id DESC LIMIT 1');

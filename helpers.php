@@ -2802,3 +2802,44 @@ function send_csv(string $filename, array $header, array $rows): void
     echo "\xEF\xBB\xBF" . implode("\n", $lines);
     exit;
 }
+
+/* ---------- v2.90.2 会话合并别名 ----------
+   客服把 A 会话并进 B 会话后，A 的行会被删掉；如果客户手上那个旧窗口还开着，
+   它继续用 A 的 id 轮询/发消息就会落空（看到的是一段空记录、发出去的消息也丢了）。
+   这里记一条 A → B 的别名，访客端所有带会话 id 的接口都先过一遍别名，
+   客户那个旧窗口不用刷新就能看到合并后的完整记录。 */
+
+/** 顺着合并别名找到当前真正在用的会话 id（最多追 5 跳，防环） */
+function session_alias_follow(int $sid): int
+{
+    if ($sid <= 0) return $sid;
+    $pdo = db();
+    for ($i = 0; $i < 5; $i++) {
+        $st = $pdo->prepare('SELECT new_id FROM session_merge_alias WHERE old_id = ?');
+        $st->execute([$sid]);
+        $next = (int)($st->fetchColumn() ?: 0);
+        if ($next <= 0 || $next === $sid) return $sid;
+        $sid = $next;
+    }
+    return $sid;
+}
+
+/** 合并时老会话留下的 visitor_token（老窗口仍然算有效，不然后续请求会被判「会话已失效」） */
+function session_alias_token(int $sid): string
+{
+    if ($sid <= 0) return '';
+    try {
+        $st = db()->prepare('SELECT token FROM session_merge_alias WHERE old_id = ?');
+        $st->execute([$sid]);
+        return (string)($st->fetchColumn() ?: '');
+    } catch (\Throwable $e) {
+        return '';
+    }
+}
+
+/** 访客端接口统一入口：拿原始会话 id，返回 [实际用的会话 id, 可接受的老 token] */
+function visitor_sid_resolve(int $sidRaw): array
+{
+    $sid = session_alias_follow($sidRaw);
+    return [$sid, ($sid === $sidRaw ? '' : session_alias_token($sidRaw))];
+}

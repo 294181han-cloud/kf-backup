@@ -258,6 +258,15 @@ function init_schema(): void
         created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
         KEY idx_ident_time (ident, created_at)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+
+    // v2.90.2 会话合并别名（老会话 id → 合并后的目标 id；老窗口不用刷新也能接着聊）
+    $pdo->exec("CREATE TABLE IF NOT EXISTS session_merge_alias (
+        old_id INT UNSIGNED NOT NULL PRIMARY KEY,
+        new_id INT UNSIGNED NOT NULL,
+        token VARCHAR(64) NOT NULL DEFAULT '',
+        created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        KEY idx_new (new_id)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
 }
 
 /** 首启种子：管理员、JWT 密钥、全局默认值 */
