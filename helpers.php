@@ -2677,8 +2677,8 @@ function gate_frame_allow_hosts(): array
             if ($d !== '') $hosts[] = $d;
         }
     } catch (\Throwable $e) { /* 库不可用就只留下面的固定项 */ }
-    // 想放行大厂免费托管门牌（如 netlify.app）就往这里加；留空 = 只认自己的域名池
-    foreach ([] as $extra) $hosts[] = $extra;
+    // 大厂免费托管门牌（微信判得松、更难红）：netlify 的随机子域都能当门牌
+    foreach (['netlify.app'] as $extra) $hosts[] = $extra;
     return array_values(array_unique($hosts));
 }
 
