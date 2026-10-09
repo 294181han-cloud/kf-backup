@@ -518,6 +518,8 @@ const app = createApp({
         codeStyle.bottomText = b.code_bottom_text || '官方客服';
         codeStyle.colorDots = b.code_color_dots === true;
         codeStyle.custom = b.code_custom_logo || '';
+        /* v2.90.21 快捷消息点击行为：direct=单击直接发送（默认）/ edit=单击只填进输入框，编辑后再手动发 */
+        quickMode.value = (b.quick_send_mode === 'edit') ? 'edit' : 'direct';
         codeCheck.state = b.code_check_state || 'idle';
         codeCheck.text = b.code_check_text || '未检测';
         codeCheck.tag = b.code_check_tag || '未检测';
@@ -1001,10 +1003,17 @@ const app = createApp({
         : '输入消息，Enter 发送，Shift+Enter 换行；可 Ctrl+V 粘贴图片'));
 
     // 快捷消息（v2.28 改版）：单击 = 直接发送；Ctrl+单击 = 填入输入框（文字+图片均可编辑）
+    /* v2.90.21 单击行为可设置：默认「直接发送」；设成「编辑后发送」时，单击快捷消息只把它填进
+       输入框（可以改文字、加图片），自己按发送才发出去。Ctrl+单击 永远是填进输入框。 */
+    const quickMode = ref('direct');
+    const setQuickMode = async (m) => {
+      quickMode.value = (m === 'edit') ? 'edit' : 'direct';
+      try { await API.put('/api/tenant/settings', { quick_send_mode: quickMode.value }); } catch (e) {}
+    };
     const pendingAtts = ref([]);   // 待发附件（编辑模式带入的图片，发送时随消息发出）
     const quickClick = (q, ev) => {
       if (qDrag.suppressClick) { qDrag.suppressClick = false; return; }   // 刚拖完，别把消息发出去
-      if (ev && (ev.ctrlKey || ev.metaKey)) {
+      if ((ev && (ev.ctrlKey || ev.metaKey)) || quickMode.value === 'edit') {
         draft.value = q.content || '';
         pendingAtts.value = (q.attachments || []).filter(a => a && a.url).slice();   // 修复：带图话术图片不再丢失
         const input = document.querySelector('.chat-input textarea, .chat-input input');
@@ -3394,7 +3403,7 @@ const app = createApp({
       navGroups,
       audioPlaying, audioDur, waveBars, toggleAudio,
       asrText, asrBusy, transcribe,
-      openSession, send, onKey, useQuick, sendQuick, quickClick, onImage, startRec, stopRec, closeSession, doTransfer,
+      openSession, send, onKey, useQuick, sendQuick, quickClick, quickMode, setQuickMode, onImage, startRec, stopRec, closeSession, doTransfer,
       autoGrowTa,
       taPlaceholder,
       pendingAtts, rmPendingAtt, quickCtx, openQuickCtx, editQuick,

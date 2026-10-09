@@ -423,7 +423,7 @@
                 <div class="quick-scroll">
                   <template v-if="quickMsgs.length">
                     <button class="quick-btn" v-for="(q, qi) in quickMsgs" :key="q.id"
-                      :title="q.content + '\n单击：直接发送\nCtrl+单击：填入输入框（可编辑）\n按住拖动：调整顺序（全局）'"
+                      :title="q.content + (quickMode === 'edit' ? '\n单击：填入输入框（编辑后再发）' : '\n单击：直接发送') + '\nCtrl+单击：填入输入框（可编辑）\n按住拖动：调整顺序（全局）'"
                       :class="{dragging: qDrag.on && qDrag.idx === qi, 'drag-armed': qDrag.on}"
                       :style="{transitionDelay: (qi * 30) + 'ms'}"
                       @click="quickClick(q, $event)" @contextmenu="openQuickCtx(q, $event)"
@@ -1495,6 +1495,17 @@
   <!-- ============ 弹窗们 ============ -->
 <el-dialog v-model="quickDlg" title="快捷消息（聊天里一点就发）" width="680px" align-center @paste.capture="quickPaste">
   <div class="qd">
+    <!-- v2.90.21 点击行为：直接发送 or 填进输入框编辑后再发 -->
+    <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;background:#f7f8fa;border-radius:10px;padding:10px 12px;margin-bottom:12px;">
+      <span style="font-size:13px;color:#4e5969;font-weight:600;">点击快捷消息时：</span>
+      <el-radio-group v-model="quickMode" size="small" @change="setQuickMode">
+        <el-radio-button label="direct">直接发送</el-radio-button>
+        <el-radio-button label="edit">填入输入框，编辑后再发</el-radio-button>
+      </el-radio-group>
+      <span style="font-size:12px;color:#86909c;line-height:1.7;">
+        不管选哪个，按住 Ctrl 单击都是「填进输入框」（可以先改文字、再加图片）
+      </span>
+    </div>
     <div class="qd-add">
       <el-input v-model="qe.title" placeholder="按钮文字，如：请发送手机号" maxlength="20" style="width:200px;" @focus="quickFocus=0"></el-input>
       <el-input v-model="qe.content" placeholder="发送内容" maxlength="200" style="flex:1;min-width:200px;" @keyup.enter="quickAdd(qe)" @focus="quickFocus=0"></el-input>
@@ -1758,7 +1769,7 @@
 <script src="/assets/qr-poster.js?v=2.3.0"></script>
 <script src="/assets/api.js?v=2.1.1"></script>
 <script src="/assets/js/app-components.js?v=2.6.2"></script>
-<script src="/assets/js/app.js?v=3.67.4"></script>
+<script src="/assets/js/app.js?v=3.67.5"></script>
 <script src="/assets/js/app-boot.js?v=2.1.1"></script>
 </body>
 </html>

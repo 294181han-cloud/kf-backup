@@ -448,10 +448,22 @@ createApp({
     };
     // 重新咨询：清掉本地会话令牌后重载页面，开启一段全新会话
     const restartChat = () => { try { location.reload(); } catch (e) {} };
+    /* v2.90.21 令牌丢了自动补：重新接入一次（同一 IP + 同设备会被接回原来那段对话，不会变成新访客） */
+    let healingToken = false;
+    const healToken = async () => {
+      if (healingToken) return;
+      healingToken = true;
+      try { await startSession({}); } catch (e) {}
+      finally { setTimeout(() => { healingToken = false; }, 3000); }
+    };
     const pollOnce = async () => {
       if (!sessionId.value) return;
       try {
-        const r = await fetch((window.KF_API_BASE||'') + '/api/poll?session=' + sessionId.value + '&sinceMsg=' + maxMsgId.value + '&visitor_token=' + encodeURIComponent(loadToken())).then(x => x.json());
+        const res = await fetch((window.KF_API_BASE||'') + '/api/poll?session=' + sessionId.value + '&sinceMsg=' + maxMsgId.value + '&visitor_token=' + encodeURIComponent(loadToken()));
+        /* v2.90.21 令牌丢了（换了落地域名 / 清了缓存 / 老页面被恢复）时服务器会回 403「会话已失效」，
+           以前这情况页面就静默死掉（客户看着像"网络出错"）。现在自动重新接入一次，把令牌补回来继续聊。 */
+        if (res.status === 403) { await healToken(); return; }
+        const r = await res.json();
         pushMessages(r.messages || []);
         if (r.agent_avatar) agentAvatar.value = r.agent_avatar;
         // v2.65 废码自动断开：客服码被换/删、租户停用或到期 → 服务器断开连接（原生错误页）
@@ -501,7 +513,9 @@ createApp({
       if (pollTimer !== null) return;
       const probe = async () => {
         try {
-          const r = await fetch((window.KF_API_BASE || '') + '/api/poll?session=' + sessionId.value + '&sinceMsg=' + maxMsgId.value + '&light=1&visitor_token=' + encodeURIComponent(loadToken())).then(x => x.json());
+          const pres = await fetch((window.KF_API_BASE || '') + '/api/poll?session=' + sessionId.value + '&sinceMsg=' + maxMsgId.value + '&light=1&visitor_token=' + encodeURIComponent(loadToken()));
+          if (pres.status === 403) { await healToken(); pollTimer = null; startPoll(); return; }
+          const r = await pres.json();
           if (r.new) { pollTimer = null; startPoll(); return; }
         } catch (e) {}
         if (pollTimer === null) return;

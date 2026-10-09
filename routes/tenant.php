@@ -278,6 +278,8 @@ function handle_tenant_settings(string $method): void
             'footer_text'     => ts_get($tid, 'footer_text', ''),
             // 「请求访客上传图片」话术（客服在工作台点该按钮时发给访客的文案）
             'ask_image_text'  => ts_get($tid, 'ask_image_text', '方便的话，请上传一下相关图片，帮您更快定位问题～'),
+            /* v2.90.21 快捷消息点击行为：direct=单击直接发送（默认） / edit=单击只填入输入框，编辑后再手动发 */
+            'quick_send_mode' => ts_get($tid, 'quick_send_mode', 'direct'),
             // 公告（访客端顶部横幅）—— v2.78 默认开 + 默认文案
             'notice_on'      => ts_get($tid, 'notice_on', '1') === '1',
             'notice_text'    => ts_get($tid, 'notice_text', '不要关闭此网页，若退出请先复制浏览器打开'),
@@ -349,6 +351,10 @@ function handle_tenant_settings(string $method): void
         }
         if (array_key_exists('ip_limit_count', $data)) {
             ts_set($tid, 'ip_limit_count', (string)max(1, min(100, (int)$data['ip_limit_count'])));
+        }
+        /* v2.90.21 快捷消息点击行为：direct=单击直接发送（默认） / edit=单击填入输入框，编辑后再发 */
+        if (array_key_exists('quick_send_mode', $data)) {
+            ts_set($tid, 'quick_send_mode', ((string)$data['quick_send_mode'] === 'edit') ? 'edit' : 'direct');
         }
         // 枚举键校验
         $enums = [
