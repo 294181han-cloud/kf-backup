@@ -1299,9 +1299,10 @@
             <div style="margin-bottom:14px;"><el-switch v-model="sec.dedup_on" active-text="访客去重：同一访客 24 小时内多次进入只接待一次（复用会话，不占新额度）"></el-switch></div>
             <!-- v2.90 同 IP 自动接回：客户换浏览器/清缓存/换入口时不再多开窗口 -->
             <div style="margin-bottom:14px;">
-              <el-switch v-model="sec.ip_merge_on" active-text="同 IP 自动合并：同一个 IP + 同一浏览器 24 小时内再进来，接回原来那段对话（不多开窗口、不占新额度）"></el-switch>
+              <el-switch v-model="sec.ip_merge_on" active-text="同 IP 自动合并：同一个 IP 24 小时内再进来，直接接回原来那段对话（不多开窗口、不占新额度）"></el-switch>
               <div class="muted" style="font-size:11.5px;line-height:1.7;margin-top:4px;">
-                同一个 WiFi / 同一个基站下如果有许多不同客户，建议关掉这个开关，避免他们互相看到对方的对话。
+                只看 IP：同一个 WiFi / 同一个基站出口下如果有许多不同客户，建议关掉这个开关，避免他们互相看到对方的对话。
+                手机流量每次连接 IP 会变，那两条（IP 不同）只能手动合并：右键会话 →「合并到当前会话」。
               </div>
             </div>
             <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px;flex-wrap:wrap;">
