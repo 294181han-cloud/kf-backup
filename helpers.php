@@ -2637,7 +2637,7 @@ function gate_loader_html(string $apiBase = ''): string
         . 'document.body.appendChild(f);'
         . 'if(rdy)clearTimeout(rdy);'
         /* v2.89.2 4.5 秒还在转就先说一句「网络较慢，正在重试」，别让人对着「正在进入…」发呆 */
-        . 'setTimeout(function(){if(okIn)return;if(box){var p1=box.querySelector("div");if(p1&&!done)p1.textContent="网络较慢，正在重试…";}},4500);'
+        . 'setTimeout(function(){if(okIn||done)return;if(box)box.textContent="网络较慢，正在重试…";},4500);'
         . 'rdy=setTimeout(function(){if(okIn)return;reportErr("frame-timeout",chost);'
         . 'if(!retried){retried=true;try{f.parentNode.removeChild(f)}catch(e){}ask(0);return;}'
         . 'msg("网络较慢，没能进入聊天页，请点击重试");},7000);}'
