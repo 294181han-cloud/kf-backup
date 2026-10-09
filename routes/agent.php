@@ -40,11 +40,13 @@ function session_scope_sql(string $scope): string
 function session_spoken_sql(): string
 {
     /* v2.86 访客刚扫码进来、人还在线（有心跳）就出现在列表里 —— 不用等对方先发消息；
-       点了下就走的（一句话没说、心跳也过期了）不再占列表位置。
-       以前是「必须访客说过话才显示」，客户扫码后客服这边要等半天才看到人。 */
-    $secs = (int)(config()['session_online_secs'] ?? 180);
+       v2.88.3 一句话都没说的也别「待会就没了」：24 小时内一直留在列表里
+       （客户扫码进来后可能先放着不说话，客服正看着聊天窗呢突然空了会被吓一跳）。
+       超过 24 小时还是没说话、人也早就走了的，才不再占列表位置。 */
+    $secs = (int)(config()['n'] ?? 180);   // 'n' = 访客心跳多少秒内算在线（见 config.php）
     return " AND (EXISTS (SELECT 1 FROM messages m WHERE m.session_id = s.id AND m.from_type = 'visitor')
-        OR (s.last_online_at IS NOT NULL AND s.last_online_at > DATE_SUB(NOW(), INTERVAL " . $secs . " SECOND)))";
+        OR (s.last_online_at IS NOT NULL AND s.last_online_at > DATE_SUB(NOW(), INTERVAL " . $secs . " SECOND))
+        OR s.created_at > DATE_SUB(NOW(), INTERVAL 24 HOUR))";
 }
 
 /** 已结束会话自动清理（poll 时懒执行；closed_keep_days=0 表示永久保留） */

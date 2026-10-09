@@ -242,7 +242,16 @@ const app = createApp({
       quick: '快捷消息', auto: '智能回复', agents: '坐席管理', broadcast: '群发模板', links: '获客码',
       setting: '设置 · ' + ((SET_ITEMS.find(x => x.v === setTab.value) || {}).n || ''),
     }[tab.value]));
-    const current = computed(() => sessions.value.find(s => s.id === currentId.value) || null);
+    /* v2.88.3 正在聊的会话不要因为「列表里暂时没有它」就整块变空：
+       以前列表刷新（切页签、会话暂时被过滤掉）会让 current 变 null，聊天区突然变成"选择左侧会话开始接待"。
+       现在保留一份快照，只要聊天没换人，面板就一直留着。 */
+    const curSnap = ref(null);
+    const current = computed(() => {
+      const hit = sessions.value.find(s => s.id === currentId.value);
+      if (hit) return hit;
+      return (curSnap.value && curSnap.value.id === currentId.value) ? curSnap.value : null;
+    });
+    Vue.watch(current, (v) => { if (v) curSnap.value = v; });
     const filteredSessions = computed(() => {
       const q = sessSearch.value.trim().toLowerCase();
       if (!q) return sessions.value;
