@@ -336,10 +336,10 @@ createApp({
               noteResume(r);
               page.value = 'chat';
               await loadHistory();
-              // v2.53 修 bug：这条「恢复已有会话」的分支原来**完全不调欢迎语接口**，
-              // 于是"客服结束会话后访客重新进来 / 换设备后重新扫码"这类新建的会话就收不到欢迎语。
-              // 服务端本身按 welcome_sent 做了幂等（trig=once 不会重发），这里可以放心调。
-              await sendWelcome({});
+              /* v2.90.9 接回原来的会话就不再发欢迎语了（v2.53 时这里必须调，是为了
+                 "客服结束后重新进来 / 换设备重新扫码"这种**新建**会话也能收到欢迎语——
+                 现在服务端会告诉我们这次是接回（reused）还是新建，接回就不发）。 */
+              if (!r.reused) await sendWelcome({});
               startPoll();
               return;
             }
@@ -400,8 +400,8 @@ createApp({
       if (r.visitor_avatar) myAvatar.value = r.visitor_avatar;
       page.value = 'chat';
       await loadHistory();
-      // 欢迎语
-      await sendWelcome(extra);
+      // 欢迎语：只有**这次新建出来的会话**才发（接回同 IP 的老会话不发）
+      if (!r.reused && !r.reused_by_ip) await sendWelcome(extra);
       await pollOnce();
       startPoll();
     };

@@ -92,6 +92,8 @@ function handle_sessions(string $method): void
     $pdo = db();
     $cfg = config();
     $scope = in_array((string)input('scope', 'online'), ['online', 'archived', 'closed', 'trash'], true) ? (string)input('scope', 'online') : 'online';
+    // v2.90.9 打开在线列表时顺手把同 IP + 同设备的重复窗口自动合成一条（不用客服手点）
+    if ($scope === 'online') auto_merge_duplicates($ctx, 3);
     $onlineSql = "CASE WHEN s.status IN ('closed','archived') THEN s.status
         WHEN s.last_online_at IS NOT NULL AND s.last_online_at > DATE_SUB(NOW(), INTERVAL " . (int)$cfg['session_online_secs'] . " SECOND) THEN 'online'
         ELSE 'offline' END";
@@ -344,11 +346,21 @@ function session_merge_into(array $ctx, int $target, int $from): array
         // 联系方式：目标没有的才补，别把已有的覆盖掉
         $q = $pdo->prepare('SELECT type, value FROM contacts WHERE session_id = ? AND tenant_id = ?');
         $q->execute([$from, $tid]);
-        $ins = $pdo->prepare('INSERT INTO contacts (tenant_id, session_id, type, value, updated_at) VALUES (?,?,?,?,?) ON DUPLICATE KEY UPDATE value = VALUES(value)');
+        $ins = $pdo->prepare('INSERT INTO contacts (tenant_id, session_id, type, value, updated_at) VALUES (?,?,?,?,?) ON DUPLICATE KEY UPDATE value = VALUES(value), updated_at = VALUES(updated_at)');
+        $hasT = $pdo->prepare('SELECT value FROM contacts WHERE session_id = ? AND type = ? LIMIT 1');
         foreach ($q->fetchAll() as $c) {
-            $has = $pdo->prepare('SELECT 1 FROM contacts WHERE session_id = ? AND type = ? LIMIT 1');
-            $has->execute([$target, $c['type']]);
-            if (!$has->fetch()) $ins->execute([$tid, $target, $c['type'], $c['value'], now_dt()]);
+            $cType = (string)$c['type'];
+            $cVal  = trim((string)$c['value']);
+            if ($cVal === '') continue;
+            $hasT->execute([$target, $cType]);
+            $cur = $hasT->fetchColumn();
+            $cur = ($cur === false) ? '' : trim((string)$cur);
+            if ($cur === '') {
+                $ins->execute([$tid, $target, $cType, $cVal, now_dt()]);
+            } elseif ($cType === 'note' && $cur !== $cVal && !str_contains($cur, $cVal)) {
+                /* v2.90.8 备注不丢：两边都写了备注就拼起来（人工写的东西比会话本身值钱） */
+                $ins->execute([$tid, $target, 'note', mb_substr($cur . '；' . $cVal, 0, 200), now_dt()]);
+            }
         }
         $pdo->prepare('DELETE FROM contacts WHERE session_id = ? AND tenant_id = ?')->execute([$from, $tid]);
         $pdo->prepare('DELETE FROM welcome_sent WHERE session_id = ? AND tenant_id = ?')->execute([$from, $tid]);
@@ -378,6 +390,45 @@ function session_merge_into(array $ctx, int $target, int $from): array
     return ['moved' => $moved, 'from_name' => $fa['visitor_name'], 'into_name' => $ta['visitor_name']];
 }
 
+/** v2.90.9「同 IP 自动合并」：不用客服手点，列表/轮询时顺手把重复窗口收成一条。
+ *  判定跟「同 IP 自动接回」一致：同一个 IP + 同一台设备（同系统/机型）+ 24 小时 + 还没结束；
+ *  保留每个分组里最近的那条，其余并进去（消息、备注都保留，被并掉的窗口靠别名继续能用）。
+ *  开关也是访客策略里的 ip_merge_on —— 关掉就完全不自动合，只能手点。
+ *  返回这次合掉的条数。 */
+function auto_merge_duplicates(array $ctx, int $maxGroups = 3): int
+{
+    if ($ctx['role'] !== 'tenant') return 0;
+    $tid = (int)$ctx['tenant_id'];
+    if (ts_get($tid, 'ip_merge_on', '1') !== '1') return 0;
+    if (!function_exists('session_merge_into')) return 0;
+    $merged = 0;
+    try {
+        $pdo = db();
+        $st = $pdo->prepare("SELECT id, ip, ua FROM v_sessions
+            WHERE tenant_id = ? AND deleted_at IS NULL AND status <> 'closed' AND ip <> ''
+              AND last_time >= ?
+            ORDER BY id ASC LIMIT 500");
+        $st->execute([$tid, now_dt(time() - 86400)]);
+        $groups = [];
+        foreach ($st->fetchAll() as $row) {
+            $tag = (string)(parse_ua((string)($row['ua'] ?? ''))['dev_tag'] ?? '');
+            // v2.90.9 按 id 升序 → 每组里第一条就是**最初那条**，合并都往它上面并
+            $groups[(string)$row['ip'] . "\t" . $tag][] = (int)$row['id'];
+        }
+        $done = 0;
+        foreach ($groups as $ids) {
+            if (count($ids) < 2) continue;
+            $keep = (int)array_shift($ids);
+            foreach ($ids as $fid) {
+                try { session_merge_into($ctx, $keep, (int)$fid); $merged++; }
+                catch (\Throwable $e) { /* 单条失败不影响其它 */ }
+            }
+            if (++$done >= max(1, $maxGroups)) break;
+        }
+    } catch (\Throwable $e) { /* 自动合并失败不影响列表 */ }
+    return $merged;
+}
+
 /** v2.90「同 IP 一键合并」：把同一个 IP、还没结束的其它会话全部并进当前这条（客户换浏览器/清缓存
  *  造成的重复窗口，一键收成一段；合并后消息都在，访客端刷新后看到的也是合并后的完整记录）。 */
 function handle_sessions_merge_by_ip(string $method): void
@@ -396,7 +447,8 @@ function handle_sessions_merge_by_ip(string $method): void
             GROUP BY ip HAVING c > 1 ORDER BY c DESC LIMIT 50");
         foreach ($st->fetchAll() as $g) {
             $ipG = (string)$g['ip'];
-            $pick = $pdo->prepare("SELECT id FROM v_sessions WHERE tenant_id = ? AND deleted_at IS NULL AND status <> 'closed' AND ip = ? ORDER BY last_time DESC LIMIT 1");
+            // v2.90.9 保留**最初那条**（id 最小），其余并进去
+            $pick = $pdo->prepare("SELECT id FROM v_sessions WHERE tenant_id = ? AND deleted_at IS NULL AND status <> 'closed' AND ip = ? ORDER BY id ASC LIMIT 1");
             $pick->execute([$tid, $ipG]);
             $keep = (int)$pick->fetchColumn();
             if ($keep <= 0) continue;
@@ -415,19 +467,26 @@ function handle_sessions_merge_by_ip(string $method): void
     $ta = session_of($ctx, $target);
     $ip = trim((string)($ta['ip'] ?? ''));
     if ($ip === '') json_error('这条会话没有 IP，无法按 IP 合并');
+    /* v2.90.9 右键「合并同 IP 的会话」：一律并进同 IP 里**最初那条**（客户第一次进来那条），
+       这样名称、创建时间、接待客服、备注都留在最初那条上，后来的重复窗口才消失。 */
     $st = $pdo->prepare("SELECT id FROM v_sessions WHERE tenant_id = ? AND deleted_at IS NULL AND ip = ?
-        AND status <> 'closed' AND id <> ? ORDER BY last_time DESC LIMIT 20");
-    $st->execute([$tid, $ip, $target]);
+        AND status <> 'closed' ORDER BY id ASC LIMIT 21");
+    $st->execute([$tid, $ip]);
     $ids = array_map('intval', $st->fetchAll(PDO::FETCH_COLUMN));
+    if (!$ids) json_error('这个 IP 下没有未结束的会话');
+    $keep = (int)$ids[0];
+    $keepRow = session_of($ctx, $keep);
     $merged = 0; $moved = 0;
     foreach ($ids as $fid) {
+        if ($fid === $keep) continue;
         try {
-            $r = session_merge_into($ctx, $target, $fid);
+            $r = session_merge_into($ctx, $keep, $fid);
             $moved += (int)$r['moved'];
             $merged++;
         } catch (\Throwable $e) { /* 单条失败不影响其它 */ }
     }
-    json_out(['ok' => true, 'merged' => $merged, 'moved' => $moved, 'ip' => $ip]);
+    json_out(['ok' => true, 'merged' => $merged, 'moved' => $moved, 'ip' => $ip,
+        'target' => $keep, 'target_name' => (string)($keepRow['visitor_name'] ?? '')]);
 }
 
 /* v2.60.13 工作台用恢复码找回会话：客户报一串恢复码，客服在这里输入就能直接跳到那段对话
@@ -1189,6 +1248,8 @@ function handle_agent_poll(string $method): void
     // 已结束会话自动清理（懒执行；closed_keep_days=0 永久保留）
     try { cleanup_closed_sessions($ctx['tenant_id']); } catch (\Throwable $e) {}
     $scope = in_array((string)input('scope', 'online'), ['online', 'archived', 'closed', 'trash'], true) ? (string)input('scope', 'online') : 'online';
+    // v2.90.9 轮询时也顺手自动合并重复窗口（每轮最多 2 组，避免拖慢轮询）
+    if ($scope === 'online') auto_merge_duplicates($ctx, 2);
     $onlineSql = "CASE WHEN s.status IN ('closed','archived') THEN s.status
         WHEN s.last_online_at IS NOT NULL AND s.last_online_at > DATE_SUB(NOW(), INTERVAL " . (int)$cfg['session_online_secs'] . " SECOND) THEN 'online'
         ELSE 'offline' END";

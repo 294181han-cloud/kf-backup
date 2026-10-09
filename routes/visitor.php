@@ -453,12 +453,21 @@ function handle_visitor_welcome(string $method): void
     $sid = session_alias_follow($sid);   // v2.90.2 老窗口（已被合并）也能发欢迎语到合并后的会话
 
     $pdo = db();
-    $st = $pdo->prepare('SELECT tenant_id, ip FROM v_sessions WHERE id = ?');
+    $st = $pdo->prepare('SELECT tenant_id, ip, created_at FROM v_sessions WHERE id = ?');
     $st->execute([$sid]);
     $s = $st->fetch();
     if (!$s) json_error('会话不存在', 400);
     $tid = (int)$s['tenant_id'];
     if (is_ip_blocked($tid, $s['ip'] ?: get_client_ip())) json_error('您的访问受限', 403);
+
+    /* v2.90.9 同 IP 接回 / 老会话复用，不再重复发欢迎语：
+       只有「这次访问刚建出来的会话」才发。否则客户从微信切浏览器、隔几分钟再扫码进来，
+       会话被接回同一条，欢迎语却又发了一遍（客服那边看着像客户刚来）。
+       触发时机：访客页拿到 session_id 后立刻调这个接口，新会话的 created_at 就在几秒内。 */
+    $createdTs = strtotime((string)($s['created_at'] ?? '')) ?: 0;
+    if ($createdTs <= 0 || (time() - $createdTs) > 120) {
+        json_out(['sent' => false, 'reason' => '老会话不重复发欢迎语', 'reused' => true]);
+    }
 
     $msgs = db()->query('SELECT * FROM welcome_msgs WHERE tenant_id = ' . $tid . ' AND enabled = 1 ORDER BY sort ASC, id ASC LIMIT 5')->fetchAll();
     if (!$msgs) json_out(['sent' => false, 'reason' => '没有可用的欢迎语']);
