@@ -16,6 +16,7 @@ createApp({
     const mintVisible = ref(false);
     const mintRow = ref(null);
     const mintSkipRed = ref(false);
+    const mintReplace = ref(false);
     const mintBusy = ref(false);
     const mintResult = ref(null);
 
@@ -309,14 +310,14 @@ createApp({
     /* v2.90.10 批量发码：给这个租户在域名池每台域名上各发一条客服码（可以连红名单一起发），
        发完就在他自己工作台「管理码」里，想用哪条用哪条。 */
     const openMint = (row) => {
-      mintRow.value = row; mintResult.value = null; mintSkipRed.value = false; mintVisible.value = true;
+      mintRow.value = row; mintResult.value = null; mintSkipRed.value = false; mintReplace.value = false; mintVisible.value = true;
     };
     const doMint = async () => {
       if (!mintRow.value) return;
       mintBusy.value = true;
       try {
         const r = await API.post('/api/admin/tenants/' + mintRow.value.id + '/mint-codes',
-          { skip_red: mintSkipRed.value ? 1 : 0 });
+          { skip_red: mintSkipRed.value ? 1 : 0, replace_all: mintReplace.value ? 1 : 0 });
         mintResult.value = r;
         ElementPlus.ElMessage.success('已发 ' + (r.created_count || 0) + ' 条客服码');
         await loadTenants();
@@ -462,7 +463,7 @@ createApp({
       pkgVisible, pkgForm, pkgSaving, openPkg, savePkg, delPkg, tgOrder,
       barWidth, locationOrigin,
       dlgVisible, dlgMode, dlg, dlgSaving, openCreate, openEdit, saveTenant, toggleTenant, delTenant,
-      mintVisible, mintRow, mintSkipRed, mintBusy, mintResult, openMint, doMint,
+      mintVisible, mintRow, mintSkipRed, mintReplace, mintBusy, mintResult, openMint, doMint,
       createdVisible, created, copyCreated, openGen, genVisible, genPair, doGen, fillGenKami, openTrial,
       addDomain, toggleDomain, delDomain, blockDomain, saveRootDomain, saveDefaults, changePw, logout, isExpired,
     };

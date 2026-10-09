@@ -660,8 +660,10 @@
       <div class="muted" style="font-size:12px;color:#86909c;line-height:1.7;margin-top:6px;">
         不勾选 = 红的也一起发（微信里打不开，但走抖音 / 浏览器 / QQ 渠道没问题）。
       </div>
+      <el-checkbox v-model="mintReplace" style="margin-top:10px;">先删掉这个账号现有的全部客服码（不可恢复，客户端里那张旧二维码立刻失效）</el-checkbox>
     </div>
     <div v-if="mintResult" style="margin-top:14px;background:#f7f8fa;border-radius:8px;padding:12px;font-size:13px;line-height:1.9;max-height:220px;overflow:auto;">
+      <div v-if="mintResult.removed" style="color:#f53f3f;margin-bottom:6px;">已删除旧客服码 {{ mintResult.removed }} 条</div>
       <div v-for="c in mintResult.created" :key="c.code">
         <b class="mono">{{ c.domain }}</b> → <span class="mono">{{ c.code }}</span>
       </div>
@@ -681,6 +683,6 @@
 <script src="/assets/vendor/vue.global.js?v=2.0.1"></script>
 <script src="/assets/vendor/element-plus.js?v=2.0.1"></script>
 <script src="/assets/api.js?v=2.1.1"></script>
-<script src="/assets/js/admin.js?v=2.10.2"></script>
+<script src="/assets/js/admin.js?v=2.10.3"></script>
 </body>
 </html>

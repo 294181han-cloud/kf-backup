@@ -24,6 +24,8 @@ function handle_admin_tenant_mint_codes(string $method, int $id): void
 
     $skipRed = (string)input('skip_red', '1') === '1';
     $force   = (string)input('force', '0') === '1';
+    /* v2.90.12 replace_all=1：先把这个账号现有的客服码全部删掉，只留这次发出来的（用户要求） */
+    $replaceAll = (string)input('replace_all', '0') === '1';
 
     $doms = [];
     foreach ($pdo->query('SELECT domain FROM domain_pool WHERE enabled = 1 ORDER BY id ASC') as $r) {
@@ -44,6 +46,15 @@ function handle_admin_tenant_mint_codes(string $method, int $id): void
     }
 
     $created = []; $skippedRed = []; $already = []; $failed = [];
+    $removed = 0;
+    if ($replaceAll) {
+        try {
+            $del = $pdo->prepare('DELETE FROM service_codes WHERE tenant_id = ?');
+            $del->execute([$id]);
+            $removed = $del->rowCount();
+            $have = [];   // 旧码已经清空，下面按域名重新铺
+        } catch (\Throwable $e) { json_error('清空旧码失败：' . $e->getMessage(), 500); }
+    }
     foreach ($doms as $d) {
         if ($skipRed && domain_in_red_list($d)) { $skippedRed[] = $d; continue; }
         if (!$force && !empty($have[$d])) { $already[] = $d; continue; }
@@ -54,6 +65,7 @@ function handle_admin_tenant_mint_codes(string $method, int $id): void
     json_out([
         'ok' => true,
         'tenant' => ['id' => (int)$t['id'], 'kami' => (string)$t['kami']],
+        'removed' => $removed,
         'created' => $created, 'created_count' => count($created),
         'skip_red' => $skippedRed, 'already' => $already, 'failed' => $failed,
     ]);
