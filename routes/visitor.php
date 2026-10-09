@@ -215,6 +215,10 @@ function handle_visitor_init(string $method): void
     $pdo = db();
     $now = now_dt();
     $visitorToken = trim((string)input('visitor_token', ''));
+    /* v2.90.13 这次进来用的是哪条客服码——复用时必须写回会话，见下面两处 UPDATE。
+       之前不写回：客户拿新码进来接了旧会话，会话里挂的还是老码；老码一旦被删（换码/批量换码），
+       轮询的「废码自动断开」就把他踢掉（页面上表现为刚进来就"链接已失效"、跳 /refused）。 */
+    $curCode = trim((string)input('code', ''));
 
     // ① 复用该租户下最近未关闭会话；开启「访客去重」时 24 小时内的已关闭会话也复用（重开，不占新额度）
     if ($visitorToken !== '') {
@@ -229,12 +233,14 @@ function handle_visitor_init(string $method): void
         $old = $st->fetch();
         if ($old) {
             $sid = (int)$old['id'];
+            $keepCode = $curCode !== '' ? $curCode : (string)($old['code'] ?? '');
             if ($old['status'] === 'closed') {
-                $pdo->prepare("UPDATE v_sessions SET status = 'online', last_online_at = ? WHERE id = ?")->execute([$now, $sid]);
+                $pdo->prepare("UPDATE v_sessions SET status = 'online', last_online_at = ?, code = ? WHERE id = ?")->execute([$now, $keepCode, $sid]);
                 $old['status'] = 'online';
             } else {
-                $pdo->prepare('UPDATE v_sessions SET last_online_at = ? WHERE id = ?')->execute([$now, $sid]);
+                $pdo->prepare('UPDATE v_sessions SET last_online_at = ?, code = ? WHERE id = ?')->execute([$now, $keepCode, $sid]);
             }
+            $old['code'] = $keepCode;
             json_out([
                 'session_id' => $sid,
                 'visitor_token' => $visitorToken,
@@ -330,9 +336,11 @@ function handle_visitor_init(string $method): void
             }
             if ($same) {
                 $sidSame = (int)$same['id'];
-                $pdo->prepare('UPDATE v_sessions SET visitor_token = ?, last_online_at = ? WHERE id = ?')
-                    ->execute([$visitorToken, $now, $sidSame]);
+                $keepCode = $curCode !== '' ? $curCode : (string)($same['code'] ?? '');
+                $pdo->prepare('UPDATE v_sessions SET visitor_token = ?, last_online_at = ?, code = ? WHERE id = ?')
+                    ->execute([$visitorToken, $now, $keepCode, $sidSame]);
                 $same['visitor_token'] = $visitorToken;
+                $same['code'] = $keepCode;
                 json_out([
                     'session_id' => $sidSame,
                     'visitor_token' => $visitorToken,
