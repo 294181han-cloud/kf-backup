@@ -25,6 +25,8 @@
       🔀 合并到当前会话<div class="ctx-sub">把这条的聊天记录并进「{{ current ? current.name : '' }}」，只留一条</div>
     </div>
     <div class="ctx-item" @click="ctxMenuBlock">🚫 拉黑访客<div class="ctx-sub">拉黑该 IP，之后进不来也发不了消息</div></div>
+    <!-- v2.90 同 IP 一键合并（客户换浏览器/清缓存后出现的第二个窗口） -->
+    <div class="ctx-item" @click="ctxMenuMergeIp">🔗 合并同 IP 的会话<div class="ctx-sub">把同一个 IP 名下其它没结束的窗口并进来，记录一条不丢</div></div>
     <div class="ctx-divider"></div>
     <div class="ctx-item danger" @click="ctxMenuDelete">🗑️ 删除会话<div class="ctx-sub">彻底删除，腾出会话额度</div></div>
     <div class="ctx-item" v-if="sessScope==='online'" @click="ctxMenuArchive">📦 归档会话</div>
@@ -1295,6 +1297,13 @@
           <div class="panel">
             <div class="panel-title">访问策略</div>
             <div style="margin-bottom:14px;"><el-switch v-model="sec.dedup_on" active-text="访客去重：同一访客 24 小时内多次进入只接待一次（复用会话，不占新额度）"></el-switch></div>
+            <!-- v2.90 同 IP 自动接回：客户换浏览器/清缓存/换入口时不再多开窗口 -->
+            <div style="margin-bottom:14px;">
+              <el-switch v-model="sec.ip_merge_on" active-text="同 IP 自动合并：同一个 IP + 同一浏览器 24 小时内再进来，接回原来那段对话（不多开窗口、不占新额度）"></el-switch>
+              <div class="muted" style="font-size:11.5px;line-height:1.7;margin-top:4px;">
+                同一个 WiFi / 同一个基站下如果有许多不同客户，建议关掉这个开关，避免他们互相看到对方的对话。
+              </div>
+            </div>
             <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px;flex-wrap:wrap;">
               <el-switch v-model="sec.ip_limit_on" active-text="IP 频率限制："></el-switch>
               <el-input-number v-model="sec.ip_limit_count" :min="1" :max="100" size="small" :disabled="!sec.ip_limit_on"></el-input-number>
@@ -1322,6 +1331,13 @@
               <span style="flex:1;">重新解析访客地区（清空后由工作台自动慢慢补全）</span>
               <el-popconfirm title="把已有会话的地区清空、按新算法重新解析？" @confirm="refreshGeo">
                 <template #reference><el-button size="small" plain>重新解析</el-button></template>
+              </el-popconfirm>
+            </div>
+            <!-- v2.90 历史遗留的「同一个人两个窗口」一键收成一段 -->
+            <div class="link-line">
+              <span style="flex:1;">合并同 IP 的重复会话（客户换浏览器/清缓存留下的多个窗口）</span>
+              <el-popconfirm title="把所有同 IP、还没结束的重复会话合并成一段？聊天记录会全部保留。" @confirm="mergeAllByIp">
+                <template #reference><el-button size="small" plain>一键合并</el-button></template>
               </el-popconfirm>
             </div>
           </div>

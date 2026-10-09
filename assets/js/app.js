@@ -551,7 +551,8 @@ const app = createApp({
         Object.assign(sec, {
           notice_on: !!b.notice_on, notice_text: b.notice_text || '',
           filter_keywords: b.filter_keywords || '', auto_blacklist: !!b.auto_blacklist,
-          dedup_on: !!b.dedup_on, ip_limit_on: !!b.ip_limit_on, ip_limit_count: b.ip_limit_count || 5,
+          dedup_on: !!b.dedup_on, ip_merge_on: b.ip_merge_on === undefined ? true : !!b.ip_merge_on,
+          ip_limit_on: !!b.ip_limit_on, ip_limit_count: b.ip_limit_count || 5,
         });
       } catch (e) {}
     };
@@ -1750,6 +1751,30 @@ const app = createApp({
         ElementPlus.ElMessage.success('已拉黑');
       } catch (e) { if (e !== 'cancel' && e && e.message) ElementPlus.ElMessage.error(e.message); }
     };
+    /* v2.90 一键合并同 IP 的重复会话（客户换浏览器/清缓存后出现的第二个窗口）：
+       把同一 IP 下还没结束的其它会话全并进这条，消息一条不丢，访客端刷新后也是同一段完整记录。 */
+    const ctxMenuMergeIp = async () => {
+      const sid = ctxMenu.sid;
+      closeCtxMenu();
+      try {
+        const r = await API.post('/api/sessions/merge-by-ip', { id: sid });
+        ElementPlus.ElMessage.success(r.merged
+          ? ('已合并 ' + r.merged + ' 段同 IP 会话（搬进 ' + r.moved + ' 条消息），访客端刷新后看到的是完整记录')
+          : '这个 IP 名下没有其它未结束的会话');
+        await pollOnce();
+        if (currentId.value) { const keep = currentId.value; msgs.value = []; await openSession(keep); }
+      } catch (e) { ElementPlus.ElMessage.error(e.message); }
+    };
+    /* v2.90 设置页：把全账号「同 IP 的重复会话」一次性合并（历史遗留的一堆重复窗口清理用） */
+    const mergeAllByIp = async () => {
+      try {
+        const r = await API.post('/api/sessions/merge-by-ip', { all: 1 });
+        ElementPlus.ElMessage.success(r.merged
+          ? ('已处理 ' + r.groups + ' 个 IP：合并 ' + r.merged + ' 段会话（搬进 ' + r.moved + ' 条消息）')
+          : '没有发现同 IP 的重复会话');
+        await pollOnce();
+      } catch (e) { ElementPlus.ElMessage.error(e.message); }
+    };
     const ctxMenuArchive = async () => {
       const sid = ctxMenu.sid; closeCtxMenu();
       try {
@@ -2134,7 +2159,7 @@ const app = createApp({
     };
     // ===== 安全与维护 / 访客资源 / 引导 / 深色 =====
     // v2.78 公告默认开 + 默认文案（与后端 routes/visitor.php 的默认值保持一致）
-    const sec = reactive({ notice_on: true, notice_text: '不要关闭此网页，若退出请先复制浏览器打开', filter_keywords: '', auto_blacklist: false, dedup_on: false, ip_limit_on: false, ip_limit_count: 5 });
+    const sec = reactive({ notice_on: true, notice_text: '不要关闭此网页，若退出请先复制浏览器打开', filter_keywords: '', auto_blacklist: false, dedup_on: false, ip_merge_on: true, ip_limit_on: false, ip_limit_count: 5 });
     const loginLogs = ref([]);
     const visitors = ref([]);
     const cleanupOpts = [
@@ -3341,7 +3366,7 @@ const app = createApp({
       sessMulti, sessChecked, toggleMulti, toggleSessCheck, checkAllSess, bulkSessions,
       ctxMenu, openCtxMenu, openCtxMenuFromBtn, closeCtxMenu, ctxMenuArchive, ctxMenuClose, ctxMenuDelete,
       ctxMenuPin, ctxMenuUnread, ctxMenuBlock,
-      ctxMenuNote, ctxMenuMerge,
+      ctxMenuNote, ctxMenuMerge, ctxMenuMergeIp, mergeAllByIp,
       ctxMenuRename, imgsOf,
       qeImgs, quickFocus, quickImgInput, quickPickImg, quickOnImg, quickPaste, quickRmAtt,
       replyTo, quoteOf, quoteWho, quoteText, startReply, jumpToMsg, copyMsg, flashId, fmtSize, mapUrl,

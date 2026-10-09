@@ -306,6 +306,34 @@ function handle_visitor_init(string $method): void
     $fromUrl = mb_substr((string)input('from_url', '直接访问'), 0, 255) ?: '直接访问';
     if ($visitorToken === '') $visitorToken = 'vt_' . bin2hex(random_bytes(8));
 
+    /* v2.90「同 IP 自动接回」：同一个租户 + 同一个 IP + 同一个浏览器标识 + 24 小时内、还没结束的会话
+       → 这次访问直接接到那段会话上（客户换浏览器/清了缓存/从另一个入口进来，客服那边都不会再多一个窗口，
+       客户那边看到的也是同一段完整记录）。开关：访客策略 → ip_merge_on（默认开）；
+       同一 WiFi 下不同客户想各自分开，就把这个开关关掉。 */
+    if (ts_get($tid, 'ip_merge_on', '1') === '1') {
+        try {
+            $uaNow = mb_substr((string)($_SERVER['HTTP_USER_AGENT'] ?? ''), 0, 200);
+            $st = $pdo->prepare("SELECT * FROM v_sessions WHERE tenant_id = ? AND deleted_at IS NULL AND ip = ?
+                AND status <> 'closed' AND last_time >= ? ORDER BY last_time DESC LIMIT 1");
+            $st->execute([$tid, $ip, now_dt(time() - 86400)]);
+            $same = $st->fetch();
+            if ($same && trim((string)($same['ua'] ?? '')) === trim($uaNow)) {
+                $sidSame = (int)$same['id'];
+                $pdo->prepare('UPDATE v_sessions SET visitor_token = ?, last_online_at = ? WHERE id = ?')
+                    ->execute([$visitorToken, $now, $sidSame]);
+                $same['visitor_token'] = $visitorToken;
+                json_out([
+                    'session_id' => $sidSame,
+                    'visitor_token' => $visitorToken,
+                    'reused' => true,
+                    'reused_by_ip' => true,
+                    'visitor_avatar' => visitor_avatar_resolve($sidSame, (string)($same['visitor_avatar'] ?? '')),
+                    'session' => visitor_session_out($same),
+                ]);
+            }
+        } catch (\Throwable $e) { /* 查不到就正常新建 */ }
+    }
+
     // 访客头像/昵称策略
     $headType = ts_get($tid, 'user_head_type', 'default');
     $visitorAvatar = '';

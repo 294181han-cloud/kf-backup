@@ -320,6 +320,15 @@ function handle_session_merge(string $method, array $m): void
     if ($ctx['role'] !== 'tenant') json_error('仅租户可合并会话', 403);
     $from = (int)input('from', 0);
     if ($from <= 0 || $from === $target) json_error('参数不对');
+    $r = session_merge_into($ctx, $target, $from);
+    json_out(['ok' => true, 'moved' => $r['moved'], 'target' => $target,
+        'from_name' => $r['from_name'], 'into_name' => $r['into_name']]);
+}
+
+/** v2.90 把一个会话（from）整体并进另一个（target）：消息、联系方式都搬过去，访客端也看到同一段完整记录。
+ *  返回 moved / from_name / into_name。 */
+function session_merge_into(array $ctx, int $target, int $from): array
+{
     $tid = (int)$ctx['tenant_id'];
     $pdo = db();
     $ta = session_of($ctx, $target);
@@ -356,7 +365,59 @@ function handle_session_merge(string $method, array $m): void
         try { $pdo->rollBack(); } catch (\Throwable $e2) {}
         json_error('合并失败：' . $e->getMessage(), 500);
     }
-    json_out(['ok' => true, 'moved' => $moved, 'target' => $target, 'from_name' => $fa['visitor_name'], 'into_name' => $ta['visitor_name']]);
+    return ['moved' => $moved, 'from_name' => $fa['visitor_name'], 'into_name' => $ta['visitor_name']];
+}
+
+/** v2.90「同 IP 一键合并」：把同一个 IP、还没结束的其它会话全部并进当前这条（客户换浏览器/清缓存
+ *  造成的重复窗口，一键收成一段；合并后消息都在，访客端刷新后看到的也是合并后的完整记录）。 */
+function handle_sessions_merge_by_ip(string $method): void
+{
+    if ($method !== 'POST') { json_error('方法不允许', 405); return; }
+    $ctx = require_workspace();
+    if ($ctx['role'] !== 'tenant') json_error('仅租户可合并会话', 403);
+    $target = (int)input('id', 0);
+    $tid = (int)$ctx['tenant_id'];
+    $pdo = db();
+    /* all=1：把所有 IP 下的重复会话都合并一遍（保留每个 IP 最新那条，其余并进去） */
+    if ((int)input('all', 0) === 1) {
+        $mergedAll = 0; $movedAll = 0; $groups = 0;
+        $st = $pdo->query("SELECT ip, COUNT(*) c FROM v_sessions
+            WHERE tenant_id = $tid AND deleted_at IS NULL AND status <> 'closed' AND ip <> ''
+            GROUP BY ip HAVING c > 1 ORDER BY c DESC LIMIT 50");
+        foreach ($st->fetchAll() as $g) {
+            $ipG = (string)$g['ip'];
+            $pick = $pdo->prepare("SELECT id FROM v_sessions WHERE tenant_id = ? AND deleted_at IS NULL AND status <> 'closed' AND ip = ? ORDER BY last_time DESC LIMIT 1");
+            $pick->execute([$tid, $ipG]);
+            $keep = (int)$pick->fetchColumn();
+            if ($keep <= 0) continue;
+            $others = $pdo->prepare("SELECT id FROM v_sessions WHERE tenant_id = ? AND deleted_at IS NULL AND status <> 'closed' AND ip = ? AND id <> ? LIMIT 20");
+            $others->execute([$tid, $ipG, $keep]);
+            $groups++;
+            foreach ($others->fetchAll(PDO::FETCH_COLUMN) as $fid) {
+                try { $r = session_merge_into($ctx, $keep, (int)$fid); $movedAll += (int)$r['moved']; $mergedAll++; }
+                catch (\Throwable $e) { }
+            }
+        }
+        json_out(['ok' => true, 'all' => true, 'groups' => $groups, 'merged' => $mergedAll, 'moved' => $movedAll]);
+        return;
+    }
+    if ($target <= 0) json_error('缺少会话 id');
+    $ta = session_of($ctx, $target);
+    $ip = trim((string)($ta['ip'] ?? ''));
+    if ($ip === '') json_error('这条会话没有 IP，无法按 IP 合并');
+    $st = $pdo->prepare("SELECT id FROM v_sessions WHERE tenant_id = ? AND deleted_at IS NULL AND ip = ?
+        AND status <> 'closed' AND id <> ? ORDER BY last_time DESC LIMIT 20");
+    $st->execute([$tid, $ip, $target]);
+    $ids = array_map('intval', $st->fetchAll(PDO::FETCH_COLUMN));
+    $merged = 0; $moved = 0;
+    foreach ($ids as $fid) {
+        try {
+            $r = session_merge_into($ctx, $target, $fid);
+            $moved += (int)$r['moved'];
+            $merged++;
+        } catch (\Throwable $e) { /* 单条失败不影响其它 */ }
+    }
+    json_out(['ok' => true, 'merged' => $merged, 'moved' => $moved, 'ip' => $ip]);
 }
 
 /* v2.60.13 工作台用恢复码找回会话：客户报一串恢复码，客服在这里输入就能直接跳到那段对话

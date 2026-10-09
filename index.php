@@ -627,6 +627,7 @@ function dispatch_api(string $method, string $uri): void
     // ---- 工作台（tenant + agent） ----
     if ($uri === '/api/sessions')        handle_sessions($method);
     if ($uri === '/api/sessions/bulk')   handle_sessions_bulk($method);
+    if ($uri === '/api/sessions/merge-by-ip') handle_sessions_merge_by_ip($method);
     if ($uri === '/api/sessions/by-resume') handle_session_by_resume($method);
     if (preg_match('#^/api/sessions/(\d+)/merge$#', $uri, $m)) handle_session_merge($method, $m);
     if ($uri === '/api/agents')          handle_agents_list($method);
