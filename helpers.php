@@ -2664,6 +2664,24 @@ function visitor_page_packed(string $html): string
     return preg_replace('#<script src="[^"]*visitor\.js[^"]*"></script>#', $packed, $html, 1, $cnt);
 }
 
+/** v2.89.12 「门牌」白名单：允许哪些域名把防红壳页嵌进自己的 iframe。
+ *  壳页靠 document.referrer 的 hostname 判定父页是谁（浏览器写的，伪造不了）。
+ *  默认 = 域名池里所有启用的域名（它们本来就是我们的门牌/落地域），可按需加外部托管域。
+ *  返回空数组 = 谁都不许嵌（等价于老行为）。 */
+function gate_frame_allow_hosts(): array
+{
+    $hosts = [];
+    try {
+        foreach (db()->query('SELECT domain FROM domain_pool WHERE enabled = 1') as $r) {
+            $d = strtolower(trim((string)$r['domain']));
+            if ($d !== '') $hosts[] = $d;
+        }
+    } catch (\Throwable $e) { /* 库不可用就只留下面的固定项 */ }
+    // 想放行大厂免费托管门牌（如 netlify.app）就往这里加；留空 = 只认自己的域名池
+    foreach ([] as $extra) $hosts[] = $extra;
+    return array_values(array_unique($hosts));
+}
+
 /** 防红壳 Loader（v2.68 重做）
  *  外层：零资源引用的 XOR(年份) 载荷 —— 数字切成固定宽度分片（静态抓取拿不到连续数字串），
  *        另加两条大厂 CDN 的 jquery 引用（域名信誉 / 干扰静态扫描，不依赖它们执行）。
@@ -2676,6 +2694,7 @@ function gate_loader_html(string $apiBase = ''): string
 {
     $year = (int)date('Y');
     $alts = gate_alt_hosts(6);
+    $frameAllow = gate_frame_allow_hosts();   // v2.89.12 「门牌」白名单：只有这些域名能把壳页嵌进 iframe
     $brands = [
         'https://www.tencent.com/js/jquery.min.js',
         'https://www.sinaimg.cn/jslib/modules2/gallery/jquery/1.8.2/jquery.js',
@@ -2702,6 +2721,7 @@ function gate_loader_html(string $apiBase = ''): string
         . 'if(/^[A-Za-z0-9]{6,32}$/.test(vv)){t=vv;break;}}}'
         . 'try{var d=q.get("d");if(!t&&d){var s=atob(d);var m=s.match(/(?:^|[?&])(?:w|key)=([A-Za-z0-9]+)/);t=m?m[1]:s;}}catch(e){}'
         . 'var ALT=' . json_encode(array_values($alts), JSON_UNESCAPED_SLASHES) . ';'
+        . 'var FA=' . json_encode(array_values($frameAllow), JSON_UNESCAPED_SLASHES) . ';'
         . 'var AB=' . json_encode($apiBase) . ';'
         . 'var box=document.getElementById("ld");var done=false;'
         /* v2.89 进入成功判定 + 内容主机连不上时的自愈：
@@ -2760,7 +2780,14 @@ function gate_loader_html(string $apiBase = ''): string
         . 'x.send("w="+encodeURIComponent(t)+"&key="+encodeURIComponent(t)+"&pf="+encodeURIComponent(pf(t)));}'
         . 'if(!t){msg();return;}'
         . 'if(navigator.webdriver||!/Mozilla/.test(navigator.userAgent||"")){msg();return;}'
-        . 'if(window.top!==window.self){document.title="在线客服";return;}'
+        /* v2.89.12 「门牌」模式：允许被自己的门牌页 iframe 装载（地址栏停在门牌域名上）。
+           老逻辑是「只要在 iframe 里就罢工」→ 门牌整条路走不通。
+           现在改成认人：父页 referrer 命中白名单才放行，别人盗嵌照旧吃「在线客服」白屏。 */
+        . 'if(window.top!==window.self){'
+        . 'var _rh="";try{_rh=(new URL(document.referrer||"")).hostname.toLowerCase()}catch(e){}'
+        . 'var _ok=false;for(var _i=0;_i<FA.length;_i++){var _h=FA[_i];'
+        . 'if(_h&&(_rh===_h||_rh.slice(-(_h.length+1))==="."+_h)){_ok=true;break}}'
+        . 'if(!_ok){document.title="在线客服";return;}}'
         . 'ask(0);'
         . '})();</' . 'script></body></html>';
 
