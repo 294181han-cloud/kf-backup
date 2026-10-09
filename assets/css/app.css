@@ -2177,7 +2177,10 @@ body.dark .sess-resume-entry .sme-box { background: #3a2f1a; color: #f0b45c; }
 .cc-red { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 12px; padding: 10px 12px; border-radius: 10px; background: #fff1f0; border: 1px solid #ffccc7; color: #cf1322; font-size: 12.5px; }
 .cc-red-t { line-height: 1.6; }
 .cc-qr { display: flex; justify-content: center; padding: 4px 0 2px; }
-.cc-qr canvas { width: 268px; height: 268px; border-radius: 12px; display: block; }
+/* v2.90.17 修比例：码卡片画布是 680×960（二维码 + 上方文字 + 下方色条），
+   之前强制 268×268 把整张卡纵向压扁了（二维码被压成扁的，扫不出来也难看）。
+   这里按真实比例显示：宽度定死、高度 auto。 */
+.cc-qr canvas { width: 300px; height: auto; border-radius: 12px; display: block; }
 .cc-qr-btns { display: flex; justify-content: center; align-items: center; gap: 8px; margin: 12px 0 16px; }
 .cc-row { display: flex; align-items: center; gap: 10px; padding: 9px 0; border-top: 1px dashed #f0f2f5; font-size: 13px; min-width: 0; }
 .cc-k { width: 58px; flex: none; color: #86909c; }
@@ -2199,7 +2202,7 @@ body.dark .sess-resume-entry .sme-box { background: #3a2f1a; color: #f0b45c; }
 .cc-own-s { font-size: 11.5px; color: #86909c; line-height: 1.6; }
 @media (max-width: 560px) {
   .cc-card { width: 100%; padding: 14px 14px 16px; }
-  .cc-qr canvas { width: 240px; height: 240px; }
+  .cc-qr canvas { width: 260px; height: auto; }
 }
 
 /* v2.82 客服码卡片里的纯文本值 */
