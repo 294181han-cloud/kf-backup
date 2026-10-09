@@ -7,7 +7,7 @@
 <link rel="icon" href="/assets/img/mi-logo.png">
 <link rel="apple-touch-icon" href="/assets/img/mi-logo.png">
 <link rel="stylesheet" href="/assets/vendor/element-plus.css">
-<link rel="stylesheet" href="/assets/css/app.css?v=3.62.0">
+<link rel="stylesheet" href="/assets/css/app.css?v=3.63.0">
 <script src="/assets/ui/ui-registry.js?v=2.10.4"></script>
 <script src="/assets/ui/ui-loader.js?v=2.10.4" data-ui-cat="auto"></script>
 </head>
@@ -276,47 +276,41 @@
                     🕒 <span class="clo-t">最后上线</span>{{ fmtTime(current.lastOnline || current.lastTime) }}
                   </span>
                   <!-- v2.60.13 恢复码：客户换手机/换浏览器后把它发给他（点一下就复制）。手机上收在 ⋯ 菜单与访客信息里 -->
-                  <span class="ch-resume m-hide" v-if="profile && profile.resume_code"
-                        :title="'点击复制恢复码：客户换手机/换浏览器看不到原对话时，把这个码发给他'"
-                        @click="copy(profile.resume_code)">
-                    🔑 {{ profile.resume_code }}
-                  </span>
+                  <!-- v2.89.9 恢复码不再堆在标题行：右侧「访客信息」里能复制，工具栏 🔑 能找回/合并对话 -->
                 </div>
                 <div class="ch-sub">
-                  <!-- v2.60.19 电脑端：这些信息全部展示（自动换行排开，不挤也不藏在滑动里）；
-                       手机端屏幕窄，只留「渠道 / 设备 / 地区」，其余的在「访客信息」抽屉里。 -->
+                  <!-- v2.89.9 会话头只留三件事：渠道 / 设备 / 地区（消息数、首次、会话编号右侧「访客信息」里都有） -->
                   <span class="ch-chip chn" v-if="profile && profile.channel"
                         :title="'渠道：访客从「' + profile.channel + '」里进来的' + (profile.browser ? '（' + profile.browser + '）' : '')">渠道：{{ profile.channel }}</span>
                   <span class="ch-chip" v-if="profile && profile.dev_tag">📱 {{ profile.dev_tag }}</span>
-                  <span v-if="profile">📍 {{ profile.region || profile.city || geoTag(profile.geo) || '未知' }}</span>
-                  <!-- v2.86 IP / 访问次数不在这里重复显示（右侧「访客信息」里有） -->
-                  <span v-if="profile" class="m-hide">💬 消息 {{ profile.message_count }}</span>
-                  <span v-if="profile" class="m-hide" title="首次进入时间">🕒 首次 {{ shortTime(profile.first_time) }}</span>
-                  <span v-if="current.lastTime" class="m-hide" title="最近活跃">⏱ 最近 {{ shortTime(current.lastTime) }}</span>
-                  <span v-if="current.agent_name" class="m-hide" title="接待客服">🎧 {{ current.agent_name }}</span>
-                  <span class="ch-id m-hide" title="会话编号">#{{ current.id }}</span>
+                  <span class="ch-chip" v-if="profile">📍 {{ profile.region || profile.city || geoTag(profile.geo) || '未知' }}</span>
                 </div>
               </div>
 
               <span class="chat-head-btns">
                 <!-- 手机端：只留「资料」+「更多」两个按钮，其余（搜索/拉黑/归档/转接/结束）收进「更多」面板 -->
                 <!-- v2.89.5 电脑端也能收起/展开右侧访客信息（手机端仍是抽屉） -->
-                <el-button size="small" plain class="cbtn" :class="{on: !infoCollapsed}" title="访客信息（收起 / 展开）" @click="toggleInfo">👤</el-button>
+                <!-- v2.89.9 头部重排：左边一小排工具（灰底），右边一排动作按钮，不再一条直线塞满 -->
+                <span class="ch-tools">
+                  <el-button size="small" plain class="cbtn" :class="{on: !infoCollapsed}" title="访客信息（收起 / 展开）" @click="toggleInfo">👤</el-button>
+                  <el-button size="small" plain class="cbtn icon m-hide-btn" title="搜索聊天记录" @click="chatSearchOn = !chatSearchOn">🔍</el-button>
+                  <!-- v2.60.11 聊天记录快速查找：只看图片 / 按日期跳转 -->
+                  <el-button size="small" plain class="cbtn icon m-hide-btn" :class="{on: imgOnly}" title="只看图片" @click="toggleImgOnly">🖼</el-button>
+                  <el-button size="small" plain class="cbtn icon m-hide-btn" title="按日期跳转" @click="dateOpen = true">📅</el-button>
+                  <el-button size="small" plain class="cbtn icon m-hide-btn" title="输入恢复码：找回 / 合并另一段对话（客户报码时用）" @click="resumeFindOpen = true">🔑</el-button>
+                </span>
                 <el-button size="small" plain class="cbtn m-only" title="更多操作（搜索 / 拉黑 / 归档 / 转接 / 结束）" @click.stop="chMore = true">⋯</el-button>
-                <el-button size="small" plain class="cbtn icon m-hide-btn" title="搜索聊天记录" @click="chatSearchOn = !chatSearchOn">🔍</el-button>
-                <!-- v2.60.11 聊天记录快速查找：只看图片 / 按日期跳转 -->
-                <el-button size="small" plain class="cbtn icon m-hide-btn" :class="{on: imgOnly}" title="只看图片" @click="toggleImgOnly">🖼</el-button>
-                <el-button size="small" plain class="cbtn icon m-hide-btn" title="按日期跳转" @click="dateOpen = true">📅</el-button>
-                <el-button size="small" plain class="cbtn icon m-hide-btn" title="输入恢复码：找回/合并另一段对话（客户报码时用）" @click="resumeFindOpen = true">🔑</el-button>
-                <el-popconfirm title="拉黑该访客 IP？拉黑后其无法再进入或发消息" @confirm="blockSession">
-                  <template #reference><el-button size="small" type="danger" plain class="cbtn m-hide-btn">🚫 拉黑</el-button></template>
-                </el-popconfirm>
-                <el-button size="small" v-if="sessScope==='archived'" type="warning" plain class="cbtn m-hide-btn" @click="archiveSession(false)">↩ 取消归档</el-button>
-                <el-button size="small" v-else-if="sessScope==='online'" plain class="cbtn m-hide-btn" @click="archiveSession(true)">📦 归档</el-button>
-                <el-button size="small" v-if="sessScope!=='closed'" plain class="cbtn m-hide-btn" @click="transferDlg=true">⇄ 转接</el-button>
-                <el-popconfirm v-if="sessScope!=='closed'" title="结束会话后，访客端聊天记录将清除，访客将无法继续在此会话发送消息。确认结束？" confirm-button-text="结束会话" cancel-button-text="取消" @confirm="closeSession">
-                  <template #reference><el-button size="small" type="danger" plain class="cbtn m-hide-btn">✔ 结束</el-button></template>
-                </el-popconfirm>
+                <span class="ch-acts">
+                  <el-popconfirm title="拉黑该访客 IP？拉黑后其无法再进入或发消息" @confirm="blockSession">
+                    <template #reference><el-button size="small" type="danger" plain class="cbtn m-hide-btn">🚫 拉黑</el-button></template>
+                  </el-popconfirm>
+                  <el-button size="small" v-if="sessScope==='archived'" type="warning" plain class="cbtn m-hide-btn" @click="archiveSession(false)">↩ 取消归档</el-button>
+                  <el-button size="small" v-else-if="sessScope==='online'" plain class="cbtn m-hide-btn" @click="archiveSession(true)">📦 归档</el-button>
+                  <el-button size="small" v-if="sessScope!=='closed'" plain class="cbtn m-hide-btn" @click="transferDlg=true">⇄ 转接</el-button>
+                  <el-popconfirm v-if="sessScope!=='closed'" title="结束会话后，访客端聊天记录将清除，访客将无法继续在此会话发送消息。确认结束？" confirm-button-text="结束会话" cancel-button-text="取消" @confirm="closeSession">
+                    <template #reference><el-button size="small" type="danger" plain class="cbtn m-hide-btn">✔ 结束</el-button></template>
+                  </el-popconfirm>
+                </span>
               </span>
             </div>
             <div class="chat-search" v-if="chatSearchOn">
