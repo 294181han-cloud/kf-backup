@@ -1025,7 +1025,8 @@ body.dark .me-btn.danger:hover { background: #3a2124; border-color: #5a3236; col
 .stat-card .l { font-size: 12.5px; color: var(--v-ink-3); margin-top: 3px; }
 
 /* ---------- 会话列表 ---------- */
-.sess-col { width: 326px; background: #fff; border-right: 1px solid var(--v-line); }
+/* v2.89.8 最小宽度放到 190px（原来 CSS 写死 250px，拖不到更窄） */
+.sess-col { width: 326px; min-width: 190px; background: #fff; border-right: 1px solid var(--v-line); }
 .sess-scope-tabs { padding: 10px 12px 0; gap: 4px; border-bottom: 1px solid var(--v-line); }
 .scope-tab { font-size: 12.5px; padding: 8px 4px 10px; border-radius: 8px 8px 0 0; }
 .scope-tab.on { color: var(--theme, #1677ff); border-bottom-color: var(--theme, #1677ff); }
