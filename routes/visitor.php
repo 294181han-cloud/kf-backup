@@ -614,6 +614,79 @@ function handle_gate_check(string $method): void
         'tk' => gate_token_issue($hit['code'])]);
 }
 
+/* ---------- v2.89 访客端「进不来」上报 ----------
+   壳页把聊天页挂在 iframe 里；如果那台内容主机被拦/连不上，访客看到的是白屏 +
+   「正在进入…」，服务端却以为一切正常（我们的红码巡检测的是入口链接，不是内容主机）。
+   这里收壳页的失败上报（iframe 超时/报错）：
+     ① 30 分钟内同主机 ≥3 次、且来自 ≥2 个不同 IP → 服务端自己复核一次；
+     ② 复核打不开（或短时间被报 ≥8 次）→ 把这台内容主机从域名池退役，并清掉
+        相关客服码的 content_host，下一次 /api/gate 自动换一台内容主机。
+   全部是「失败的访客」才会触发，不影响正常访问。 */
+function handle_gate_err(string $method): void
+{
+    if ($method !== 'POST') { json_out(['ok' => false], 405); return; }
+    $code = trim((string)input('code', ''));
+    $host = strtolower(trim((string)input('host', '')));
+    $reason = mb_substr(trim((string)input('r', '')), 0, 32);
+    try { $pdo = db(); } catch (\Throwable $e) { json_out(['ok' => false]); return; }
+    if ($host === '' && $code !== '') {
+        try {
+            $st = $pdo->prepare('SELECT content_host FROM service_codes WHERE code = ? LIMIT 1');
+            $st->execute([$code]);
+            $host = strtolower(trim((string)$st->fetchColumn()));
+        } catch (\Throwable $e) { }
+    }
+    if ($host === '' || !preg_match('/^[a-z0-9.\-]{4,120}$/', $host)) { json_out(['ok' => false, 'msg' => 'host 无效']); return; }
+
+    // 30 分钟窗口内按主机聚合（去重 IP，避免同一台设备刷次数）
+    $k = 'gateerr:' . md5($host);
+    $now = time();
+    $cnt = 0; $start = $now; $ips = [];
+    $raw = (string)kv_get($k, '');
+    if ($raw !== '') {
+        $p = explode('|', $raw);
+        if (count($p) === 3 && $now - (int)$p[1] < 1800) {
+            $cnt = (int)$p[0]; $start = (int)$p[1];
+            $ips = array_values(array_filter(explode(',', (string)$p[2])));
+        }
+    }
+    $cnt++;
+    $ih = substr(md5(get_client_ip() . '|kf'), 0, 8);
+    if (!in_array($ih, $ips, true)) $ips[] = $ih;
+    $ips = array_slice($ips, -20);
+    try { kv_set($k, $cnt . '|' . $start . '|' . implode(',', $ips)); } catch (\Throwable $e) { }
+
+    $enough = ($cnt >= 3 && count($ips) >= 2) || $cnt >= 8;
+    if (!$enough) { json_out(['ok' => true, 'action' => 'noted', 'host' => $host, 'reports' => $cnt, 'ips' => count($ips)]); return; }
+
+    $probeOk = gate_host_probe_ok($host);
+    if ($probeOk && $cnt < 8) { json_out(['ok' => true, 'action' => 'probe-ok', 'host' => $host, 'reports' => $cnt]); return; }
+
+    /* 确认这台内容主机不能用了：退役（子域从池里摘掉）+ 清掉指向它的 content_host */
+    $retire = [];
+    try { $retire = code_red_retire('https://' . $host . '/', 'content'); } catch (\Throwable $e) { }
+    try { $pdo->prepare('UPDATE service_codes SET content_host = "" WHERE content_host = ?')->execute([$host]); } catch (\Throwable $e) { }
+    try { kv_set($k, ''); } catch (\Throwable $e) { }
+    json_out(['ok' => true, 'action' => 'retire', 'host' => $host, 'reports' => $cnt, 'ips' => count($ips),
+        'probe' => $probeOk ? 'ok' : 'fail', 'retire' => $retire]);
+}
+
+/** 服务端复核：这台主机还能不能取到访客页（5 秒超时，真人 UA；证书不严校，只看拿不拿得到内容） */
+function gate_host_probe_ok(string $host): bool
+{
+    if ($host === '') return false;
+    $url = 'https://' . $host . '/visitor.html';
+    try {
+        $ctx = stream_context_create([
+            'http' => ['method' => 'GET', 'timeout' => 5, 'ignore_errors' => true,
+                'header' => "User-Agent: Mozilla/5.0 (iPhone; CPU iPhone OS 16_6 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) MicroMessenger/8.0.49\r\n"],
+            'ssl' => ['verify_peer' => false, 'verify_peer_name' => false],
+        ]);
+        $body = @file_get_contents($url, false, $ctx);
+        return is_string($body) && strlen($body) > 500;
+    } catch (\Throwable $e) { return false; }
+}
+
 /* ---------- v2.60.9 访客「恢复原对话」 ----------
    换手机 / 换浏览器 / 清了缓存后，浏览器里的 visitor_token 没了，访客会被当成新访客。
    输入客服给的 8 位恢复码 → 找到那段未结束的会话 → 把它的 visitor_token 还给前端

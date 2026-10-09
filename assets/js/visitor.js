@@ -983,6 +983,13 @@ createApp({
 /* v2.52 挂载成功标记：① 去掉"正在接入"兜底提示；② 中转壳页据此判断这页真的跑起来了 */
 (function () {
   window.__KF_MOUNTED__ = 1;
+  /* v2.89 在壳页的 iframe 里跑：报到一声，外壳据此收起「正在进入…」；
+     一直没报到的（内容主机被拦/连不上）外壳会重试并上报给服务端换一台内容域名。 */
+  try {
+    if (window.parent && window.parent !== window) {
+      window.parent.postMessage({ kf: 'ready' }, '*');
+    }
+  } catch (e) {}
   var tip = document.getElementById('boot-tip');
   if (tip && tip.parentNode) tip.parentNode.removeChild(tip);
 })();
