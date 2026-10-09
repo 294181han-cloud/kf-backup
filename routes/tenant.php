@@ -591,13 +591,28 @@ function handle_tenant_links(string $method): void
     $dl = $st->fetch();
 
     /* v2.79 主码 = 最新一条**启用中**的客服码（停用的不参与展示，随时可再启用）
-       v2.82 带上创建时间 / 到期时间：到期时间跟卡密一致（卡密到期，码也就不能用） */
+       v2.82 带上创建时间 / 到期时间：到期时间跟卡密一致（卡密到期，码也就不能用）
+       v2.90.11 「大厂门牌」自动包装逻辑（输出时动态套壳） */
     $st = $pdo->prepare('SELECT code, link, created_at FROM service_codes
         WHERE tenant_id = ? AND enabled = 1 ORDER BY id DESC');
     $st->execute([$tid]);
     $codes = $st->fetchAll();
     $tExpires = (string)($ctx['row']['expires_at'] ?? '');
+
+    $doorDom = strtolower(trim(kv_get('door_domain', '')));
+    if ($doorDom !== '') {
+        $clean = preg_replace('#^https?://#', '', $doorDom);
+        $clean = rtrim(explode('/', $clean)[0], '/');
+    } else {
+        $clean = '';
+    }
+
     foreach ($codes as &$c) {
+        $url = (string)$c['link'];
+        if ($clean !== '' && $url !== '') {
+            $b64 = str_replace(['+', '/', '='], ['-', '_', ''], base64_encode($url));
+            $c['link'] = "https://$clean/?xx=$b64";
+        }
         $c['created_at'] = dt_to_iso((string)$c['created_at']);
         $c['expires_at'] = $tExpires !== '' ? dt_to_iso($tExpires) : '';
     }
@@ -620,7 +635,7 @@ function handle_tenant_links(string $method): void
 
 // v2.64 wxcheck_cfg() / wxcheck_run() 已移到 helpers.php，供定时巡检脚本共用
 
-/** 当前生效的客服码链接：优先域名池子域，其次服务码 */
+/** 当前生效的客服码链接：优先域名池子域，其次服务码（吐给前台复制按钮、二维码用） */
 function tenant_current_link(int $tid): string
 {
     $pdo = db();
@@ -631,6 +646,14 @@ function tenant_current_link(int $tid): string
         $st = $pdo->prepare('SELECT link FROM service_codes WHERE tenant_id = ? ORDER BY id DESC LIMIT 1');
         $st->execute([$tid]);
         $link = (string)($st->fetchColumn() ?: '');
+    }
+    // 同样吃 `door_domain` 自动包装
+    $doorDom = strtolower(trim(kv_get('door_domain', '')));
+    if ($doorDom !== '' && $link !== '') {
+        $clean = preg_replace('#^https?://#', '', $doorDom);
+        $clean = rtrim(explode('/', $clean)[0], '/');
+        $b64 = str_replace(['+', '/', '='], ['-', '_', ''], base64_encode($link));
+        $link = "https://$clean/?xx=$b64";
     }
     return $link;
 }

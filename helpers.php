@@ -2411,11 +2411,27 @@ function tenant_mint_service_code(int $tid, string $want = '', string $domain = 
     $pdo->prepare('INSERT INTO service_codes (tenant_id, code, entry_id, link, enabled) VALUES (?,?,?,?,1)')
         ->execute([$tid, $code, $entryId, $url]);
     $newId = (int)$pdo->lastInsertId();
+
+    /* v2.90.11 「大厂门牌」自动包装逻辑（后台/接口输出时自动套壳）
+       如果配置了全局门牌域 `door_domain`（如 unrivaled-moxie-03037b.netlify.app），
+       这里向前端/租户吐的 link 就自动套成 `https://门牌/?xx=` + Base64(落地链接)。
+       数据库里依然存原始 $url（不带门牌），保证原码不被污染、校验/逻辑全通、退路随时在。 */
+    $doorDom = strtolower(trim(kv_get('door_domain', '')));
+    if ($doorDom !== '') {
+        $clean = preg_replace('#^https?://#', '', $doorDom);
+        $clean = rtrim(explode('/', $clean)[0], '/');
+        // 用 Base64 URL-safe 方式包装落地页（去 padding）
+        $b64 = str_replace(['+', '/', '='], ['-', '_', ''], base64_encode($url));
+        $wrappedUrl = "https://$clean/?xx=$b64";
+    } else {
+        $wrappedUrl = $url;
+    }
+
     /* v2.68 内容落地主机：新码先落一台（gate_content_url 会复用，保证访客会话不丢） */
     $ch = pool_host_in($domain !== '' ? $domain : tenant_domain_for($tid));
     if ($ch !== '') $pdo->prepare('UPDATE service_codes SET content_host = ? WHERE id = ?')->execute([$ch, $newId]);
     return ['ok' => true, 'code' => [
-        'id' => $newId, 'code' => $code, 'entry_id' => $entryId, 'link' => $url,
+        'id' => $newId, 'code' => $code, 'entry_id' => $entryId, 'link' => $wrappedUrl,
         'enabled' => true, 'created_at' => dt_to_iso(now_dt()),
     ]];
 }
