@@ -126,9 +126,10 @@
                 <template #default="{row}"><span style="font-size:12px;color:#86909c;">{{ row.last_login_at ? row.last_login_at.slice(0,16) : '从未' }}</span></template>
               </el-table-column>
               <el-table-column label="备注" prop="remark" min-width="100" show-overflow-tooltip></el-table-column>
-              <el-table-column label="操作" width="200" fixed="right">
+              <el-table-column label="操作" width="280" fixed="right">
                 <template #default="{row}">
                   <el-button size="small" @click="openEdit(row)">编辑</el-button>
+                  <el-button size="small" type="primary" plain @click="openMint(row)">批量发码</el-button>
                   <el-button size="small" :type="row.status==='active' ? 'warning' : 'success'" @click="toggleTenant(row)">
                     {{ row.status==='active' ? '停用' : '启用' }}
                   </el-button>
@@ -647,11 +648,39 @@
       <el-button type="primary" @click="genVisible=false">关闭</el-button>
     </template>
   </el-dialog>
+
+  <!-- v2.90.10 批量发码：给这个租户在域名池每台域名上各发一条客服码 -->
+  <el-dialog v-model="mintVisible" title="批量发码" width="520px">
+    <div style="font-size:14px;line-height:1.9;">
+      给「<b>{{ mintRow ? (mintRow.nickname || mintRow.kami) : '' }}</b>」在域名池里<b>每台域名各发一条客服码</b>，
+      发完都会出现在他工作台的「管理码」里；已经发过码的域名不会重复发。
+    </div>
+    <div style="margin-top:14px;">
+      <el-checkbox v-model="mintSkipRed">跳过红名单上的域名（微信里已经红了的那几台）</el-checkbox>
+      <div class="muted" style="font-size:12px;color:#86909c;line-height:1.7;margin-top:6px;">
+        不勾选 = 红的也一起发（微信里打不开，但走抖音 / 浏览器 / QQ 渠道没问题）。
+      </div>
+    </div>
+    <div v-if="mintResult" style="margin-top:14px;background:#f7f8fa;border-radius:8px;padding:12px;font-size:13px;line-height:1.9;max-height:220px;overflow:auto;">
+      <div v-for="c in mintResult.created" :key="c.code">
+        <b class="mono">{{ c.domain }}</b> → <span class="mono">{{ c.code }}</span>
+      </div>
+      <div v-if="(mintResult.skip_red||[]).length" style="color:#86909c;">跳过红名单：{{ mintResult.skip_red.join('、') }}</div>
+      <div v-if="(mintResult.already||[]).length" style="color:#86909c;">已有码没重发：{{ mintResult.already.join('、') }}</div>
+      <div v-if="(mintResult.failed||[]).length" style="color:#f53f3f;">
+        失败：{{ mintResult.failed.map(f => f.domain + '（' + f.msg + '）').join('、') }}
+      </div>
+    </div>
+    <template #footer>
+      <el-button @click="mintVisible=false">关闭</el-button>
+      <el-button type="primary" :loading="mintBusy" @click="doMint">开始发码</el-button>
+    </template>
+  </el-dialog>
 </div>
 
 <script src="/assets/vendor/vue.global.js?v=2.0.1"></script>
 <script src="/assets/vendor/element-plus.js?v=2.0.1"></script>
 <script src="/assets/api.js?v=2.1.1"></script>
-<script src="/assets/js/admin.js?v=2.10.0"></script>
+<script src="/assets/js/admin.js?v=2.10.2"></script>
 </body>
 </html>

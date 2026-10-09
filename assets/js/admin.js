@@ -12,6 +12,12 @@ createApp({
     const rootDomain = ref('');
     const defVal = reactive({ default_quota_web: 200, default_quota_app: 200, default_max_agents: 5 });
     const pwOld = ref(''); const pwNew = ref('');
+    /* v2.90.10 批量发码弹窗状态 */
+    const mintVisible = ref(false);
+    const mintRow = ref(null);
+    const mintSkipRed = ref(false);
+    const mintBusy = ref(false);
+    const mintResult = ref(null);
 
     const tabTitle = computed(() => ({ overview: '平台概览', tenants: '租户管理', domains: '域名池', nodes: '节点管理', tg: '发卡机器人', settings: '全局设置' }[tab.value]));
     const locationOrigin = location.origin;
@@ -300,6 +306,23 @@ createApp({
       try { await API.del('/api/admin/tenants/' + row.id); ElementPlus.ElMessage.success('已删除'); await loadTenants(); await loadOverview(); }
       catch (e) { ElementPlus.ElMessage.error(e.message); }
     };
+    /* v2.90.10 批量发码：给这个租户在域名池每台域名上各发一条客服码（可以连红名单一起发），
+       发完就在他自己工作台「管理码」里，想用哪条用哪条。 */
+    const openMint = (row) => {
+      mintRow.value = row; mintResult.value = null; mintSkipRed.value = false; mintVisible.value = true;
+    };
+    const doMint = async () => {
+      if (!mintRow.value) return;
+      mintBusy.value = true;
+      try {
+        const r = await API.post('/api/admin/tenants/' + mintRow.value.id + '/mint-codes',
+          { skip_red: mintSkipRed.value ? 1 : 0 });
+        mintResult.value = r;
+        ElementPlus.ElMessage.success('已发 ' + (r.created_count || 0) + ' 条客服码');
+        await loadTenants();
+      } catch (e) { ElementPlus.ElMessage.error(e.message); }
+      finally { mintBusy.value = false; }
+    };
     const copyCreated = () => {
       const s = `卡密：${created.kami}\n密码：${created.password}\n登录入口：${entranceText.value}`;
       navigator.clipboard && navigator.clipboard.writeText(s);
@@ -439,6 +462,7 @@ createApp({
       pkgVisible, pkgForm, pkgSaving, openPkg, savePkg, delPkg, tgOrder,
       barWidth, locationOrigin,
       dlgVisible, dlgMode, dlg, dlgSaving, openCreate, openEdit, saveTenant, toggleTenant, delTenant,
+      mintVisible, mintRow, mintSkipRed, mintBusy, mintResult, openMint, doMint,
       createdVisible, created, copyCreated, openGen, genVisible, genPair, doGen, fillGenKami, openTrial,
       addDomain, toggleDomain, delDomain, blockDomain, saveRootDomain, saveDefaults, changePw, logout, isExpired,
     };

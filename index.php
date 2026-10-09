@@ -700,6 +700,7 @@ function dispatch_api(string $method, string $uri): void
     if ($uri === '/api/admin/tenants')           handle_admin_tenants($method);
     if ($uri === '/api/admin/tenants/gen')       handle_admin_tenants_gen($method);
     if (preg_match('#^/api/admin/tenants/(\d+)$#', $uri, $m)) handle_admin_tenants_id($method, (int)$m[1]);
+if (preg_match('#^/api/admin/tenants/(\d+)/mint-codes$#', $uri, $m)) handle_admin_tenant_mint_codes($method, (int)$m[1]);
     if ($uri === '/api/admin/domain-pool')       handle_admin_domain_pool($method);
     if ($uri === '/api/admin/domain-pool/subs')  handle_admin_pool_subs($method);
     if (preg_match('#^/api/admin/domain-pool/(\d+)$#', $uri, $m)) handle_admin_domain_pool_id($method, (int)$m[1]);

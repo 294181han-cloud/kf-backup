@@ -2361,11 +2361,13 @@ function pool_host_in(string $domain): string
    「新码 / 更换码」和「新用户第一次登录自动发一条」共用这一份发码逻辑，
    免得两处各写一遍、以后改漏一处。 */
 
-/** 发一条新的客服码（新域名 + 新随机路径）。失败返回 ['ok'=>false,'msg'=>...] */
-function tenant_mint_service_code(int $tid, string $want = ''): array
+/** 发一条新的客服码（新域名 + 新随机路径）。失败返回 ['ok'=>false,'msg'=>...]
+ *  $domain 非空 = 指定用域名池里的哪一台（v2.90.10 批量发码「每台域名各一条」用）。 */
+function tenant_mint_service_code(int $tid, string $want = '', string $domain = ''): array
 {
     $pdo = db();
     $entryId = gen_entry_id();
+    $domain = strtolower(trim($domain));
     $want = trim($want);
     if ($want !== '') {
         if (!preg_match('/^[A-Za-z0-9]{4,32}$/', $want)) return ['ok' => false, 'msg' => '客服码只能是 4~32 位字母或数字'];
@@ -2389,8 +2391,18 @@ function tenant_mint_service_code(int $tid, string $want = ''): array
         $host = rtrim(explode('/', $host)[0], '/');
         $url = "$scheme://$host/$gatePath";
     } else {
-        /* v2.70 专属落地域名（自动分配）：这个租户固定用一台域名，红了只影响它自己 */
-        $bound = tenant_domain_for($tid);
+        /* v2.70 专属落地域名（自动分配）：这个租户固定用一台域名，红了只影响它自己；
+           指定 $domain 时按指定的那台发（批量铺码用）。 */
+        $bound = $domain !== '' ? $domain : tenant_domain_for($tid);
+        if ($domain !== '') {
+            $ok = false;
+            try {
+                $chk = $pdo->prepare('SELECT enabled FROM domain_pool WHERE domain = ? LIMIT 1');
+                $chk->execute([$domain]);
+                $ok = (int)($chk->fetchColumn() ?: 0) === 1;
+            } catch (\Throwable $e) { $ok = false; }
+            if (!$ok) return ['ok' => false, 'msg' => '域名 ' . $domain . ' 不在域名池里或已停用'];
+        }
         if ($bound === '') return ['ok' => false, 'msg' => '域名池为空，请联系平台管理员添加可用域名'];
         $host = pool_host_in($bound);
         if ($host === '') return ['ok' => false, 'msg' => '域名池为空，请联系平台管理员添加可用域名'];
@@ -2400,7 +2412,7 @@ function tenant_mint_service_code(int $tid, string $want = ''): array
         ->execute([$tid, $code, $entryId, $url]);
     $newId = (int)$pdo->lastInsertId();
     /* v2.68 内容落地主机：新码先落一台（gate_content_url 会复用，保证访客会话不丢） */
-    $ch = pool_host_in(tenant_domain_for($tid));
+    $ch = pool_host_in($domain !== '' ? $domain : tenant_domain_for($tid));
     if ($ch !== '') $pdo->prepare('UPDATE service_codes SET content_host = ? WHERE id = ?')->execute([$ch, $newId]);
     return ['ok' => true, 'code' => [
         'id' => $newId, 'code' => $code, 'entry_id' => $entryId, 'link' => $url,

@@ -9,6 +9,56 @@ function require_admin_ctx(): array
     return require_role('admin');
 }
 
+/** v2.90.10 批量发码：给某个租户在域名池里**每台域名各发一条客服码**（发完都在他的「管理码」里）。
+ *  用途：客户手里的码在某台域名上红了、或者想给他一堆备用码时，一次铺满，不用一台台换绑再发。
+ *  参数：skip_red=1（默认）跳过红名单上的域名；force=1 才会给已经发过码的域名再来一条。 */
+function handle_admin_tenant_mint_codes(string $method, int $id): void
+{
+    if ($method !== 'POST') { json_error('方法不允许', 405); return; }
+    require_admin_ctx();
+    $pdo = db();
+    $st = $pdo->prepare('SELECT id, kami FROM tenants WHERE id = ?');
+    $st->execute([$id]);
+    $t = $st->fetch();
+    if (!$t) json_error('租户不存在', 404);
+
+    $skipRed = (string)input('skip_red', '1') === '1';
+    $force   = (string)input('force', '0') === '1';
+
+    $doms = [];
+    foreach ($pdo->query('SELECT domain FROM domain_pool WHERE enabled = 1 ORDER BY id ASC') as $r) {
+        $d = strtolower(trim((string)$r['domain']));
+        if ($d !== '') $doms[] = $d;
+    }
+    if (!$doms) json_error('域名池是空的，先在「域名池」里加域名');
+
+    // 这个租户已经在哪几台域名上发过码（不重复铺）
+    $have = [];
+    if (!$force) {
+        $q = $pdo->prepare('SELECT link FROM service_codes WHERE tenant_id = ?');
+        $q->execute([$id]);
+        foreach ($q->fetchAll(PDO::FETCH_COLUMN) as $lk) {
+            $h = strtolower((string)(parse_url((string)$lk, PHP_URL_HOST) ?: ''));
+            if ($h !== '') $have[pool_domain_of($h)] = true;
+        }
+    }
+
+    $created = []; $skippedRed = []; $already = []; $failed = [];
+    foreach ($doms as $d) {
+        if ($skipRed && domain_in_red_list($d)) { $skippedRed[] = $d; continue; }
+        if (!$force && !empty($have[$d])) { $already[] = $d; continue; }
+        $r = tenant_mint_service_code($id, '', $d);
+        if (!empty($r['ok'])) $created[] = ['domain' => $d, 'code' => $r['code']['code'], 'link' => $r['code']['link']];
+        else $failed[] = ['domain' => $d, 'msg' => (string)($r['msg'] ?? '失败')];
+    }
+    json_out([
+        'ok' => true,
+        'tenant' => ['id' => (int)$t['id'], 'kami' => (string)$t['kami']],
+        'created' => $created, 'created_count' => count($created),
+        'skip_red' => $skippedRed, 'already' => $already, 'failed' => $failed,
+    ]);
+}
+
 /* ---------- 平台概览 ---------- */
 function handle_admin_overview(string $method): void
 {
