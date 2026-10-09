@@ -1854,8 +1854,16 @@ function geo_region(?string $geo): string
         if ($ispShort !== '') $out .= ' ' . $ispShort;
     } else {
         // 海外：地区 + 城市（国家在悬停全文里）；像「台湾|台北市」显示成「台湾 台北」更好认
-        if ($prov !== '' && $city !== '' && $prov !== $city) $out = $prov . ' ' . $city;
-        else $out = $city !== '' ? $city : $prov;
+        if ($prov !== '' && $city !== '' && $prov !== $city) {
+            // 两个库互相包含时只留长的那半，别出现「Central Singapore 新加坡」这种啰嗦写法
+            if (mb_stripos($prov, $city) !== false || mb_stripos($city, $prov) !== false) {
+                $out = mb_strlen($prov) >= mb_strlen($city) ? $prov : $city;
+            } else {
+                $out = $prov . ' ' . $city;
+            }
+        } else {
+            $out = $city !== '' ? $city : $prov;
+        }
     }
     return $out !== '' ? $out : geo_city($geo);
 }
