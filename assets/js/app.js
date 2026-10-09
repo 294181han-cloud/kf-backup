@@ -3040,7 +3040,9 @@ const app = createApp({
               dangerouslyUseHTMLString: true,
               message: '<div style="line-height:1.95;font-size:13px;">'
                 + '登录身份：<b>' + (n.note || dev.note || '同账号') + '</b><br>'
-                + '登录信息：<b>' + (n.ip || '') + '</b>　' + (n.geo || '') + '<br>'
+                /* v2.90.20 这里原来直接吐后端的原始 geo 串（中国|广东省|深圳市|移动|CN），
+                   现在后端给的是已经整理好的中文地区（广东 深圳 移动）。 */
+                + '登录信息：<b>' + (n.ip || '') + '</b>　' + (n.geo_text || n.geo || '') + '<br>'
                 + '登录来源：<b>' + (n.device || '') + '</b><br>'
                 + '<span style="color:#86909c;font-size:12px;">' + (n.at || '') + '　5 分钟后自动关闭</span></div>'
             });

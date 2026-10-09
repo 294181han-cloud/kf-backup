@@ -334,6 +334,7 @@ function login_notice_push(string $ownerKey, string $devId, string $note, string
             'note' => mb_substr($note, 0, 32),
             'ip' => $ip,
             'geo' => lookup_geo($ip),
+            'geo_text' => ($g0 = lookup_geo($ip)) !== '' ? (geo_region($g0) ?: geo_city($g0)) : '',
             'device' => ua_label($ua),
             'at' => date('Y-m-d H:i:s'),
         ];
