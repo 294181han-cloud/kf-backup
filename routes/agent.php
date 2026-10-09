@@ -126,6 +126,7 @@ function handle_sessions(string $method): void
         unset($r['ua']);
     }
     unset($r);
+    geo_backfill($pdo, $out, 3);   // v2.90.3 列表也顺手补几条归属地（以前只有轮询会补）
     // 各分区计数（供 tab 徽标：在线/归档的未读合计提示）
     $vis = session_visible_sql($ctx) . session_spoken_sql();
     $cnt = $pdo->prepare("SELECT
@@ -1274,23 +1275,7 @@ function handle_agent_poll(string $method): void
         $st->execute([$session, $sinceMsg]);
         $msgs = array_map('to_msg', $st->fetchAll());
     }
-    // 地理信息渐进补查：每轮最多补 2 个未解析的 IP（写回 v_sessions.geo，配合 1h 缓存）
-    try {
-        $needGeo = [];
-        foreach ($sessions as $row) {
-            if (count($needGeo) >= 2) break;
-            if (empty($row['geo']) && !empty($row['ip'])) $needGeo[$row['id']] = $row['ip'];
-        }
-        foreach ($needGeo as $sidG => $ipG) {
-            $g = lookup_geo($ipG);
-            if ($g !== '') {
-                $pdo->prepare('UPDATE v_sessions SET geo = ? WHERE id = ?')->execute([$g, $sidG]);
-                foreach ($sessions as &$rowUpd) {
-                    if ((int)$rowUpd['id'] === $sidG) { $rowUpd['geo'] = $g; break; }
-                }
-                unset($rowUpd);
-            }
-        }
-    } catch (\Throwable $e) { /* 地理补查失败不影响轮询 */ }
+    // 地理信息渐进补查：每轮最多补 4 个未解析的 IP（写回 v_sessions.geo，配合 24h 缓存）
+    geo_backfill($pdo, $sessions, 4);
     json_out(['sessions' => $sessions, 'messages' => $msgs, 'readUpto' => $readUpto, 'recalledIds' => $recalledIds, 'editedMsgs' => $editedMsgs, 'now' => time(), 'counts' => $counts]);
 }

@@ -2843,3 +2843,33 @@ function visitor_sid_resolve(int $sidRaw): array
     $sid = session_alias_follow($sidRaw);
     return [$sid, ($sid === $sidRaw ? '' : session_alias_token($sidRaw))];
 }
+
+/** v2.90.3 归属地渐进补查：把列表里还没解析出地区的会话补上（写回 v_sessions.geo）。
+ *  一次最多补 $max 条，避免拖慢轮询/列表；每条 IP 的解析结果有 24h 缓存，补过一次就不再花钱。
+ *  补完顺手把这一轮的 city / region 也重算，前端不用等下一轮才显示。 */
+function geo_backfill(PDO $pdo, array &$sessions, int $max = 3): void
+{
+    if (!$sessions) return;
+    try {
+        $need = [];
+        foreach ($sessions as $row) {
+            if (count($need) >= max(1, $max)) break;
+            if (empty($row['geo']) && !empty($row['ip'])) $need[(int)$row['id']] = (string)$row['ip'];
+        }
+        foreach ($need as $sidG => $ipG) {
+            $g = lookup_geo($ipG);
+            if ($g === '') continue;
+            try { $pdo->prepare('UPDATE v_sessions SET geo = ? WHERE id = ?')->execute([$g, $sidG]); }
+            catch (\Throwable $e) { continue; }
+            foreach ($sessions as &$rowUpd) {
+                if ((int)$rowUpd['id'] === $sidG) {
+                    $rowUpd['geo'] = $g;
+                    $rowUpd['city'] = geo_city($g);
+                    $rowUpd['region'] = geo_region($g);
+                    break;
+                }
+            }
+            unset($rowUpd);
+        }
+    } catch (\Throwable $e) { /* 补查失败不影响主流程 */ }
+}

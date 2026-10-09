@@ -54,7 +54,13 @@ function ensure_upgrade(): void
         try { $pdo->exec("ALTER TABLE messages ADD COLUMN recalled_at DATETIME NULL"); } catch (\Throwable $e) { /* 列已存在 */ }
         try { $pdo->exec("ALTER TABLE messages ADD INDEX idx_msg_read (session_id, from_type, read_at)"); } catch (\Throwable $e) { /* 已存在 */ }
         try { $pdo->exec("ALTER TABLE v_sessions ADD COLUMN visitor_avatar VARCHAR(255) NOT NULL DEFAULT ''"); } catch (\Throwable $e) { /* 列已存在 */ }
-        try { $pdo->exec("UPDATE v_sessions SET geo = '' WHERE geo LIKE '%|%'"); } catch (\Throwable $e) { /* 旧英文格式清空 */ }
+        /* v2.90.3 修 bug：这句原来是**每次请求都跑**的旧格式清理，而新格式的归属地串（中国|山东省|0|移动|CN）
+           也含「|」→ 等于每来一个请求就把刚解析好的归属地擦掉，会话列表里永远看不到地区
+           （轮询里补的那两条只在内存里显示一瞬，进库就被擦）。改成只清一次，而且只清英文格式的旧数据。 */
+        if (kv_get('geo_legacy_purged', '') !== '1') {
+            try { $pdo->exec("UPDATE v_sessions SET geo = '' WHERE geo LIKE '%|%' AND geo REGEXP '^[A-Za-z]'"); } catch (\Throwable $e) { }
+            try { kv_set('geo_legacy_purged', '1'); } catch (\Throwable $e) { }
+        }
         try { $pdo->exec("ALTER TABLE v_sessions ADD COLUMN geo VARCHAR(150) NOT NULL DEFAULT ''"); } catch (\Throwable $e) { /* 列已存在 */ }
         // v2.25 三级会话：已结束会话自动清理时间 + 归档时间；租户级会话总数上限
         try { $pdo->exec("ALTER TABLE tenants ADD COLUMN closed_keep_days INT UNSIGNED NOT NULL DEFAULT 3"); } catch (\Throwable $e) { /* 列已存在 */ }
