@@ -237,9 +237,9 @@ const app = createApp({
 
     const tabTitle = computed(() => ({
       work: '会话接待', stats: '数据面板', quick: '快捷回复', welcome: '欢迎语', auto: '自动回复',
-      broadcast: '群发', blacklist: 'IP 黑名单', preinq: '询前表单', links: '获客链接', agents: '子客服管理',
+      broadcast: '群发', blacklist: 'IP 黑名单', preinq: '询前表单', links: '客服码', agents: '子客服管理',
       brand: '访客端模板', policy: '访客策略', visitors: '访客列表', security: '安全与维护', profile: '个人设置', ui: '后台 UI',
-      quick: '快捷消息', auto: '智能回复', agents: '坐席管理', broadcast: '群发模板', links: '获客码',
+      quick: '快捷消息', auto: '智能回复', agents: '坐席管理', broadcast: '群发模板', links: '客服码',
       setting: '设置 · ' + ((SET_ITEMS.find(x => x.v === setTab.value) || {}).n || ''),
     }[tab.value]));
     /* v2.88.3 正在聊的会话不要因为「列表里暂时没有它」就整块变空：
