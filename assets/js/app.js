@@ -1011,6 +1011,26 @@ const app = createApp({
       try { await API.put('/api/tenant/settings', { quick_send_mode: quickMode.value }); } catch (e) {}
     };
     const pendingAtts = ref([]);   // 待发附件（编辑模式带入的图片，发送时随消息发出）
+    /* v2.90.22 当前会话之外、同一个 IP 下还没结束的其它会话（会话头那个「同 IP 还有 N 条」按钮用） */
+    const sameIpOthers = Vue.computed(() => {
+      const cur = current.value;
+      if (!cur || !cur.ip) return [];
+      return (sessions.value || []).filter(x => x.id !== cur.id && x.ip === cur.ip && x.status !== 'closed' && x.status !== 'archived');
+    });
+    const mergeSameIpNow = async () => {
+      if (!currentId.value) return;
+      try {
+        const r = await API.post('/api/sessions/merge-by-ip', { id: currentId.value });
+        if (r && r.merged) {
+          ElementPlus.ElMessage.success('已并入 ' + r.merged + ' 条同 IP 会话（搬过来 ' + (r.moved || 0) + ' 条消息），客户那边看到的是一整段完整记录');
+        } else {
+          ElementPlus.ElMessage.info('这个 IP 下没有别的未结束会话');
+        }
+        await pollOnce();
+        const keep = currentId.value;
+        if (keep) { msgs.value = []; await openSession(keep); }
+      } catch (e) { ElementPlus.ElMessage.error(e.message || '合并失败'); }
+    };
     const quickClick = (q, ev) => {
       if (qDrag.suppressClick) { qDrag.suppressClick = false; return; }   // 刚拖完，别把消息发出去
       if ((ev && (ev.ctrlKey || ev.metaKey)) || quickMode.value === 'edit') {
@@ -3403,7 +3423,9 @@ const app = createApp({
       navGroups,
       audioPlaying, audioDur, waveBars, toggleAudio,
       asrText, asrBusy, transcribe,
-      openSession, send, onKey, useQuick, sendQuick, quickClick, quickMode, setQuickMode, onImage, startRec, stopRec, closeSession, doTransfer,
+      openSession, send, onKey, useQuick, sendQuick, quickClick, quickMode, setQuickMode,
+      sameIpOthers, mergeSameIpNow,
+      onImage, startRec, stopRec, closeSession, doTransfer,
       autoGrowTa,
       taPlaceholder,
       pendingAtts, rmPendingAtt, quickCtx, openQuickCtx, editQuick,

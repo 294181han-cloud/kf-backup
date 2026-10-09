@@ -7,7 +7,7 @@
 <link rel="icon" href="/assets/img/mi-logo.png">
 <link rel="apple-touch-icon" href="/assets/img/mi-logo.png">
 <link rel="stylesheet" href="/assets/vendor/element-plus.css">
- <link rel="stylesheet" href="/assets/css/app.css?v=3.64.1">
+ <link rel="stylesheet" href="/assets/css/app.css?v=3.64.2">
 <script src="/assets/ui/ui-registry.js?v=2.10.4"></script>
 <script src="/assets/ui/ui-loader.js?v=2.10.4" data-ui-cat="auto"></script>
 </head>
@@ -276,6 +276,9 @@
                         :title="'访客最后上线：' + fmtTime(current.lastOnline || current.lastTime)">
                     🕒 <span class="clo-t">最后上线</span>{{ fmtTime(current.lastOnline || current.lastTime) }}
                   </span>
+                    <!-- v2.90.22 同一个 IP 下还有别的没结束的窗口 → 一键并进来（自动合并不上的兜底，比如系统版本被识别成两台设备） -->
+                    <button v-if="sameIpOthers.length" class="ch-merge-ip" :title="'同一个 IP 下还有 ' + sameIpOthers.length + ' 条没结束的会话：' + sameIpOthers.map(s => s.name).join('、')"
+                            @click="mergeSameIpNow">🧩 同 IP 还有 {{ sameIpOthers.length }} 条 · 合并</button>
                   <!-- v2.60.13 恢复码：客户换手机/换浏览器后把它发给他（点一下就复制）。手机上收在 ⋯ 菜单与访客信息里 -->
                   <!-- v2.89.9 恢复码不再堆在标题行：右侧「访客信息」里能复制，工具栏 🔑 能找回/合并对话 -->
                 </div>
@@ -1769,7 +1772,7 @@
 <script src="/assets/qr-poster.js?v=2.3.0"></script>
 <script src="/assets/api.js?v=2.1.1"></script>
 <script src="/assets/js/app-components.js?v=2.6.2"></script>
-<script src="/assets/js/app.js?v=3.67.5"></script>
+<script src="/assets/js/app.js?v=3.67.6"></script>
 <script src="/assets/js/app-boot.js?v=2.1.1"></script>
 </body>
 </html>

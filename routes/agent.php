@@ -404,18 +404,23 @@ function auto_merge_duplicates(array $ctx, int $maxGroups = 3): int
     $merged = 0;
     try {
         $pdo = db();
-        $st = $pdo->prepare("SELECT id, ip, ua FROM v_sessions
+        $st = $pdo->prepare("SELECT id, ip, ua,
+            (SELECT COUNT(*) FROM messages m WHERE m.session_id = v_sessions.id AND m.from_type = 'visitor') AS vm
+            FROM v_sessions
             WHERE tenant_id = ? AND deleted_at IS NULL AND status <> 'closed' AND ip <> ''
               AND last_time >= ?
             ORDER BY id ASC LIMIT 500");
         $st->execute([$tid, now_dt(time() - 86400)]);
-        $groups = [];
+        $groups = []; $byIp = [];
         foreach ($st->fetchAll() as $row) {
             $tag = (string)(parse_ua((string)($row['ua'] ?? ''))['dev_tag'] ?? '');
             // v2.90.9 按 id 升序 → 每组里第一条就是**最初那条**，合并都往它上面并
             $groups[(string)$row['ip'] . "\t" . $tag][] = (int)$row['id'];
+            // v2.90.22 顺手按 IP 也分一下组（给下面第二轮"空窗口"用）
+            $byIp[(string)$row['ip']][] = ['id' => (int)$row['id'], 'vm' => (int)($row['vm'] ?? 0)];
         }
         $done = 0;
+        // 第一轮：同 IP + 同设备（正常情况：同一个人换微信/浏览器，或者手抖进两次）
         foreach ($groups as $ids) {
             if (count($ids) < 2) continue;
             $keep = (int)array_shift($ids);
@@ -424,6 +429,27 @@ function auto_merge_duplicates(array $ctx, int $maxGroups = 3): int
                 catch (\Throwable $e) { /* 单条失败不影响其它 */ }
             }
             if (++$done >= max(1, $maxGroups)) break;
+        }
+        /* 第二轮（v2.90.22）：同一个 IP 下「一句话都没说过的空窗口」（只有系统那条"客户已接入"，
+           客户手抖扫两次、或壳页/内容页各起过一次会话），不管系统版本一不一样都并掉 ——
+           这种窗口里没有任何客户内容，合并是安全的，能兜住"偶发多出一个会话"。 */
+        if ($done < max(1, $maxGroups)) {
+            foreach ($byIp as $ip => $list) {
+                if (count($list) < 2) continue;
+                $ghosts = []; $real = [];
+                foreach ($list as $it) {
+                    if ($it['vm'] > 0) $real[] = (int)$it['id']; else $ghosts[] = (int)$it['id'];
+                }
+                if (!$ghosts) continue;
+                $keep = $real ? $real[0] : $ghosts[0];
+                $cnt = 0;
+                foreach ($ghosts as $gid) {
+                    if ($gid === $keep) continue;
+                    try { session_merge_into($ctx, $keep, $gid); $merged++; $cnt++; }
+                    catch (\Throwable $e) { }
+                }
+                if ($cnt && ++$done >= max(1, $maxGroups)) break;
+            }
         }
     } catch (\Throwable $e) { /* 自动合并失败不影响列表 */ }
     return $merged;
