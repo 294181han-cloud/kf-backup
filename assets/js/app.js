@@ -3159,7 +3159,48 @@ const app = createApp({
     };
     /** v2.60.11 切页签立刻刷新（原来要等下一次轮询，切到「已删除」会先闪一下上一页的旧列表） */
     const setScope = (s) => { sessScope.value = s; try { pollOnce(); } catch (e) {} };
-    const sideCollapsed = ref(false);
+    /* v2.89.5 工作台布局自定义：左侧栏收起 / 会话列表拖宽 / 访客信息收起，都记在本地 */
+    const sideCollapsed = ref((function () { try { return localStorage.getItem('kfxt_side_collapsed') === '1'; } catch (e) { return false; } })());
+    const sessW = ref((function () {
+      try { return Math.min(560, Math.max(240, parseInt(localStorage.getItem('kfxt_sess_w') || '326', 10) || 326)); }
+      catch (e) { return 326; }
+    })());
+    const sessResizing = ref(false);
+    const infoCollapsed = ref((function () { try { return localStorage.getItem('kfxt_info_collapsed') === '1'; } catch (e) { return false; } })());
+    let sessDragFrom = null;
+    const sessResizeStart = (e) => {
+      sessResizing.value = true;
+      document.body.classList.add('resizing-col');
+      sessDragFrom = { x: e.clientX, w: sessW.value };
+      const mv = (ev) => {
+        if (!sessDragFrom) return;
+        sessW.value = Math.min(560, Math.max(240, sessDragFrom.w + (ev.clientX - sessDragFrom.x)));
+      };
+      const up = () => {
+        sessDragFrom = null;
+        sessResizing.value = false;
+        document.body.classList.remove('resizing-col');
+        try { localStorage.setItem('kfxt_sess_w', String(sessW.value)); } catch (e2) {}
+        document.removeEventListener('mousemove', mv);
+        document.removeEventListener('mouseup', up);
+      };
+      document.addEventListener('mousemove', mv);
+      document.addEventListener('mouseup', up);
+    };
+    const sessResetW = () => {
+      sessW.value = 326;
+      try { localStorage.setItem('kfxt_sess_w', '326'); } catch (e) {}
+    };
+    const toggleSide = () => {
+      sideCollapsed.value = !sideCollapsed.value;
+      try { localStorage.setItem('kfxt_side_collapsed', sideCollapsed.value ? '1' : '0'); } catch (e) {}
+    };
+    const toggleInfo = () => {
+      /* 手机端是右侧抽屉，电脑端是"显示/隐藏这一列" */
+      if (document.documentElement.getAttribute('data-ui-cat') === 'mobile') { infoOpen.value = !infoOpen.value; return; }
+      infoCollapsed.value = !infoCollapsed.value;
+      try { localStorage.setItem('kfxt_info_collapsed', infoCollapsed.value ? '1' : '0'); } catch (e) {}
+    };
     try { dark.value = localStorage.getItem('kfxt_dark') === '1'; } catch (e) {}
     const applyDark = () => { document.body.classList.toggle('dark', dark.value); };
     const toggleDark = () => { dark.value = !dark.value; try { localStorage.setItem('kfxt_dark', dark.value ? '1' : '0'); } catch (e) {} applyDark(); };
@@ -3283,6 +3324,7 @@ const app = createApp({
       sec, loginLogs, visitors, cleanupOpts, loadSecurityPage, saveSecurity, doCleanup, refreshGeo, loadVisitors, openVisitorSessions,
       guide, guideDone, dark, toggleDark, renameVisitor, renderCodeQrs, tplList,
       uiCatList, uiCurrentCat, uiActiveCat, uiActiveList, uiSel, uiTplList, uiColorList, uiPick, sideCollapsed, mSideOpen,
+      sessW, sessResizing, sessResizeStart, sessResetW, toggleSide, infoCollapsed, toggleInfo,
       blockSession, blockIp, kwList, kwInput, kwSaving, addKw, removeKw, saveFilter, agentCmd, restartPoll,
       devices, deviceLimit, loadDevices, kickDevice, renameDevice, isCurDevice,
       chatSearchOn, chatSearchKw, searchHit, visibleMsgs, canRecall, recallMsg, isRead,

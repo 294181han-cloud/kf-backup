@@ -7,7 +7,7 @@
 <link rel="icon" href="/assets/img/mi-logo.png">
 <link rel="apple-touch-icon" href="/assets/img/mi-logo.png">
 <link rel="stylesheet" href="/assets/vendor/element-plus.css">
-<link rel="stylesheet" href="/assets/css/app.css?v=3.58.0">
+<link rel="stylesheet" href="/assets/css/app.css?v=3.59.0">
 <script src="/assets/ui/ui-registry.js?v=2.10.4"></script>
 <script src="/assets/ui/ui-loader.js?v=2.10.4" data-ui-cat="auto"></script>
 </head>
@@ -96,8 +96,11 @@
     <div class="m-mask" v-if="mSideOpen" @click="mSideOpen = false"></div>
     <!-- ============ 侧栏导航 ============ -->
     <!-- 手机端点侧栏里任何东西后自动收起抽屉 -->
-    <div class="side" @click="mSideOpen = false">
-      <div class="logo"><img class="lg-mi" src="/assets/img/mi-logo.png" alt=""><span class="lg-text">小米客服</span></div>
+    <div class="side" :class="{collapsed: sideCollapsed}" @click="mSideOpen = false">
+      <div class="logo"><img class="lg-mi" src="/assets/img/mi-logo.png" alt=""><span class="lg-text">小米客服</span>
+        <!-- v2.89.5 侧栏可以收起（记住状态） -->
+        <button type="button" class="side-toggle" :title="sideCollapsed ? '展开侧栏' : '收起侧栏'" @click.stop="toggleSide">{{ sideCollapsed ? '»' : '«' }}</button>
+      </div>
       <div class="nav">
         <div class="nav-group" style="padding-top:6px;">工 作</div>
         <div class="nav-item" :class="{active: tab==='work'}" @click="tab='work'; restartPoll()"><span class="nv-ic">💬</span><span class="nv-text">工作台</span><span class="nv-badge" v-if="unreadTotal>0" :title="unreadTotal + ' 条未读消息'">{{ unreadTotal>99 ? '99+' : unreadTotal }}</span></div>
@@ -189,7 +192,9 @@
       </aside>
 
       <div class="content workbench" v-if="tab==='work'" :class="{'has-chat': !!currentId}">
-        <div class="sess-col">
+        <div class="sess-col" :class="{resizing: sessResizing}" :style="{width: sessW + 'px'}">
+          <!-- v2.89.5 会话列表宽度自己拖（双击恢复默认） -->
+          <div class="sess-resizer" title="拖动调整会话列表宽度，双击恢复默认" @mousedown.prevent="sessResizeStart" @dblclick="sessResetW"></div>
           <div class="sess-scope-tabs">
             <button class="scope-tab" :class="{on: sessScope==='online'}" @click="setScope('online')">
               在线聊天<span class="scope-n" v-if="sessCounts.online">{{ sessCounts.online }}</span><span class="scope-dot" v-if="sessCounts.online_unread" :title="sessCounts.online_unread + ' 条未读'"></span>
@@ -295,7 +300,8 @@
 
               <span class="chat-head-btns">
                 <!-- 手机端：只留「资料」+「更多」两个按钮，其余（搜索/拉黑/归档/转接/结束）收进「更多」面板 -->
-                <el-button size="small" plain class="cbtn m-only" title="访客信息" @click="infoOpen = !infoOpen">👤</el-button>
+                <!-- v2.89.5 电脑端也能收起/展开右侧访客信息（手机端仍是抽屉） -->
+                <el-button size="small" plain class="cbtn" :class="{on: !infoCollapsed}" title="访客信息（收起 / 展开）" @click="toggleInfo">👤</el-button>
                 <el-button size="small" plain class="cbtn m-only" title="更多操作（搜索 / 拉黑 / 归档 / 转接 / 结束）" @click.stop="chMore = true">⋯</el-button>
                 <el-button size="small" plain class="cbtn icon m-hide-btn" title="搜索聊天记录" @click="chatSearchOn = !chatSearchOn">🔍</el-button>
                 <!-- v2.60.11 聊天记录快速查找：只看图片 / 按日期跳转 -->
@@ -507,7 +513,7 @@
         <!-- 手机端：访客信息抽屉的遮罩 -->
         <div class="m-mask m-info-mask" v-if="infoOpen" @click="infoOpen = false"></div>
 
-        <div class="info-col" v-if="current" :class="{open: infoOpen}">
+        <div class="info-col" v-if="current && !infoCollapsed" :class="{open: infoOpen}">
           <h4>
             访客信息
             <button type="button" class="info-close m-only" title="收起" @click="infoOpen = false">✕</button>
@@ -1758,7 +1764,7 @@
 <script src="/assets/qr-poster.js?v=2.3.0"></script>
 <script src="/assets/api.js?v=2.1.1"></script>
 <script src="/assets/js/app-components.js?v=2.6.2"></script>
-<script src="/assets/js/app.js?v=3.62.0"></script>
+<script src="/assets/js/app.js?v=3.63.0"></script>
 <script src="/assets/js/app-boot.js?v=2.1.1"></script>
 </body>
 </html>
