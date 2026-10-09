@@ -805,6 +805,16 @@ const app = createApp({
         markRead(id);
         // 资料与联系方式
         profile.value = await API.get('/api/sessions/' + id + '/profile');
+        /* v2.88.4 打开「不在当前列表里」的会话（从访客列表点进来、已归档/已结束的会话）：
+           给聊天头留一份兜底数据，否则 current 会是空 → 聊天区一片空白（用户反馈「跳转不了」） */
+        if (profile.value && profile.value.session && !sessions.value.some(s => s.id === id)) {
+          const ps = profile.value.session;
+          curSnap.value = {
+            id: id, name: ps.name, status: ps.status, unread: ps.unread || 0,
+            lastTime: ps.last_time, lastOnline: ps.last_time,
+            visitor_avatar: profile.value.avatar || '', agent_name: '', pinned: 0,
+          };
+        }
         contactList.value = await API.get('/api/sessions/' + id + '/contacts');
         noteDraft.value = (contactList.value.find(c => c.type === 'note') || {}).value || '';
         if (!agentOptions.value.length) await loadAgentOptions();
@@ -1635,6 +1645,7 @@ const app = createApp({
         sessChecked.value = [];
         if (ids.indexOf(currentId.value) >= 0) { currentId.value = 0; msgs.value = []; }
         await pollOnce();
+        loadVisitors();   // v2.88.4 批量删/归档/结束后，访客列表也跟着更新
       } catch (e) { ElementPlus.ElMessage.error(e.message); }
     };
 
@@ -1758,15 +1769,17 @@ const app = createApp({
       const sid = ctxMenu.sid; const name = ctxMenu.name; closeCtxMenu();
       try {
         await ElementPlus.ElMessageBox.confirm(
-          '把「' + name + '」移到回收站？会话额度立刻腾出来，30 天内还能在「已删除」里恢复。', '删除会话',
+          '删除「' + name + '」这段对话？删除后不在列表里显示，会话额度立刻腾出来。', '删除会话',
           { type: 'warning', confirmButtonText: '删除', cancelButtonText: '取消' });
         await API.post('/api/sessions/' + sid + '/delete');
         sessions.value = sessions.value.filter(s => s.id !== sid);
         if (currentId.value === sid) { currentId.value = 0; msgs.value = []; }
         await pollOnce();
-        toastWithUndo('已移到回收站', '撤销', async () => {
+        loadVisitors();   // v2.88.4 访客列表跟着刷新，删掉的会话那边也要没了
+        toastWithUndo('已删除（点撤销可找回）', '撤销', async () => {
           await API.post('/api/sessions/' + sid + '/restore');
           await pollOnce();
+          loadVisitors();
         });
       } catch (e) { if (e !== 'cancel' && e && e.message) ElementPlus.ElMessage.error(e.message); }
     };
@@ -2184,9 +2197,21 @@ const app = createApp({
     const loadVisitors = async () => {
       try { visitors.value = await API.get('/api/tenant/visitors'); } catch (e) {}
     };
-    const openVisitorSessions = (row) => {
-      if (row.last_session_id) { tab.value = 'work'; openSession(row.last_session_id); }
-      else ElementPlus.ElMessage.info('该访客暂无会话记录');
+    /* v2.88.4 访客列表 → 点「会话」跳到会话接待：
+       原来直接 openSession 就走了，如果那条会话是「已归档 / 已结束」的，当前列表里根本没有它 →
+       聊天区空白，看着就是「跳转不了」。现在先问一下它属于哪个分区，切过去再打开。 */
+    const openVisitorSessions = async (row) => {
+      const sid = parseInt(row && row.last_session_id, 10) || 0;
+      if (!sid) { ElementPlus.ElMessage.info('该访客暂无会话记录'); return; }
+      let st = '';
+      try {
+        const p = await API.get('/api/sessions/' + sid + '/profile');
+        st = (p && p.session && p.session.status) || '';
+      } catch (e) { /* 拿不到就按在线处理 */ }
+      sessScope.value = st === 'archived' ? 'archived' : (st === 'closed' ? 'closed' : 'online');
+      tab.value = 'work';
+      try { await pollOnce(); } catch (e) {}
+      await openSession(sid);
     };
 
     // 接入引导（真实配置状态）
