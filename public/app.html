@@ -26,7 +26,6 @@
     </div>
     <div class="ctx-item" @click="ctxMenuBlock">🚫 拉黑访客<div class="ctx-sub">拉黑该 IP，之后进不来也发不了消息</div></div>
     <!-- v2.90 同 IP 一键合并（客户换浏览器/清缓存后出现的第二个窗口） -->
-    <div class="ctx-item" @click="ctxMenuMergeIp">🔗 合并同 IP 的会话<div class="ctx-sub">把同一个 IP 名下其它没结束的窗口并进来，记录一条不丢</div></div>
     <div class="ctx-divider"></div>
     <div class="ctx-item danger" @click="ctxMenuDelete">🗑️ 删除会话<div class="ctx-sub">彻底删除，腾出会话额度</div></div>
     <div class="ctx-item" v-if="sessScope==='online'" @click="ctxMenuArchive">📦 归档会话</div>
@@ -1781,7 +1780,7 @@
 <script src="/assets/qr-poster.js?v=2.3.0"></script>
 <script src="/assets/api.js?v=2.1.1"></script>
 <script src="/assets/js/app-components.js?v=2.6.2"></script>
-<script src="/assets/js/app.js?v=3.67.0"></script>
+<script src="/assets/js/app.js?v=3.67.1"></script>
 <script src="/assets/js/app-boot.js?v=2.1.1"></script>
 </body>
 </html>

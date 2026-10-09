@@ -1751,20 +1751,9 @@ const app = createApp({
         ElementPlus.ElMessage.success('已拉黑');
       } catch (e) { if (e !== 'cancel' && e && e.message) ElementPlus.ElMessage.error(e.message); }
     };
-    /* v2.90 一键合并同 IP 的重复会话（客户换浏览器/清缓存后出现的第二个窗口）：
-       把同一 IP 下还没结束的其它会话全并进这条，消息一条不丢，访客端刷新后也是同一段完整记录。 */
-    const ctxMenuMergeIp = async () => {
-      const sid = ctxMenu.sid;
-      closeCtxMenu();
-      try {
-        const r = await API.post('/api/sessions/merge-by-ip', { id: sid });
-        ElementPlus.ElMessage.success(r.merged
-          ? ('已合并 ' + r.merged + ' 段同 IP 会话（搬进 ' + r.moved + ' 条消息），访客端刷新后看到的是完整记录')
-          : '这个 IP 名下没有其它未结束的会话');
-        await pollOnce();
-        if (currentId.value) { const keep = currentId.value; msgs.value = []; await openSession(keep); }
-      } catch (e) { ElementPlus.ElMessage.error(e.message); }
-    };
+    /* v2.90.15 右键的「合并同 IP 的会话」已去掉：同 IP 重复窗口现在由
+       auto_merge_duplicates() 自动合并（打开列表/轮询时懒执行），不用客服手点。
+       设置页那个「一键合并」还留着，做历史遗留清理用。 */
     /* v2.90 设置页：把全账号「同 IP 的重复会话」一次性合并（历史遗留的一堆重复窗口清理用） */
     const mergeAllByIp = async () => {
       try {
@@ -3366,7 +3355,7 @@ const app = createApp({
       sessMulti, sessChecked, toggleMulti, toggleSessCheck, checkAllSess, bulkSessions,
       ctxMenu, openCtxMenu, openCtxMenuFromBtn, closeCtxMenu, ctxMenuArchive, ctxMenuClose, ctxMenuDelete,
       ctxMenuPin, ctxMenuUnread, ctxMenuBlock,
-      ctxMenuNote, ctxMenuMerge, ctxMenuMergeIp, mergeAllByIp,
+      ctxMenuNote, ctxMenuMerge, mergeAllByIp,
       ctxMenuRename, imgsOf,
       qeImgs, quickFocus, quickImgInput, quickPickImg, quickOnImg, quickPaste, quickRmAtt,
       replyTo, quoteOf, quoteWho, quoteText, startReply, jumpToMsg, copyMsg, flashId, fmtSize, mapUrl,
