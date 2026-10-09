@@ -49,6 +49,7 @@ createApp({
     let mediaRecorder = null, recChunks = [], recTimer = null, recStartAt = 0;
 
     let pollTimer = null;
+    let histDone = false;   // v2.89.12 历史消息是否已拉完（拉完才会响应「刷新访客端」指令）
 
     const params = () => {
       const p = {};
@@ -160,6 +161,7 @@ createApp({
         /* v2.89.12 客服在工作台点了「刷新」→ 这里收到 sys_reload 指令就刷新整个页面
            （客户页面卡住、图片不显示、样式错乱时用；这条指令本身不显示） */
         if (m && m.msg_type === 'sys_reload') {
+          if (!histDone) continue;                  // 历史里的旧指令不触发（只有页面开着时新来的才刷）
           let done = '';
           try { done = sessionStorage.getItem('kfxt_reload_done') || ''; } catch (e) {}
           if (done === String(m.id)) continue;      // 这条指令已经刷过了（否则刷新后会无限循环）
@@ -407,6 +409,9 @@ createApp({
     const loadHistory = async () => {
       const r = await fetch((window.KF_API_BASE||'') + '/api/visitor/messages?session_id=' + sessionId.value).then(x => x.json());
       pushMessages(r.messages || []);
+      /* v2.89.12 拉完历史再打开「刷新指令」的开关：历史里以前留下的 sys_reload 不触发刷新，
+         只有页面开着的时候客服新点的刷新才会让客户页刷新（避免一进来就白刷一次）。 */
+      histDone = true;
     };
 
     const submitForm = async () => {
