@@ -2308,7 +2308,7 @@ body.resizing-col { cursor: col-resize !important; user-select: none; }
 @container (max-width: 900px) {
   .chat-head .ch-sub .ch-chip:nth-child(2) { display: none; }   /* 设备 */
 }
-@container (max-width: 780px) {
+@container (max-width: 700px) {
   .chat-head .ch-sub { display: none; }                          /* 剩下地区也省掉 */
   .ch-tools .m-hide-btn { display: none; }                       /* 工具条只留「访客信息」，其余收起来 */
 }
