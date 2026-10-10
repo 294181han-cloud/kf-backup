@@ -2758,8 +2758,18 @@ function gate_frame_allow_hosts(): array
             if ($d !== '') $hosts[] = $d;
         }
     } catch (\Throwable $e) { /* 库不可用就只留下面的固定项 */ }
-    // 大厂免费托管门牌（微信判得松、更难红）：netlify 的随机子域都能当门牌
-    foreach (['netlify.app'] as $extra) $hosts[] = $extra;
+    /* 大厂免费托管门牌：这些**整段**都放行，建了站直接能当门牌用，不用再改代码。
+       2026-10-10 实测微信状态：netlify / vercel / pages.dev / workers.dev / github.io / gitlab.io /
+       glitch.me / surge.sh / render / web.app / firebaseapp / fly.dev / herokuapp / wixsite /
+       notion.site / wordpress / statically / jsdelivr / gitee.io / 腾讯云COS / 阿里云OSS / 七牛 / 百度BOS
+       —— 全部 🟢 绿；**deno.dev、blogspot.com 已红，别用**。
+       注：整段放行 = 别人也能拿这些域当门牌嵌壳页；但壳页要带有效入口 ID 才有内容，风险可控。 */
+    foreach ([
+        'netlify.app', 'vercel.app', 'pages.dev', 'workers.dev', 'github.io', 'gitlab.io',
+        'glitch.me', 'surge.sh', 'onrender.com', 'web.app', 'firebaseapp.com', 'fly.dev',
+        'herokuapp.com', 'wixsite.com', 'notion.site', 'wordpress.com', 'statically.io',
+        'jsdelivr.net', 'gitee.io', 'myqcloud.com', 'aliyuncs.com', 'clouddn.com', 'bcebos.com',
+    ] as $extra) $hosts[] = $extra;
     return array_values(array_unique($hosts));
 }
 
