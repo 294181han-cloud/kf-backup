@@ -297,10 +297,10 @@ body.dark .trend-legend { color: #98a3b4; }
   touch-action: none;
 }
 .ci-resizer::before {
-  content: ''; width: 44px; height: 3px; border-radius: 3px; background: #dcdfe6;
+  content: ''; width: 58px; height: 4px; border-radius: 3px; background: #ccd3dd;
   transition: background .15s, width .15s;
 }
-.ci-resizer:hover::before, .ci-resizer.dragging::before { background: var(--theme, #1677ff); width: 76px; }
+.ci-resizer:hover::before, .ci-resizer.dragging::before { background: var(--theme, #1677ff); width: 92px; }
 body.resizing-ta, body.resizing-ta * { cursor: row-resize !important; }
 body.resizing-ta { user-select: none; }
 body.dark .ci-resizer::before { background: #3a4048; }
