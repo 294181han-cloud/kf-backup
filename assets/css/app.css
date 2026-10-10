@@ -336,7 +336,8 @@ body.dark .iq-t { color: #e5e6eb; }
 .qk-groups { display: flex; gap: 6px; flex-wrap: wrap; }
 .qk-search { padding: 0 12px 8px; }
 .qk-x { border: 0; background: #f2f5fa; color: #6b7688; width: 24px; height: 24px; border-radius: 7px; cursor: pointer; flex: 0 0 auto; }
-.qk-list { max-height: min(58vh, 460px); overflow-y: auto; overscroll-behavior: contain; padding: 8px 12px 10px; display: grid; grid-template-columns: 1fr; gap: 6px; }
+/* v2.90.60 只露 5 条（多了在面板里上下滚），别让面板一拉就铺满半屏 */
+.qk-list { max-height: 212px; overflow-y: auto; overscroll-behavior: contain; padding: 8px 12px 10px; display: grid; grid-template-columns: 1fr; gap: 6px; }
 .qk-item {
   text-align: left; border: 1px solid var(--v-line, #e5e6eb); background: #fff; border-radius: 9px;
   padding: 7px 10px; cursor: pointer; display: flex; align-items: center; gap: 8px; min-width: 0;
@@ -1184,6 +1185,17 @@ body.dark .me-btn.danger:hover { background: #3a2124; border-color: #5a3236; col
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .ch-edit { cursor: pointer; font-size: 12.5px; opacity: .55; }
 .ch-edit:hover { opacity: 1; }
+/* v2.90.60 点会话头里的名字，就地变成输入框改名（不再弹框） */
+.ch-top .name { cursor: text; border-radius: 6px; padding: 1px 5px; margin-left: -5px; transition: background .12s, color .12s; }
+.ch-top .name:hover { background: #f2f5fa; color: var(--theme, #1677ff); }
+.name-input {
+  font: inherit; font-size: 15px; font-weight: 700; color: var(--v-ink, #1d2129);
+  border: 1px solid var(--theme, #1677ff); border-radius: 7px; background: #fff;
+  padding: 1px 8px; outline: none; width: 168px; max-width: 40vw; min-width: 80px;
+}
+.info-col .name-input { font-size: 13px; font-weight: 400; width: 100%; max-width: none; text-align: right; padding: 0 6px; }
+body.dark .ch-top .name:hover { background: #2b313a; }
+body.dark .name-input { background: #262c34; color: #e5e6eb; }
 .ch-chip {
   font-size: 11.5px; color: #5c6b85; background: #f2f5fa;
   border-radius: 7px; padding: 2px 8px; white-space: nowrap;

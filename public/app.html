@@ -7,7 +7,7 @@
 <link rel="icon" href="/assets/img/mi-logo.png">
 <link rel="apple-touch-icon" href="/assets/img/mi-logo.png">
 <link rel="stylesheet" href="/assets/vendor/element-plus.css">
-<link rel="stylesheet" href="/assets/css/app.css?v=3.64.28">
+<link rel="stylesheet" href="/assets/css/app.css?v=3.64.29">
 <script src="/assets/ui/ui-registry.js?v=2.10.4"></script>
 <script src="/assets/ui/ui-loader.js?v=2.10.4" data-ui-cat="auto"></script>
 </head>
@@ -269,8 +269,11 @@
               <div class="ch-ava" :class="{on: current.status==='online'}">{{ current.visitor_avatar || sessIcon(current) }}</div>
               <div class="ch-info">
                 <div class="ch-top">
-                  <span class="name" :title="current.name">{{ current.name }}</span>
-                  <span class="ch-edit" title="修改访客名称" @click="renameVisitor">✏️</span>
+                  <!-- v2.90.60 点名字就地改名：点一下名字直接变成输入框，回车/点别处保存，Esc 取消（不再弹框） -->
+                  <span class="name" v-if="!nameEditing" :title="current.name + '（点一下直接改名）'" @click="startRename">{{ current.name }}</span>
+                  <input v-else class="name-input" v-model="nameDraft" maxlength="30" placeholder="输入新名称" autocomplete="off"
+                         @keydown.enter.prevent="commitRename" @keydown.esc.prevent="cancelRename" @blur="commitRename">
+                  <span class="ch-edit" title="点名字就能改" @click="startRename">✏️</span>
                   <span class="ch-state" :class="current.status"><i></i>{{ current.status==='online' ? '在线' : '离线' }}</span>
                   <!-- v2.60.1 访客最后上线时间（心跳时间；离线/已结束都看得到） -->
                   <span class="ch-last-online" v-if="current.status!=='online' && (current.lastOnline || current.lastTime)"
@@ -544,7 +547,7 @@
             <button type="button" class="info-collapse" title="收起访客信息" @click="toggleInfo">»</button>
             <button type="button" class="info-close m-only" title="收起" @click="infoOpen = false">✕</button>
           </h4>
-          <div class="info-item"><span class="k">名称</span><span class="v" style="cursor:pointer;" title="点击修改" @click="renameVisitor">{{ current.name }} ✏️</span></div>
+            <div class="info-item"><span class="k">名称</span><span class="v" style="cursor:pointer;" title="点一下直接改名" @click="!nameEditing && startRename()">{{ current.name }} ✏️</span></div>
           <div class="info-item" v-if="profile"><span class="k">设备 / 平台</span><span class="v">{{ profile.dev_tag || profile.os || '未知' }}</span></div>
             <div class="info-item" v-if="profile"><span class="k">渠道</span><span class="v" :title="profile.browser ? ('浏览器标识：' + profile.browser) : ''">{{ profile.channel || profile.browser || '未知' }}</span></div>
           <div class="info-item"><span class="k">I P</span><span class="v mono">{{ current.ip }}</span></div>
@@ -1822,7 +1825,7 @@
 <script src="/assets/qr-poster.js?v=2.3.0"></script>
 <script src="/assets/api.js?v=2.1.2"></script>
 <script src="/assets/js/app-components.js?v=2.6.2"></script>
-<script src="/assets/js/app.js?v=3.68.9"></script>
+<script src="/assets/js/app.js?v=3.68.10"></script>
 <script src="/assets/js/app-boot.js?v=2.1.1"></script>
 </body>
 </html>

@@ -2147,6 +2147,36 @@ const app = createApp({
       }
     };
     const renameVisitor = async () => {
+      /* v2.90.60 改成「就地改名」：点名字直接变输入框（不再弹那个 prompt 框） */
+      startRename();
+    };
+    const nameEditing = ref(false);
+    const nameDraft = ref('');
+    const startRename = () => {
+      if (!currentId.value) return;
+      nameDraft.value = current.value ? (current.value.name || '') : '';
+      nameEditing.value = true;
+      nextTick(() => {
+        const el = document.querySelector('.chat-head .name-input') || document.querySelector('.info-col .name-input');
+        if (el) { el.focus(); try { el.select(); } catch (e) {} }
+      });
+    };
+    const cancelRename = () => { nameEditing.value = false; };
+    const commitRename = async () => {
+      if (!nameEditing.value) return;
+      nameEditing.value = false;
+      const name = (nameDraft.value || '').trim().slice(0, 30);
+      const old = current.value ? current.value.name : '';
+      if (!name || !currentId.value || name === old) return;   // 空名字 / 没改：当没发生
+      try {
+        await API.put('/api/sessions/' + currentId.value + '/name', { name });
+        const s = sessions.value.find(x => x.id === currentId.value);
+        if (s) s.name = name;
+        if (profile.value && profile.value.session) profile.value.session.name = name;
+        ElementPlus.ElMessage({ message: '已改名：' + name, duration: 900 });
+      } catch (e) { ElementPlus.ElMessage.error(e.message || '改名失败'); }
+    };
+    const renameVisitorLegacy = async () => {
       if (!currentId.value) return;
       try {
         // v2.71 输入框改成空白——原来预填了旧名字，还得先全选删掉才能改
@@ -3546,7 +3576,7 @@ const app = createApp({
       waNumber, tgUser, waQrBox, tgQrBox, genWaQr, genTgQr,
       uploadAvatar, isImg,
       sec, loginLogs, visitors, cleanupOpts, loadSecurityPage, saveSecurity, doCleanup, refreshGeo, loadVisitors, openVisitorSessions,
-      guide, guideDone, dark, toggleDark, renameVisitor, renderCodeQrs, tplList,
+      guide, guideDone, dark, toggleDark, renameVisitor, nameEditing, nameDraft, startRename, commitRename, cancelRename, renderCodeQrs, tplList,
       uiCatList, uiCurrentCat, uiActiveCat, uiActiveList, uiSel, uiTplList, uiColorList, uiPick, sideCollapsed, mSideOpen,
       sessW, sessTabText, sessResizing, sessResizeStart, sessResetW, toggleSide, infoCollapsed, toggleInfo,
       blockSession, blockIp, kwList, kwInput, kwSaving, addKw, removeKw, saveFilter, agentCmd, restartPoll,
