@@ -183,7 +183,9 @@ body.dark .tool-btn:hover { color: var(--theme, #69b1ff); }
 .ui-seg { display: inline-flex; background: #f2f3f5; border-radius: 12px; padding: 4px; }
 .ui-seg-btn { width: 130px; height: 40px; border: none; border-radius: 9px; background: transparent; color: #333; font-size: 14px; cursor: pointer; transition: all .15s; }
 .ui-seg-btn.on { background: var(--theme, #1677ff); color: #fff; font-weight: 600; }
-.quick-toggle-row { padding: 0 2px 5px; }
+/* v2.90.40 「⚡快捷消息 / ⚙设置」和快捷按钮排在同一行（原来是上下两行） */
+.quick-line { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; min-width: 0; }
+.quick-toggle-row { padding: 0; flex: 0 0 auto; display: flex; align-items: center; gap: 6px; }
 .quick-toggle-btn {
   border: 1px solid #eeeaea; background: #fff; color: #333; border-radius: 8px;
   padding: 4px 9px; font-size: 12px; font-weight: 500; cursor: pointer;
@@ -263,11 +265,10 @@ body.dark .trend-legend { color: #98a3b4; }
 .pa-rm { position: absolute; top: -7px; right: -7px; width: 18px; height: 18px; border-radius: 50%; background: #f53f3f; color: #fff; text-align: center; line-height: 18px; font-size: 11px; cursor: pointer; }
 /* 快捷条：布局内占位（不遮挡），位于工具栏上方，向右展开 */
 .quick-bar {
-  max-height: 0; opacity: 0; overflow: hidden; margin-bottom: 0;
-  transition: max-height .28s ease, opacity .22s ease, margin-bottom .28s ease;
+  flex: 1 1 auto; min-width: 0; opacity: 1; overflow: visible; margin-bottom: 0;
 }
-.quick-bar.open { max-height: 46px; opacity: 1; margin-bottom: 8px; }
-.quick-scroll { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 2px; }
+.quick-bar:not(.open) { display: none; }     /* 收起来的时候只留左边两个按钮 */
+.quick-scroll { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 0; align-items: center; }
 .quick-scroll::-webkit-scrollbar { height: 4px; }
 .quick-scroll::-webkit-scrollbar-thumb { background: #e0e3e8; border-radius: 2px; }
 .quick-btn {
@@ -1570,8 +1571,9 @@ body.dark .msg-sheet .ms-item.ghost { border-top-color: #2b313a; color: #8b95a7;
       按钮不接管滚动，那排就没法横向滑了，换行正好绕开这个矛盾。
    ===================================================================== */
 @media (max-width: 900px) {
-  .quick-bar.open { max-height: none; }
-  .quick-bar .quick-scroll { flex-wrap: wrap; overflow-x: visible; row-gap: 6px; }
+.quick-bar.open { max-height: none; }
+/* v2.90.40 手机上也保持一行：快捷按钮横向滑，不再换行堆成两排 */
+.quick-bar .quick-scroll { flex-wrap: nowrap; overflow-x: auto; row-gap: 0; }
   .quick-bar .quick-scroll .quick-btn { flex-shrink: 0; }
 }
 
@@ -1651,15 +1653,15 @@ body.dark .msg-sheet .ms-item.ghost { border-top-color: #2b313a; color: #8b95a7;
   .workbench:not(.has-chat) .chat-col { display: none !important; }
   .chat-col { width: 100%; flex: 1 1 auto; min-height: 0; }
 
-  /* ---------- 聊天头部：允许换行，按钮横滑，别把内容挤没 ---------- */
-  .chat-head { padding: 8px 10px; flex-wrap: wrap; gap: 8px; row-gap: 6px; }
-  .chat-head .ch-ava { width: 36px; height: 36px; font-size: 18px; border-radius: 11px; }
-  .chat-head .ch-top .name { font-size: 15px; max-width: 46vw; }
-  .chat-head .ch-info { flex: 1 1 100%; order: 3; }
-  .chat-head .ch-sub { flex-wrap: wrap; overflow-x: visible; row-gap: 4px; }
-  .chat-head .ch-sub > span { max-width: 88vw; }
+  /* ---------- 聊天头部：v2.90.40 也改一行（原来手机上名字一行、标签一行、按钮一行） ---------- */
+  .chat-head { padding: 7px 10px; flex-wrap: nowrap; gap: 8px; row-gap: 0; }
+  .chat-head .ch-ava { width: 34px; height: 34px; font-size: 17px; border-radius: 11px; }
+  .chat-head .ch-top .name { font-size: 15px; max-width: 40vw; }
+  .chat-head .ch-info { flex: 1 1 auto; order: 0; min-width: 0; display: flex; align-items: center; gap: 8px; }
+  .chat-head .ch-top { flex-wrap: nowrap; overflow: hidden; gap: 6px; }
+  .chat-head .ch-sub { display: none; }        /* 渠道/设备/地区在手机上进「访客信息」抽屉看，头保持一行 */
   .chat-head-btns {
-    flex: 1 1 100%; order: 4; overflow-x: auto; padding-bottom: 2px;
+    flex: 0 0 auto; order: 0; overflow-x: auto; max-width: 56vw; padding-bottom: 0;
     scrollbar-width: none; -ms-overflow-style: none;
   }
   .chat-head-btns::-webkit-scrollbar { height: 0; display: none; }

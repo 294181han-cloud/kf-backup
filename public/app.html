@@ -7,7 +7,7 @@
 <link rel="icon" href="/assets/img/mi-logo.png">
 <link rel="apple-touch-icon" href="/assets/img/mi-logo.png">
 <link rel="stylesheet" href="/assets/vendor/element-plus.css">
- <link rel="stylesheet" href="/assets/css/app.css?v=3.64.10">
+ <link rel="stylesheet" href="/assets/css/app.css?v=3.64.11">
 <script src="/assets/ui/ui-registry.js?v=2.10.4"></script>
 <script src="/assets/ui/ui-loader.js?v=2.10.4" data-ui-cat="auto"></script>
 </head>
@@ -412,6 +412,8 @@
               </template>
             </div>
             <div class="chat-input">
+              <!-- v2.90.40 快捷消息一行：左边「⚡ 快捷消息 ▾ / ⚙ 设置」，右边直接排开快捷按钮（多了就横向滑） -->
+              <div class="quick-line">
               <div class="quick-toggle-row">
                 <button class="quick-toggle-btn" :class="{on: showQuick}" @click="showQuick=!showQuick">
                   <svg class="q-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2 4.5 13.5h6L9 22l10.5-12H13L13 2z"/></svg>
@@ -437,6 +439,7 @@
                   </template>
                   <span v-if="!quickMsgs.length" class="muted" style="font-size:12px;padding:0 6px;">还没有快捷消息，去「快捷消息」页直接添加</span>
                 </div>
+              </div>
               </div>
               <div class="chat-tools" style="margin-bottom:6px;">
 
