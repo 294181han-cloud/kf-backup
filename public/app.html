@@ -7,7 +7,7 @@
 <link rel="icon" href="/assets/img/mi-logo.png">
 <link rel="apple-touch-icon" href="/assets/img/mi-logo.png">
 <link rel="stylesheet" href="/assets/vendor/element-plus.css">
- <link rel="stylesheet" href="/assets/css/app.css?v=3.64.22">
+ <link rel="stylesheet" href="/assets/css/app.css?v=3.64.23">
 <script src="/assets/ui/ui-registry.js?v=2.10.4"></script>
 <script src="/assets/ui/ui-loader.js?v=2.10.4" data-ui-cat="auto"></script>
 </head>
@@ -436,11 +436,6 @@
                   <el-input v-model="quickPanelKw" size="small" placeholder="搜标题 / 内容" clearable style="width:190px;margin-left:auto;"></el-input>
                   <button type="button" class="qk-x" title="收起（Esc）" @click="showQuick = false">✕</button>
                 </div>
-                <!-- 分组：点一下切换（只有一组时不显示） -->
-                <div class="qk-groups" v-if="multiGroup">
-                  <button type="button" class="qg-chip" v-for="g in quickGroups" :key="'pg' + g"
-                          :class="{on: g === curGroup}" @click="pickGroup(g)">{{ g }}</button>
-                </div>
                 <div class="qk-list">
                   <button type="button" class="qk-item" v-for="(q, qi) in quickPanelList" :key="'p' + q.id"
                           :title="q.content + (quickMode === 'edit' ? '\n单击：填入输入框（编辑后再发）' : '\n单击：直接发送') + '\nCtrl+单击：填入输入框（可编辑）'"
@@ -455,7 +450,14 @@
                   <div class="qk-empty" v-if="!quickMsgs.length">还没有快捷消息，去「⚙ 设置」里添加</div>
                   <div class="qk-empty" v-else-if="!quickPanelList.length">没有匹配的快捷消息</div>
                 </div>
-                <div class="qk-foot">点一下就发 · <b>Ctrl + 点击</b> 填进输入框（可改完再发） · 按住可拖动排序</div>
+                <!-- v2.90.55 分组挪到面板最下面（点一下切换；只有一组时不显示） -->
+                <div class="qk-bottom">
+                  <div class="qk-groups" v-if="multiGroup">
+                    <button type="button" class="qg-chip" v-for="g in quickGroups" :key="'pg' + g"
+                            :class="{on: g === curGroup}" @click="pickGroup(g)">{{ g }}</button>
+                  </div>
+                  <span class="qk-hint">点一下就发 · <b>Ctrl + 点击</b> 填进输入框 · 按住可拖动排序</span>
+                </div>
               </div>
               <div class="chat-tools" style="margin-bottom:6px;">
 
