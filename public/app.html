@@ -7,7 +7,7 @@
 <link rel="icon" href="/assets/img/mi-logo.png">
 <link rel="apple-touch-icon" href="/assets/img/mi-logo.png">
 <link rel="stylesheet" href="/assets/vendor/element-plus.css">
-<link rel="stylesheet" href="/assets/css/app.css?v=3.64.27">
+<link rel="stylesheet" href="/assets/css/app.css?v=3.64.28">
 <script src="/assets/ui/ui-registry.js?v=2.10.4"></script>
 <script src="/assets/ui/ui-loader.js?v=2.10.4" data-ui-cat="auto"></script>
 </head>
@@ -581,6 +581,30 @@
             <span class="k">{{ contactLabel(c.type) }}</span>
             <span class="v" style="cursor:pointer;" @click="editContact(c)" :title="'点击编辑'">{{ c.value || '＋ 添加' }}</span>
           </div>
+              <!-- v2.90.58 访客信息里也能直接发快捷消息（跟输入框上面那个面板同一套数据、同一套规矩） -->
+              <h4 class="iq-head" @click="infoQuickOpen = !infoQuickOpen" title="点一下展开 / 收起">
+                快捷消息
+                <span class="iq-head-r">
+                  <span>{{ quickPanelList.length }} 条</span>
+                  <span class="iq-caret">{{ infoQuickOpen ? '▾' : '▸' }}</span>
+                </span>
+              </h4>
+              <div class="iq-wrap" v-if="infoQuickOpen">
+                <div class="iq-groups" v-if="multiGroup">
+                  <button type="button" class="qg-chip" v-for="g in quickGroups" :key="'ig' + g"
+                          :class="{on: g === curGroup}" @click.stop="pickGroup(g)">{{ g }}</button>
+                </div>
+                <div class="iq-list">
+                  <button type="button" class="iq-item" v-for="q in quickPanelList" :key="'iq' + q.id"
+                          :title="q.title + (q.content ? '：' + q.content : '') + '\n点一下直接把这条发给访客\nCtrl+单击：先填进输入框，改完再发'"
+                          @click="quickPanelClick(q, $event)">
+                    <span class="iq-t">{{ q.title }}</span>
+                    <span class="qk-badge" v-if="(q.attachments||[]).length">图</span>
+                    <span class="iq-send">发送</span>
+                  </button>
+                  <div class="iq-empty" v-if="!quickPanelList.length">还没有快捷消息，去「设置 → 快捷消息」里加</div>
+                </div>
+              </div>
           <h4>备注</h4>
           <el-input type="textarea" :rows="3" v-model="noteDraft" placeholder="点击保存记录访客备注" @blur="saveNote"></el-input>
         </div>
@@ -1799,7 +1823,7 @@
 <script src="/assets/qr-poster.js?v=2.3.0"></script>
 <script src="/assets/api.js?v=2.1.2"></script>
 <script src="/assets/js/app-components.js?v=2.6.2"></script>
-<script src="/assets/js/app.js?v=3.68.7"></script>
+<script src="/assets/js/app.js?v=3.68.8"></script>
 <script src="/assets/js/app-boot.js?v=2.1.1"></script>
 </body>
 </html>

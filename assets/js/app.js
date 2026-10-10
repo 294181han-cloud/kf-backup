@@ -152,6 +152,11 @@ const app = createApp({
     const curGroup = computed(() => quickGroups.value.includes(quickGroup.value) ? quickGroup.value : (quickGroups.value[0] || '通用'));
     const visibleQuick = computed(() => (quickMsgs.value || []).filter(m => (m.group_name || '通用') === curGroup.value));
     const multiGroup = computed(() => quickGroups.value.length > 1);
+    /* v2.90.58 访客信息面板里那个「快捷消息」区块：展开 / 收起记在本机 */
+    const infoQuickOpen = ref((function () {
+      try { return localStorage.getItem('kfxt_iq_open') !== '0'; } catch (e) { return true; }
+    })());
+    Vue.watch(infoQuickOpen, (v) => { try { localStorage.setItem('kfxt_iq_open', v ? '1' : '0'); } catch (e) {} });
     const pickGroup = (g) => {
       quickGroup.value = g;
       try { localStorage.setItem('kfxt_qgroup', g); } catch (e) {}
@@ -3585,7 +3590,7 @@ const app = createApp({
       asrText, asrBusy, transcribe,
       openSession, send, onKey, useQuick, sendQuick, quickClick, quickPanelClick, quickMode, setQuickMode,
       quickGroups, curGroup, visibleQuick, multiGroup, pickGroup,
-      quickPanelKw, quickPanelList, qkHi,
+      quickPanelKw, quickPanelList, qkHi, infoQuickOpen,
       richText,
       sameIpOthers, mergeSameIpNow,
       onImage, startRec, stopRec, closeSession, doTransfer,

@@ -304,6 +304,21 @@ body.dark .trend-legend { color: #98a3b4; }
 body.resizing-ta, body.resizing-ta * { cursor: row-resize !important; }
 body.resizing-ta { user-select: none; }
 body.dark .ci-resizer::before { background: #3a4048; }
+/* v2.90.58 访客信息面板里的「快捷消息」：点一下直接发，Ctrl+单击填进输入框 */
+.info-col h4.iq-head { display: flex; align-items: center; justify-content: space-between; cursor: pointer; user-select: none; }
+.info-col h4.iq-head:hover { color: var(--theme, #1677ff); }
+.iq-head-r { display: inline-flex; align-items: center; gap: 6px; font-size: 11.5px; color: #86909c; }
+.iq-wrap { display: flex; flex-direction: column; gap: 6px; }
+.iq-groups { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 2px; }
+.iq-list { display: flex; flex-direction: column; gap: 6px; max-height: 200px; overflow-y: auto; overscroll-behavior: contain; }
+.iq-item { display: flex; align-items: center; gap: 8px; width: 100%; text-align: left; border: 1px solid var(--v-line, #e5e6eb); background: #fff; border-radius: 9px; padding: 6px 9px; cursor: pointer; transition: all .12s; }
+.iq-item:hover { border-color: var(--theme, #1677ff); background: color-mix(in srgb, var(--theme, #1677ff) 6%, #fff); }
+.iq-t { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12.5px; font-weight: 600; color: var(--v-ink, #1d2129); }
+.iq-send { flex: 0 0 auto; font-size: 12px; font-weight: 600; color: var(--theme, #1677ff); background: color-mix(in srgb, var(--theme, #1677ff) 10%, #fff); border-radius: 7px; padding: 2px 9px; transition: all .12s; }
+.iq-item:hover .iq-send { background: var(--theme, #1677ff); color: #fff; }
+.iq-empty { font-size: 12px; color: #86909c; text-align: center; padding: 10px 0; }
+body.dark .iq-item { background: #23272e; border-color: #31363e; }
+body.dark .iq-t { color: #e5e6eb; }
 .qk-mask { position: fixed; inset: 0; z-index: 40; }
 /* v2.90.56 快捷消息：往上弹的「窄面板」（固定 330px，不再铺满整行），一行一条 + 右侧「发送」 */
 .qk-panel {
