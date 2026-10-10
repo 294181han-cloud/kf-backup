@@ -1079,6 +1079,19 @@ const app = createApp({
       }
       sendQuick(q);
     };
+    /* v2.90.56 快捷消息面板（窄面板）里点一下：直接发出，发出去就把面板收起来。
+       Ctrl/⌘ + 点击 仍然是「填进输入框」，这时候不关面板，方便改完再发。 */
+    const quickPanelClick = async (q, ev) => {
+      if (qDrag.suppressClick) { qDrag.suppressClick = false; return; }   // 刚拖完，别把消息发出去
+      if ((ev && (ev.ctrlKey || ev.metaKey)) || quickMode.value === 'edit') {
+        draft.value = q.content || '';
+        pendingAtts.value = (q.attachments || []).filter(a => a && a.url).slice();
+        const input = document.querySelector('.chat-input textarea, .chat-input input');
+        if (input) { input.focus(); }
+        return;
+      }
+      if (await sendQuick(q)) showQuick.value = false;
+    };
     const rmPendingAtt = (i) => { pendingAtts.value.splice(i, 1); };
     // 快捷按钮右键：编辑该条（跳转快捷消息页并打开编辑框）
     const quickCtx = reactive({ show: false, x: 0, y: 0, item: null });
@@ -1109,7 +1122,7 @@ const app = createApp({
         enterQuickDrag();
       }
       ev.preventDefault();
-      const wrap = document.querySelector('.quick-scroll');
+      const wrap = document.querySelector('.qk-list');   // v2.90.56 面板改窄后拖动容器跟着换名
       if (!wrap) return;
       const x = ev.clientX, y = ev.clientY;
       let to = qDrag.idx;
@@ -1182,10 +1195,10 @@ const app = createApp({
       setTimeout(tryOpen, 250);
     };
     const sendQuick = async (q) => {
-      if (!currentId.value || sending.value) { ElementPlus.ElMessage.warning('请先选择会话'); return; }
+      if (!currentId.value || sending.value) { ElementPlus.ElMessage.warning('请先选择会话'); return false; }
       const text = q.content || '';
       const atts = (q.attachments || []).filter(a => a && a.url);
-      if (!text && !atts.length) return;
+      if (!text && !atts.length) return false;
       sending.value = true;
       try {
         const r = await API.post('/api/sessions/' + currentId.value + '/messages', { text, attachments: atts });
@@ -1195,7 +1208,8 @@ const app = createApp({
         sendBeep();
         const s = sessions.value.find(x => x.id === currentId.value);
         if (s) s.lastMsg = (text || (atts.length ? '[图片]' : '')).slice(0, 60);
-      } catch (e) { ElementPlus.ElMessage.error(e.message); }
+        return true;
+      } catch (e) { ElementPlus.ElMessage.error(e.message); return false; }
       finally { sending.value = false; }
     };
     // v2.53 用快捷消息填到输入框后也不收起快捷栏（同上，别让人反复点）
@@ -3523,7 +3537,7 @@ const app = createApp({
       navGroups,
       audioPlaying, audioDur, waveBars, toggleAudio,
       asrText, asrBusy, transcribe,
-      openSession, send, onKey, useQuick, sendQuick, quickClick, quickMode, setQuickMode,
+      openSession, send, onKey, useQuick, sendQuick, quickClick, quickPanelClick, quickMode, setQuickMode,
       quickGroups, curGroup, visibleQuick, multiGroup, pickGroup,
       quickPanelKw, quickPanelList, qkHi,
       richText,

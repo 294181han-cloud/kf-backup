@@ -291,35 +291,40 @@ body.dark .trend-legend { color: #98a3b4; }
 .quick-btn.quick-more { background: color-mix(in srgb, var(--theme, #1677ff) 12%, #fff); color: var(--theme, #1677ff); font-weight: 600; }
 .chat-input { position: relative; }
 .qk-mask { position: fixed; inset: 0; z-index: 40; }
-/* v2.90.54 快捷消息：往上弹的竖列表（上下滚动，不再左右滑） */
+/* v2.90.56 快捷消息：往上弹的「窄面板」（固定 330px，不再铺满整行），一行一条 + 右侧「发送」 */
 .qk-panel {
-  position: absolute; left: 12px; right: 12px; bottom: calc(100% - 6px); z-index: 41;
+  position: absolute; left: 12px; right: auto; bottom: calc(100% - 6px); z-index: 41;
+  width: 330px; max-width: calc(100vw - 24px);
   background: #fff; border: 1px solid var(--v-line, #e5e6eb); border-radius: 12px;
   box-shadow: 0 12px 34px -14px rgba(16, 40, 80, .38); overflow: hidden;
   animation: qkUp .16s ease-out;
 }
 @keyframes qkUp { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
 .quick-count { font-size: 11.5px; color: #86909c; margin-left: 2px; }
-.qk-head { display: flex; align-items: center; gap: 8px; padding: 10px 12px; border-bottom: 1px solid var(--v-line, #e5e6eb); font-size: 13px; }
+.qk-head { display: flex; align-items: center; gap: 8px; padding: 10px 12px 6px; font-size: 13px; }
+.qk-head > b { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.qk-head .qk-n { font-size: 11.5px; color: #86909c; flex: 1 1 auto; }
 .qk-groups { display: flex; gap: 6px; flex-wrap: wrap; }
-.qk-head .qk-n { font-size: 11.5px; color: #86909c; }
-.qk-x { border: 0; background: #f2f5fa; color: #6b7688; width: 24px; height: 24px; border-radius: 7px; cursor: pointer; }
-.qk-list { max-height: min(54vh, 440px); overflow-y: auto; overscroll-behavior: contain; padding: 8px 12px; display: grid; grid-template-columns: 1fr; gap: 6px; }
+.qk-search { padding: 0 12px 8px; }
+.qk-x { border: 0; background: #f2f5fa; color: #6b7688; width: 24px; height: 24px; border-radius: 7px; cursor: pointer; flex: 0 0 auto; }
+.qk-list { max-height: min(58vh, 460px); overflow-y: auto; overscroll-behavior: contain; padding: 8px 12px 10px; display: grid; grid-template-columns: 1fr; gap: 6px; }
 .qk-item {
   text-align: left; border: 1px solid var(--v-line, #e5e6eb); background: #fff; border-radius: 9px;
-  padding: 8px 10px; cursor: pointer; display: flex; align-items: baseline; gap: 8px; min-width: 0; position: relative;
+  padding: 7px 10px; cursor: pointer; display: flex; align-items: center; gap: 8px; min-width: 0;
   transition: all .12s;
 }
 .qk-item.dragging { opacity: .55; border-color: var(--theme, #1677ff); }
-.qk-item:hover { border-color: var(--theme, #1677ff); background: color-mix(in srgb, var(--theme, #1677ff) 6%, #fff); transform: translateY(-1px); }
+.qk-item:hover { border-color: var(--theme, #1677ff); background: color-mix(in srgb, var(--theme, #1677ff) 6%, #fff); }
 .qk-item mark { background: #fff3bf; color: inherit; padding: 0 1px; border-radius: 3px; }
-.qk-t { font-size: 12.5px; font-weight: 600; color: var(--v-ink, #1d2129); white-space: nowrap; flex: 0 0 auto; max-width: 40%; overflow: hidden; text-overflow: ellipsis; }
-.qk-c { font-size: 12px; color: #86909c; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1 1 auto; min-width: 0; }
-.qk-badge { position: absolute; right: 7px; top: 7px; font-size: 10px; color: #fff; background: var(--theme, #1677ff); border-radius: 5px; padding: 0 4px; line-height: 1.5; }
+.qk-t { font-size: 13px; font-weight: 600; color: var(--v-ink, #1d2129); white-space: nowrap; flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.qk-badge { flex: 0 0 auto; font-size: 10px; color: #fff; background: var(--theme, #1677ff); border-radius: 5px; padding: 0 4px; line-height: 1.6; }
+/* v2.90.56 右侧「发送」：点它就是发出去、并把面板收起来 */
+.qk-send { flex: 0 0 auto; font-size: 12.5px; font-weight: 600; color: var(--theme, #1677ff); background: color-mix(in srgb, var(--theme, #1677ff) 10%, #fff); border-radius: 7px; padding: 3px 10px; transition: all .12s; }
+.qk-item:hover .qk-send { background: var(--theme, #1677ff); color: #fff; }
 .qk-empty { grid-column: 1/-1; text-align: center; color: #86909c; font-size: 12px; padding: 18px 0; }
 /* v2.90.55 面板最下面那一行：左边分组、右边操作提示 */
 .qk-bottom {
-  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
   padding: 8px 12px; border-top: 1px solid var(--v-line, #e5e6eb);
 }
 .qk-hint { margin-left: auto; font-size: 11.5px; color: #86909c; }
@@ -327,6 +332,7 @@ body.dark .trend-legend { color: #98a3b4; }
 body.dark .qk-panel { background: #1e2229; border-color: #31363e; }
 body.dark .qk-item { background: #23272e; border-color: #31363e; }
 body.dark .qk-t { color: #e5e6eb; }
+body.dark .qk-x { background: #2b3038; color: #a9b0bd; }
 .quick-btn:hover { background: #464649; transform: translateY(-1px); }
 .recording-bar { display: flex; align-items: center; gap: 8px; font-size: 13px; color: #4e5769; padding: 4px 0; }
 .chat-search { background: #fff; padding: 8px 14px; display: flex; align-items: center; gap: 10px; border-bottom: 1px solid #e5e6eb; }
