@@ -2298,32 +2298,30 @@ body.resizing-col { cursor: col-resize !important; user-select: none; }
 .sess-col.tiny .sess-ava { width: 30px; height: 30px; font-size: 15px; }
 .sess-col.tiny .sess-body .row1 .name { font-size: 13px; }
 .sess-col.tiny .sess-body .row2 { margin-top: 2px; }
-/* v2.90.37 会话头一行显示：宽度不够时按「渠道 → 设备 → 地区」顺序省标签，按钮永远留在同一行。
-   这些只在电脑端生效（手机端是另一套头部布局，别动它）。 */
-@media (min-width: 901px) {
-  @container (max-width: 1120px) {
-    .chat-head .tools-hint { display: none; }
-  }
-  @container (max-width: 880px) {
-    .chat-head .ch-sub .ch-chip:nth-child(1) { display: none; }   /* 先省「渠道」 */
-  }
-  @container (max-width: 760px) {
-    .chat-head .ch-sub .ch-chip:nth-child(2) { display: none; }   /* 再省「设备」 */
-  }
-  @container (max-width: 640px) {
-    .chat-head .ch-sub { display: none; }                          /* 地区也省掉 */
-    .ch-tools .m-hide-btn { display: none; }                       /* 工具条只留「访客信息」 */
-  }
-  @container (max-width: 620px) {
-    .ch-acts .cbtn-t, .ch-merge-ip .cbtn-t { display: none; }      /* 动作按钮只留图标 */
-    .ch-merge-ip .ch-merge-short { display: inline; }
-  }
-  @container (max-width: 560px) {
-    .chat-head .ch-top .ch-edit { display: none; }
-    .chat-input .tools-hint { display: none; }
-    .quick-toggle-row .qt-label { display: none; }
-    .chat-input .tool-btn { padding: 4px 6px; }
-  }
+/* v2.90.41 会话头永远一行：按聊天区自己的宽度分级收东西（电脑缩窗口 = 变成下面这些档位）
+   ≥900 全都要 → 760 起工具图标收起来 → 660 起动作按钮收成图标 → 再窄依次省 渠道/设备/地区 */
+@container (max-width: 1120px) {
+  .chat-head .tools-hint { display: none; }
+}
+@container (max-width: 900px) {
+  .ch-tools .m-hide-btn { display: none; }                       /* 工具条只留「访客信息」 */
+}
+@container (max-width: 660px) {
+  .ch-acts .cbtn-t, .ch-merge-ip .cbtn-t { display: none; }      /* 动作按钮只留图标 */
+  .ch-merge-ip .ch-merge-short { display: inline; }
+}
+@container (max-width: 620px) {
+  .chat-head .ch-sub .ch-chip:nth-child(1) { display: none; }    /* 省「渠道」 */
+}
+@container (max-width: 540px) {
+  .chat-head .ch-sub .ch-chip:nth-child(2) { display: none; }    /* 省「设备」 */
+}
+@container (max-width: 460px) {
+  .chat-head .ch-sub { display: none; }                          /* 地区也省 */
+  .chat-head .ch-top .ch-edit { display: none; }
+  .chat-input .tools-hint { display: none; }
+  .quick-toggle-row .qt-label { display: none; }
+  .chat-input .tool-btn { padding: 4px 6px; }
 }
 
 /* 访客信息：面板上直接收起 + 收起后右侧的竖条可以点开 */
