@@ -116,7 +116,8 @@ body { margin: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'P
 
 /* ===== 聊天头部紧凑按钮组 + 右键菜单（v2.26） ===== */
 .chat-head-btns { margin-left: auto; display: flex; gap: 4px; align-items: center; flex-shrink: 0; }
-.chat-head-btns .cbtn { padding: 5px 9px; font-size: 12px; margin: 0; }
+/* v2.90.35 会话头和输入区的按钮整体缩一号（用户反馈偏大） */
+.chat-head-btns .cbtn { padding: 3px 7px; font-size: 11.5px; margin: 0; min-height: 24px; }
 .ctx-menu {
   position: fixed; z-index: 3000; min-width: 190px;
   background: #fff; border-radius: 8px; padding: 4px;
@@ -174,18 +175,18 @@ body { margin: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'P
 body.dark .tool-btn { color: #8b919c; }
 body.dark .tool-btn:hover { color: var(--theme, #69b1ff); }
 /* 快捷消息条线性图标 */
-.quick-toggle-btn { display: inline-flex; align-items: center; gap: 5px; }
-.quick-toggle-btn .q-ic { width: 14px; height: 14px; flex-shrink: 0; }
+.quick-toggle-btn { display: inline-flex; align-items: center; gap: 4px; }
+.quick-toggle-btn .q-ic { width: 12px; height: 12px; flex-shrink: 0; }
 .q-img-ic { display: inline-flex; vertical-align: -2px; margin-right: 4px; color: inherit; }
 .q-img-ic svg { width: 13px; height: 13px; display: block; }
 /* 后台UI 分段选择（电脑端/手机端） */
 .ui-seg { display: inline-flex; background: #f2f3f5; border-radius: 12px; padding: 4px; }
 .ui-seg-btn { width: 130px; height: 40px; border: none; border-radius: 9px; background: transparent; color: #333; font-size: 14px; cursor: pointer; transition: all .15s; }
 .ui-seg-btn.on { background: var(--theme, #1677ff); color: #fff; font-weight: 600; }
-.quick-toggle-row { padding: 0 2px 6px; }
+.quick-toggle-row { padding: 0 2px 5px; }
 .quick-toggle-btn {
   border: 1px solid #eeeaea; background: #fff; color: #333; border-radius: 8px;
-  padding: 6px 12px; font-size: 13px; font-weight: 500; cursor: pointer;
+  padding: 4px 9px; font-size: 12px; font-weight: 500; cursor: pointer;
   transition: all .15s;
 }
 .quick-toggle-btn:hover { background: #f5f5f5; }
@@ -2353,15 +2354,15 @@ body.dark .info-reopen { background: #23272e; color: #b6bfcd; border-color: #333
   }
   .ch-tools {
     display: inline-flex; align-items: center; gap: 2px;
-    background: #f4f6fa; border-radius: 10px; padding: 3px;
+    background: #f4f6fa; border-radius: 9px; padding: 2px;
   }
   .ch-tools .cbtn {
     border: 0 !important; background: transparent !important; box-shadow: none !important;
-    margin: 0 !important; color: #5c6b85;
+    margin: 0 !important; color: #5c6b85; padding: 3px 6px !important; font-size: 11.5px;
   }
   .ch-tools .cbtn:hover { background: #fff !important; color: var(--theme, #1677ff); }
   .ch-tools .cbtn.on { background: #fff !important; color: var(--theme, #1677ff); }
-  .ch-acts { display: inline-flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+  .ch-acts { display: inline-flex; align-items: center; gap: 5px; flex-wrap: wrap; }
   body.dark .ch-tools { background: #262c34; }
   body.dark .ch-tools .cbtn { color: #b6bfcd; }
   body.dark .ch-tools .cbtn:hover, body.dark .ch-tools .cbtn.on { background: #333b46 !important; }
