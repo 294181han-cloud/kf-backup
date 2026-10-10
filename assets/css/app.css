@@ -1116,16 +1116,21 @@ body.dark .me-btn.danger:hover { background: #3a2124; border-color: #5a3236; col
 }
 .ch-merge-ip:hover { background: #ffeccc; border-color: #ffc078; }
 .ch-merge-ip .ch-merge-short { display: none; }
+/* v2.90.36 会话头改成一行：头像 | 名字+在线 | 渠道·设备·地区 | …… 右边工具和动作按钮
+   （原来名字和标签是上下两行，头显得很高） */
 .ch-sub {
-  display: flex; align-items: center; gap: 14px; flex-wrap: wrap;
-  margin-top: 6px; font-size: 12px; color: var(--v-ink-3);
+  display: flex; align-items: center; gap: 10px; flex-wrap: nowrap;
+  margin-top: 0; font-size: 12px; color: var(--v-ink-3); min-width: 0; overflow: hidden;
 }
+.chat-head .ch-info { display: flex; align-items: center; gap: 12px; min-width: 0; flex: 1 1 auto; }
+.chat-head .ch-top { flex: 0 1 auto; } 
+.chat-head .ch-sub .ch-chip { flex-shrink: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .ch-sub .ch-id { font-family: Consolas, monospace; color: #b3bccb; }
 
 /* 头部信息保持两行：第一行不换行（超出省略），第二行不换行横向可滚，避免窄屏堆成高墙 */
 .chat-head .ch-top { flex-wrap: nowrap; overflow: hidden; }
 .chat-head .ch-top .name { flex: 0 1 auto; min-width: 90px; }
-.chat-head .ch-info { flex: 1 1 240px; }
+.chat-head .ch-info { flex: 1 1 auto; min-width: 0; }   /* v2.90.36 一行显示：别用 240px 的基准宽度把右边按钮顶下去 */
 .chat-head .chat-head-btns { flex: 0 0 auto; }
 .chat-head .ch-top .ch-edit, .chat-head .ch-top .ch-chip, .chat-head .ch-top .ch-state { flex-shrink: 0; }
 .chat-head .ch-sub .ch-chip { font-size: 11px; padding: 2px 7px; }
