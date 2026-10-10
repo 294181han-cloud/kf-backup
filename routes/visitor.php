@@ -835,12 +835,8 @@ function handle_visitor_send(string $method): void
     $ip = $s['ip'] ?: get_client_ip();
     if (is_ip_blocked($tid, $ip)) json_error('您的访问受限', 403);
     if ($s['status'] === 'closed') json_error('会话已结束', 403);
-    // 归档会话有新消息 → 自动取消归档（活跃对话回到在线列表，带未读提示）
-    if ($s['status'] === 'archived') {
-        $pdo->prepare("UPDATE v_sessions SET status = 'online', archived_at = NULL WHERE id = ?")->execute([$sid]);
-        $s['status'] = 'online';
-    }
-
+    /* v2.90.52 归档 = 静音：客户再发消息也**不再自动转回在线列表**，客服端不响提示音、不弹提醒，
+       消息照样进这段对话（客服点开「已归档」能看到）。想重新激活就手动「取消归档」。 */
     // 限频
     $cfg = config();
     $recent = fetch_count($pdo, "SELECT COUNT(*) FROM messages WHERE session_id = ? AND from_type = 'visitor' AND created_at > ?",

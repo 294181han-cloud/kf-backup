@@ -201,7 +201,8 @@
               {{ sessTabText.online }}<span class="scope-n" v-if="sessCounts.online">{{ sessCounts.online }}</span><span class="scope-dot" v-if="sessCounts.online_unread" :title="sessCounts.online_unread + ' 条未读'"></span>
             </button>
             <button class="scope-tab" v-if="!sessCollapsed" :class="{on: sessScope==='archived'}" @click="setScope('archived')">
-              {{ sessTabText.archived }}<span class="scope-n" v-if="sessCounts.archived">{{ sessCounts.archived }}</span><span class="scope-dot" v-if="sessCounts.archived_unread" :title="sessCounts.archived_unread + ' 条未读'"></span>
+              <!-- v2.90.52 归档不提醒：这里不再显示未读红点（只留条数） -->
+              {{ sessTabText.archived }}<span class="scope-n" v-if="sessCounts.archived">{{ sessCounts.archived }}</span>
             </button>
             <button class="scope-tab" v-if="!sessCollapsed" :class="{on: sessScope==='closed'}" @click="setScope('closed')">
               {{ sessTabText.closed }}<span class="scope-n" v-if="sessCounts.closed">{{ sessCounts.closed }}</span>
@@ -1812,7 +1813,7 @@
 <script src="/assets/qr-poster.js?v=2.3.0"></script>
 <script src="/assets/api.js?v=2.1.2"></script>
 <script src="/assets/js/app-components.js?v=2.6.2"></script>
-<script src="/assets/js/app.js?v=3.68.3"></script>
+<script src="/assets/js/app.js?v=3.68.4"></script>
 <script src="/assets/js/app-boot.js?v=2.1.1"></script>
 </body>
 </html>

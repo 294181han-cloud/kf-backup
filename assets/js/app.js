@@ -3177,7 +3177,10 @@ const app = createApp({
     const clock = ref('');
     const tickClock = () => { clock.value = new Date().toLocaleString('zh-CN', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit' }); };
     tickClock(); setInterval(tickClock, 1000);
-    const unreadTotal = Vue.computed(() => sessions.value.reduce((a, s) => a + (s.unread || 0), 0));
+    /* v2.90.52 归档会话不算「消息提醒」：未读合计只统计没归档的（归档的就当静音了，
+       侧栏角标、窗口标题闪动、提示音、桌面通知都不再被它触发）。 */
+    const unreadTotal = Vue.computed(() => sessions.value.reduce(
+      (a, s) => a + (s.status === 'archived' ? 0 : (s.unread || 0)), 0));
     // 标题栏提示（页面在后台时最直观）：有未读显示 "(3) 小米客服"
     const BASE_TITLE = '小米客服';
     const lastTitle = ref('');
