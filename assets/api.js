@@ -3,6 +3,9 @@
   const API = {
     token: null,
     base: (typeof window !== 'undefined' && window.KF_API_BASE) || '',   // 分控静态节点：总控地址（主站同源部署为空）
+    /* v2.90.47 备用地址：节点页面走同源 /api/（由节点反代到总控），如果这条被本地代理/网络拦掉，
+       自动改用总控地址再试一次；反过来也一样（保证客服端在各种网络/代理环境下都能用）。 */
+    alt: (typeof window !== 'undefined' && window.KF_API_FALLBACK) || '',
     setToken(t) { this.token = t; try { localStorage.setItem('kfxt_token', t); } catch (e) {} },
     loadToken() { try { this.token = localStorage.getItem('kfxt_token'); } catch (e) {} return this.token; },
     clearToken() { this.token = null; try { localStorage.removeItem('kfxt_token'); } catch (e) {} },
@@ -22,7 +25,13 @@
       try {
         res = await fetch(this.base + path, opts);
       } catch (e) {
-        throw new Error('网络异常，请稍后重试');
+        /* 主地址（同源）连不上 → 换备用地址（总控）再试一次 */
+        if (this.alt) {
+          try { res = await fetch(this.alt + path, opts); }
+          catch (e2) { throw new Error('网络异常，请稍后重试'); }
+        } else {
+          throw new Error('网络异常，请稍后重试');
+        }
       }
       /* v2.60.16 发版瞬间的 500（PHP 文件正在被替换，可能读到半截）：
          GET 自动重试一次，用户基本感觉不到；写操作不重试，避免重复提交。 */
@@ -31,7 +40,8 @@
         try {
           res = await fetch(this.base + path, opts);
         } catch (e) {
-          throw new Error('网络异常，请稍后重试');
+          try { res = this.alt ? await fetch(this.alt + path, opts) : res; }
+          catch (e2) { throw new Error('网络异常，请稍后重试'); }
         }
       }
       if (res.status === 401) {

@@ -817,7 +817,9 @@ function node_bundle_build(string $role = '', bool $static = false): array
        以前只有「静态包」带根副本，普通包只带 public/*.html —— 于是 PHP 型节点的根副本
        永远停在建站那天（现场：某节点 visitor.js 停在 2.14.2、app.css 停在 3.31.0，
        而它自报的版本号却是新的，光看「节点管理」根本发现不了）。 */
-    $inject = '<script src="/edge-config.js"></script>';
+    /* v2.90.47 edge-config.js 带上版本号：不然浏览器把旧的（里面写着跨域总控地址）缓存住，
+       节点改成本地 /api/ 之后老用户还是走旧地址 → 一直「网络异常」。 */
+    $inject = '<script src="/edge-config.js?v=' . rawurlencode(app_version()) . '"></script>';
     foreach (['login', 'app', 'visitor', 'gate'] as $pg) {
         /* v2.65 壳页不再用文件：烤制 XOR 自解密 loader（静态包跨域直连总控，PHP 包同源）；
          * v2.67 访客页烤制为内联加密版（页面源码无明文业务逻辑） */
@@ -842,6 +844,7 @@ function node_bundle_build(string $role = '', bool $static = false): array
            客服的浏览器要跨域直连总控——被本地代理/网络拦一下就整页「网络异常，请稍后重试」。
            访客节点保持原样（很多是纯静态节点，没有反代可走）。 */
         'window.KF_API_BASE=' . json_encode($role === 'agent' ? '' : $mainBase)
+        . ';window.KF_API_FALLBACK=' . json_encode($role === 'agent' ? $mainBase : '')
         . ';window.KF_EDGE_ROLE=' . json_encode($role) . ';');
     if ($staticMode) {
         // index.html 只在静态包下发：PHP 节点要靠 index.php 兜底路由，不能被 index.html 抢走
