@@ -432,7 +432,6 @@
               <span class="quick-count" v-if="showQuick && quickMsgs.length">共 {{ visibleQuick.length }} 条 · 点一下就发</span>
               </div>
               <!-- v2.90.56 快捷消息面板：窄面板（330px）往上弹，一行一条 + 右侧「发送」，点发送就发出去并收起 -->
-              <div class="qk-mask" v-if="showQuick" @click="showQuick = false"></div>
               <div class="qk-panel" v-if="showQuick" @keydown.esc="showQuick = false">
                 <div class="qk-head">
                   <b>快捷消息 · {{ curGroup }}</b>
@@ -1823,7 +1822,7 @@
 <script src="/assets/qr-poster.js?v=2.3.0"></script>
 <script src="/assets/api.js?v=2.1.2"></script>
 <script src="/assets/js/app-components.js?v=2.6.2"></script>
-<script src="/assets/js/app.js?v=3.68.8"></script>
+<script src="/assets/js/app.js?v=3.68.9"></script>
 <script src="/assets/js/app-boot.js?v=2.1.1"></script>
 </body>
 </html>

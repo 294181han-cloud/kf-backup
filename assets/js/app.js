@@ -157,6 +157,15 @@ const app = createApp({
       try { return localStorage.getItem('kfxt_iq_open') !== '0'; } catch (e) { return true; }
     })());
     Vue.watch(infoQuickOpen, (v) => { try { localStorage.setItem('kfxt_iq_open', v ? '1' : '0'); } catch (e) {} });
+    /* v2.90.59 快捷消息面板原来靠一层「全屏遮罩」来收面板，结果点哪儿第一下都只收面板（点不中下面的按钮）。
+       改成监听全局点击：点到面板 / 工具条以外的区域就收面板，同时你点的那一下照常生效（访客信息里点发送也是一下就发出）。 */
+    document.addEventListener('click', (e) => {
+      if (!showQuick.value) return;
+      const t = e.target;
+      if (!t || typeof t.closest !== 'function') return;
+      if (t.closest('.qk-panel') || t.closest('.quick-line') || t.closest('.ci-resizer')) return;
+      showQuick.value = false;
+    });
     const pickGroup = (g) => {
       quickGroup.value = g;
       try { localStorage.setItem('kfxt_qgroup', g); } catch (e) {}
