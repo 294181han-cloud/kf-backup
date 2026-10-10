@@ -177,6 +177,15 @@ const app = createApp({
       quickClick(q, ev);                             // 跟快捷条上的点击同一套规则
       if (!fillMode) quickPanelOpen.value = false;   // 直接发出去就把面板收起来
     };
+    const closeQuickPanel = () => { quickPanelOpen.value = false; };
+    /** 面板里把命中的关键词高亮（先转义，防注入） */
+    const qkHi = (text) => {
+      const s = escHtml(text == null ? '' : text);
+      const kw = quickPanelKw.value.trim();
+      if (kw === '') return s;
+      const safe = escHtml(kw).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      try { return s.replace(new RegExp(safe, 'gi'), m => '<mark>' + m + '</mark>'); } catch (e) { return s; }
+    };
 
     // CRUD 数据
     const welcomeMsgs = ref([]);
@@ -3525,6 +3534,7 @@ const app = createApp({
       openSession, send, onKey, useQuick, sendQuick, quickClick, quickMode, setQuickMode,
       quickGroups, curGroup, visibleQuick, multiGroup, pickGroup,
       quickBarShown, quickMoreCount, quickPanelOpen, quickPanelKw, quickPanelList, openQuickPanel, quickPanelPick,
+      closeQuickPanel, qkHi,
       richText,
       sameIpOthers, mergeSameIpNow,
       onImage, startRec, stopRec, closeSession, doTransfer,

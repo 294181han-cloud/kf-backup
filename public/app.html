@@ -7,7 +7,7 @@
 <link rel="icon" href="/assets/img/mi-logo.png">
 <link rel="apple-touch-icon" href="/assets/img/mi-logo.png">
 <link rel="stylesheet" href="/assets/vendor/element-plus.css">
- <link rel="stylesheet" href="/assets/css/app.css?v=3.64.19">
+ <link rel="stylesheet" href="/assets/css/app.css?v=3.64.20">
 <script src="/assets/ui/ui-registry.js?v=2.10.4"></script>
 <script src="/assets/ui/ui-loader.js?v=2.10.4" data-ui-cat="auto"></script>
 </head>
@@ -453,23 +453,30 @@
               </div>
               </div>
               <!-- v2.90.50 「更多 N 条」：这一组全部快捷消息，可搜索，点一下就发 -->
-              <div class="qk-mask" v-if="quickPanelOpen" @click="quickPanelOpen = false"></div>
-              <div class="qk-panel" v-if="quickPanelOpen">
+              <div class="qk-mask" v-if="quickPanelOpen" @click="closeQuickPanel"></div>
+              <div class="qk-panel" v-if="quickPanelOpen" @keydown.esc="closeQuickPanel">
                 <div class="qk-head">
                   <b>快捷消息 · {{ curGroup }}</b>
                   <span class="qk-n">{{ visibleQuick.length }} 条</span>
-                  <el-input v-model="quickPanelKw" size="small" placeholder="搜索标题/内容" clearable style="width:180px;margin-left:auto;"></el-input>
-                  <button type="button" class="qk-x" @click="quickPanelOpen = false">✕</button>
+                  <el-input v-model="quickPanelKw" size="small" placeholder="搜标题 / 内容" clearable style="width:190px;margin-left:auto;"></el-input>
+                  <button type="button" class="qk-x" title="关闭（Esc）" @click="closeQuickPanel">✕</button>
+                </div>
+                <!-- 面板里也能直接换组（鼠标划过即切，跟上面那排一样） -->
+                <div class="qk-groups" v-if="multiGroup">
+                  <button type="button" class="qg-chip" v-for="g in quickGroups" :key="'pg' + g"
+                          :class="{on: g === curGroup}" @mouseenter="pickGroup(g)" @click="pickGroup(g)">{{ g }}</button>
                 </div>
                 <div class="qk-list">
                   <button type="button" class="qk-item" v-for="q in quickPanelList" :key="'p' + q.id"
                           :title="q.content + (quickMode === 'edit' ? '\n单击：填入输入框（编辑后再发）' : '\n单击：直接发送') + '\nCtrl+单击：填入输入框（可编辑）'"
                           @click="quickPanelPick(q, $event)">
-                    <span class="qk-t">{{ q.title }}</span>
-                    <span class="qk-c">{{ q.content }}</span>
+                    <span class="qk-t" v-html="qkHi(q.title)"></span>
+                    <span class="qk-c" v-html="qkHi(q.content)"></span>
+                    <span class="qk-badge" v-if="(q.attachments||[]).length">图</span>
                   </button>
                   <div class="qk-empty" v-if="!quickPanelList.length">没有匹配的快捷消息</div>
                 </div>
+                <div class="qk-foot">点一下就发 · <b>Ctrl + 点击</b> 填进输入框（可改完再发） · 共 {{ quickPanelList.length }} 条</div>
               </div>
               <div class="chat-tools" style="margin-bottom:6px;">
 
@@ -1805,7 +1812,7 @@
 <script src="/assets/qr-poster.js?v=2.3.0"></script>
 <script src="/assets/api.js?v=2.1.2"></script>
 <script src="/assets/js/app-components.js?v=2.6.2"></script>
-<script src="/assets/js/app.js?v=3.68.2"></script>
+<script src="/assets/js/app.js?v=3.68.3"></script>
 <script src="/assets/js/app-boot.js?v=2.1.1"></script>
 </body>
 </html>
