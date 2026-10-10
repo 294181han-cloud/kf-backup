@@ -158,6 +158,25 @@ const app = createApp({
       const wrap = document.querySelector('.quick-scroll');
       if (wrap) wrap.scrollLeft = 0;
     };
+    /* v2.90.50 一组里快捷消息太多（比如 20 条）时：那排只摆最前面的几条 + 「更多 N 条」，
+       点「更多」弹一个带搜索的面板，把这一组全部列出来（点一下就发，Ctrl+点击=填进输入框）。 */
+    const QUICK_BAR_MAX = 9;
+    const quickBarShown = computed(() => visibleQuick.value.slice(0, QUICK_BAR_MAX));
+    const quickMoreCount = computed(() => Math.max(0, visibleQuick.value.length - QUICK_BAR_MAX));
+    const quickPanelOpen = ref(false);
+    const quickPanelKw = ref('');
+    const quickPanelList = computed(() => {
+      const kw = quickPanelKw.value.trim().toLowerCase();
+      const list = visibleQuick.value;
+      if (kw === '') return list;
+      return list.filter(q => ((q.title || '') + ' ' + (q.content || '')).toLowerCase().includes(kw));
+    });
+    const openQuickPanel = () => { quickPanelOpen.value = true; quickPanelKw.value = ''; };
+    const quickPanelPick = (q, ev) => {
+      const fillMode = (ev && (ev.ctrlKey || ev.metaKey)) || quickMode.value === 'edit';
+      quickClick(q, ev);                             // 跟快捷条上的点击同一套规则
+      if (!fillMode) quickPanelOpen.value = false;   // 直接发出去就把面板收起来
+    };
 
     // CRUD 数据
     const welcomeMsgs = ref([]);
@@ -3505,6 +3524,7 @@ const app = createApp({
       asrText, asrBusy, transcribe,
       openSession, send, onKey, useQuick, sendQuick, quickClick, quickMode, setQuickMode,
       quickGroups, curGroup, visibleQuick, multiGroup, pickGroup,
+      quickBarShown, quickMoreCount, quickPanelOpen, quickPanelKw, quickPanelList, openQuickPanel, quickPanelPick,
       richText,
       sameIpOthers, mergeSameIpNow,
       onImage, startRec, stopRec, closeSession, doTransfer,

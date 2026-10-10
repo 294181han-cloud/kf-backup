@@ -287,6 +287,30 @@ body.dark .trend-legend { color: #98a3b4; }
 .qg-chip:hover { border-color: var(--theme, #1677ff); color: var(--theme, #1677ff); }
 .qg-chip.on { background: var(--theme, #1677ff); border-color: var(--theme, #1677ff); color: #fff; }
 .qg-sep { flex-shrink: 0; width: 1px; height: 16px; background: var(--v-line, #e5e6eb); margin: 0 2px; }
+/* v2.90.50 一组里很多条时的「更多 N 条」+ 面板 */
+.quick-btn.quick-more { background: color-mix(in srgb, var(--theme, #1677ff) 12%, #fff); color: var(--theme, #1677ff); font-weight: 600; }
+.chat-input { position: relative; }
+.qk-mask { position: fixed; inset: 0; z-index: 40; }
+.qk-panel {
+  position: absolute; left: 12px; right: 12px; bottom: calc(100% - 6px); z-index: 41;
+  background: #fff; border: 1px solid var(--v-line, #e5e6eb); border-radius: 12px;
+  box-shadow: 0 10px 30px -12px rgba(16, 40, 80, .35); overflow: hidden;
+}
+.qk-head { display: flex; align-items: center; gap: 8px; padding: 9px 12px; border-bottom: 1px solid var(--v-line, #e5e6eb); font-size: 13px; }
+.qk-head .qk-n { font-size: 11.5px; color: #86909c; }
+.qk-x { border: 0; background: #f2f5fa; color: #6b7688; width: 24px; height: 24px; border-radius: 7px; cursor: pointer; }
+.qk-list { max-height: min(46vh, 320px); overflow-y: auto; padding: 6px; display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 6px; }
+.qk-item {
+  text-align: left; border: 1px solid var(--v-line, #e5e6eb); background: #fff; border-radius: 9px;
+  padding: 7px 9px; cursor: pointer; display: flex; flex-direction: column; gap: 2px; min-width: 0;
+}
+.qk-item:hover { border-color: var(--theme, #1677ff); background: color-mix(in srgb, var(--theme, #1677ff) 5%, #fff); }
+.qk-t { font-size: 12.5px; font-weight: 600; color: var(--v-ink, #1d2129); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.qk-c { font-size: 11.5px; color: #86909c; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.qk-empty { grid-column: 1/-1; text-align: center; color: #86909c; font-size: 12px; padding: 18px 0; }
+body.dark .qk-panel { background: #1e2229; border-color: #31363e; }
+body.dark .qk-item { background: #23272e; border-color: #31363e; }
+body.dark .qk-t { color: #e5e6eb; }
 .quick-btn:hover { background: #464649; transform: translateY(-1px); }
 .recording-bar { display: flex; align-items: center; gap: 8px; font-size: 13px; color: #4e5769; padding: 4px 0; }
 .chat-search { background: #fff; padding: 8px 14px; display: flex; align-items: center; gap: 10px; border-bottom: 1px solid #e5e6eb; }
