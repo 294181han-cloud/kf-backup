@@ -2426,6 +2426,9 @@ function door_ext_hosts(): array
         'chimerical-cactus-8962ad.netlify.app',
         'regal-blancmange-875c42.netlify.app',
         'dreamy-frangipane-91b176.netlify.app',
+        'illustrious-kitsune-adda42.netlify.app',
+        'frolicking-gelato-eccc55.netlify.app',
+        'dainty-genie-dce29d.netlify.app',
     ];
 }
 
