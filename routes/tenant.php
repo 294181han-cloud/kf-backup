@@ -645,13 +645,8 @@ function tenant_current_link(int $tid): string
         $st->execute([$tid]);
         $link = (string)($st->fetchColumn() ?: '');
     }
-    // 写死默认门牌，无需写库
-    $doorDom = 'unrivaled-moxie-03037b.netlify.app';
-    if ($doorDom !== '' && $link !== '') {
-        $clean = 'unrivaled-moxie-03037b.netlify.app';
-        $b64 = str_replace(['+', '/', '='], ['-', '_', ''], base64_encode($link));
-        $link = "https://$clean/?xx=$b64";
-    }
+    // v2.90.23 统一走门牌包装（与「管理码/查看码/二维码」同一份逻辑）
+    if ($link !== '') $link = gate_door_wrap($link);
     return $link;
 }
 

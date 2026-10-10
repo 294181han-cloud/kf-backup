@@ -2377,20 +2377,50 @@ function pool_host_in(string $domain): string
    「新码 / 更换码」和「新用户第一次登录自动发一条」共用这一份发码逻辑，
    免得两处各写一遍、以后改漏一处。 */
 
-/** v2.90.23 「大厂门牌」包装：真实落地链接 → https://门牌/?xx=<base64url>
- *  门牌取后台配置 door_domain，没配就用默认那个 netlify 门牌；已经包过的不会再包一层。
+/** v2.90.24 「门牌池」包装：真实落地链接 → https://门牌/?xx=<base64url>
+ *  为什么要池子：只用一个门牌，被举报多了必红（实测 unrivaled-moxie-03037b 红了 → 全站码一起打不开）。
+ *  后台配了 door_domain 就固定用它；没配就从池子随机挑一个，且**跳过与落地域同域的门牌**
+ *  （同域会跟落地一起红，白套）。已经包过的不再包一层。
  *  管理码列表、查看码、复制链接、二维码统一走这一份逻辑。 */
 function gate_door_wrap(string $url): string
 {
     if ($url === '') return '';
     if (str_contains($url, '?xx=')) return $url;
-    $dom = strtolower(trim((string)kv_get('door_domain', '')));
-    if ($dom === '') $dom = 'unrivaled-moxie-03037b.netlify.app';
-    $clean = preg_replace('#^https?://#', '', $dom);
-    $clean = rtrim(explode('/', (string)$clean)[0], '/');
-    if ($clean === '') return $url;
     $b64 = str_replace(['+', '/', '='], ['-', '_', ''], base64_encode($url));
-    return "https://$clean/?xx=$b64";
+
+    $dom = strtolower(trim((string)kv_get('door_domain', '')));
+    if ($dom !== '') {                      // 后台配了固定门牌 → 照旧只用它
+        $clean = preg_replace('#^https?://#', '', $dom);
+        $clean = rtrim(explode('/', (string)$clean)[0], '/');
+        return $clean === '' ? $url : "https://$clean/?xx=$b64";
+    }
+
+    $lh = strtolower((string)(parse_url($url, PHP_URL_HOST) ?: ''));
+    $cand = [];
+    foreach (door_own_hosts() as $d) {
+        if ($lh !== '' && $d === $lh) continue;          // 同域跳过
+        $cand[] = "https://$d/k9f3m2.html?xx=";          // 自家门牌页
+    }
+    foreach (door_ext_hosts() as $d) {
+        if ($lh !== '' && $d === $lh) continue;
+        $cand[] = "https://$d/?xx=";                     // 大厂托管站（根目录 index.html）
+    }
+    if (!$cand) return $url;
+    return $cand[array_rand($cand)] . $b64;
+}
+
+/** 门牌池·自家绿域名（门牌页 /k9f3m2.html 两份 docroot 各放一份，池域名都能命中） */
+function door_own_hosts(): array
+{
+    return ['hujm2g.shop', 'j73t1ia.shop', 'hi6o7e.shop', 'h652ww.shop', 'f5ma20.shop', 'piv27x4.shop'];
+}
+
+/** 门牌池·大厂免费托管（netlify 整段已放行；新建站把域名填这里就行，留空=只用自家域名） */
+function door_ext_hosts(): array
+{
+    return [
+        // 'xxxx-yyyy-123456.netlify.app',
+    ];
 }
 
 /** 发一条新的客服码（新域名 + 新随机路径）。失败返回 ['ok'=>false,'msg'=>...]
