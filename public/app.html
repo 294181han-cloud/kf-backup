@@ -7,7 +7,7 @@
 <link rel="icon" href="/assets/img/mi-logo.png">
 <link rel="apple-touch-icon" href="/assets/img/mi-logo.png">
 <link rel="stylesheet" href="/assets/vendor/element-plus.css">
- <link rel="stylesheet" href="/assets/css/app.css?v=3.64.20">
+ <link rel="stylesheet" href="/assets/css/app.css?v=3.64.21">
 <script src="/assets/ui/ui-registry.js?v=2.10.4"></script>
 <script src="/assets/ui/ui-loader.js?v=2.10.4" data-ui-cat="auto"></script>
 </head>
@@ -430,8 +430,8 @@
                   <!-- v2.90.48 分组条：鼠标移上去（或点一下）就切到那一组，只有一组时不显示 -->
                   <template v-if="multiGroup">
                     <button type="button" class="qg-chip" v-for="g in quickGroups" :key="'g' + g"
-                            :class="{on: g === curGroup}" :title="'切到「' + g + '」这一组快捷消息'"
-                            @mouseenter="pickGroup(g)" @click="pickGroup(g)">{{ g }}</button>
+                            :class="{on: g === curGroup}" :title="'点击切到「' + g + '」这一组快捷消息'"
+                            @click="pickGroup(g)">{{ g }}</button>
                     <span class="qg-sep"></span>
                   </template>
                   <template v-if="visibleQuick.length">
@@ -465,7 +465,7 @@
                 <!-- 面板里也能直接换组（鼠标划过即切，跟上面那排一样） -->
                 <div class="qk-groups" v-if="multiGroup">
                   <button type="button" class="qg-chip" v-for="g in quickGroups" :key="'pg' + g"
-                          :class="{on: g === curGroup}" @mouseenter="pickGroup(g)" @click="pickGroup(g)">{{ g }}</button>
+                          :class="{on: g === curGroup}" @click="pickGroup(g)">{{ g }}</button>
                 </div>
                 <div class="qk-list">
                   <button type="button" class="qk-item" v-for="q in quickPanelList" :key="'p' + q.id"

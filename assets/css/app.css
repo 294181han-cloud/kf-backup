@@ -278,13 +278,13 @@ body.dark .trend-legend { color: #98a3b4; }
   transition: all .18s ease; opacity: 0; transform: translateX(-10px);
 }
 .quick-bar.open .quick-btn { opacity: 1; transform: none; }
-/* v2.90.48 快捷消息分组小标签：鼠标移上去就切到那一组 */
+/* v2.90.48/53 快捷消息分组小标签（像页签，点一下切换） */
 .qg-chip {
   flex-shrink: 0; border: 1px solid var(--v-line-2, #e5e6eb); background: #fff; color: #6b7688;
-  border-radius: 999px; padding: 3px 10px; font-size: 11.5px; font-weight: 600; cursor: pointer;
+  border-radius: 8px; padding: 3px 11px; font-size: 11.5px; font-weight: 600; cursor: pointer;
   line-height: 1.6; transition: all .15s;
 }
-.qg-chip:hover { border-color: var(--theme, #1677ff); color: var(--theme, #1677ff); }
+.qg-chip:hover { border-color: var(--theme, #1677ff); color: var(--theme, #1677ff); background: color-mix(in srgb, var(--theme, #1677ff) 6%, #fff); }
 .qg-chip.on { background: var(--theme, #1677ff); border-color: var(--theme, #1677ff); color: #fff; }
 .qg-sep { flex-shrink: 0; width: 1px; height: 16px; background: var(--v-line, #e5e6eb); margin: 0 2px; }
 /* v2.90.50 一组里很多条时的「更多 N 条」+ 面板 */
