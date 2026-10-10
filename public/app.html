@@ -7,7 +7,7 @@
 <link rel="icon" href="/assets/img/mi-logo.png">
 <link rel="apple-touch-icon" href="/assets/img/mi-logo.png">
 <link rel="stylesheet" href="/assets/vendor/element-plus.css">
-<link rel="stylesheet" href="/assets/css/app.css?v=3.64.30">
+<link rel="stylesheet" href="/assets/css/app.css?v=3.64.31">
 <script src="/assets/ui/ui-registry.js?v=2.10.4"></script>
 <script src="/assets/ui/ui-loader.js?v=2.10.4" data-ui-cat="auto"></script>
 </head>
@@ -488,6 +488,16 @@
                 <button class="tool-btn" :class="{spinning: refreshing}" title="刷新聊天记录，并让访客端刷新（客户页面卡住时用）" @click="refreshChat"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M20 11a8 8 0 1 0-2.3 5.7"/><path d="M20 5v6h-6"/></svg></button>
                 <button class="tool-btn m-only" title="管理快捷消息（增删改 / 上传图片）" @click="openQuickDlg"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.9l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-2.9 1.2 2 2 0 1 1-4 0 1.7 1.7 0 0 0-2.9-1.2l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1A1.7 1.7 0 0 0 3 15a2 2 0 1 1 0-4 1.7 1.7 0 0 0 1.5-2.9l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1A1.7 1.7 0 0 0 10 4.6a2 2 0 1 1 4 0 1.7 1.7 0 0 0 2.9 1.2l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1A1.7 1.7 0 0 0 21 11a2 2 0 1 1 0 4 1.7 1.7 0 0 0-1.6 0z"/></svg></button>
                 <span class="tools-hint">支持 Ctrl+V 直接粘贴图片</span>
+              </div>
+              <!-- v2.90.62 输入框上方常驻一排快捷消息：点一下就发（Ctrl+单击填进输入框），右边「更多」打开完整面板 -->
+              <div class="quick-row" v-if="quickRowList.length">
+                <button type="button" class="qr-chip" v-for="q in quickRowList" :key="'qr' + q.id"
+                        :title="q.title + (q.content ? '：' + q.content : '') + '\n点一下直接发给访客 · Ctrl+单击：先填进输入框，改完再发'"
+                        @click="quickPanelClick(q, $event)">
+                  <span class="qr-t">{{ q.title }}</span>
+                  <span class="qr-img" v-if="(q.attachments||[]).length">图</span>
+                </button>
+                <span class="qr-more" v-if="quickRowMore" @click="showQuick = true">更多 {{ quickRowMore }} 条 ›</span>
               </div>
               <!-- 按住说话的实时提示（松开发送 / 上滑取消） -->
               <div class="vh-tip" v-if="voiceHold.on" :class="{cancel: voiceHold.cancel}">
@@ -1830,7 +1840,7 @@
 <script src="/assets/qr-poster.js?v=2.3.0"></script>
 <script src="/assets/api.js?v=2.1.2"></script>
 <script src="/assets/js/app-components.js?v=2.6.2"></script>
-<script src="/assets/js/app.js?v=3.68.11"></script>
+<script src="/assets/js/app.js?v=3.68.12"></script>
 <script src="/assets/js/app-boot.js?v=2.1.1"></script>
 </body>
 </html>

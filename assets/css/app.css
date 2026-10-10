@@ -320,6 +320,21 @@ body.dark .ci-resizer::before { background: #3a4048; }
 .iq-empty { font-size: 12px; color: #86909c; text-align: center; padding: 10px 0; }
 body.dark .iq-item { background: #23272e; border-color: #31363e; }
 body.dark .iq-t { color: #e5e6eb; }
+/* v2.90.62 输入框上方常驻那一排快捷消息（点一下就发；多了横着滚，右边「更多」开面板） */
+.quick-row { display: flex; align-items: center; gap: 6px; overflow-x: auto; overscroll-behavior-x: contain; padding-bottom: 3px; margin-bottom: 5px; }
+.quick-row::-webkit-scrollbar { height: 4px; }
+.quick-row::-webkit-scrollbar-thumb { background: #e0e3e8; border-radius: 2px; }
+.qr-chip {
+  flex: 0 0 auto; display: inline-flex; align-items: center; gap: 4px; cursor: pointer;
+  border: 1px solid var(--v-line, #e5e6eb); background: #fff; color: var(--v-ink, #1d2129);
+  border-radius: 8px; padding: 4px 11px; font-size: 12.5px; font-weight: 600; white-space: nowrap;
+  transition: all .12s;
+}
+.qr-chip:hover { border-color: var(--theme, #1677ff); color: var(--theme, #1677ff); background: color-mix(in srgb, var(--theme, #1677ff) 6%, #fff); }
+.qr-chip .qr-img { font-size: 10px; line-height: 1.5; color: #fff; background: var(--theme, #1677ff); border-radius: 4px; padding: 0 3px; }
+.qr-more { flex: 0 0 auto; color: var(--theme, #1677ff); font-size: 12px; font-weight: 600; cursor: pointer; padding: 4px 4px; white-space: nowrap; }
+.qr-more:hover { text-decoration: underline; }
+body.dark .qr-chip { background: #23272e; border-color: #31363e; color: #e5e6eb; }
 .qk-mask { position: fixed; inset: 0; z-index: 40; }
 /* v2.90.56 快捷消息：往上弹的「窄面板」（固定 330px，不再铺满整行），一行一条 + 右侧「发送」 */
 .qk-panel {
