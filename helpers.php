@@ -2419,7 +2419,7 @@ function door_own_hosts(): array
 function door_ext_hosts(): array
 {
     return [
-        // 'xxxx-yyyy-123456.netlify.app',
+        'luminous-cactus-91a97c.netlify.app',
     ];
 }
 
