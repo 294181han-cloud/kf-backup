@@ -197,7 +197,9 @@ body.dark .tool-btn:hover { color: var(--theme, #69b1ff); }
 .ci-row .send-btn { margin-top: 6px; }
 .ci-row .send-btn .sb-ic { display: none; width: 18px; height: 18px; }
 
-.info-col { flex: 0 1 300px; width: 300px; min-width: 232px; background: #fff; border-left: 1px solid #e5e6eb; overflow-y: auto; padding: 16px; }
+.info-col { flex: 0 1 300px; width: 300px; min-width: 220px; background: #fff; border-left: 1px solid #e5e6eb; overflow-y: auto; padding: 16px; }
+/* v2.90.34 窗口不算宽的时候，访客信息面板先自己收窄一点（300→250），别把会话列挤到没眼看 */
+@media (max-width: 1320px) { .info-col { flex-basis: 250px; } }
 .info-col h4 { font-size: 13px; color: #86909c; margin: 16px 0 8px; font-weight: normal; }
 .info-col h4:first-child { margin-top: 0; }
 .info-item { display: flex; justify-content: space-between; font-size: 13px; padding: 5px 0; color: #4e5969; }

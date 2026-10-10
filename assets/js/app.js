@@ -3227,7 +3227,7 @@ const app = createApp({
       const sideW = (document.querySelector('.side') || {}).offsetWidth || 190;
       const infoW = infoCollapsed.value ? 0 : ((document.querySelector('.info-col') || {}).offsetWidth || 300);
       const room = window.innerWidth - sideW - infoW - 360;
-      return Math.max(200, Math.min(560, room));
+      return Math.max(240, Math.min(560, room));   // 会话列也不低于 240（再窄就看不清名字了）
     };
     const clampSessW = () => { const m = sessMaxW(); if (sessW.value > m) sessW.value = m; };
     window.addEventListener('resize', () => { try { clampSessW(); } catch (e) {} });
