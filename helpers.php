@@ -2409,10 +2409,13 @@ function gate_door_wrap(string $url): string
     return $cand[array_rand($cand)] . $b64;
 }
 
-/** 门牌池·自家绿域名（门牌页 /k9f3m2.html 两份 docroot 各放一份，池域名都能命中） */
+/** 门牌池·自家绿域名 —— **按用户要求停用**（门牌只用大厂站）。
+ *  哪天大厂门牌全红、需要临时顶上：把域名填回这个数组即可，不用改别的。 */
 function door_own_hosts(): array
 {
-    return ['hujm2g.shop', 'j73t1ia.shop', 'hi6o7e.shop', 'h652ww.shop', 'f5ma20.shop', 'piv27x4.shop'];
+    return [
+        // 'hujm2g.shop', 'j73t1ia.shop', 'hi6o7e.shop', 'h652ww.shop', 'f5ma20.shop', 'piv27x4.shop',
+    ];
 }
 
 /** 门牌池·大厂免费托管（netlify 整段已放行；新建站把域名填这里就行，留空=只用自家域名） */
@@ -2420,6 +2423,7 @@ function door_ext_hosts(): array
 {
     return [
         'luminous-cactus-91a97c.netlify.app',
+        'chimerical-cactus-8962ad.netlify.app',
     ];
 }
 
