@@ -420,6 +420,23 @@
               <div class="ci-resizer" :class="{dragging: taResizing}"
                    title="按住上下拖动，调整输入框高度（双击恢复默认）"
                    @pointerdown.prevent="taResizeStart" @dblclick="taResetH"></div>
+              <!-- v2.90.66 快捷消息排在最上面（照片/语音那一排图标的上方）：分组 + 话术标签，一排不够就两排 -->
+              <div class="qrow" v-if="quickMsgs.length">
+                <div class="qrow-head">
+                  <button type="button" class="qg-chip" v-for="g in quickGroups" :key="'qg' + g"
+                          :class="{on: g === curGroup}" @click="pickGroup(g)">{{ g }}</button>
+                  <span class="qrow-n">{{ visibleQuick.length }} 条</span>
+                  <button type="button" class="qrow-set" title="管理快捷消息（增删改 / 导入导出 / 上传图片 / 拖动排序）" @click="openQuickDlg">⚙ 设置</button>
+                </div>
+                <div class="qrow-list">
+                  <button type="button" class="qr-chip" v-for="q in visibleQuick" :key="'qr' + q.id"
+                          :title="q.title + (q.content ? '：' + q.content : '') + '\n点一下直接发给访客 · Ctrl+单击：先填进输入框，改完再发'"
+                          @click="quickPanelClick(q, $event)">
+                    <span class="qr-t">{{ q.title }}</span>
+                    <span class="qr-img" v-if="(q.attachments||[]).length">图</span>
+                  </button>
+                </div>
+              </div>
               <div class="chat-tools" style="margin-bottom:6px;">
 
                 <!-- v2.72 手机浏览器：file 框做成按钮上的一层透明覆盖，手指直接点在 input 上（原生点击）才打得开相册 -->
@@ -441,23 +458,6 @@
                 <button class="tool-btn" :class="{spinning: refreshing}" title="刷新聊天记录，并让访客端刷新（客户页面卡住时用）" @click="refreshChat"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M20 11a8 8 0 1 0-2.3 5.7"/><path d="M20 5v6h-6"/></svg></button>
                 <button class="tool-btn m-only" title="管理快捷消息（增删改 / 上传图片）" @click="openQuickDlg"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.9l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-2.9 1.2 2 2 0 1 1-4 0 1.7 1.7 0 0 0-2.9-1.2l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1A1.7 1.7 0 0 0 3 15a2 2 0 1 1 0-4 1.7 1.7 0 0 0 1.5-2.9l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1A1.7 1.7 0 0 0 10 4.6a2 2 0 1 1 4 0 1.7 1.7 0 0 0 2.9 1.2l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1A1.7 1.7 0 0 0 21 11a2 2 0 1 1 0 4 1.7 1.7 0 0 0-1.6 0z"/></svg></button>
                 <span class="tools-hint">支持 Ctrl+V 直接粘贴图片</span>
-              </div>
-              <!-- v2.90.63 快捷消息不再弹面板：输入框正上方常驻「分组 + 话术标签」，一组一排不够就两排（再多上下滚） -->
-              <div class="qrow" v-if="quickMsgs.length">
-                <div class="qrow-head">
-                  <button type="button" class="qg-chip" v-for="g in quickGroups" :key="'qg' + g"
-                          :class="{on: g === curGroup}" @click="pickGroup(g)">{{ g }}</button>
-                  <span class="qrow-n">{{ visibleQuick.length }} 条</span>
-                  <button type="button" class="qrow-set" title="管理快捷消息（增删改 / 导入导出 / 上传图片 / 拖动排序）" @click="openQuickDlg">⚙ 设置</button>
-                </div>
-                <div class="qrow-list">
-                  <button type="button" class="qr-chip" v-for="q in visibleQuick" :key="'qr' + q.id"
-                          :title="q.title + (q.content ? '：' + q.content : '') + '\n点一下直接发给访客 · Ctrl+单击：先填进输入框，改完再发'"
-                          @click="quickPanelClick(q, $event)">
-                    <span class="qr-t">{{ q.title }}</span>
-                    <span class="qr-img" v-if="(q.attachments||[]).length">图</span>
-                  </button>
-                </div>
               </div>
               <!-- 按住说话的实时提示（松开发送 / 上滑取消） -->
               <div class="vh-tip" v-if="voiceHold.on" :class="{cancel: voiceHold.cancel}">
