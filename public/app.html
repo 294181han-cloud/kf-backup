@@ -7,7 +7,7 @@
 <link rel="icon" href="/assets/img/mi-logo.png">
 <link rel="apple-touch-icon" href="/assets/img/mi-logo.png">
 <link rel="stylesheet" href="/assets/vendor/element-plus.css">
- <link rel="stylesheet" href="/assets/css/app.css?v=3.64.16">
+ <link rel="stylesheet" href="/assets/css/app.css?v=3.64.17">
 <script src="/assets/ui/ui-registry.js?v=2.10.4"></script>
 <script src="/assets/ui/ui-loader.js?v=2.10.4" data-ui-cat="auto"></script>
 </head>
@@ -426,8 +426,15 @@
               </div>
               <div class="quick-bar" :class="{open: showQuick}">
                 <div class="quick-scroll">
-                  <template v-if="quickMsgs.length">
-                    <button class="quick-btn" v-for="(q, qi) in quickMsgs" :key="q.id"
+                  <!-- v2.90.48 分组条：鼠标移上去（或点一下）就切到那一组，只有一组时不显示 -->
+                  <template v-if="multiGroup">
+                    <button type="button" class="qg-chip" v-for="g in quickGroups" :key="'g' + g"
+                            :class="{on: g === curGroup}" :title="'切到「' + g + '」这一组快捷消息'"
+                            @mouseenter="pickGroup(g)" @click="pickGroup(g)">{{ g }}</button>
+                    <span class="qg-sep"></span>
+                  </template>
+                  <template v-if="visibleQuick.length">
+                    <button class="quick-btn" v-for="(q, qi) in visibleQuick" :key="q.id"
                       :title="q.content + (quickMode === 'edit' ? '\n单击：填入输入框（编辑后再发）' : '\n单击：直接发送') + '\nCtrl+单击：填入输入框（可编辑）\n按住拖动：调整顺序（全局）'"
                       :class="{dragging: qDrag.on && qDrag.idx === qi, 'drag-armed': qDrag.on}"
                       :style="{transitionDelay: (qi * 30) + 'ms'}"
@@ -438,6 +445,7 @@
                     </button>
                   </template>
                   <span v-if="!quickMsgs.length" class="muted" style="font-size:12px;padding:0 6px;">还没有快捷消息，去「快捷消息」页直接添加</span>
+                  <span v-else-if="!visibleQuick.length" class="muted" style="font-size:12px;padding:0 6px;">这一组还没有快捷消息</span>
                 </div>
               </div>
               </div>
@@ -1775,7 +1783,7 @@
 <script src="/assets/qr-poster.js?v=2.3.0"></script>
 <script src="/assets/api.js?v=2.1.2"></script>
 <script src="/assets/js/app-components.js?v=2.6.2"></script>
-<script src="/assets/js/app.js?v=3.67.9"></script>
+<script src="/assets/js/app.js?v=3.68.0"></script>
 <script src="/assets/js/app-boot.js?v=2.1.1"></script>
 </body>
 </html>

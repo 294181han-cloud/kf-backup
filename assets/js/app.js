@@ -138,6 +138,26 @@ const app = createApp({
     // 快捷回复
     const quickMsgs = ref([]);
     const showQuick = ref(true);
+    /* v2.90.48 快捷消息分组：聊天里那排按钮按「分组」显示，鼠标移到某个分组上就直接切到那一组
+       （触屏点一下也一样），选中哪个分组会记住。只有一个分组时完全不显示分组条，保持简洁。 */
+    const quickGroups = computed(() => {
+      const out = [];
+      (quickMsgs.value || []).forEach(m => {
+        const g = (m.group_name || '通用');
+        if (!out.includes(g)) out.push(g);
+      });
+      return out;
+    });
+    const quickGroup = ref((function () { try { return localStorage.getItem('kfxt_qgroup') || ''; } catch (e) { return ''; } })());
+    const curGroup = computed(() => quickGroups.value.includes(quickGroup.value) ? quickGroup.value : (quickGroups.value[0] || '通用'));
+    const visibleQuick = computed(() => (quickMsgs.value || []).filter(m => (m.group_name || '通用') === curGroup.value));
+    const multiGroup = computed(() => quickGroups.value.length > 1);
+    const pickGroup = (g) => {
+      quickGroup.value = g;
+      try { localStorage.setItem('kfxt_qgroup', g); } catch (e) {}
+      const wrap = document.querySelector('.quick-scroll');
+      if (wrap) wrap.scrollLeft = 0;
+    };
 
     // CRUD 数据
     const welcomeMsgs = ref([]);
@@ -1080,10 +1100,15 @@ const app = createApp({
         const r = b.getBoundingClientRect();
         if (x >= r.left && x <= r.right && y >= r.top && y <= r.bottom) to = i;
       });
-      if (to !== qDrag.idx && to >= 0 && to < quickMsgs.value.length) {
+      /* v2.90.48 分组后拖动的下标是"当前这一组里"的位置，换算回整张表的真实下标再移动，
+         这样其它分组的相对顺序不会被弄乱 */
+      if (to !== qDrag.idx && to >= 0 && to < visibleQuick.value.length) {
+        const fromFull = quickMsgs.value.findIndex(x => x.id === visibleQuick.value[qDrag.idx].id);
+        const toFull = quickMsgs.value.findIndex(x => x.id === visibleQuick.value[to].id);
+        if (fromFull < 0 || toFull < 0 || fromFull === toFull) return;
         const arr = quickMsgs.value.slice();
-        const [it] = arr.splice(qDrag.idx, 1);
-        arr.splice(to, 0, it);
+        const [it] = arr.splice(fromFull, 1);
+        arr.splice(toFull, 0, it);
         quickMsgs.value = arr;
         qDrag.idx = to; qDrag.moved = true;
       }
@@ -3442,6 +3467,7 @@ const app = createApp({
       audioPlaying, audioDur, waveBars, toggleAudio,
       asrText, asrBusy, transcribe,
       openSession, send, onKey, useQuick, sendQuick, quickClick, quickMode, setQuickMode,
+      quickGroups, curGroup, visibleQuick, multiGroup, pickGroup,
       sameIpOthers, mergeSameIpNow,
       onImage, startRec, stopRec, closeSession, doTransfer,
       autoGrowTa,
