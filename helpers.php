@@ -2424,6 +2424,8 @@ function door_ext_hosts(): array
     return [
         'luminous-cactus-91a97c.netlify.app',
         'chimerical-cactus-8962ad.netlify.app',
+        'regal-blancmange-875c42.netlify.app',
+        'dreamy-frangipane-91b176.netlify.app',
     ];
 }
 
