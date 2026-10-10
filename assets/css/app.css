@@ -310,7 +310,8 @@ body.dark .ci-resizer::before { background: #3a4048; }
 .iq-head-r { display: inline-flex; align-items: center; gap: 6px; font-size: 11.5px; color: #86909c; }
 .iq-wrap { display: flex; flex-direction: column; gap: 6px; }
 .iq-groups { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 2px; }
-.iq-list { display: flex; flex-direction: column; gap: 6px; max-height: 200px; overflow-y: auto; overscroll-behavior: contain; }
+/* 访客信息里那块也一样：最多露 5 条（5×34 + 4×6 ≈ 194），多了在里面滚 */
+.iq-list { display: flex; flex-direction: column; gap: 6px; max-height: 196px; overflow-y: auto; overscroll-behavior: contain; }
 .iq-item { display: flex; align-items: center; gap: 8px; width: 100%; text-align: left; border: 1px solid var(--v-line, #e5e6eb); background: #fff; border-radius: 9px; padding: 6px 9px; cursor: pointer; transition: all .12s; }
 .iq-item:hover { border-color: var(--theme, #1677ff); background: color-mix(in srgb, var(--theme, #1677ff) 6%, #fff); }
 .iq-t { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12.5px; font-weight: 600; color: var(--v-ink, #1d2129); }
@@ -337,7 +338,8 @@ body.dark .iq-t { color: #e5e6eb; }
 .qk-search { padding: 0 12px 8px; }
 .qk-x { border: 0; background: #f2f5fa; color: #6b7688; width: 24px; height: 24px; border-radius: 7px; cursor: pointer; flex: 0 0 auto; }
 /* v2.90.60 只露 5 条（多了在面板里上下滚），别让面板一拉就铺满半屏 */
-.qk-list { max-height: 212px; overflow-y: auto; overscroll-behavior: contain; padding: 8px 12px 10px; display: grid; grid-template-columns: 1fr; gap: 6px; }
+/* 5 条 = 5×38(行) + 4×6(行距) + 8+10(上下内边距) = 232px，第 6 条开始要往下滚 */
+.qk-list { max-height: 232px; overflow-y: auto; overscroll-behavior: contain; padding: 8px 12px 10px; display: grid; grid-template-columns: 1fr; gap: 6px; }
 .qk-item {
   text-align: left; border: 1px solid var(--v-line, #e5e6eb); background: #fff; border-radius: 9px;
   padding: 7px 10px; cursor: pointer; display: flex; align-items: center; gap: 8px; min-width: 0;
