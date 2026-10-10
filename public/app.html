@@ -7,7 +7,7 @@
 <link rel="icon" href="/assets/img/mi-logo.png">
 <link rel="apple-touch-icon" href="/assets/img/mi-logo.png">
 <link rel="stylesheet" href="/assets/vendor/element-plus.css">
-<link rel="stylesheet" href="/assets/css/app.css?v=3.64.24">
+<link rel="stylesheet" href="/assets/css/app.css?v=3.64.25">
 <script src="/assets/ui/ui-registry.js?v=2.10.4"></script>
 <script src="/assets/ui/ui-loader.js?v=2.10.4" data-ui-cat="auto"></script>
 </head>
@@ -413,6 +413,10 @@
               </template>
             </div>
             <div class="chat-input">
+              <!-- v2.90.57 输入框高度自己调：拖顶端这条手柄上下拉，高度记在本机；双击恢复默认 -->
+              <div class="ci-resizer" :class="{dragging: taResizing}"
+                   title="按住上下拖动，调整输入框高度（双击恢复默认）"
+                   @pointerdown.prevent="taResizeStart" @dblclick="taResetH"></div>
               <!-- v2.90.54 快捷消息改成「往上弹的竖列表」：左边 ⚡ 开关 + ⚙ 设置，内容往上展开、上下滚动 -->
               <div class="quick-line">
               <div class="quick-toggle-row">
@@ -1795,7 +1799,7 @@
 <script src="/assets/qr-poster.js?v=2.3.0"></script>
 <script src="/assets/api.js?v=2.1.2"></script>
 <script src="/assets/js/app-components.js?v=2.6.2"></script>
-<script src="/assets/js/app.js?v=3.68.6"></script>
+<script src="/assets/js/app.js?v=3.68.7"></script>
 <script src="/assets/js/app-boot.js?v=2.1.1"></script>
 </body>
 </html>

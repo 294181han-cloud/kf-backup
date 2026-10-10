@@ -290,6 +290,20 @@ body.dark .trend-legend { color: #98a3b4; }
 /* v2.90.50 一组里很多条时的「更多 N 条」+ 面板 */
 .quick-btn.quick-more { background: color-mix(in srgb, var(--theme, #1677ff) 12%, #fff); color: var(--theme, #1677ff); font-weight: 600; }
 .chat-input { position: relative; }
+/* v2.90.57 输入框高度自己调：输入区顶上一条细手柄，按住上下拖（双击恢复默认） */
+.ci-resizer {
+  position: absolute; left: 0; right: 0; top: 0; height: 12px; transform: translateY(-50%);
+  display: flex; align-items: center; justify-content: center; cursor: row-resize; z-index: 5;
+  touch-action: none;
+}
+.ci-resizer::before {
+  content: ''; width: 44px; height: 3px; border-radius: 3px; background: #dcdfe6;
+  transition: background .15s, width .15s;
+}
+.ci-resizer:hover::before, .ci-resizer.dragging::before { background: var(--theme, #1677ff); width: 76px; }
+body.resizing-ta, body.resizing-ta * { cursor: row-resize !important; }
+body.resizing-ta { user-select: none; }
+body.dark .ci-resizer::before { background: #3a4048; }
 .qk-mask { position: fixed; inset: 0; z-index: 40; }
 /* v2.90.56 快捷消息：往上弹的「窄面板」（固定 330px，不再铺满整行），一行一条 + 右侧「发送」 */
 .qk-panel {

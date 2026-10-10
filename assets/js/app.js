@@ -1022,8 +1022,54 @@ const app = createApp({
     };
     /* v2.60 手机端：输入框随内容长高（最多 ~5 行），不用在里面滚来滚去找字。
        只在手机端生效，电脑端保持原来的固定高度。 */
+    /* v2.90.57 输入框高度自己调：拖「输入区顶端那条细手柄」上下拉，拖出来的高度记在本机，双击手柄恢复默认。
+       taH = 0 表示跟默认一样（电脑 44 / 手机 50），不拖的话显示和以前完全一致。 */
+    const taResizing = ref(false);
+    const taH = ref((function () {
+      try {
+        const v = parseInt(localStorage.getItem('kfxt_ta_h') || '0', 10) || 0;
+        return v ? Math.min(420, Math.max(40, v)) : 0;
+      } catch (e) { return 0; }
+    })());
+    const taDefaultH = () => (document.documentElement.getAttribute('data-ui-cat') === 'mobile' ? 50 : 44);
+    const applyTaH = () => {
+      const el = document.querySelector('.chat-input textarea');
+      if (!el) return;
+      el.style.height = taH.value ? taH.value + 'px' : '';
+    };
+    const taResizeStart = (e) => {
+      const el = document.querySelector('.chat-input textarea');
+      if (!el || e.clientY === undefined) return;
+      taResizing.value = true;
+      document.body.classList.add('resizing-ta');
+      const fromY = e.clientY, fromH = el.offsetHeight || taDefaultH();
+      const mv = (ev) => {
+        taH.value = Math.min(420, Math.max(40, Math.round(fromH - (ev.clientY - fromY))));   // 往上拖 = 变高
+        el.style.height = taH.value + 'px';
+      };
+      const up = () => {
+        taResizing.value = false;
+        document.body.classList.remove('resizing-ta');
+        try { localStorage.setItem('kfxt_ta_h', String(taH.value)); } catch (e2) {}
+        document.removeEventListener('pointermove', mv);
+        document.removeEventListener('pointerup', up);
+        document.removeEventListener('pointercancel', up);
+      };
+      document.addEventListener('pointermove', mv);
+      document.addEventListener('pointerup', up);
+      document.addEventListener('pointercancel', up);
+    };
+    const taResetH = () => {
+      taH.value = 0;
+      try { localStorage.removeItem('kfxt_ta_h'); } catch (e) {}
+      applyTaH();
+    };
+    Vue.watch(currentId, () => nextTick(applyTaH));
     const autoGrowTa = (ev) => {
       const el = ev && ev.target;
+      if (!el) return;
+      // 自己拖过高度：以自己拖的为准，只保证内容不被裁掉
+      if (taH.value) { el.style.height = Math.max(taH.value, Math.min(360, el.scrollHeight)) + 'px'; return; }
       if (!el || document.documentElement.getAttribute('data-ui-cat') !== 'mobile') return;
       el.style.height = 'auto';
       el.style.height = Math.min(132, Math.max(44, el.scrollHeight)) + 'px';
@@ -3544,6 +3590,7 @@ const app = createApp({
       sameIpOthers, mergeSameIpNow,
       onImage, startRec, stopRec, closeSession, doTransfer,
       autoGrowTa,
+      taH, taResizing, taResizeStart, taResetH,
       taPlaceholder,
       pendingAtts, rmPendingAtt, quickCtx, openQuickCtx, editQuick,
       qDrag, quickDragDown, quickDragMove, quickDragUp, quickMove,
