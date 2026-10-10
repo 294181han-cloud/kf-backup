@@ -965,9 +965,51 @@ createApp({
         last = mm.index + mm[1].length;
       }
       if (last < text.length) segs.push({ t: text.slice(last), isUrl: false });
-      return segs;
+      /* v2.90.49 再把非链接片段里的数字标出来（链接里的数字不算） */
+      const out = [];
+      segs.forEach(sg => {
+        if (sg.isUrl) { out.push(sg); return; }
+        const ns = numSegs(sg.t);
+        if (ns) ns.forEach(x => out.push(x)); else out.push(sg);
+      });
+      return out;
     };
     const copyLink = (url) => { navigator.clipboard && navigator.clipboard.writeText(url); alert('链接已复制，请在浏览器中打开'); };
+    /* v2.90.49 消息里的数字（手机号 / 金额 / 银行卡这类）显示成蓝色，点一下就复制 —— 跟微信一样。
+       4 位以上数字，或者带 - / 空格分隔、总位数 ≥8 的号码；日期(10-09)、时间(17:04)这种不会命中。 */
+    const NUM_RE = /(?<!\d)(?:\d{4,}|(?:\d{2,4}[-\s]){1,}\d{2,4})(?!\d)/g;
+    const numSegs = (text) => {
+      const out = [];
+      let last = 0, mm;
+      NUM_RE.lastIndex = 0;
+      while ((mm = NUM_RE.exec(text)) !== null) {
+        const tok = mm[0];
+        const digits = (tok.match(/\d/g) || []).length;
+        if (digits < 4) continue;
+        if (/[-\s]/.test(tok) && digits < 8) continue;   // 10-09 / 1 2 3 这种不算号码
+        if (mm.index > last) out.push({ t: text.slice(last, mm.index), num: false });
+        out.push({ t: tok, num: true });
+        last = mm.index + tok.length;
+      }
+      if (!out.length) return null;
+      if (last < text.length) out.push({ t: text.slice(last), num: false });
+      return out;
+    };
+    const copyNum = (v) => {
+      const ok = () => showToast('已复制 ' + v);
+      try {
+        if (navigator.clipboard && navigator.clipboard.writeText) { navigator.clipboard.writeText(v).then(ok, () => fallback()); return; }
+      } catch (e) {}
+      fallback();
+      function fallback() {
+        try {
+          const ta = document.createElement('textarea');
+          ta.value = v; ta.style.position = 'fixed'; ta.style.opacity = '0';
+          document.body.appendChild(ta); ta.select(); document.execCommand('copy'); document.body.removeChild(ta);
+          ok();
+        } catch (e) { alert('复制失败，请长按选择'); }
+      }
+    };
 
     // ===== 访客自己头像 =====
     const myAvatar = ref('');
@@ -998,7 +1040,7 @@ createApp({
       audioPlaying, audioDur, waveBars, toggleAudio,
       ui, robotType, verifyTitle, verifyBg, verifyPassed, verifyValue, verifyErr, codeText, codeInput,
       genCode, codeVerify, verifyGo, slideStart, slideMove, slideEnd, doEnter,
-      pubShow, pubTitle, pubContent, linkMode, linkSegs, copyLink, myAvatar,
+      pubShow, pubTitle, pubContent, linkMode, linkSegs, copyLink, copyNum, myAvatar,
       resumeOpen, resumeCode, resumeErr, resumeBusy, openResume, doResume,
       myResumeCode, resumeLink, copyResumeLink,
       ended, handleEnded, restartChat,

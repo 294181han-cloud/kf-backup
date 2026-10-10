@@ -1179,6 +1179,10 @@ body.dark .me-btn.danger:hover { background: #3a2124; border-color: #5a3236; col
 .msg-time { font-size: 10.5px; color: #b9c0cc; margin-top: 4px; }
 .msg-bubble img { max-width: 240px; border-radius: 8px; }
 .msg-row.sys .msg-bubble { background: rgba(17, 24, 39, .06); border-radius: 999px; padding: 3px 10px; color: #8b95a7; }
+/* v2.90.49 消息里的数字（手机号/金额/卡号）：微信那种蓝，点一下复制 */
+.msg-bubble .num { color: #576b95; cursor: pointer; }
+.msg-bubble .num:hover { text-decoration: underline; }
+body.dark .msg-bubble .num { color: #7d9bd6; }
 
 /* ---------- 输入区 ---------- */
 .chat-input { background: #fff; border-top: 1px solid var(--v-line); padding: 9px 14px 11px; }

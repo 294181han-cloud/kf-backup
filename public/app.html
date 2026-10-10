@@ -7,7 +7,7 @@
 <link rel="icon" href="/assets/img/mi-logo.png">
 <link rel="apple-touch-icon" href="/assets/img/mi-logo.png">
 <link rel="stylesheet" href="/assets/vendor/element-plus.css">
- <link rel="stylesheet" href="/assets/css/app.css?v=3.64.17">
+ <link rel="stylesheet" href="/assets/css/app.css?v=3.64.18">
 <script src="/assets/ui/ui-registry.js?v=2.10.4"></script>
 <script src="/assets/ui/ui-loader.js?v=2.10.4" data-ui-cat="auto"></script>
 </head>
@@ -367,7 +367,7 @@
                       <div class="msg-imgs" v-if="imgsOf(m).length" :class="'n' + Math.min(imgsOf(m).length, 4)">
                         <img v-for="(a,ii) in imgsOf(m)" :key="'i'+ii" :src="a.url" @load="onMediaLoad" @click="viewing=a.url">
                       </div>
-                      <span v-if="m.text" class="msg-text">{{ m.text }}</span>
+                      <span v-if="m.text" class="msg-text" v-html="richText(m.text)"></span>
                       <span class="msg-edited" v-if="m.edited" title="这条消息被编辑过">已编辑</span>
                       <template v-for="(a,i) in (m.attachments||[])" :key="i">
                         <div v-if="a.type==='audio'" class="voice-bubble" :class="{playing: audioPlaying===a.url}" @click.stop="toggleAudio(a.url)">
@@ -1783,7 +1783,7 @@
 <script src="/assets/qr-poster.js?v=2.3.0"></script>
 <script src="/assets/api.js?v=2.1.2"></script>
 <script src="/assets/js/app-components.js?v=2.6.2"></script>
-<script src="/assets/js/app.js?v=3.68.0"></script>
+<script src="/assets/js/app.js?v=3.68.1"></script>
 <script src="/assets/js/app-boot.js?v=2.1.1"></script>
 </body>
 </html>

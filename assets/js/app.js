@@ -3353,7 +3353,44 @@ const app = createApp({
 
     // 浮层关闭：挂在 document 上（模板根是 #app 的 innerHTML，#app 上的 @click 根本绑不上）
     // 打开菜单的地方都做了 stopPropagation，所以这里只要无脑全关就不会误伤刚打开的菜单。
-    const onDocClick = () => closeAllMenus();
+    /* v2.90.49 消息里的数字：蓝色 + 点一下复制（跟微信一样）。用事件委托，不用给每条消息挂 handler。 */
+    const onDocClick = (ev) => {
+      const t = ev && ev.target;
+      if (t && t.classList && t.classList.contains('num')) {
+        const v = t.getAttribute('data-copy') || t.textContent || '';
+        copyPlain(v);
+        return;
+      }
+      closeAllMenus();
+    };
+    const copyPlain = (v) => {
+      const done = () => { try { ElementPlus.ElMessage.success('已复制 ' + v); } catch (e) {} };
+      try {
+        if (navigator.clipboard && navigator.clipboard.writeText) { navigator.clipboard.writeText(v).then(done, fb); return; }
+      } catch (e) {}
+      fb();
+      function fb() {
+        try {
+          const ta = document.createElement('textarea');
+          ta.value = v; ta.style.position = 'fixed'; ta.style.opacity = '0';
+          document.body.appendChild(ta); ta.select(); document.execCommand('copy'); document.body.removeChild(ta);
+          done();
+        } catch (e) { try { ElementPlus.ElMessage.error('复制失败，请手动选择'); } catch (e2) {} }
+      }
+    };
+    const escHtml = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+    const NUM_RE = /(?<!\d)(?:\d{4,}|(?:\d{2,4}[-\s]){1,}\d{2,4})(?!\d)/g;
+    /** 把消息文字里的数字包成可点的蓝色片段（先转义再包，防注入） */
+    const richText = (text) => {
+      const s = escHtml(text);
+      if (!/\d/.test(s)) return s;
+      return s.replace(NUM_RE, (tok) => {
+        const d = (tok.match(/\d/g) || []).length;
+        if (d < 4) return tok;
+        if (/[-\s]/.test(tok) && d < 8) return tok;   // 10-09 / 1 2 3 这类不算
+        return '<span class="num" data-copy="' + tok.replace(/"/g, '&quot;') + '">' + tok + '</span>';
+      });
+    };
     const onDocCtx = (ev) => { if (ev && ev.target && ev.target.closest && ev.target.closest('.ctx-menu')) return; closeAllMenus(); };
     /* ===== v2.86 手机端返回 =====
        以前进了会话，只能点顶栏那个小「‹」才回得去；手机返回键 / 返回手势
@@ -3468,6 +3505,7 @@ const app = createApp({
       asrText, asrBusy, transcribe,
       openSession, send, onKey, useQuick, sendQuick, quickClick, quickMode, setQuickMode,
       quickGroups, curGroup, visibleQuick, multiGroup, pickGroup,
+      richText,
       sameIpOthers, mergeSameIpNow,
       onImage, startRec, stopRec, closeSession, doTransfer,
       autoGrowTa,
