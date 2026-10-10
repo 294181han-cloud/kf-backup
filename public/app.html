@@ -7,7 +7,7 @@
 <link rel="icon" href="/assets/img/mi-logo.png">
 <link rel="apple-touch-icon" href="/assets/img/mi-logo.png">
 <link rel="stylesheet" href="/assets/vendor/element-plus.css">
-<link rel="stylesheet" href="/assets/css/app.css?v=3.64.32">
+<link rel="stylesheet" href="/assets/css/app.css?v=3.64.33">
 <script src="/assets/ui/ui-registry.js?v=2.10.4"></script>
 <script src="/assets/ui/ui-loader.js?v=2.10.4" data-ui-cat="auto"></script>
 </head>
@@ -510,13 +510,16 @@
         <!-- 手机端：访客信息抽屉的遮罩 -->
         <div class="m-mask m-info-mask" v-if="infoOpen" @click="infoOpen = false"></div>
 
-        <div class="info-col" v-if="current && !infoCollapsed" :class="{open: infoOpen}">
-          <h4>
-            访客信息
+        <!-- v2.90.64 右边这块顶部改成两个页签：访客信息 / 快捷消息，点一下切换 -->
+        <div class="info-col" v-if="current && !infoCollapsed" :class="{open: infoOpen, 'tab-quick': infoTab==='quick'}">
+          <h4 class="info-tabs">
+            <button type="button" class="it-btn" :class="{on: infoTab==='info'}" @click="infoTab='info'">访客信息</button>
+            <button type="button" class="it-btn" :class="{on: infoTab==='quick'}" @click="infoTab='quick'">快捷消息</button>
             <!-- v2.89.7 电脑端也能从面板上直接收起 -->
-            <button type="button" class="info-collapse" title="收起访客信息" @click="toggleInfo">»</button>
+            <button type="button" class="info-collapse" title="收起（点右边竖条可展开）" @click="toggleInfo">»</button>
             <button type="button" class="info-close m-only" title="收起" @click="infoOpen = false">✕</button>
           </h4>
+          <template v-if="infoTab==='info'">
             <div class="info-item">
               <span class="k">名称</span>
               <span class="v" v-if="!(nameEditing && nameScope==='info')" style="cursor:pointer;" title="点一下直接改名" @click="startRename('info')">{{ current.name }} ✏️</span>
@@ -558,32 +561,28 @@
             <span class="k">{{ contactLabel(c.type) }}</span>
             <span class="v" style="cursor:pointer;" @click="editContact(c)" :title="'点击编辑'">{{ c.value || '＋ 添加' }}</span>
           </div>
-              <!-- v2.90.58 访客信息里也能直接发快捷消息（跟输入框上面那个面板同一套数据、同一套规矩） -->
-              <h4 class="iq-head" @click="infoQuickOpen = !infoQuickOpen" title="点一下展开 / 收起">
-                快捷消息
-                <span class="iq-head-r">
-                  <span>{{ quickPanelList.length }} 条</span>
-                  <span class="iq-caret">{{ infoQuickOpen ? '▾' : '▸' }}</span>
-                </span>
-              </h4>
-              <div class="iq-wrap" v-if="infoQuickOpen">
-                <div class="iq-groups" v-if="multiGroup">
-                  <button type="button" class="qg-chip" v-for="g in quickGroups" :key="'ig' + g"
-                          :class="{on: g === curGroup}" @click.stop="pickGroup(g)">{{ g }}</button>
-                </div>
-                <div class="iq-list">
-                  <button type="button" class="iq-item" v-for="q in quickPanelList" :key="'iq' + q.id"
-                          :title="q.title + (q.content ? '：' + q.content : '') + '\n点一下直接把这条发给访客\nCtrl+单击：先填进输入框，改完再发'"
-                          @click="quickPanelClick(q, $event)">
-                    <span class="iq-t">{{ q.title }}</span>
-                    <span class="qk-badge" v-if="(q.attachments||[]).length">图</span>
-                    <span class="iq-send">发送</span>
-                  </button>
-                  <div class="iq-empty" v-if="!quickPanelList.length">还没有快捷消息，去「设置 → 快捷消息」里加</div>
-                </div>
-              </div>
           <h4>备注</h4>
           <el-input type="textarea" :rows="3" v-model="noteDraft" placeholder="点击保存记录访客备注" @blur="saveNote"></el-input>
+          </template>
+          <!-- v2.90.64 快捷消息页签：这一组的话术铺满整块，点一下就发给访客 -->
+          <template v-else>
+            <div class="iq2-head">
+              <button type="button" class="qg-chip" v-for="g in quickGroups" :key="'it' + g"
+                      :class="{on: g === curGroup}" @click="pickGroup(g)">{{ g }}</button>
+              <span class="iq2-n">{{ visibleQuick.length }} 条</span>
+              <button type="button" class="qrow-set" title="管理快捷消息（增删改 / 导入导出 / 上传图片 / 拖动排序）" @click="openQuickDlg">⚙ 设置</button>
+            </div>
+            <div class="iq2-list">
+              <button type="button" class="iq-item" v-for="q in visibleQuick" :key="'iq' + q.id"
+                      :title="q.title + (q.content ? '：' + q.content : '') + '\n点一下直接把这条发给访客\nCtrl+单击：先填进输入框，改完再发'"
+                      @click="quickPanelClick(q, $event)">
+                <span class="iq-t">{{ q.title }}</span>
+                <span class="qk-badge" v-if="(q.attachments||[]).length">图</span>
+                <span class="iq-send">发送</span>
+              </button>
+              <div class="iq-empty" v-if="!visibleQuick.length">这一组还没有快捷消息，去「⚙ 设置」里加</div>
+            </div>
+          </template>
         </div>
         <!-- v2.89.7 访客信息收起后，右边留一个竖条随时点开 -->
         <button type="button" class="info-reopen" v-if="current && infoCollapsed" title="展开访客信息" @click="toggleInfo">👤 访客信息</button>
@@ -1800,7 +1799,7 @@
 <script src="/assets/qr-poster.js?v=2.3.0"></script>
 <script src="/assets/api.js?v=2.1.2"></script>
 <script src="/assets/js/app-components.js?v=2.6.2"></script>
-<script src="/assets/js/app.js?v=3.68.13"></script>
+<script src="/assets/js/app.js?v=3.68.14"></script>
 <script src="/assets/js/app-boot.js?v=2.1.1"></script>
 </body>
 </html>

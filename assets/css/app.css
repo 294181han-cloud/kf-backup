@@ -320,6 +320,24 @@ body.dark .ci-resizer::before { background: #3a4048; }
 .iq-empty { font-size: 12px; color: #86909c; text-align: center; padding: 10px 0; }
 body.dark .iq-item { background: #23272e; border-color: #31363e; }
 body.dark .iq-t { color: #e5e6eb; }
+/* v2.90.64 右侧面板顶部页签：访客信息 / 快捷消息 */
+.info-col h4.info-tabs { display: flex; align-items: center; justify-content: flex-start; gap: 6px; margin: 0 0 10px; }
+.it-btn {
+  border: 0; background: transparent; color: #86909c; cursor: pointer;
+  font-size: 13px; font-weight: 600; padding: 4px 9px; border-radius: 8px; transition: all .12s;
+}
+.it-btn:hover { color: var(--theme, #1677ff); }
+.it-btn.on { background: color-mix(in srgb, var(--theme, #1677ff) 12%, #fff); color: var(--theme, #1677ff); }
+.info-tabs .info-collapse { margin-left: auto; }
+/* 快捷消息页签：列表铺满整块，里面自己滚 */
+.info-col.tab-quick { display: flex; flex-direction: column; }
+.iq2-head { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin-bottom: 8px; }
+.iq2-n { font-size: 11.5px; color: #86909c; }
+.iq2-list { display: flex; flex-direction: column; gap: 6px; flex: 1 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding-right: 2px; }
+.iq2-list::-webkit-scrollbar { width: 5px; }
+.iq2-list::-webkit-scrollbar-thumb { background: #e0e3e8; border-radius: 3px; }
+body.dark .it-btn { color: #8b95a7; }
+body.dark .it-btn.on { background: color-mix(in srgb, var(--theme, #1677ff) 22%, #1e2229); color: #6aa6ff; }
 /* v2.90.63 输入框正上面的快捷消息常驻区：第一行分组 + 设置，第二块话术标签最多两排（再多上下滚） */
 .qrow { display: flex; flex-direction: column; gap: 5px; margin: 2px 0 6px; }
 .qrow-head { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
