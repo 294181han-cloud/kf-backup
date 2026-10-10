@@ -2359,8 +2359,9 @@ body.dark .info-reopen { background: #23272e; color: #b6bfcd; border-color: #333
     border-radius: 999px; padding: 2px 9px;
   }
   body.dark .chat-head .ch-last-online { background: #262c34; color: #9aa4b5; }
-  .chat-head .ch-sub { flex-wrap: wrap; overflow: visible; gap: 6px; margin-top: 4px; }
-  .chat-head-btns { flex: 0 0 auto; flex-wrap: wrap; gap: 8px; justify-content: flex-end; }
+  /* v2.90.41 头一行：标签不换行（挤了就省略号），按钮也不换行 */
+  .chat-head .ch-sub { flex-wrap: nowrap; overflow: hidden; gap: 8px; margin-top: 0; }
+  .chat-head-btns { flex: 0 0 auto; flex-wrap: nowrap; gap: 8px; justify-content: flex-end; }
   /* v2.89.10 聊天区窄的时候按钮会换到第二行 —— 换行后从左边开始排，不要贴右边 */
   .chat-col { container-type: inline-size; container-name: kfchat; }
   .ch-tools {
