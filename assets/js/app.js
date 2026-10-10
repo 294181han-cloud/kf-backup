@@ -137,7 +137,6 @@ const app = createApp({
 
     // 快捷回复
     const quickMsgs = ref([]);
-    const showQuick = ref(true);
     /* v2.90.48 快捷消息分组：聊天里那排按钮按「分组」显示，鼠标移到某个分组上就直接切到那一组
        （触屏点一下也一样），选中哪个分组会记住。只有一个分组时完全不显示分组条，保持简洁。 */
     const quickGroups = computed(() => {
@@ -157,18 +156,6 @@ const app = createApp({
       try { return localStorage.getItem('kfxt_iq_open') !== '0'; } catch (e) { return true; }
     })());
     Vue.watch(infoQuickOpen, (v) => { try { localStorage.setItem('kfxt_iq_open', v ? '1' : '0'); } catch (e) {} });
-    /* v2.90.62 输入框上方那排常驻快捷消息：只显示当前这一组的前 8 条，多的走右边「更多」打开面板 */
-    const quickRowList = computed(() => (visibleQuick.value || []).slice(0, 8));
-    const quickRowMore = computed(() => Math.max(0, (visibleQuick.value || []).length - 8));
-    /* v2.90.59 快捷消息面板原来靠一层「全屏遮罩」来收面板，结果点哪儿第一下都只收面板（点不中下面的按钮）。
-       改成监听全局点击：点到面板 / 工具条以外的区域就收面板，同时你点的那一下照常生效（访客信息里点发送也是一下就发出）。 */
-    document.addEventListener('click', (e) => {
-      if (!showQuick.value) return;
-      const t = e.target;
-      if (!t || typeof t.closest !== 'function') return;
-      if (t.closest('.qk-panel') || t.closest('.quick-line') || t.closest('.ci-resizer')) return;
-      showQuick.value = false;
-    });
     const pickGroup = (g) => {
       quickGroup.value = g;
       try { localStorage.setItem('kfxt_qgroup', g); } catch (e) {}
@@ -1153,7 +1140,7 @@ const app = createApp({
         if (input) { input.focus(); }
         return;
       }
-      if (await sendQuick(q)) showQuick.value = false;
+      await sendQuick(q);
     };
     const rmPendingAtt = (i) => { pendingAtts.value.splice(i, 1); };
     // 快捷按钮右键：编辑该条（跳转快捷消息页并打开编辑框）
@@ -3577,7 +3564,7 @@ const app = createApp({
       msgs, draft, sending, chatBody, viewing, profile, contactList, noteDraft, transferDlg, transferTo, agentOptions,
       pinBottom, onMediaLoad,
       chatAtBottom, onChatScroll, toBottom,
-      quickMsgs, showQuick, welcomeMsgs, autoReplies, blacklist, preInq, preqOn, links, agents, brand,
+      quickMsgs, welcomeMsgs, autoReplies, blacklist, preInq, preqOn, links, agents, brand,
       bcText, bcSending, profileForm, pwOld, pwNew, recording, recSecs, qrVisible, qrData, qrBox,
       posterUrl, posterOpts, downloadPoster, pickPosterLogo, onQrOpen, downloadQrBox,
       waNumber, tgUser, waQrBox, tgQrBox, genWaQr, genTgQr,
@@ -3636,7 +3623,7 @@ const app = createApp({
       asrText, asrBusy, transcribe,
       openSession, send, onKey, useQuick, sendQuick, quickClick, quickPanelClick, quickMode, setQuickMode,
       quickGroups, curGroup, visibleQuick, multiGroup, pickGroup,
-      quickPanelKw, quickPanelList, qkHi, infoQuickOpen, quickRowList, quickRowMore,
+      quickPanelKw, quickPanelList, qkHi, infoQuickOpen,
       richText,
       sameIpOthers, mergeSameIpNow,
       onImage, startRec, stopRec, closeSession, doTransfer,

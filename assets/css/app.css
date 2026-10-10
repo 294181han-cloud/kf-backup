@@ -320,7 +320,21 @@ body.dark .ci-resizer::before { background: #3a4048; }
 .iq-empty { font-size: 12px; color: #86909c; text-align: center; padding: 10px 0; }
 body.dark .iq-item { background: #23272e; border-color: #31363e; }
 body.dark .iq-t { color: #e5e6eb; }
-/* v2.90.62 输入框上方常驻那一排快捷消息（点一下就发；多了横着滚，右边「更多」开面板） */
+/* v2.90.63 输入框正上面的快捷消息常驻区：第一行分组 + 设置，第二块话术标签最多两排（再多上下滚） */
+.qrow { display: flex; flex-direction: column; gap: 5px; margin: 2px 0 6px; }
+.qrow-head { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.qrow-n { font-size: 11.5px; color: #86909c; }
+.qrow-set {
+  margin-left: auto; flex: 0 0 auto; cursor: pointer;
+  border: 1px solid var(--v-line, #e5e6eb); background: #fff; color: #4e5969;
+  border-radius: 8px; padding: 3px 10px; font-size: 11.5px; font-weight: 600; transition: all .12s;
+}
+.qrow-set:hover { border-color: var(--theme, #1677ff); color: var(--theme, #1677ff); background: color-mix(in srgb, var(--theme, #1677ff) 6%, #fff); }
+.qrow-list { display: flex; flex-wrap: wrap; gap: 6px; max-height: 62px; overflow-y: auto; overscroll-behavior: contain; padding-right: 2px; }
+.qrow-list::-webkit-scrollbar { width: 5px; }
+.qrow-list::-webkit-scrollbar-thumb { background: #e0e3e8; border-radius: 3px; }
+body.dark .qrow-set { background: #23272e; border-color: #31363e; color: #c9cdd4; }
+/* v2.90.62 输入框上方那一排快捷消息标签（点一下就发） */
 .quick-row { display: flex; align-items: center; gap: 6px; overflow-x: auto; overscroll-behavior-x: contain; padding-bottom: 3px; margin-bottom: 5px; }
 .quick-row::-webkit-scrollbar { height: 4px; }
 .quick-row::-webkit-scrollbar-thumb { background: #e0e3e8; border-radius: 2px; }

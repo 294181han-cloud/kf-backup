@@ -7,7 +7,7 @@
 <link rel="icon" href="/assets/img/mi-logo.png">
 <link rel="apple-touch-icon" href="/assets/img/mi-logo.png">
 <link rel="stylesheet" href="/assets/vendor/element-plus.css">
-<link rel="stylesheet" href="/assets/css/app.css?v=3.64.31">
+<link rel="stylesheet" href="/assets/css/app.css?v=3.64.32">
 <script src="/assets/ui/ui-registry.js?v=2.10.4"></script>
 <script src="/assets/ui/ui-loader.js?v=2.10.4" data-ui-cat="auto"></script>
 </head>
@@ -420,53 +420,6 @@
               <div class="ci-resizer" :class="{dragging: taResizing}"
                    title="按住上下拖动，调整输入框高度（双击恢复默认）"
                    @pointerdown.prevent="taResizeStart" @dblclick="taResetH"></div>
-              <!-- v2.90.54 快捷消息改成「往上弹的竖列表」：左边 ⚡ 开关 + ⚙ 设置，内容往上展开、上下滚动 -->
-              <div class="quick-line">
-              <div class="quick-toggle-row">
-                <button class="quick-toggle-btn" :class="{on: showQuick}" @click="showQuick=!showQuick">
-                  <svg class="q-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2 4.5 13.5h6L9 22l10.5-12H13L13 2z"/></svg>
-                  <span class="qt-label">快捷消息 <span style="font-size:11px;">{{ showQuick ? '▾' : '▸' }}</span></span>
-                </button>
-                <button class="quick-toggle-btn" title="在弹窗里管理快捷消息（增删改，不用离开聊天）" @click="openQuickDlg">
-                  <svg class="q-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.9l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-2.9 1.2 2 2 0 1 1-4 0 1.7 1.7 0 0 0-2.9-1.2l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1A1.7 1.7 0 0 0 3 15a2 2 0 1 1 0-4 1.7 1.7 0 0 0 1.5-2.9l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1A1.7 1.7 0 0 0 10 4.6a2 2 0 1 1 4 0 1.7 1.7 0 0 0 2.9 1.2l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1A1.7 1.7 0 0 0 21 11a2 2 0 1 1 0 4 1.7 1.7 0 0 0-1.6 0z"/></svg>
-                  <span class="qt-label">设置</span>
-                </button>
-              </div>
-              <span class="quick-count" v-if="showQuick && quickMsgs.length">共 {{ visibleQuick.length }} 条 · 点一下就发</span>
-              </div>
-              <!-- v2.90.56 快捷消息面板：窄面板（330px）往上弹，一行一条 + 右侧「发送」，点发送就发出去并收起 -->
-              <div class="qk-panel" v-if="showQuick" @keydown.esc="showQuick = false">
-                <div class="qk-head">
-                  <b>快捷消息 · {{ curGroup }}</b>
-                  <span class="qk-n">{{ visibleQuick.length }} 条</span>
-                  <button type="button" class="qk-x" title="收起（Esc）" @click="showQuick = false">✕</button>
-                </div>
-                <div class="qk-search">
-                  <el-input v-model="quickPanelKw" size="small" placeholder="搜索快捷回复" clearable></el-input>
-                </div>
-                <div class="qk-list">
-                  <button type="button" class="qk-item" v-for="(q, qi) in quickPanelList" :key="'p' + q.id"
-                          :title="q.title + (q.content ? '：' + q.content : '') + '\n点「发送」直接把这条发给访客\nCtrl+单击：先填进输入框，改完再发'"
-                          :class="{dragging: qDrag.on && qDrag.idx === qi}"
-                          @click="quickPanelClick(q, $event)" @contextmenu="openQuickCtx(q, $event)"
-                          @pointerdown="quickDragDown(qi, $event)" @pointermove="quickDragMove($event)"
-                          @pointerup="quickDragUp" @pointercancel="quickDragUp">
-                    <span class="qk-t" v-html="qkHi(q.title)"></span>
-                    <span class="qk-badge" v-if="(q.attachments||[]).length">图</span>
-                    <span class="qk-send">发送</span>
-                  </button>
-                  <div class="qk-empty" v-if="!quickMsgs.length">还没有快捷消息，去「⚙ 设置」里添加</div>
-                  <div class="qk-empty" v-else-if="!quickPanelList.length">没有匹配的快捷消息</div>
-                </div>
-                <!-- v2.90.55 分组挪到面板最下面（点一下切换；只有一组时不显示） -->
-                <div class="qk-bottom">
-                  <div class="qk-groups" v-if="multiGroup">
-                    <button type="button" class="qg-chip" v-for="g in quickGroups" :key="'pg' + g"
-                            :class="{on: g === curGroup}" @click="pickGroup(g)">{{ g }}</button>
-                  </div>
-                  <span class="qk-hint">点「发送」即发出 · <b>Ctrl + 点击</b> 填进输入框</span>
-                </div>
-              </div>
               <div class="chat-tools" style="margin-bottom:6px;">
 
                 <!-- v2.72 手机浏览器：file 框做成按钮上的一层透明覆盖，手指直接点在 input 上（原生点击）才打得开相册 -->
@@ -489,15 +442,22 @@
                 <button class="tool-btn m-only" title="管理快捷消息（增删改 / 上传图片）" @click="openQuickDlg"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.9l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-2.9 1.2 2 2 0 1 1-4 0 1.7 1.7 0 0 0-2.9-1.2l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1A1.7 1.7 0 0 0 3 15a2 2 0 1 1 0-4 1.7 1.7 0 0 0 1.5-2.9l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1A1.7 1.7 0 0 0 10 4.6a2 2 0 1 1 4 0 1.7 1.7 0 0 0 2.9 1.2l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1A1.7 1.7 0 0 0 21 11a2 2 0 1 1 0 4 1.7 1.7 0 0 0-1.6 0z"/></svg></button>
                 <span class="tools-hint">支持 Ctrl+V 直接粘贴图片</span>
               </div>
-              <!-- v2.90.62 输入框上方常驻一排快捷消息：点一下就发（Ctrl+单击填进输入框），右边「更多」打开完整面板 -->
-              <div class="quick-row" v-if="quickRowList.length">
-                <button type="button" class="qr-chip" v-for="q in quickRowList" :key="'qr' + q.id"
-                        :title="q.title + (q.content ? '：' + q.content : '') + '\n点一下直接发给访客 · Ctrl+单击：先填进输入框，改完再发'"
-                        @click="quickPanelClick(q, $event)">
-                  <span class="qr-t">{{ q.title }}</span>
-                  <span class="qr-img" v-if="(q.attachments||[]).length">图</span>
-                </button>
-                <span class="qr-more" v-if="quickRowMore" @click="showQuick = true">更多 {{ quickRowMore }} 条 ›</span>
+              <!-- v2.90.63 快捷消息不再弹面板：输入框正上方常驻「分组 + 话术标签」，一组一排不够就两排（再多上下滚） -->
+              <div class="qrow" v-if="quickMsgs.length">
+                <div class="qrow-head">
+                  <button type="button" class="qg-chip" v-for="g in quickGroups" :key="'qg' + g"
+                          :class="{on: g === curGroup}" @click="pickGroup(g)">{{ g }}</button>
+                  <span class="qrow-n">{{ visibleQuick.length }} 条</span>
+                  <button type="button" class="qrow-set" title="管理快捷消息（增删改 / 导入导出 / 上传图片 / 拖动排序）" @click="openQuickDlg">⚙ 设置</button>
+                </div>
+                <div class="qrow-list">
+                  <button type="button" class="qr-chip" v-for="q in visibleQuick" :key="'qr' + q.id"
+                          :title="q.title + (q.content ? '：' + q.content : '') + '\n点一下直接发给访客 · Ctrl+单击：先填进输入框，改完再发'"
+                          @click="quickPanelClick(q, $event)">
+                    <span class="qr-t">{{ q.title }}</span>
+                    <span class="qr-img" v-if="(q.attachments||[]).length">图</span>
+                  </button>
+                </div>
               </div>
               <!-- 按住说话的实时提示（松开发送 / 上滑取消） -->
               <div class="vh-tip" v-if="voiceHold.on" :class="{cancel: voiceHold.cancel}">
@@ -1840,7 +1800,7 @@
 <script src="/assets/qr-poster.js?v=2.3.0"></script>
 <script src="/assets/api.js?v=2.1.2"></script>
 <script src="/assets/js/app-components.js?v=2.6.2"></script>
-<script src="/assets/js/app.js?v=3.68.12"></script>
+<script src="/assets/js/app.js?v=3.68.13"></script>
 <script src="/assets/js/app-boot.js?v=2.1.1"></script>
 </body>
 </html>
