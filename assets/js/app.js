@@ -155,15 +155,11 @@ const app = createApp({
     const pickGroup = (g) => {
       quickGroup.value = g;
       try { localStorage.setItem('kfxt_qgroup', g); } catch (e) {}
-      const wrap = document.querySelector('.quick-scroll');
+      const wrap = document.querySelector('.qk-list');
       if (wrap) wrap.scrollLeft = 0;
     };
-    /* v2.90.50 一组里快捷消息太多（比如 20 条）时：那排只摆最前面的几条 + 「更多 N 条」，
-       点「更多」弹一个带搜索的面板，把这一组全部列出来（点一下就发，Ctrl+点击=填进输入框）。 */
-    const QUICK_BAR_MAX = 9;
-    const quickBarShown = computed(() => visibleQuick.value.slice(0, QUICK_BAR_MAX));
-    const quickMoreCount = computed(() => Math.max(0, visibleQuick.value.length - QUICK_BAR_MAX));
-    const quickPanelOpen = ref(false);
+    /* v2.90.54 快捷消息改成「往上弹的竖列表」：不再左右横滑（横滑会蹭到分组切换），
+       内容竖着列、多了上下滚，分组点一下切，搜索/拖动排序都在这个面板里。 */
     const quickPanelKw = ref('');
     const quickPanelList = computed(() => {
       const kw = quickPanelKw.value.trim().toLowerCase();
@@ -171,13 +167,6 @@ const app = createApp({
       if (kw === '') return list;
       return list.filter(q => ((q.title || '') + ' ' + (q.content || '')).toLowerCase().includes(kw));
     });
-    const openQuickPanel = () => { quickPanelOpen.value = true; quickPanelKw.value = ''; };
-    const quickPanelPick = (q, ev) => {
-      const fillMode = (ev && (ev.ctrlKey || ev.metaKey)) || quickMode.value === 'edit';
-      quickClick(q, ev);                             // 跟快捷条上的点击同一套规则
-      if (!fillMode) quickPanelOpen.value = false;   // 直接发出去就把面板收起来
-    };
-    const closeQuickPanel = () => { quickPanelOpen.value = false; };
     /** 面板里把命中的关键词高亮（先转义，防注入） */
     const qkHi = (text) => {
       const s = escHtml(text == null ? '' : text);
@@ -1124,7 +1113,7 @@ const app = createApp({
       if (!wrap) return;
       const x = ev.clientX, y = ev.clientY;
       let to = qDrag.idx;
-      [...wrap.querySelectorAll('.quick-btn')].forEach((b, i) => {
+      [...wrap.querySelectorAll('.qk-item')].forEach((b, i) => {
         const r = b.getBoundingClientRect();
         if (x >= r.left && x <= r.right && y >= r.top && y <= r.bottom) to = i;
       });
@@ -3536,8 +3525,7 @@ const app = createApp({
       asrText, asrBusy, transcribe,
       openSession, send, onKey, useQuick, sendQuick, quickClick, quickMode, setQuickMode,
       quickGroups, curGroup, visibleQuick, multiGroup, pickGroup,
-      quickBarShown, quickMoreCount, quickPanelOpen, quickPanelKw, quickPanelList, openQuickPanel, quickPanelPick,
-      closeQuickPanel, qkHi,
+      quickPanelKw, quickPanelList, qkHi,
       richText,
       sameIpOthers, mergeSameIpNow,
       onImage, startRec, stopRec, closeSession, doTransfer,
