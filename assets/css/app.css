@@ -329,8 +329,10 @@ body.dark .iq-t { color: #e5e6eb; }
 .it-btn:hover { color: var(--theme, #1677ff); }
 .it-btn.on { background: color-mix(in srgb, var(--theme, #1677ff) 12%, #fff); color: var(--theme, #1677ff); }
 .info-tabs .info-collapse { margin-left: auto; }
-/* 快捷消息页签：列表铺满整块，里面自己滚 */
-.info-col.tab-quick { display: flex; flex-direction: column; }
+/* 快捷消息页签：列表铺满整块，里面自己滚。
+   手机端的 UI 模板里有一条 html[data-ui-cat="mobile"][data-ui-template="default"] .info-col{display:block}
+   比这条权重高，会把它压回 block（抽屉里的列表就不铺满了），所以这里必须 !important。 */
+.info-col.tab-quick { display: flex !important; flex-direction: column; }
 .iq2-head { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin-bottom: 8px; }
 .iq2-n { font-size: 11.5px; color: #86909c; }
 .iq2-list { display: flex; flex-direction: column; gap: 6px; flex: 1 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding-right: 2px; }
