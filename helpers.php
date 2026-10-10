@@ -2776,12 +2776,15 @@ function gate_frame_allow_hosts(): array
        glitch.me / surge.sh / render / web.app / firebaseapp / fly.dev / herokuapp / wixsite /
        notion.site / wordpress / statically / jsdelivr / gitee.io / 腾讯云COS / 阿里云OSS / 七牛 / 百度BOS
        —— 全部 🟢 绿；**deno.dev、blogspot.com 已红，别用**。
+       2026-10-10 补：**zeabur.app**（Zeabur 免费托管；github.com/foxplaying/fanghong 建门牌用的就是它）
+       同批实测 🟢 绿，加入。
        注：整段放行 = 别人也能拿这些域当门牌嵌壳页；但壳页要带有效入口 ID 才有内容，风险可控。 */
     foreach ([
         'netlify.app', 'vercel.app', 'pages.dev', 'workers.dev', 'github.io', 'gitlab.io',
         'glitch.me', 'surge.sh', 'onrender.com', 'web.app', 'firebaseapp.com', 'fly.dev',
         'herokuapp.com', 'wixsite.com', 'notion.site', 'wordpress.com', 'statically.io',
         'jsdelivr.net', 'gitee.io', 'myqcloud.com', 'aliyuncs.com', 'clouddn.com', 'bcebos.com',
+        'zeabur.app',
     ] as $extra) $hosts[] = $extra;
     return array_values(array_unique($hosts));
 }
