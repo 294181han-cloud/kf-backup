@@ -2298,9 +2298,19 @@ body.resizing-col { cursor: col-resize !important; user-select: none; }
 .sess-col.tiny .sess-body .row2 { margin-top: 2px; }
 /* v2.90.24 聊天区自己变窄时（会话列拖宽 / 收起访客信息 / 小窗口）也要好看：
    先收掉标题下的"渠道/设备/地区"小标签，再收掉工具条右侧的提示文字，最后把动作按钮收成图标。 */
-@container (max-width: 620px) {
-  .chat-head .ch-sub { display: none; }
+/* v2.90.37 头是一行：宽度不够时按「渠道 → 设备 → 地区」顺序省标签，按钮始终留在同一行 */
+@container (max-width: 1120px) {
   .chat-head .tools-hint { display: none; }
+}
+@container (max-width: 1040px) {
+  .chat-head .ch-sub .ch-chip:nth-child(1) { display: none; }   /* 渠道 */
+}
+@container (max-width: 900px) {
+  .chat-head .ch-sub .ch-chip:nth-child(2) { display: none; }   /* 设备 */
+}
+@container (max-width: 780px) {
+  .chat-head .ch-sub { display: none; }                          /* 剩下地区也省掉 */
+  .ch-tools .m-hide-btn { display: none; }                       /* 工具条只留「访客信息」，其余收起来 */
 }
 @container (max-width: 560px) {
   /* 动作按钮只留图标（🚫 拉黑 → 🚫），会话头的合并提示也收成"🧩 N 条" */
@@ -2335,13 +2345,13 @@ body.dark .info-reopen { background: #23272e; color: #b6bfcd; border-color: #333
   .info-collapse, .info-reopen { display: none !important; }
 }
 
-/* ===== v2.89.9 会话头重排（只改电脑端，手机端布局不动）=====
-   目标：一行"名字 + 状态 + 最后上线"，一行"渠道 / 设备 / 地区"，
-   右边工具（👤🔍🖼📅🔑）收进一个灰底小工具条，动作按钮（拉黑/归档/转接/结束）单独一组。 */
+/* ===== v2.90.37 会话头（只改电脑端，手机端布局不动）=====
+   一行到底：头像 | 名字 + 状态 + 最后上线 | 渠道 / 设备 / 地区 | 右边灰底工具条 + 动作按钮。
+   宽度不够时的顺序：先省「渠道」→ 再省「设备」→ 再省「地区」，按钮不掉到第二行。 */
 @media (min-width: 901px) {
-  .chat-head { padding: 12px 16px; gap: 12px; align-items: center; }
-  .chat-head .ch-top { flex-wrap: wrap; row-gap: 4px; gap: 8px; overflow: visible; }
-  .chat-head .ch-top .name { font-size: 16px; max-width: 100%; white-space: normal; }
+  .chat-head { padding: 9px 14px; gap: 10px; align-items: center; flex-wrap: nowrap; }
+  .chat-head .ch-top { flex-wrap: nowrap; row-gap: 0; gap: 7px; overflow: visible; }
+  .chat-head .ch-top .name { font-size: 15px; max-width: 220px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .chat-head .ch-edit { opacity: .28; cursor: pointer; font-size: 13px; transition: opacity .15s; }
   .chat-head:hover .ch-edit { opacity: .9; }
   .chat-head .ch-last-online {
@@ -2353,10 +2363,6 @@ body.dark .info-reopen { background: #23272e; color: #b6bfcd; border-color: #333
   .chat-head-btns { flex: 0 0 auto; flex-wrap: wrap; gap: 8px; justify-content: flex-end; }
   /* v2.89.10 聊天区窄的时候按钮会换到第二行 —— 换行后从左边开始排，不要贴右边 */
   .chat-col { container-type: inline-size; container-name: kfchat; }
-  @container kfchat (max-width: 760px) {
-    .chat-head { flex-wrap: wrap; row-gap: 8px; }
-    .chat-head-btns { flex: 1 1 100%; margin-left: 0 !important; justify-content: flex-start; }
-  }
   .ch-tools {
     display: inline-flex; align-items: center; gap: 2px;
     background: #f4f6fa; border-radius: 9px; padding: 2px;
