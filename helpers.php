@@ -2429,6 +2429,10 @@ function door_ext_hosts(): array
         'illustrious-kitsune-adda42.netlify.app',
         'frolicking-gelato-eccc55.netlify.app',
         'dainty-genie-dce29d.netlify.app',
+        'golden-basbousa-c69ec1.netlify.app',
+        'harmonious-concha-3f070e.netlify.app',
+        'majestic-gaufre-cb34a5.netlify.app',
+        'sprightly-druid-1084d2.netlify.app',
     ];
 }
 
