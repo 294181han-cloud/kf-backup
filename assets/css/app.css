@@ -137,7 +137,7 @@ body { margin: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'P
 .snd-label { width: 120px; font-size: 13px; color: #1f2329; }
 .chat-head .geo-tag { font-size: 11px; background: #f2f3f5; }
 
-.chat-col { flex: 1; display: flex; flex-direction: column; min-width: 0; background: #f7f7f7; }
+.chat-col { flex: 1; display: flex; flex-direction: column; min-width: 0; background: #f7f7f7; container-type: inline-size; }
     ::-webkit-scrollbar { width: 6px; height: 6px; }
     ::-webkit-scrollbar-track { background: #e4e4e5; }
     ::-webkit-scrollbar-thumb { background: #c0bebc; border-radius: 3px; }
@@ -1110,6 +1110,7 @@ body.dark .me-btn.danger:hover { background: #3a2124; border-color: #5a3236; col
   display: inline-flex; align-items: center; gap: 4px; line-height: 1.7;
 }
 .ch-merge-ip:hover { background: #ffeccc; border-color: #ffc078; }
+.ch-merge-ip .ch-merge-short { display: none; }
 .ch-sub {
   display: flex; align-items: center; gap: 14px; flex-wrap: wrap;
   margin-top: 6px; font-size: 12px; color: var(--v-ink-3);
@@ -2267,14 +2268,40 @@ body.resizing-col { cursor: col-resize !important; user-select: none; }
 }
 
 /* v2.89.7 会话列表「窄模式」：拖到 300px 以内自动少显示（渠道标签/预览/客服标签都收起） */
+/* v2.90.24 会话列变窄的分级适配：先丢"渠道/地区"标签，再丢预览文字，别把字挤成竖排 */
 .sess-col.slim .geo-tag,
-.sess-col.slim .last,
 .sess-col.slim .tag-agent,
 .sess-col.slim .sess-multi-entry .sme-text { display: none; }
-.sess-col.slim .sess-item { gap: 8px; padding: 9px 30px 9px 8px; }
-.sess-col.slim .sess-ava { width: 32px; height: 32px; font-size: 16px; }
+.sess-col .sme-text-short { display: none; }
+.sess-col.slim .sme-text-short { display: inline; }
+.sess-col.slim .sess-item { gap: 8px; padding: 9px 26px 9px 8px; }
 .sess-col.slim .sess-body .row1 .name { font-size: 13.5px; }
 .sess-col.slim .sess-multi-entry { justify-content: center; }
+/* 页签：窄的时候只留短词，且绝不换行 */
+.sess-col.slim .scope-tab { font-size: 12px; padding: 7px 3px 9px; }
+.sess-scope-tabs .scope-tab { white-space: nowrap; }
+/* 更窄（<240）：预览文字也收掉，头像小一号，行更紧凑 */
+.sess-col.tiny .sess-item { padding: 8px 22px 8px 7px; }
+.sess-col.tiny .sess-item .last { display: none; }
+.sess-col.tiny .sess-ava { width: 30px; height: 30px; font-size: 15px; }
+.sess-col.tiny .sess-body .row1 .name { font-size: 13px; }
+.sess-col.tiny .sess-body .row2 { margin-top: 2px; }
+/* v2.90.24 聊天区自己变窄时（会话列拖宽 / 收起访客信息 / 小窗口）也要好看：
+   先收掉标题下的"渠道/设备/地区"小标签，再收掉工具条右侧的提示文字，最后把动作按钮收成图标。 */
+@container (max-width: 620px) {
+  .chat-head .ch-sub { display: none; }
+  .chat-head .tools-hint { display: none; }
+}
+@container (max-width: 560px) {
+  /* 动作按钮只留图标（🚫 拉黑 → 🚫），会话头的合并提示也收成"🧩 N 条" */
+  .ch-acts .cbtn-t, .ch-merge-ip .cbtn-t { display: none; }
+  .ch-merge-ip .ch-merge-short { display: inline; }
+}
+@container (max-width: 520px) {
+  .chat-head .ch-top .ch-edit { display: none; }
+  .chat-input .tools-hint { display: none; }
+  .quick-toggle-row .qt-label { display: none; }
+}
 
 /* 访客信息：面板上直接收起 + 收起后右侧的竖条可以点开 */
 .info-collapse {

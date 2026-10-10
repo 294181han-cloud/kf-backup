@@ -3214,6 +3214,11 @@ const app = createApp({
       try { return Math.min(560, Math.max(200, parseInt(localStorage.getItem('kfxt_sess_w') || '326', 10) || 326)); }
       catch (e) { return 326; }
     })());
+    /* v2.90.24 会话列窄了以后，页签文字自动收短，别让「在线聊天」被挤成竖排（之前 190px 时会一个字一行） */
+    const sessTabText = computed(() => {
+      const narrow = sessW.value < 320;
+      return { online: narrow ? '在线' : '在线聊天', archived: narrow ? '归档' : '已归档', closed: narrow ? '结束' : '已结束' };
+    });
     const sessResizing = ref(false);
     const infoCollapsed = ref((function () { try { return localStorage.getItem('kfxt_info_collapsed') === '1'; } catch (e) { return false; } })());
     let sessDragFrom = null;
@@ -3374,7 +3379,7 @@ const app = createApp({
       sec, loginLogs, visitors, cleanupOpts, loadSecurityPage, saveSecurity, doCleanup, refreshGeo, loadVisitors, openVisitorSessions,
       guide, guideDone, dark, toggleDark, renameVisitor, renderCodeQrs, tplList,
       uiCatList, uiCurrentCat, uiActiveCat, uiActiveList, uiSel, uiTplList, uiColorList, uiPick, sideCollapsed, mSideOpen,
-      sessW, sessResizing, sessResizeStart, sessResetW, toggleSide, infoCollapsed, toggleInfo,
+      sessW, sessTabText, sessResizing, sessResizeStart, sessResetW, toggleSide, infoCollapsed, toggleInfo,
       blockSession, blockIp, kwList, kwInput, kwSaving, addKw, removeKw, saveFilter, agentCmd, restartPoll,
       devices, deviceLimit, loadDevices, kickDevice, renameDevice, isCurDevice,
       chatSearchOn, chatSearchKw, searchHit, visibleMsgs, canRecall, recallMsg, isRead,

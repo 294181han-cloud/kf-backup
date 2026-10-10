@@ -7,7 +7,7 @@
 <link rel="icon" href="/assets/img/mi-logo.png">
 <link rel="apple-touch-icon" href="/assets/img/mi-logo.png">
 <link rel="stylesheet" href="/assets/vendor/element-plus.css">
- <link rel="stylesheet" href="/assets/css/app.css?v=3.64.2">
+ <link rel="stylesheet" href="/assets/css/app.css?v=3.64.3">
 <script src="/assets/ui/ui-registry.js?v=2.10.4"></script>
 <script src="/assets/ui/ui-loader.js?v=2.10.4" data-ui-cat="auto"></script>
 </head>
@@ -193,18 +193,18 @@
       </aside>
 
       <div class="content workbench" v-if="tab==='work'" :class="{'has-chat': !!currentId}">
-        <div class="sess-col" :class="{resizing: sessResizing, slim: sessW < 300}" :style="{width: sessW + 'px'}">
+        <div class="sess-col" :class="{resizing: sessResizing, slim: sessW < 300, tiny: sessW < 240}" :style="{width: sessW + 'px'}">
           <!-- v2.89.5 会话列表宽度自己拖（双击恢复默认） -->
           <div class="sess-resizer" title="拖动调整会话列表宽度，双击恢复默认" @mousedown.prevent="sessResizeStart" @dblclick="sessResetW"></div>
           <div class="sess-scope-tabs">
             <button class="scope-tab" :class="{on: sessScope==='online'}" @click="setScope('online')">
-              在线聊天<span class="scope-n" v-if="sessCounts.online">{{ sessCounts.online }}</span><span class="scope-dot" v-if="sessCounts.online_unread" :title="sessCounts.online_unread + ' 条未读'"></span>
+              {{ sessTabText.online }}<span class="scope-n" v-if="sessCounts.online">{{ sessCounts.online }}</span><span class="scope-dot" v-if="sessCounts.online_unread" :title="sessCounts.online_unread + ' 条未读'"></span>
             </button>
             <button class="scope-tab" v-if="!sessCollapsed" :class="{on: sessScope==='archived'}" @click="setScope('archived')">
-              已归档<span class="scope-n" v-if="sessCounts.archived">{{ sessCounts.archived }}</span><span class="scope-dot" v-if="sessCounts.archived_unread" :title="sessCounts.archived_unread + ' 条未读'"></span>
+              {{ sessTabText.archived }}<span class="scope-n" v-if="sessCounts.archived">{{ sessCounts.archived }}</span><span class="scope-dot" v-if="sessCounts.archived_unread" :title="sessCounts.archived_unread + ' 条未读'"></span>
             </button>
             <button class="scope-tab" v-if="!sessCollapsed" :class="{on: sessScope==='closed'}" @click="setScope('closed')">
-              已结束<span class="scope-n" v-if="sessCounts.closed">{{ sessCounts.closed }}</span>
+              {{ sessTabText.closed }}<span class="scope-n" v-if="sessCounts.closed">{{ sessCounts.closed }}</span>
             </button>
             <!-- v2.86 去掉「已删除」页签：删除会话就是删掉了，不再单独开一个回收站页签 -->
             <!-- v2.45 收起＝把「已归档 / 已结束」收起来，只留在线聊天（列表和搜索一直都在） -->
@@ -216,7 +216,7 @@
           </div>
           <!-- 多选入口（v2.70）：做成一条醒目的文字按钮，不用再找小图标 -->
           <button type="button" class="sess-multi-entry" v-if="!sessMulti" @click="toggleMulti">
-            <span class="sme-box">☑</span><span class="sme-text"> 多选：批量归档 / 结束 / 删除</span>
+            <span class="sme-box">☑</span><span class="sme-text"> 多选：批量归档 / 结束 / 删除</span><span class="sme-text-short">多选</span>
           </button>
           <!-- 多选操作栏（v2.67） -->
           <div class="sess-multi-bar" v-if="sessMulti">
@@ -278,7 +278,7 @@
                   </span>
                     <!-- v2.90.22 同一个 IP 下还有别的没结束的窗口 → 一键并进来（自动合并不上的兜底，比如系统版本被识别成两台设备） -->
                     <button v-if="sameIpOthers.length" class="ch-merge-ip" :title="'同一个 IP 下还有 ' + sameIpOthers.length + ' 条没结束的会话：' + sameIpOthers.map(s => s.name).join('、')"
-                            @click="mergeSameIpNow">🧩 同 IP 还有 {{ sameIpOthers.length }} 条 · 合并</button>
+                            @click="mergeSameIpNow">🧩 <span class="cbtn-t">同 IP 还有 {{ sameIpOthers.length }} 条 · 合并</span><span class="ch-merge-short">{{ sameIpOthers.length }} 条</span></button>
                   <!-- v2.60.13 恢复码：客户换手机/换浏览器后把它发给他（点一下就复制）。手机上收在 ⋯ 菜单与访客信息里 -->
                   <!-- v2.89.9 恢复码不再堆在标题行：右侧「访客信息」里能复制，工具栏 🔑 能找回/合并对话 -->
                 </div>
@@ -306,13 +306,13 @@
                 <el-button size="small" plain class="cbtn m-only" title="更多操作（搜索 / 拉黑 / 归档 / 转接 / 结束）" @click.stop="chMore = true">⋯</el-button>
                 <span class="ch-acts">
                   <el-popconfirm title="拉黑该访客 IP？拉黑后其无法再进入或发消息" @confirm="blockSession">
-                    <template #reference><el-button size="small" type="danger" plain class="cbtn m-hide-btn">🚫 拉黑</el-button></template>
+                    <template #reference><el-button size="small" type="danger" plain class="cbtn m-hide-btn">🚫 <span class="cbtn-t">拉黑</span></el-button></template>
                   </el-popconfirm>
-                  <el-button size="small" v-if="sessScope==='archived'" type="warning" plain class="cbtn m-hide-btn" @click="archiveSession(false)">↩ 取消归档</el-button>
-                  <el-button size="small" v-else-if="sessScope==='online'" plain class="cbtn m-hide-btn" @click="archiveSession(true)">📦 归档</el-button>
-                  <el-button size="small" v-if="sessScope!=='closed'" plain class="cbtn m-hide-btn" @click="transferDlg=true">⇄ 转接</el-button>
+                  <el-button size="small" v-if="sessScope==='archived'" type="warning" plain class="cbtn m-hide-btn" @click="archiveSession(false)">↩ <span class="cbtn-t">取消归档</span></el-button>
+                  <el-button size="small" v-else-if="sessScope==='online'" plain class="cbtn m-hide-btn" @click="archiveSession(true)">📦 <span class="cbtn-t">归档</span></el-button>
+                  <el-button size="small" v-if="sessScope!=='closed'" plain class="cbtn m-hide-btn" @click="transferDlg=true">⇄ <span class="cbtn-t">转接</span></el-button>
                   <el-popconfirm v-if="sessScope!=='closed'" title="结束会话后，访客端聊天记录将清除，访客将无法继续在此会话发送消息。确认结束？" confirm-button-text="结束会话" cancel-button-text="取消" @confirm="closeSession">
-                    <template #reference><el-button size="small" type="danger" plain class="cbtn m-hide-btn">✔ 结束</el-button></template>
+                    <template #reference><el-button size="small" type="danger" plain class="cbtn m-hide-btn">✔ <span class="cbtn-t">结束</span></el-button></template>
                   </el-popconfirm>
                 </span>
               </span>
@@ -1772,7 +1772,7 @@
 <script src="/assets/qr-poster.js?v=2.3.0"></script>
 <script src="/assets/api.js?v=2.1.1"></script>
 <script src="/assets/js/app-components.js?v=2.6.2"></script>
-<script src="/assets/js/app.js?v=3.67.6"></script>
+<script src="/assets/js/app.js?v=3.67.7"></script>
 <script src="/assets/js/app-boot.js?v=2.1.1"></script>
 </body>
 </html>
