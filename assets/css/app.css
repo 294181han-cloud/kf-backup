@@ -1263,6 +1263,14 @@ body.dark .nav-item.active {
   font-size: 11.5px; font-weight: 700; line-height: 19px; text-align: center;
   box-shadow: 0 2px 8px rgba(245, 69, 92, .38);
 }
+/* v2.90.43 侧栏收起成图标时，未读数别压在图标上：挪到这一格的右上角，数字也小一号 */
+.side.collapsed .nav-item { position: relative; }
+.side.collapsed .nav-item .nv-badge {
+  position: absolute; top: 3px; right: 4px; margin-left: 0;
+  min-width: 16px; height: 16px; padding: 0 4px; border-radius: 8px;
+  font-size: 10.5px; line-height: 16px;
+  box-shadow: 0 1px 6px rgba(245, 69, 92, .45);
+}
 
 /* ---------- 左下账号卡放大 ---------- */
 .side .me { padding: 16px 14px 18px; }
