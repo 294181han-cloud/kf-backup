@@ -1172,8 +1172,11 @@ body.dark .me-btn.danger:hover { background: #3a2124; border-color: #5a3236; col
 .msg-row.sys .msg-bubble { background: rgba(17, 24, 39, .06); border-radius: 999px; padding: 3px 10px; color: #8b95a7; }
 
 /* ---------- 输入区 ---------- */
-.chat-input { background: #fff; border-top: 1px solid var(--v-line); padding: 12px 16px 14px; }
-.chat-input textarea { height: 74px; font-size: 14.5px; line-height: 1.6; }
+.chat-input { background: #fff; border-top: 1px solid var(--v-line); padding: 9px 14px 11px; }
+/* v2.90.45 输入框缩小 + 发送键挪到同一行右边（原来输入框 74px 高、发送键还独占一行在左下角） */
+.ci-row { display: flex; align-items: flex-end; gap: 8px; }
+.chat-input textarea { height: 44px; font-size: 14px; line-height: 1.5; }
+.ci-row .send-btn { margin: 0; padding: 7px 18px; border-radius: 8px; box-shadow: none; }
 .tool-btn { color: #6b7688; width: 32px; height: 32px; border-radius: 9px; justify-content: center; }
 .tool-btn:hover { background: #f2f5fa; color: var(--theme, #1677ff); }
 .send-btn {
@@ -1687,7 +1690,7 @@ body.dark .msg-sheet .ms-item.ghost { border-top-color: #2b313a; color: #8b95a7;
   .msg-bubble img { max-width: 68vw; }
   .file-bubble, .loc-bubble { min-width: 0; width: 100%; }
   .chat-input { padding: 8px 10px calc(10px + env(safe-area-inset-bottom)); }
-  .chat-input textarea { height: 62px; font-size: 16px; }   /* ≥16px 防 iOS 聚焦自动放大 */
+  .chat-input textarea { height: 50px; font-size: 16px; }   /* ≥16px 防 iOS 聚焦自动放大（v2.90.45 62→50，跟电脑端一起收） */
   .send-btn { padding: 10px 20px; }
   .quick-bar .quick-scroll { overflow-x: auto; }
   .tools-hint { display: none; }
