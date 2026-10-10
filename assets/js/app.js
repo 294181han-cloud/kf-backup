@@ -2152,12 +2152,16 @@ const app = createApp({
     };
     const nameEditing = ref(false);
     const nameDraft = ref('');
-    const startRename = () => {
+    const nameScope = ref('head');   // 在哪儿点的就地编辑：head=会话头，info=右侧访客信息
+    const startRename = (scope) => {
       if (!currentId.value) return;
+      nameScope.value = (scope === 'info') ? 'info' : 'head';
       nameDraft.value = current.value ? (current.value.name || '') : '';
       nameEditing.value = true;
       nextTick(() => {
-        const el = document.querySelector('.chat-head .name-input') || document.querySelector('.info-col .name-input');
+        const el = nameScope.value === 'info'
+          ? document.querySelector('.info-col .name-input')
+          : document.querySelector('.chat-head .name-input');
         if (el) { el.focus(); try { el.select(); } catch (e) {} }
       });
     };
@@ -3576,7 +3580,7 @@ const app = createApp({
       waNumber, tgUser, waQrBox, tgQrBox, genWaQr, genTgQr,
       uploadAvatar, isImg,
       sec, loginLogs, visitors, cleanupOpts, loadSecurityPage, saveSecurity, doCleanup, refreshGeo, loadVisitors, openVisitorSessions,
-      guide, guideDone, dark, toggleDark, renameVisitor, nameEditing, nameDraft, startRename, commitRename, cancelRename, renderCodeQrs, tplList,
+      guide, guideDone, dark, toggleDark, renameVisitor, nameEditing, nameDraft, nameScope, startRename, commitRename, cancelRename, renderCodeQrs, tplList,
       uiCatList, uiCurrentCat, uiActiveCat, uiActiveList, uiSel, uiTplList, uiColorList, uiPick, sideCollapsed, mSideOpen,
       sessW, sessTabText, sessResizing, sessResizeStart, sessResetW, toggleSide, infoCollapsed, toggleInfo,
       blockSession, blockIp, kwList, kwInput, kwSaving, addKw, removeKw, saveFilter, agentCmd, restartPoll,
