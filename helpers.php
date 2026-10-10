@@ -837,7 +837,12 @@ function node_bundle_build(string $role = '', bool $static = false): array
         $files[$pg . '.html'] = base64_encode($html);
     }
     $files['edge-config.js'] = base64_encode(
-        'window.KF_API_BASE=' . json_encode($mainBase) . ';window.KF_EDGE_ROLE=' . json_encode($role) . ';');
+        /* v2.90.44 客服节点（agent）的页面改成**同源**调用：浏览器的 /api/ 请求直接打本节点，
+           由节点 nginx（extension/<域名>/api-proxy.conf）反代到总控。原来前端写死总控地址，
+           客服的浏览器要跨域直连总控——被本地代理/网络拦一下就整页「网络异常，请稍后重试」。
+           访客节点保持原样（很多是纯静态节点，没有反代可走）。 */
+        'window.KF_API_BASE=' . json_encode($role === 'agent' ? '' : $mainBase)
+        . ';window.KF_EDGE_ROLE=' . json_encode($role) . ';');
     if ($staticMode) {
         // index.html 只在静态包下发：PHP 节点要靠 index.php 兜底路由，不能被 index.html 抢走
         $files['index.html'] = base64_encode($role === 'agent'
