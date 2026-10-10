@@ -1176,7 +1176,10 @@ body.dark .me-btn.danger:hover { background: #3a2124; border-color: #5a3236; col
 /* v2.90.45 输入框缩小 + 发送键挪到同一行右边（原来输入框 74px 高、发送键还独占一行在左下角） */
 .ci-row { display: flex; align-items: flex-end; gap: 8px; }
 .chat-input textarea { height: 44px; font-size: 14px; line-height: 1.5; }
-.ci-row .send-btn { margin: 0; padding: 7px 18px; border-radius: 8px; box-shadow: none; }
+.ci-row .send-btn {
+  margin: 0; padding: 8px 18px; border-radius: 8px; box-shadow: none;
+  white-space: nowrap; min-width: 78px;   /* 别让"发送"两个字竖着排 */
+}
 .tool-btn { color: #6b7688; width: 32px; height: 32px; border-radius: 9px; justify-content: center; }
 .tool-btn:hover { background: #f2f5fa; color: var(--theme, #1677ff); }
 .send-btn {
