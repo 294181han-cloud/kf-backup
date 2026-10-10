@@ -7,7 +7,7 @@
 <link rel="icon" href="/assets/img/mi-logo.png">
 <link rel="apple-touch-icon" href="/assets/img/mi-logo.png">
 <link rel="stylesheet" href="/assets/vendor/element-plus.css">
- <link rel="stylesheet" href="/assets/css/app.css?v=3.64.3">
+ <link rel="stylesheet" href="/assets/css/app.css?v=3.64.4">
 <script src="/assets/ui/ui-registry.js?v=2.10.4"></script>
 <script src="/assets/ui/ui-loader.js?v=2.10.4" data-ui-cat="auto"></script>
 </head>
@@ -415,11 +415,11 @@
               <div class="quick-toggle-row">
                 <button class="quick-toggle-btn" :class="{on: showQuick}" @click="showQuick=!showQuick">
                   <svg class="q-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2 4.5 13.5h6L9 22l10.5-12H13L13 2z"/></svg>
-                  快捷消息 <span style="font-size:11px;">{{ showQuick ? '▾' : '▸' }}</span>
+                  <span class="qt-label">快捷消息 <span style="font-size:11px;">{{ showQuick ? '▾' : '▸' }}</span></span>
                 </button>
                 <button class="quick-toggle-btn" title="在弹窗里管理快捷消息（增删改，不用离开聊天）" @click="openQuickDlg">
                   <svg class="q-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.9l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-2.9 1.2 2 2 0 1 1-4 0 1.7 1.7 0 0 0-2.9-1.2l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1A1.7 1.7 0 0 0 3 15a2 2 0 1 1 0-4 1.7 1.7 0 0 0 1.5-2.9l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1A1.7 1.7 0 0 0 10 4.6a2 2 0 1 1 4 0 1.7 1.7 0 0 0 2.9 1.2l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1A1.7 1.7 0 0 0 21 11a2 2 0 1 1 0 4 1.7 1.7 0 0 0-1.6 0z"/></svg>
-                  设置
+                  <span class="qt-label">设置</span>
                 </button>
               </div>
               <div class="quick-bar" :class="{open: showQuick}">
@@ -1772,7 +1772,7 @@
 <script src="/assets/qr-poster.js?v=2.3.0"></script>
 <script src="/assets/api.js?v=2.1.1"></script>
 <script src="/assets/js/app-components.js?v=2.6.2"></script>
-<script src="/assets/js/app.js?v=3.67.7"></script>
+<script src="/assets/js/app.js?v=3.67.8"></script>
 <script src="/assets/js/app-boot.js?v=2.1.1"></script>
 </body>
 </html>

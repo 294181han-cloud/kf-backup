@@ -67,7 +67,7 @@ body { margin: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'P
 .clock { font-size: 13px; color: #999; font-variant-numeric: tabular-nums; }
 /* v2.32 铺满：内容区默认满宽（大屏自适应内边距，不再两侧留白） */
 .content { flex: 1; overflow-y: auto; padding: 20px 24px; max-width: none; margin: 0; width: 100%; background: #f7f7f7; }
-.content.workbench { padding: 0; overflow: hidden; display: flex; max-width: none; }
+.content.workbench { padding: 0; overflow-x: auto; overflow-y: hidden; display: flex; max-width: none; }
 @media (min-width: 1800px) { .content { padding: 24px 32px; } }
 
 /* ---------- 工作台三栏 ---------- */
@@ -137,7 +137,9 @@ body { margin: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'P
 .snd-label { width: 120px; font-size: 13px; color: #1f2329; }
 .chat-head .geo-tag { font-size: 11px; background: #f2f3f5; }
 
-.chat-col { flex: 1; display: flex; flex-direction: column; min-width: 0; background: #f7f7f7; container-type: inline-size; }
+/* v2.90.33 聊天区保底宽度：会话列拖太宽/访客信息不收起时，原来聊天区会被压成几十像素，
+   里面的按钮直接盖到右边访客信息面板上。这里给个保底宽度，挤不下就让整行横向滚动。 */
+.chat-col { flex: 1; display: flex; flex-direction: column; min-width: 340px; background: #f7f7f7; container-type: inline-size; }
     ::-webkit-scrollbar { width: 6px; height: 6px; }
     ::-webkit-scrollbar-track { background: #e4e4e5; }
     ::-webkit-scrollbar-thumb { background: #c0bebc; border-radius: 3px; }
@@ -195,7 +197,7 @@ body.dark .tool-btn:hover { color: var(--theme, #69b1ff); }
 .ci-row .send-btn { margin-top: 6px; }
 .ci-row .send-btn .sb-ic { display: none; width: 18px; height: 18px; }
 
-.info-col { width: 300px; min-width: 240px; background: #fff; border-left: 1px solid #e5e6eb; overflow-y: auto; flex-shrink: 0; padding: 16px; }
+.info-col { flex: 0 1 300px; width: 300px; min-width: 232px; background: #fff; border-left: 1px solid #e5e6eb; overflow-y: auto; padding: 16px; }
 .info-col h4 { font-size: 13px; color: #86909c; margin: 16px 0 8px; font-weight: normal; }
 .info-col h4:first-child { margin-top: 0; }
 .info-item { display: flex; justify-content: space-between; font-size: 13px; padding: 5px 0; color: #4e5969; }
@@ -2301,6 +2303,7 @@ body.resizing-col { cursor: col-resize !important; user-select: none; }
   .chat-head .ch-top .ch-edit { display: none; }
   .chat-input .tools-hint { display: none; }
   .quick-toggle-row .qt-label { display: none; }
+  .chat-input .tool-btn { padding: 4px 6px; }
 }
 
 /* 访客信息：面板上直接收起 + 收起后右侧的竖条可以点开 */

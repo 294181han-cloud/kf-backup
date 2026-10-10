@@ -3222,13 +3222,23 @@ const app = createApp({
     const sessResizing = ref(false);
     const infoCollapsed = ref((function () { try { return localStorage.getItem('kfxt_info_collapsed') === '1'; } catch (e) { return false; } })());
     let sessDragFrom = null;
+    /* v2.90.33 会话列能拖多宽，要留够聊天区的保底宽度（不然聊天区被压成几十像素，按钮盖到访客信息上） */
+    const sessMaxW = () => {
+      const sideW = (document.querySelector('.side') || {}).offsetWidth || 190;
+      const infoW = infoCollapsed.value ? 0 : ((document.querySelector('.info-col') || {}).offsetWidth || 300);
+      const room = window.innerWidth - sideW - infoW - 360;
+      return Math.max(200, Math.min(560, room));
+    };
+    const clampSessW = () => { const m = sessMaxW(); if (sessW.value > m) sessW.value = m; };
+    window.addEventListener('resize', () => { try { clampSessW(); } catch (e) {} });
     const sessResizeStart = (e) => {
       sessResizing.value = true;
       document.body.classList.add('resizing-col');
       sessDragFrom = { x: e.clientX, w: sessW.value };
+      const maxW = sessMaxW();
       const mv = (ev) => {
         if (!sessDragFrom) return;
-        sessW.value = Math.min(560, Math.max(200, sessDragFrom.w + (ev.clientX - sessDragFrom.x)));
+        sessW.value = Math.min(maxW, Math.max(200, sessDragFrom.w + (ev.clientX - sessDragFrom.x)));
       };
       const up = () => {
         sessDragFrom = null;
@@ -3254,6 +3264,8 @@ const app = createApp({
       if (document.documentElement.getAttribute('data-ui-cat') === 'mobile') { infoOpen.value = !infoOpen.value; return; }
       infoCollapsed.value = !infoCollapsed.value;
       try { localStorage.setItem('kfxt_info_collapsed', infoCollapsed.value ? '1' : '0'); } catch (e) {}
+      // v2.90.33 展开访客信息后位置不够时，自动把会话列收窄一点（会话列/聊天区/访客信息三栏都保住）
+      setTimeout(() => { try { clampSessW(); } catch (e) {} }, 60);
     };
     try { dark.value = localStorage.getItem('kfxt_dark') === '1'; } catch (e) {}
     const applyDark = () => { document.body.classList.toggle('dark', dark.value); };
@@ -3330,6 +3342,7 @@ const app = createApp({
     const onPopState = () => { if (currentId.value) currentId.value = null; };
     onMounted(async () => {
       document.addEventListener('click', onDocClick);
+      setTimeout(() => { try { clampSessW(); } catch (e) {} }, 1500);   // v2.90.33 窗口小的时候别让上次存的宽度把聊天区挤没
       document.addEventListener('contextmenu', onDocCtx);
       window.addEventListener('keydown', imgKey);   // v2.69 图片查看器：← → 翻页 / Esc 关闭
       window.addEventListener('popstate', onPopState);
