@@ -522,6 +522,11 @@ body[data-tpl="whatsapp"] .v-header { background: linear-gradient(135deg, #00806
 }
 .b-time .b-tick { font-style: normal; margin-left: 3px; font-weight: 700; color: #2f8fe6; }
 .msg-row.visitor .b-time .b-tick { color: #0b7f66; }
+/* v2.90.81 乐观发送：发送中 / 发送失败可点重试 */
+.b-time .b-pend { font-style: normal; margin-left: 4px; color: #86909c; }
+.b-time .b-fail { font-style: normal; margin-left: 4px; color: #e5484d; text-decoration: underline; cursor: pointer; }
+.msg-row.visitor .b-time .b-fail { color: #ffd7d7; }
+.msg-row.pending .msg-bubble, .msg-bubble.pending { opacity: .62; }
 .msg-row { animation: msgIn .18s ease-out; }
 @keyframes msgIn { from { opacity: 0; transform: translateY(6px); } }
 .msg-time { margin-top: 3px; }

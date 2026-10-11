@@ -413,14 +413,9 @@ createApp({
       let url = (window.KF_API_BASE||'') + '/api/visitor/messages?session_id=' + sessionId.value + (tk ? '&visitor_token=' + encodeURIComponent(tk) : '');
       const res = await fetch(url);
       if (res.status === 403) {
-        let last = 0;
-        try { last = parseInt(sessionStorage.getItem('kf_tok_fix') || '0', 10) || 0; } catch (e) {}
-        if (!retried && Date.now() - last > 30000) {
-          try { sessionStorage.setItem('kf_tok_fix', String(Date.now())); } catch (e) {}
-          location.reload();
-          return;
-        }
-        toast('会话已失效，请刷新页面后继续');
+        /* v2.90.81 令牌丢了（清缓存/换浏览器/老页面）：复用页面已有的 healToken() 重新接入一次，
+           它会重新绑定令牌并再拉一次历史，比整页重载更顺（healToken 自带 3 秒防抖）。 */
+        await healToken();
         return;
       }
       const r = await res.json();
@@ -555,21 +550,59 @@ createApp({
       if ((!text && !atts.length) || sending.value || !sessionId.value) return;
       sending.value = true;
       draft.value = '';
+      /* v2.90.81 乐观回显：点发送立刻显示一条「发送中…」，接口回来原地替换成真消息。
+         以前是等接口返回才 pushMessages —— 手机上（尤其走门牌跳转/中转）会明显顿一下才蹦出来。 */
+      const tmp = {
+        id: 0, tmp: true, pending: true, from: 'visitor',
+        text, attachments: atts,
+        msg_type: atts.length ? 'mixed' : 'text',
+        time: new Date().toISOString(),
+        reply_to: replyTo.value ? replyTo.value.id : 0,
+      };
+      messages.value.push(tmp);
+      const keepReply = replyTo.value;
+      pendingAtts.value = [];
+      scrollBottom();
       try {
         const body = { session_id: sessionId.value, text };
         if (atts.length) body.attachments = atts;
-        if (replyTo.value) body.reply_to = replyTo.value.id;   // v2.43 引用回复
+        if (keepReply) body.reply_to = keepReply.id;   // v2.43 引用回复
         const r = await fetch((window.KF_API_BASE||'') + '/api/visitor/send', {
           method: 'POST', headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ ...body, visitor_token: loadToken() })
         }).then(x => { if (!x.ok) return x.json().then(j => { throw new Error(j.error); }); return x.json(); });
-        if (r.message) { pushMessages([r.message]); replyTo.value = null; pendingAtts.value = []; if (snd.send_on) playSnd(snd.send_which); }
+        // 真消息可能已经被轮询先塞进来了：那就只把临时条去掉，别显示两条
+        const idx = messages.value.indexOf(tmp);
+        if (r.message) {
+          const already = messages.value.some(x => x.id === r.message.id);
+          if (idx >= 0) { if (already) messages.value.splice(idx, 1); else messages.value.splice(idx, 1, r.message); }
+          else if (!already) { messages.value.push(r.message); }
+          if (r.message.id > maxMsgId.value) maxMsgId.value = r.message.id;
+        } else if (idx >= 0) { messages.value.splice(idx, 1); }
+        replyTo.value = null;
+        if (snd.send_on) playSnd(snd.send_which);
         if (r.auto_reply) { pushMessages([r.auto_reply]); }
+        scrollBottom();
       } catch (e) {
+        // 失败：这条标成可重试，内容还原回输入框，用户点一下就能再发
+        tmp.pending = false;
+        tmp.failed = true;
         draft.value = text;
+        pendingAtts.value = atts;
+        replyTo.value = keepReply;
         if (String(e.message).includes('会话已结束')) handleEnded();
+        else if (String(e.message).includes('会话已失效')) { await healToken(); }
         else alert(e.message);
       } finally { sending.value = false; }
+    };
+    /* v2.90.81 发送失败后的重试：撤掉那条失败消息，把内容塞回输入框再发一次 */
+    const retrySend = async (m) => {
+      const i = messages.value.indexOf(m);
+      if (i >= 0) messages.value.splice(i, 1);
+      draft.value = String(m.text || '');
+      pendingAtts.value = Array.isArray(m.attachments) ? m.attachments.slice() : [];
+      replyTo.value = m.reply_to ? { id: m.reply_to } : null;
+      await send();
     };
 
     // ---- 图片 ----
@@ -1049,7 +1082,7 @@ createApp({
       recording, recSecs, startRec, stopRec,
       voiceMode, holding, holdSecs, holdCancel, toggleVoice, startHold, moveHold, endHold,
       toastMsg, SUGGEST, suggest,
-      send, pickImage, onImage, fmtTime, scrollBottom, onlineText, isImg, visibleMessages, navTitle, canRecall, recallMine,
+      send, retrySend, pickImage, onImage, fmtTime, scrollBottom, onlineText, isImg, visibleMessages, navTitle, canRecall, recallMine,
       onInputKey,
       needDaySep, dayText,
       atBottom, onBodyScroll, scrollBottomNow, onDraftInput,
