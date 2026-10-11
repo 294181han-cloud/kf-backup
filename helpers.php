@@ -100,21 +100,42 @@ function kv_set(string $key, string $val): void
         ->execute([$key, $val]);
 }
 
+/* v2.90.79 租户设置加"请求内缓存"：同一请求里同一个 tenant+key 只查一次库。
+   背景：访客打开页面时 tenant_brand() 会连读近 30 个设置项 = 30 条 SELECT；
+   轮询路径上 ts_get 也被反复调用。缓存只活在这一个请求里（PHP 每次请求都是新进程/新内存），
+   写走 ts_set 会同步更新缓存；任何绕过 ts_set 直接写 tenant_settings 的地方记得调 ts_cache_flush()。 */
+function &ts_cache(): array
+{
+    static $c = [];
+    return $c;
+}
+function ts_cache_flush(): void
+{
+    $c = &ts_cache();
+    $c = [];
+}
+
 /** 租户级设置 */
 function ts_get(int $tenantId, string $key, string $def = ''): string
 {
+    $c = &ts_cache();
+    $ck = $tenantId . "\0" . $key;
+    if (array_key_exists($ck, $c)) return $c[$ck];
     try {
         $stmt = db()->prepare('SELECT sval FROM tenant_settings WHERE tenant_id = ? AND skey = ?');
         $stmt->execute([$tenantId, $key]);
         $r = $stmt->fetch();
-        return $r ? (string)$r['sval'] : $def;
-    } catch (\Throwable $e) { return $def; }
+        $c[$ck] = $r ? (string)$r['sval'] : $def;
+    } catch (\Throwable $e) { $c[$ck] = $def; }
+    return $c[$ck];
 }
 
 function ts_set(int $tenantId, string $key, string $val): void
 {
     db()->prepare('INSERT INTO tenant_settings (tenant_id, skey, sval) VALUES (?,?,?) 
         ON DUPLICATE KEY UPDATE sval = VALUES(sval)')->execute([$tenantId, $key, $val]);
+    $c = &ts_cache();
+    $c[$tenantId . "\0" . $key] = (string)$val;   // 同请求内立刻可见，避免读到旧值
 }
 
 /* ================= JWT（HMAC-SHA256，密钥存 kv） ================= */
@@ -1202,6 +1223,11 @@ function presence_off(string $key): void { $p = mem_get('presence') ?: []; if (i
 function presence_prune(int $maxAgeSecs = 75): void
 {
     if (!mem_ok()) return;
+    /* v2.90.79 节流：原来每个轮询（1.2~3 秒一次）都把整张在线表 array_filter 后整体回写，
+       并发轮询还会互相覆盖；改成最多 20 秒清一次。 */
+    $lastPrune = (int)(mem_get('presence_prune_at') ?: 0);
+    if (time() - $lastPrune < 20) return;
+    mem_set('presence_prune_at', time(), 600);
     $p = mem_get('presence') ?: [];
     $now = time();
     $p2 = array_filter($p, fn($e) => ($now - (int)($e['since'] ?? 0)) <= $maxAgeSecs);
@@ -1590,9 +1616,13 @@ function lookup_geo(string $ip): string
     if (!$ip || $ip === '127.0.0.1') return '';
     /* v2.89.4 缓存代号升 v3：算法换了两源交叉 + 第三票，老缓存里那些不准的结果直接作废重查 */
     $cacheFile = sys_get_temp_dir() . '/kfxt_geo_v3_' . md5($ip) . '.json';
-    if (is_file($cacheFile) && (time() - filemtime($cacheFile)) < 86400) {
+    if (is_file($cacheFile)) {
+        $ageG = time() - (int)@filemtime($cacheFile);
         $v = @file_get_contents($cacheFile);
-        if ($v !== false && $v !== '') return $v;
+        /* v2.90.79 负缓存：内容为 '-' 表示"查过、确实没有结果"，6 小时内不再重复查。
+           以前查不到就不落盘，于是同一个查不出的 IP 每轮轮询都把 4 个外部接口重新打一遍。 */
+        if ($v === '-') { if ($ageG < 21600) return ''; }
+        elseif ($v !== false && $v !== '' && $ageG < 86400) return $v;
     }
     /* v2.89.4 归属地重做（原来是 太平洋 + 淘宝，淘宝那个公开接口已经废了 → 等于单源，所以经常不准）：
        ① 有 ipip token 还是优先（最准）；
@@ -1634,7 +1664,7 @@ function lookup_geo(string $ip): string
         }
     }
     if ($out === '') $out = geo_lookup_world($ip);
-    if ($out !== '') @file_put_contents($cacheFile, $out);
+    @file_put_contents($cacheFile, $out !== '' ? $out : '-');   // v2.90.79 查不到也落盘（负缓存，避免每轮重查）
     geo_cache_gc();
     return $out;
 }
@@ -3104,16 +3134,26 @@ function visitor_sid_resolve(int $sidRaw): array
 /** v2.90.3 归属地渐进补查：把列表里还没解析出地区的会话补上（写回 v_sessions.geo）。
  *  一次最多补 $max 条，避免拖慢轮询/列表；每条 IP 的解析结果有 24h 缓存，补过一次就不再花钱。
  *  补完顺手把这一轮的 city / region 也重算，前端不用等下一轮才显示。 */
-function geo_backfill(PDO $pdo, array &$sessions, int $max = 3): void
+function geo_backfill(PDO $pdo, array &$sessions, int $max = 2): void
 {
     if (!$sessions) return;
     try {
         $need = [];
         foreach ($sessions as $row) {
             if (count($need) >= max(1, $max)) break;
-            if (empty($row['geo']) && !empty($row['ip'])) $need[(int)$row['id']] = (string)$row['ip'];
+            if (empty($row['geo']) && !empty($row['ip'])) {
+                $ipC = (string)$row['ip'];
+                /* v2.90.79 内网/保留地址（127.0.0.1、10.x、192.168.x、运营商大内网等）永远查不到，
+                   以前每轮轮询都会重新尝试一遍；这里直接跳过，省掉无谓等待。 */
+                if (!filter_var($ipC, FILTER_VALIDATE_IP, FILTER_FLAG_NO_PRIV_RANGE | FILTER_FLAG_NO_RES_RANGE)) continue;
+                $need[(int)$row['id']] = $ipC;
+            }
         }
+        $t0Geo = microtime(true);
         foreach ($need as $sidG => $ipG) {
+            /* v2.90.79 时间预算：整轮补查最多花 1.5 秒，超了就下一轮再补 ——
+               绝不能让归属地查询把 /api/poll 拖到几秒甚至超时（这是之前客服端"卡住"的根源）。 */
+            if ((microtime(true) - $t0Geo) > 1.5) break;
             $g = lookup_geo($ipG);
             if ($g === '') continue;
             try { $pdo->prepare('UPDATE v_sessions SET geo = ? WHERE id = ?')->execute([$g, $sidG]); }

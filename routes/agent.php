@@ -56,7 +56,7 @@ function session_spoken_sql(): string
  *  三条都要删消息/联系人/欢迎语记录 + **附件文件**（v2.90.76 起一并删，不再留孤儿）。
  *  注意：以前这里有两处提前 return（closed_keep_days<=0、没有已结束会话），会把后面的清理整段跳过；
  *        现在改成各自独立判断，互不影响。 */
-function cleanup_closed_sessions(int $tenantId): void
+function cleanup_closed_sessions(int $tenantId, ?int $closedKeep = null, ?int $archivedKeep = null): void
 {
     $pdo = db();
     /* ① 回收站超时清理：删掉的会话保留 30 天，过期自动彻底删除 */
@@ -75,11 +75,11 @@ function cleanup_closed_sessions(int $tenantId): void
     } catch (\Throwable $e) { /* 清理失败不影响主流程 */ }
 
     /* ② 已结束会话 */
-    $days = (int)fetch_count($pdo, 'SELECT closed_keep_days FROM tenants WHERE id = ?', [$tenantId]);
+    $days = $closedKeep !== null ? $closedKeep : (int)fetch_count($pdo, 'SELECT closed_keep_days FROM tenants WHERE id = ?', [$tenantId]);
     if ($days > 0) purge_sessions_by($tenantId, 'closed', 'closed_at', $days);
 
     /* ③ v2.90.76 已归档会话（以前是"免清理区"） */
-    $adays = (int)fetch_count($pdo, 'SELECT archived_keep_days FROM tenants WHERE id = ?', [$tenantId]);
+    $adays = $archivedKeep !== null ? $archivedKeep : (int)fetch_count($pdo, 'SELECT archived_keep_days FROM tenants WHERE id = ?', [$tenantId]);
     if ($adays > 0) purge_sessions_by($tenantId, 'archived', 'archived_at', $adays);
 }
 
@@ -435,15 +435,28 @@ function auto_merge_duplicates(array $ctx, int $maxGroups = 3): int
     $merged = 0;
     try {
         $pdo = db();
-        $st = $pdo->prepare("SELECT id, ip, ua,
-            (SELECT COUNT(*) FROM messages m WHERE m.session_id = v_sessions.id AND m.from_type = 'visitor') AS vm
+        /* v2.90.79 与列表查询同一个问题：这里原来也是"每行一个访客消息数子查询"
+           （最多 500 行 = 500 次子查询，且每次轮询都会跑），改成一条 IN 批量查。 */
+        $st = $pdo->prepare("SELECT id, ip, ua
             FROM v_sessions
             WHERE tenant_id = ? AND deleted_at IS NULL AND status <> 'closed' AND ip <> ''
               AND last_time >= ?
             ORDER BY id ASC LIMIT 500");
         $st->execute([$tid, now_dt(time() - 86400)]);
+        $rowsAuto = $st->fetchAll();
+        $vmMap = [];
+        if ($rowsAuto) {
+            $autoIds = array_map(fn($x) => (int)$x['id'], $rowsAuto);
+            $phAuto = implode(',', array_fill(0, count($autoIds), '?'));
+            try {
+                $qVm = $pdo->prepare("SELECT session_id, COUNT(*) AS c FROM messages WHERE from_type = 'visitor' AND session_id IN ($phAuto) GROUP BY session_id");
+                $qVm->execute($autoIds);
+                foreach ($qVm->fetchAll() as $rVm) $vmMap[(int)$rVm['session_id']] = (int)$rVm['c'];
+            } catch (\Throwable $e) { /* 计数失败就当作 0，不影响合并 */ }
+        }
         $groups = []; $byIp = [];
-        foreach ($st->fetchAll() as $row) {
+        foreach ($rowsAuto as $row) {
+            $row['vm'] = $vmMap[(int)$row['id']] ?? 0;
             $tag = (string)(parse_ua((string)($row['ua'] ?? ''))['dev_tag'] ?? '');
             // v2.90.9 按 id 升序 → 每组里第一条就是**最初那条**，合并都往它上面并
             $groups[(string)$row['ip'] . "\t" . $tag][] = (int)$row['id'];
@@ -1305,26 +1318,48 @@ function handle_agent_poll(string $method): void
     presence_prune();                        // 惰性清理：超过窗口未活动的直接从内存删除
     $cfg = config();
     // 已结束会话自动清理（懒执行；closed_keep_days=0 永久保留）
-    try { cleanup_closed_sessions($ctx['tenant_id']); } catch (\Throwable $e) {}
+    // v2.90.79 保留天数直接用已加载的租户行，省掉 2 条只为读两个整数的 SELECT
+    try { cleanup_closed_sessions($ctx['tenant_id'],
+        isset($ctx['row']['closed_keep_days']) ? (int)$ctx['row']['closed_keep_days'] : null,
+        isset($ctx['row']['archived_keep_days']) ? (int)$ctx['row']['archived_keep_days'] : null); } catch (\Throwable $e) {}
     $scope = in_array((string)input('scope', 'online'), ['online', 'archived', 'closed', 'trash'], true) ? (string)input('scope', 'online') : 'online';
     // v2.90.9 轮询时也顺手自动合并重复窗口（每轮最多 2 组，避免拖慢轮询）
     if ($scope === 'online') auto_merge_duplicates($ctx, 2);
     $onlineSql = "CASE WHEN s.status IN ('closed','archived') THEN s.status
         WHEN s.last_online_at IS NOT NULL AND s.last_online_at > DATE_SUB(NOW(), INTERVAL " . (int)$cfg['session_online_secs'] . " SECOND) THEN 'online'
         ELSE 'offline' END";
+    /* v2.90.79 轮询瘦身：原来 list 里每行都带两个相关子查询（备注 + 消息数），
+       500 个会话就是 1000 次子查询。现在主查询只取会话行，备注与消息数各用一条 IN 批量查回来。 */
     $st = $pdo->prepare("SELECT s.id, s.agent_id, a.nickname AS agent_name, s.visitor_name AS name, s.visitor_avatar,
-        (SELECT value FROM contacts WHERE session_id = s.id AND type = 'note' LIMIT 1) AS note,
         s.ip, s.from_url AS `from`, s.last_msg AS lastMsg, s.last_time AS lastTime, s.unread, s.source, s.geo, s.ua,
         s.archived_at, s.closed_at, s.last_online_at AS lastOnline,
         s.pinned, s.pinned_at,
-        $onlineSql AS status,
-        (SELECT COUNT(*) FROM messages WHERE session_id = s.id) AS message_count
+        $onlineSql AS status
         FROM v_sessions s LEFT JOIN agents a ON a.id = s.agent_id AND a.tenant_id = s.tenant_id
         WHERE s.tenant_id = ?" . session_scope_sql($scope) . session_visible_sql($ctx) . ($scope === 'trash' ? '' : session_spoken_sql()) . "
         ORDER BY s.pinned DESC, s.pinned_at DESC, s.last_time DESC LIMIT 500");
     $st->execute([$ctx['tenant_id']]);
+    $rowsSess = $st->fetchAll();
+    $noteMap = [];
+    $cntMap = [];
+    if ($rowsSess) {
+        $sessIds = array_map(fn($x) => (int)$x['id'], $rowsSess);
+        $phSess = implode(',', array_fill(0, count($sessIds), '?'));
+        try {
+            $qN = $pdo->prepare("SELECT session_id, value FROM contacts WHERE type = 'note' AND session_id IN ($phSess)");
+            $qN->execute($sessIds);
+            foreach ($qN->fetchAll() as $rN) $noteMap[(int)$rN['session_id']] = (string)$rN['value'];
+        } catch (\Throwable $e) { /* 备注取不到不影响列表 */ }
+        try {
+            $qC = $pdo->prepare("SELECT session_id, COUNT(*) AS c FROM messages WHERE session_id IN ($phSess) GROUP BY session_id");
+            $qC->execute($sessIds);
+            foreach ($qC->fetchAll() as $rC) $cntMap[(int)$rC['session_id']] = (int)$rC['c'];
+        } catch (\Throwable $e) { /* 计数取不到不影响列表 */ }
+    }
     $sessions = [];
-    foreach ($st->fetchAll() as $r) {
+    foreach ($rowsSess as $r) {
+        $r['note'] = $noteMap[(int)$r['id']] ?? '';
+        $r['message_count'] = $cntMap[(int)$r['id']] ?? 0;
         $r['lastTime'] = dt_to_iso($r['lastTime']);
         $r['lastOnline'] = dt_to_iso($r['lastOnline'] ?? null);   // v2.60.1 访客最后上线（心跳时间）
         $r['unread'] = (int)$r['unread'];
@@ -1396,6 +1431,6 @@ function handle_agent_poll(string $method): void
         $msgs = array_map('to_msg', $st->fetchAll());
     }
     // 地理信息渐进补查：每轮最多补 4 个未解析的 IP（写回 v_sessions.geo，配合 24h 缓存）
-    geo_backfill($pdo, $sessions, 4);
+    geo_backfill($pdo, $sessions, 2);   // v2.90.79 每轮最多 2 个 + 1.5 秒预算（原来 4 个且无预算）
     json_out(['sessions' => $sessions, 'messages' => $msgs, 'readUpto' => $readUpto, 'recalledIds' => $recalledIds, 'editedMsgs' => $editedMsgs, 'now' => time(), 'counts' => $counts]);
 }
