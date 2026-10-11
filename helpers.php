@@ -2740,7 +2740,7 @@ function gate_fail_page(string $msg = '链接已失效，请重新扫码进入')
 {
     return '<!DOCTYPE html><html lang="zh-CN"><head><meta charset="utf-8">'
         . '<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">'
-        . '<meta name="referrer" content="no-referrer"><title>在线客服</title>'
+        . '<meta name="referrer" content="no-referrer"><link rel="icon" href="data:,"><title>在线客服</title>'
         . '<style>html,body{height:100%;margin:0;background:#fff;color:#6b7280;'
         . 'font:15px/1.8 -apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei",sans-serif}'
         . 'body{display:flex;align-items:center;justify-content:center;text-align:center;padding:0 28px}'
@@ -2980,7 +2980,7 @@ function gate_loader_html(string $apiBase = ''): string
     // 内层（解密后才会出现在浏览器里）
     $inner = '<!DOCTYPE html><html lang="zh-CN"><head><meta charset="utf-8">'
         . '<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">'
-        . '<meta name="referrer" content="no-referrer"><title>在线客服</title>'
+        . '<meta name="referrer" content="no-referrer"><link rel="icon" href="data:,"><title>在线客服</title>'
         . '<style>html,body{height:100%;margin:0;background:#fff;color:#9aa3af;'
         . 'font:14px/1.7 -apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei",sans-serif}'
         . '.ld{position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:0 28px}'
