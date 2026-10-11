@@ -3004,7 +3004,7 @@ function gate_loader_html(string $apiBase = ''): string
            上报服务端（复核后会把这台退役换一台），自己再要一次地址重试一次。 */
         . 'var okIn=false;var rdy=null;var retried=false;var CD="";'
         . 'function hideLoad(){okIn=true;if(rdy){clearTimeout(rdy);rdy=null;}if(box)box.style.display="none";}'
-        . 'window.addEventListener("message",function(e){var dd=e.data;if(dd&&dd.kf==="ready"){if(dd.brand){try{document.title=dd.brand;}catch(x){}}hideLoad();}});'
+        . 'window.addEventListener("message",function(e){var dd=e.data;if(dd&&dd.kf==="ready"){if(dd.brand){try{document.title=dd.brand;}catch(x){}}hideLoad();}else if(dd&&dd.kf==="ping"){if(rdy){clearTimeout(rdy);rdy=null;}}});'
         . 'function reportErr(reason,host){try{'
         . 'if(navigator.sendBeacon&&window.FormData){var fd=new FormData();fd.append("code",CD);fd.append("host",host||"");fd.append("r",reason);navigator.sendBeacon(AB+"/api/gate/err",fd);return;}'
         . 'var x=new XMLHttpRequest();x.open("POST",AB+"/api/gate/err",true);'
@@ -3039,7 +3039,7 @@ function gate_loader_html(string $apiBase = ''): string
         . 'setTimeout(function(){if(okIn||done)return;if(box)box.textContent="网络较慢，正在重试…";},4500);'
         . 'rdy=setTimeout(function(){if(okIn)return;reportErr("frame-timeout",chost);'
         . 'if(!retried){retried=true;try{f.parentNode.removeChild(f)}catch(e){}ask(0);return;}'
-        . 'msg("网络较慢，没能进入聊天页，请点击重试");},7000);}'
+        . 'msg("网络较慢，没能进入聊天页，请点击重试");},12000);}'
         . 'var pf=function(k){var h=5381,s=k+"|' . $year . '|kfxt";for(var i=0;i<s.length;i++){h=((h<<5)+h+s.charCodeAt(i))>>>0}return h.toString(16)};'
         . 'function ask(n){var x=new XMLHttpRequest();x.open("POST",AB+"/api/gate",true);'
         . 'x.setRequestHeader("Content-Type","application/x-www-form-urlencoded");x.timeout=6000;'

@@ -1104,11 +1104,18 @@ createApp({
 (function () {
   window.__KF_MOUNTED__ = 1;
   /* v2.89 在壳页的 iframe 里跑：报到一声，外壳据此收起「正在进入…」；
-     一直没报到的（内容主机被拦/连不上）外壳会重试并上报给服务端换一台内容域名。 */
+     一直没报到的（内容主机被拦/连不上）外壳会重试并上报给服务端换一台内容域名。
+     v2.90.85 加固：进 iframe 先立刻发一次 ping —— 门牌层收到就确认「这台内容主机是通的」，
+     不再因为 ready 消息偶尔丢失/网络慢而误判超时去换域名（那会让客户看到页面一直自动刷新）；
+     ready 一共发三次（0/1.5/4 秒），带上品牌名给门牌层改标题用。 */
   try {
     if (window.parent && window.parent !== window) {
-      /* v2.90.84 报到时把品牌名一起带给门牌层 —— 它会把浏览器标题从「在线客服」改成该租户的品牌名 */
-      window.parent.postMessage({ kf: 'ready', brand: (brand && brand.company_name) || '' }, '*');
+      var _p = function (m) { try { window.parent.postMessage(m, '*'); } catch (e) {} };
+      var _b = (brand && brand.company_name) || '';
+      _p({ kf: 'ping' });
+      _p({ kf: 'ready', brand: _b });
+      setTimeout(function () { _p({ kf: 'ready', brand: _b }); }, 1500);
+      setTimeout(function () { _p({ kf: 'ready', brand: _b }); }, 4000);
     }
   } catch (e) {}
   var tip = document.getElementById('boot-tip');
