@@ -1101,11 +1101,21 @@ const app = createApp({
       if (taH.value) { el.style.height = Math.max(taH.value, Math.min(360, el.scrollHeight)) + 'px'; return; }
       if (!el || document.documentElement.getAttribute('data-ui-cat') !== 'mobile') return;
       el.style.height = 'auto';
-      el.style.height = Math.min(132, Math.max(44, el.scrollHeight)) + 'px';
+      /* v2.90.70 下限改用真实默认高度（手机 50 / 电脑 44）：原来写死 44，与 CSS 的 50~52px 不一致，
+         结果一打字输入框先矮 6~8px、发完又长回来，也是一次可见的跳动。 */
+      el.style.height = Math.min(132, Math.max(taDefaultH(), el.scrollHeight)) + 'px';
     };
     const resetTaHeight = () => {
       const el = document.querySelector('.chat-input textarea');
-      if (el) el.style.height = '';
+      if (!el) return;
+      /* v2.90.70 发送后回到「本该有」的高度：拖过手柄的用 taH（原来一律清空 inline 高度，
+         拖过手柄的人每次发送都塌回默认、下次打字又弹回 taH）；并只给这一次塌陷加 160ms 过渡。 */
+      const target = taH.value ? taH.value + 'px' : '';
+      if ((el.style.height || '') === target) return;
+      el.classList.add('ta-smooth');
+      void el.offsetHeight;   // 强制重排：先把过渡登记上，再改高度，否则同一帧改高度不会走动画
+      el.style.height = target;
+      setTimeout(() => { try { el.classList.remove('ta-smooth'); } catch (e) {} }, 240);
     };
     /* 手机端输入框只有一行高，原来那句长提示（Enter 发送 / Ctrl+V 粘贴）会被截成两行还看不全，
        换成短提示；电脑端保留完整说明。 */

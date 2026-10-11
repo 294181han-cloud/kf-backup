@@ -7,7 +7,7 @@
 <link rel="icon" href="/assets/img/mi-logo.png">
 <link rel="apple-touch-icon" href="/assets/img/mi-logo.png">
 <link rel="stylesheet" href="/assets/vendor/element-plus.css">
-<link rel="stylesheet" href="/assets/css/app.css?v=3.64.35">
+<link rel="stylesheet" href="/assets/css/app.css?v=3.64.36">
 <script src="/assets/ui/ui-registry.js?v=2.10.4"></script>
 <script src="/assets/ui/ui-loader.js?v=2.10.4" data-ui-cat="auto"></script>
 </head>
@@ -474,6 +474,7 @@
                 <span class="vh-t">{{ voiceHold.cancel ? '松开手指，取消发送' : '手指上滑，取消发送' }}</span>
                 <span class="vh-s">{{ voiceHold.secs }}″</span>
               </div>
+              <transition name="ci-drop">
               <div class="pending-atts" v-if="!recording && pendingAtts.length">
                 <div class="pa-item" v-for="(a, ai) in pendingAtts" :key="ai">
                   <img v-if="!a.type || a.type==='image'" :src="a.url">
@@ -484,7 +485,9 @@
                   <span class="pa-rm" @click="rmPendingAtt(ai)" title="移除">✕</span>
                 </div>
               </div>
+              </transition>
               <!-- v2.43 引用回复：正在回复的那条 -->
+              <transition name="ci-drop">
               <div class="reply-bar" v-if="replyTo && !selMode">
                 <div class="rb-body">
                   <span class="rb-who">回复 {{ quoteWho(replyTo) }}</span>
@@ -492,6 +495,7 @@
                 </div>
                 <button type="button" class="rb-x" title="取消回复" @click="replyTo=null">✕</button>
               </div>
+              </transition>
               <!-- v2.43 多选：批量操作条 -->
               <div class="sel-bar" v-if="selMode">
                 <span class="sb-n">已选 {{ selIds.length }} 条</span>
@@ -1815,7 +1819,7 @@
 <script src="/assets/qr-poster.js?v=2.3.0"></script>
 <script src="/assets/api.js?v=2.1.2"></script>
 <script src="/assets/js/app-components.js?v=2.6.2"></script>
-<script src="/assets/js/app.js?v=3.68.15"></script>
+<script src="/assets/js/app.js?v=3.68.16"></script>
 <script src="/assets/js/app-boot.js?v=2.1.1"></script>
 </body>
 </html>

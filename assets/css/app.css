@@ -1349,6 +1349,32 @@ body.dark .msg-bubble .num { color: #7d9bd6; }
 }
 .tool-btn { color: #6b7688; width: 32px; height: 32px; border-radius: 9px; justify-content: center; }
 .tool-btn:hover { background: #f2f5fa; color: var(--theme, #1677ff); }
+/* v2.90.70 待发附件条 / 引用回复条 = 浮层（不占文档流）：
+   它们出现/消失时输入区高度恒定不变 → 发送后输入框「一动不动」。
+   原来由 v-if 直接消失，输入区高度会在一帧内塌 70px（发图、引用回复后必现）。
+   代价：会浮在消息列表底部之上，所以限高 + 轻阴影，读起来是一条浮动面板。 */
+.chat-input .pending-atts {
+  position: absolute; left: 0; right: 0; bottom: 100%;
+  margin: 0; padding: 8px 14px 10px;
+  background: #fff; border-top: 1px solid var(--v-line);
+  box-shadow: 0 -6px 16px rgba(17, 24, 39, .07);
+  max-height: 40vh; overflow-y: auto; z-index: 30;
+}
+.chat-input .reply-bar {
+  position: absolute; left: 0; right: 0; bottom: 100%;
+  margin: 0; padding: 8px 14px; border-radius: 0;
+  background: #f2f5fa; border-left: 3px solid var(--theme, #1677ff);
+  box-shadow: 0 -6px 16px rgba(17, 24, 39, .07);
+  max-height: 40vh; overflow-y: auto; z-index: 30;
+}
+body.dark .chat-input .pending-atts { background: #23272e; border-top-color: #31363e; box-shadow: 0 -6px 16px rgba(0, 0, 0, .35); }
+body.dark .chat-input .reply-bar { background: #262c34; box-shadow: 0 -6px 16px rgba(0, 0, 0, .35); }
+/* 浮层自己的进出场：只动透明度和位移，不碰布局 */
+.ci-drop-enter-active, .ci-drop-leave-active { transition: opacity .18s ease, transform .18s ease; }
+.ci-drop-enter-from, .ci-drop-leave-to { opacity: 0; transform: translateY(8px); }
+.ci-drop-enter-to, .ci-drop-leave-from { opacity: 1; transform: none; }
+/* 发送后输入框从多行塌回一行：只给这一次加过渡（打字时长高不能有过渡，会拖影） */
+.chat-input textarea.ta-smooth { transition: height .16s ease; }
 .send-btn {
   background: var(--theme, #1677ff); border-radius: 9px; padding: 8px 26px; font-weight: 600;
   box-shadow: 0 6px 16px color-mix(in srgb, var(--theme, #1677ff) 28%, transparent);
