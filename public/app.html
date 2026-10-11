@@ -1144,6 +1144,11 @@
                   <el-input-number v-model="pol.closed_keep_days" :min="0" :max="3650" style="width:140px;"></el-input-number>
                   <span class="muted" style="margin-left:10px;font-size:12px;">「已结束」会话保留 N 天后自动删除；0 = 永久保留</span>
                 </el-form-item>
+                <!-- v2.90.76 归档会话以前是"免清理区"，这里可以让它按天数自动清 -->
+                <el-form-item label="归档保留天数">
+                  <el-input-number v-model="pol.archived_keep_days" :min="0" :max="3650" style="width:140px;"></el-input-number>
+                  <span class="muted" style="margin-left:10px;font-size:12px;">「已归档」会话保留 N 天后自动删除；0 = 永久保留（默认）</span>
+                </el-form-item>
               </el-form>
               <p class="muted" style="margin:0 0 10px;font-size:12px;">会话总额度由平台管理员在租户管理中设置（数据面板可查看当前用量）；额度不足时可删除或结束旧会话腾出空间。</p>
               <el-button type="primary" size="small" @click="savePolicy">保存会话管理</el-button>
@@ -1825,7 +1830,7 @@
 <script src="/assets/qr-poster.js?v=2.3.0"></script>
 <script src="/assets/api.js?v=2.1.2"></script>
 <script src="/assets/js/app-components.js?v=2.6.2"></script>
-<script src="/assets/js/app.js?v=3.68.19"></script>
+<script src="/assets/js/app.js?v=3.68.20"></script>
 <script src="/assets/js/app-boot.js?v=2.1.1"></script>
 </body>
 </html>

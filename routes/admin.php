@@ -204,7 +204,9 @@ function tenant_fields(array $t, ?int $sessions = null): array
         'status' => $t['status'], 'expires_at' => $t['expires_at'],
         'quota_web' => (int)$t['quota_web'], 'quota_app' => (int)$t['quota_app'], 'max_agents' => (int)$t['max_agents'],
         'max_devices' => (int)($t['max_devices'] ?? 3),   // v2.60.10 登录设备上限（默认 3，最高 8）
-        'closed_keep_days' => (int)($t['closed_keep_days'] ?? 3), 'max_sessions' => (int)($t['max_sessions'] ?? 0),
+        'closed_keep_days' => (int)($t['closed_keep_days'] ?? 3),
+        'archived_keep_days' => (int)($t['archived_keep_days'] ?? 0),
+        'max_sessions' => (int)($t['max_sessions'] ?? 0),
         'content_domain' => (string)($t['content_domain'] ?? ''),   // v2.70 专属落地域名（自动分配）
         'content_host' => (string)($t['content_host'] ?? ''),       // v2.90.14 专属主机（可选，绑了码都发这台上）
         'created_at' => $t['created_at'], 'last_login_at' => $t['last_login_at'],
@@ -323,7 +325,7 @@ function handle_admin_tenants_id(string $method, int $id): void
             $v = in_array($data['status'], ['active', 'banned'], true) ? $data['status'] : 'active';
             $set[] = 'status = ?'; $vals[] = $v;
         }
-        foreach (['quota_web', 'quota_app', 'max_agents', 'closed_keep_days', 'max_sessions'] as $f) {
+        foreach (['quota_web', 'quota_app', 'max_agents', 'closed_keep_days', 'archived_keep_days', 'max_sessions'] as $f) {
             if (array_key_exists($f, $data)) { $set[] = "$f = ?"; $vals[] = max(0, min(3650, (int)$data[$f])); }
         }
         // v2.60.10 登录设备上限：默认 3，最高 8
@@ -353,6 +355,7 @@ function handle_admin_tenants_id(string $method, int $id): void
 
     if ($method === 'DELETE') {
         // 删除租户及全部关联数据
+        delete_tenant_attachments($id);   // v2.90.76 附件文件也一起删（否则磁盘上永远留着孤儿）
         $pdo->beginTransaction();
         try {
             foreach (['v_sessions', 'messages', 'contacts', 'quick_msgs', 'welcome_msgs', 'welcome_sent',

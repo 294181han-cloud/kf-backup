@@ -52,6 +52,7 @@ function init_schema(): void
         quota_web INT UNSIGNED NOT NULL DEFAULT 200,
         quota_app INT UNSIGNED NOT NULL DEFAULT 200,
         closed_keep_days INT UNSIGNED NOT NULL DEFAULT 3,
+        archived_keep_days INT UNSIGNED NOT NULL DEFAULT 0,   // v2.90.76 归档满 N 天自动清理（0=永久）
         max_sessions INT UNSIGNED NOT NULL DEFAULT 0,
         max_agents INT UNSIGNED NOT NULL DEFAULT 5,
         content_domain VARCHAR(120) NOT NULL DEFAULT '',

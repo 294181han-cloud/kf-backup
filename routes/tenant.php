@@ -254,6 +254,7 @@ function handle_tenant_settings(string $method): void
             'robot_code'     => ts_get($tid, 'robot_code', ''),
             // 会话管理（v2.25）：已结束保留天数（0=永久）、会话总数额度（0=不限）
             'closed_keep_days' => (int)($t['closed_keep_days'] ?? 3),
+            'archived_keep_days' => (int)($t['archived_keep_days'] ?? 0),   // v2.90.76 归档保留天数（0=永久）
             'max_sessions'     => (int)($t['max_sessions'] ?? 0),
             // 链接模式
             'link_mode'      => ts_get($tid, 'link_mode', 'no'),
@@ -395,7 +396,7 @@ function handle_tenant_settings(string $method): void
         if (array_key_exists('code_color_dots', $data)) ts_set($tid, 'code_color_dots', $data['code_color_dots'] ? '1' : '0');
         // 会话管理（v2.25）：写租户级字段（非 ts 键值）
         $tidInt = (int)$tid;
-        foreach (['closed_keep_days', 'max_sessions'] as $col) {
+        foreach (['closed_keep_days', 'archived_keep_days', 'max_sessions'] as $col) {
             if (array_key_exists($col, $data)) {
                 $v = max(0, min(3650, (int)$data[$col]));
                 db()->prepare("UPDATE tenants SET $col = ? WHERE id = ?")->execute([$v, $tidInt]);
@@ -452,6 +453,7 @@ function handle_tenant_cleanup(string $method): void
     $ids = $st->fetchAll(PDO::FETCH_COLUMN);
     if (!$ids) json_out(['ok' => true, 'deleted' => 0, 'scope' => 'sessions']);
     $idList = implode(',', array_map('intval', $ids));
+    $files = delete_session_attachments($ids, $tid);   // v2.90.76 附件一起删
     $pdo->beginTransaction();
     try {
         $pdo->exec("DELETE FROM messages WHERE tenant_id = $tid AND session_id IN ($idList)");
@@ -463,7 +465,7 @@ function handle_tenant_cleanup(string $method): void
         $pdo->rollBack();
         json_error('清理失败：' . $e->getMessage(), 500);
     }
-    json_out(['ok' => true, 'deleted' => (int)$n, 'scope' => 'sessions', 'label' => $days < 0 ? '全部' : "{$days}天前"]);
+    json_out(['ok' => true, 'deleted' => (int)$n, 'files' => (int)$files, 'scope' => 'sessions', 'label' => $days < 0 ? '全部' : "{$days}天前"]);
 }
 
 /* ---------- 访客资源（原「访客管理」做真：按访客聚合） ---------- */

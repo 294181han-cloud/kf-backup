@@ -244,6 +244,63 @@ function require_workspace(): array
    一个卡密默认只能有 3 台设备在线（浏览器/手机各算一台），满了别人就登不进来，
    但自己这边可以看设备列表、改备注、把不认识的那台踢掉。
    —— 做卡密生意最怕的就是一张卡被转卖/共享几十个人用。 */
+/* ===================== v2.90.76 会话彻底删除时，一并删除附件文件 =====================
+   以前只删数据库行：uploads 里的图/语音/文件永远留在磁盘上变成孤儿（353MB 只涨不减）。
+   安全要点：只删 uploads 目录内的文件；文件名用 basename 解析，防路径穿越；
+             文件不存在、删不掉、不是文件，都静默忽略，绝不影响主流程。 */
+function delete_session_attachments(array $sessionIds, int $tenantId): int
+{
+    $ids = array_values(array_filter(array_map('intval', $sessionIds)));
+    if (!$ids) return 0;
+    $base = realpath((string)(config()['upload_dir'] ?? (__DIR__ . '/uploads')));
+    if ($base === false) return 0;
+    $deleted = 0;
+    try {
+        $pdo = db();
+        $in = implode(',', $ids);
+        $st = $pdo->query("SELECT attachments FROM messages
+            WHERE tenant_id = " . (int)$tenantId . " AND session_id IN ($in) AND attachments <> ''");
+        foreach ($st->fetchAll(PDO::FETCH_COLUMN) as $json) {
+            $deleted += delete_attachment_files((string)$json, $base);
+        }
+    } catch (\Throwable $e) { /* 附件删除失败不影响主流程 */ }
+    return $deleted;
+}
+
+/** 删除整个租户的所有附件（平台管理员彻底删除租户时用） */
+function delete_tenant_attachments(int $tenantId): int
+{
+    $base = realpath((string)(config()['upload_dir'] ?? (__DIR__ . '/uploads')));
+    if ($base === false) return 0;
+    $deleted = 0;
+    try {
+        $st = db()->prepare("SELECT attachments FROM messages WHERE tenant_id = ? AND attachments <> ''");
+        $st->execute([(int)$tenantId]);
+        foreach ($st->fetchAll(PDO::FETCH_COLUMN) as $json) {
+            $deleted += delete_attachment_files((string)$json, $base);
+        }
+    } catch (\Throwable $e) { /* 忽略 */ }
+    return $deleted;
+}
+
+/** 把一条消息的 attachments JSON 里引用的本地文件删掉，返回删掉的文件数 */
+function delete_attachment_files(string $json, string $base): int
+{
+    $arr = json_decode($json, true);
+    if (!is_array($arr)) return 0;
+    $n = 0;
+    foreach ($arr as $a) {
+        $url = is_array($a) ? (string)($a['url'] ?? '') : '';
+        if ($url === '') continue;
+        $name = basename((string)(parse_url($url, PHP_URL_PATH) ?: $url));
+        if ($name === '' || !preg_match('/^[A-Za-z0-9._-]+$/', $name)) continue;   // 只认规规矩矩的文件名
+        $real = realpath($base . DIRECTORY_SEPARATOR . $name);
+        if ($real === false || !str_starts_with($real, $base) || !is_file($real)) continue;
+        if (@unlink($real)) $n++;
+    }
+    return $n;
+}
+
 function device_limit_for(array $t): int
 {
     $n = (int)($t['max_devices'] ?? 3);

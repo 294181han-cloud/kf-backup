@@ -615,6 +615,7 @@
         <span class="muted" style="margin-left:8px;font-size:12px;">同账号同时在线设备数，默认 3，最高 8</span>
       </el-form-item>
       <el-form-item label="结束保留天数"><el-input-number v-model="dlg.closed_keep_days" :min="0" :max="3650"></el-input-number><span class="muted" style="margin-left:8px;font-size:12px;">0=永久</span></el-form-item>
+      <el-form-item label="归档保留天数"><el-input-number v-model="dlg.archived_keep_days" :min="0" :max="3650"></el-input-number><span class="muted" style="margin-left:8px;font-size:12px;">0=永久（默认）</span></el-form-item>
       <el-form-item label="会话总额度"><el-input-number v-model="dlg.max_sessions" :min="0" :max="1000000"></el-input-number><span class="muted" style="margin-left:8px;font-size:12px;">0=不限</span></el-form-item>
       <el-form-item label="备注"><el-input v-model="dlg.remark" placeholder="购买渠道 / 联系方式等"></el-input></el-form-item>
       <el-form-item label="重置密码" v-if="dlgMode==='edit'">
@@ -709,6 +710,6 @@
 <script src="/assets/vendor/vue.global.js?v=2.0.1"></script>
 <script src="/assets/vendor/element-plus.js?v=2.0.1"></script>
 <script src="/assets/api.js?v=2.1.1"></script>
-<script src="/assets/js/admin.js?v=2.10.6"></script>
+<script src="/assets/js/admin.js?v=2.10.7"></script>
 </body>
 </html>

@@ -603,6 +603,7 @@ const app = createApp({
           tpl_nav_on: b.tpl_nav_on !== false, tpl_nav_title: b.tpl_nav_title || '',
           vip_badge: b.vip_badge || '', footer_text: b.footer_text || '',
           closed_keep_days: b.closed_keep_days != null ? b.closed_keep_days : 3,
+          archived_keep_days: b.archived_keep_days != null ? b.archived_keep_days : 0,
           max_sessions: b.max_sessions != null ? b.max_sessions : 0,
           ask_image_text: b.ask_image_text || '方便的话，请上传一下相关图片，帮您更快定位问题～',
         });
@@ -2349,7 +2350,7 @@ const app = createApp({
       robot: 'no', robot_frequency: 'first', robot_code: '',
       filtration_wx: false, filtration_pc: false, filtration_area: false,
       link_mode: 'no', user_head_type: 'default', user_head: '', user_name_type: 'default',
-      closed_keep_days: 3, max_sessions: 0,
+      closed_keep_days: 3, archived_keep_days: 0, max_sessions: 0,
       publicity_on: false, publicity_title: '', publicity_content: '',
       inform_on: false, inform_text: '',
       // 「请求访客上传图片」话术（可自定义）

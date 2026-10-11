@@ -49,38 +49,58 @@ function session_spoken_sql(): string
         OR s.created_at > DATE_SUB(NOW(), INTERVAL 24 HOUR))";
 }
 
-/** 已结束会话自动清理（poll 时懒执行；closed_keep_days=0 表示永久保留） */
+/** 会话自动清理（poll 时懒执行）：
+ *  ① 回收站（deleted_at）超 30 天 → 彻底删除
+ *  ② 已结束（closed）超 closed_keep_days → 删除（0=永久）
+ *  ③ v2.90.76 已归档（archived）超 archived_keep_days → 删除（0=永久，默认 0）
+ *  三条都要删消息/联系人/欢迎语记录 + **附件文件**（v2.90.76 起一并删，不再留孤儿）。
+ *  注意：以前这里有两处提前 return（closed_keep_days<=0、没有已结束会话），会把后面的清理整段跳过；
+ *        现在改成各自独立判断，互不影响。 */
 function cleanup_closed_sessions(int $tenantId): void
 {
-    /* v2.60.11 回收站超时清理：删掉的会话保留 30 天，过期自动彻底删除 */
+    $pdo = db();
+    /* ① 回收站超时清理：删掉的会话保留 30 天，过期自动彻底删除 */
     try {
-        $pdo = db();
         $st = $pdo->prepare('SELECT id FROM v_sessions WHERE tenant_id = ? AND deleted_at IS NOT NULL AND deleted_at < ? LIMIT 200');
         $st->execute([$tenantId, now_dt(time() - 30 * 86400)]);
         $old = $st->fetchAll(PDO::FETCH_COLUMN);
         if ($old) {
             $in = implode(',', array_map('intval', $old));
+            delete_session_attachments($old, $tenantId);
             $pdo->exec("DELETE FROM messages WHERE session_id IN ($in)");
             $pdo->exec("DELETE FROM contacts WHERE session_id IN ($in)");
             $pdo->exec("DELETE FROM welcome_sent WHERE session_id IN ($in)");
             $pdo->exec("DELETE FROM v_sessions WHERE id IN ($in)");
         }
     } catch (\Throwable $e) { /* 清理失败不影响主流程 */ }
-    $days = fetch_count(db(), 'SELECT closed_keep_days FROM tenants WHERE id = ?', [$tenantId]);
-    if ($days <= 0) return;
+
+    /* ② 已结束会话 */
+    $days = (int)fetch_count($pdo, 'SELECT closed_keep_days FROM tenants WHERE id = ?', [$tenantId]);
+    if ($days > 0) purge_sessions_by($tenantId, 'closed', 'closed_at', $days);
+
+    /* ③ v2.90.76 已归档会话（以前是"免清理区"） */
+    $adays = (int)fetch_count($pdo, 'SELECT archived_keep_days FROM tenants WHERE id = ?', [$tenantId]);
+    if ($adays > 0) purge_sessions_by($tenantId, 'archived', 'archived_at', $adays);
+}
+
+/** v2.90.76 通用清理：某状态、某时间列超过 N 天的会话，连同消息/联系人/欢迎语记录和附件文件一起删（每次最多 100 条） */
+function purge_sessions_by(int $tenantId, string $status, string $timeCol, int $days): void
+{
+    if (!in_array($timeCol, ['closed_at', 'archived_at'], true)) return;   // 列名白名单，防注入
     $pdo = db();
-    // 注意：回收站里的（deleted_at 不为空）不在这里清，交给上面的 30 天逻辑，否则刚删的会话会被「已结束自动清理」顺手干掉
-    $st = $pdo->prepare('SELECT id FROM v_sessions WHERE tenant_id = ? AND deleted_at IS NULL AND status = \'closed\' AND closed_at IS NOT NULL AND closed_at < ? LIMIT 100');
-    $st->execute([$tenantId, now_dt(time() - $days * 86400)]);
-    $ids = $st->fetchAll(PDO::FETCH_COLUMN);
-    if (!$ids) return;
-    $idList = implode(',', array_map('intval', $ids));
     try {
+        $st = $pdo->prepare("SELECT id FROM v_sessions WHERE tenant_id = ? AND deleted_at IS NULL AND status = ?
+            AND $timeCol IS NOT NULL AND $timeCol < ? LIMIT 100");
+        $st->execute([$tenantId, $status, now_dt(time() - $days * 86400)]);
+        $ids = $st->fetchAll(PDO::FETCH_COLUMN);
+        if (!$ids) return;
+        $list = implode(',', array_map('intval', $ids));
+        delete_session_attachments($ids, $tenantId);
         $pdo->beginTransaction();
-        $pdo->exec("DELETE FROM messages WHERE tenant_id = $tenantId AND session_id IN ($idList)");
-        $pdo->exec("DELETE FROM contacts WHERE tenant_id = $tenantId AND session_id IN ($idList)");
-        $pdo->exec("DELETE FROM welcome_sent WHERE tenant_id = $tenantId AND session_id IN ($idList)");
-        $pdo->exec("DELETE FROM v_sessions WHERE tenant_id = $tenantId AND id IN ($idList)");
+        $pdo->exec("DELETE FROM messages WHERE tenant_id = $tenantId AND session_id IN ($list)");
+        $pdo->exec("DELETE FROM contacts WHERE tenant_id = $tenantId AND session_id IN ($list)");
+        $pdo->exec("DELETE FROM welcome_sent WHERE tenant_id = $tenantId AND session_id IN ($list)");
+        $pdo->exec("DELETE FROM v_sessions WHERE tenant_id = $tenantId AND id IN ($list)");
         $pdo->commit();
     } catch (\Throwable $e) { try { $pdo->rollBack(); } catch (\Throwable $e2) {} }
 }
@@ -560,6 +580,7 @@ function handle_session_purge(string $method, array $m): void
     if (empty($row['deleted_at'])) json_error('请先删除会话再彻底删除', 400);
     $tid = (int)$ctx['tenant_id'];
     $pdo = db();
+    delete_session_attachments([$sid], $tid);   // v2.90.76 附件一起删
     $pdo->beginTransaction();
     try {
         $pdo->prepare("DELETE FROM messages WHERE tenant_id = ? AND session_id = ?")->execute([$tid, $sid]);
@@ -633,6 +654,7 @@ function handle_sessions_bulk(string $method): void
             $ins = $pdo->prepare("INSERT INTO messages (tenant_id, session_id, from_type, sender_name, text, msg_type, created_at) VALUES (?,?,'system','系统','会话已结束','text',?)");
             foreach ($target as $sid) $ins->execute([$tid, $sid, $now]);
         } else {
+            delete_session_attachments($target, $tid);   // v2.90.76 附件一起删
             $pdo->beginTransaction();
             try {
                 $pdo->exec("DELETE FROM messages WHERE tenant_id = $tid AND session_id IN ($in)");
