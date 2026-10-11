@@ -872,6 +872,7 @@ const app = createApp({
     const loadingMsgs = ref(false);
     const msgCache = new Map();
     const MSG_CACHE_MAX = 8;
+    const MSG_CACHE_ITEM_MAX = 300;   // v2.90.90 单会话超过 300 条不进缓存（护内存，长会话照常按需拉）
     const openSession = async (id) => {
       // v2.55 草稿/待发附件按会话隔离：给 A 打了一半的字（或贴好的图）不会跟着你跑到 B 的聊天框里
       saveSessionDraft(currentId.value);
@@ -906,8 +907,15 @@ const app = createApp({
         prefetchAudio(msgs.value);
         if (msgs.value.length) maxMsgId.value = msgs.value[msgs.value.length - 1].id;
         loadingMsgs.value = false;
-        msgCache.set(id, { msgs: msgs.value, maxMsgId: maxMsgId.value });
-        if (msgCache.size > MSG_CACHE_MAX) { const oldest = msgCache.keys().next().value; msgCache.delete(oldest); }
+        /* v2.90.90 缓存保护：单会话超过 300 条就不进缓存。
+           长会话的历史记录很大，缓 8 个长会话等于把几万条消息挂在内存里（切会话反而变卡），
+           300 条以内才缓存 —— 秒开的收益留给真正轻的会话，长会话每次照常拉最近 300 条。 */
+        if (msgs.value.length <= MSG_CACHE_ITEM_MAX) {
+          msgCache.set(id, { msgs: msgs.value, maxMsgId: maxMsgId.value });
+          if (msgCache.size > MSG_CACHE_MAX) { const oldest = msgCache.keys().next().value; msgCache.delete(oldest); }
+        } else {
+          msgCache.delete(id);
+        }
     pinBottom(1800);   // v2.58 进会话：图片/视频异步撑高，必须持续贴底一会儿
         markRead(id);
         // 资料与联系方式

@@ -2591,3 +2591,10 @@ body.dark .info-reopen { background: #23272e; color: #b6bfcd; border-color: #333
     line-height: 1.4 !important;
   }
 }
+
+/* v2.90.90 访客信息里「值」不再被 justify-content: space-between 推到抽屉最右边：
+   改成「值」自己是个右对齐的 flex（文字贴右、按文字长度自适应，右边留一点回旋），
+   这样短值（备注/手机/微信等）不会跟标签隔一大片；本来就要靠右的按钮行不受影响。
+   手机端窄抽屉里最明显。 */
+.info-item .v { display: flex; align-items: center; justify-content: flex-end; }
+.info-item .v .vt { flex: 1 1 auto; min-width: 0; text-align: right; }

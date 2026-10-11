@@ -228,7 +228,12 @@ function handle_session_messages(string $method, array $m): void
 
     if ($method === 'GET') {
         $since = (int)input('since', 0);
-        $sql = 'SELECT id, session_id, from_type AS `from`, sender_id, sender_name, text, msg_type, attachments, reply_to, recalled_at, edited_at, created_at FROM messages WHERE session_id = ?' . ($since > 0 ? ' AND id > ?' : '') . ' ORDER BY id ASC';
+        /* v2.90.90 消息接口封顶 300 条：以前没上限，聊了几千条的会话一打开就整段吐给前端
+           （首次进会话卡、切会话也卡）。改成先取最近 300 条再按 id 升序输出，
+           时间顺序、maxMsgId 递增、轮询 sinceMsg 增量这些逻辑都不受影响。 */
+        $sql = 'SELECT * FROM (SELECT id, session_id, from_type AS `from`, sender_id, sender_name, text, msg_type, attachments, reply_to, recalled_at, edited_at, created_at FROM messages WHERE session_id = ?'
+            . ($since > 0 ? ' AND id > ?' : '')
+            . ' ORDER BY id DESC LIMIT 300) t ORDER BY t.id ASC';
         $st = $pdo->prepare($sql);
         $st->execute($since > 0 ? [$sid, $since] : [$sid]);
         json_out(['messages' => array_map('to_msg', $st->fetchAll())]);
@@ -1353,8 +1358,11 @@ function handle_agent_poll(string $method): void
         $onlineSql AS status
         FROM v_sessions s LEFT JOIN agents a ON a.id = s.agent_id AND a.tenant_id = s.tenant_id
         WHERE s.tenant_id = ?" . session_scope_sql($scope) . session_visible_sql($ctx) . ($scope === 'trash' ? '' : session_spoken_sql()) . "
-        ORDER BY s.pinned DESC, s.pinned_at DESC, s.last_time DESC LIMIT 500");
+        ORDER BY s.pinned DESC, s.pinned_at DESC, s.last_time DESC LIMIT 200");
     $st->execute([$ctx['tenant_id']]);
+    /* v2.90.90 轮询瘦身②：会话列表 500 → 200 条。
+       轮询 1.2~3 秒一轮，500 行的列表（还带备注/消息数两条 IN 批量查）对绝大多数客服是浪费；
+       按「置顶 → 最后消息时间」排下来的最近 200 条已覆盖日常接待面。 */
     $rowsSess = $st->fetchAll();
     $noteMap = [];
     $cntMap = [];
