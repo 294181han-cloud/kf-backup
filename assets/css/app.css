@@ -357,6 +357,9 @@ body.dark .qrow-set { background: #23272e; border-color: #31363e; color: #c9cdd4
 /* v2.90.78 快捷消息收起条已去掉：改由图标排里的 ⚡ 直接开关（那块样式一并删除） */
 /* 图标排里的 ⚡（当前是展开状态时点亮） */
 .tool-btn.on { background: color-mix(in srgb, var(--theme, #1677ff) 12%, #fff); color: var(--theme, #1677ff); }
+/* v2.90.82 刷新访客端的按钮：等待客户页面刷新期间禁用（灰掉 + 禁止点击） */
+.tool-btn:disabled { opacity: .45; cursor: not-allowed; }
+.tool-btn:disabled:hover { background: transparent; }
 body.dark .tool-btn.on { background: color-mix(in srgb, var(--theme, #1677ff) 22%, #1e2229); color: #6aa6ff; }
 /* v2.90.62 输入框上方那一排快捷消息标签（点一下就发） */
 .quick-row { display: flex; align-items: center; gap: 6px; overflow-x: auto; overscroll-behavior-x: contain; padding-bottom: 3px; margin-bottom: 5px; }

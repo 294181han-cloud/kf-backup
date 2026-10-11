@@ -175,17 +175,32 @@ function handle_sessions(string $method): void
 
 /** v2.89.12「刷新访客端」：客服点一下刷新，客户那边的页面会自动刷新一次。
     做法：往会话里插一条 msg_type='sys_reload' 的系统消息 —— 两端都不显示这条消息，
-    访客端轮询收到就执行 location.reload()（用于客户页面卡住、样式错乱、图片不显示等）。 */
+    访客端轮询收到就执行 location.reload()（用于客户页面卡住、样式错乱、图片不显示等）。
+    v2.90.82 防连按：上一次刷新还没被访客页面接上（last_online_at 还没超过请求时间）时，
+    直接拒绝再发指令 —— 否则客户页面会被反复重载。25 秒没回来（客户不在线）也放行，避免按钮卡死。 */
 function handle_session_reload(string $method, array $m): void
 {
     if ($method !== 'POST') { json_error('方法不允许', 405); return; }
     $sid = (int)$m[1];
     $ctx = require_workspace();
-    session_of($ctx, $sid);
+    $row = session_of($ctx, $sid);
     $pdo = db();
+    $tid = (int)$ctx['tenant_id'];
+    $reqAt = (string)($row['reload_req_at'] ?? '');
+    if ($reqAt !== '') {
+        $reqTs = (int)strtotime($reqAt);
+        $seenTs = !empty($row['last_online_at']) ? (int)strtotime((string)$row['last_online_at']) : 0;
+        $waited = time() - $reqTs;
+        if ($seenTs <= $reqTs && $waited < 25) {
+            json_out(['ok' => false, 'pending' => true, 'waited' => max(0, $waited),
+                'error' => '上一次刷新还在等客户页面响应（' . max(0, $waited) . ' 秒），等它重新连上再点']);
+        }
+    }
     $pdo->prepare("INSERT INTO messages (tenant_id, session_id, from_type, sender_name, text, msg_type, created_at)
         VALUES (?,?,'system','系统','刷新访客页面','sys_reload',?)")
-        ->execute([(int)$ctx['tenant_id'], $sid, now_dt()]);
+        ->execute([$tid, $sid, now_dt()]);
+    /* 记下本次请求时间：访客页面刷新完回来轮询会把 last_online_at 顶到它之后，即视为完成 */
+    $pdo->prepare('UPDATE v_sessions SET reload_req_at = ? WHERE tenant_id = ? AND id = ?')->execute([now_dt(), $tid, $sid]);
     json_out(['ok' => true]);
 }
 
@@ -1333,6 +1348,7 @@ function handle_agent_poll(string $method): void
     $st = $pdo->prepare("SELECT s.id, s.agent_id, a.nickname AS agent_name, s.visitor_name AS name, s.visitor_avatar,
         s.ip, s.from_url AS `from`, s.last_msg AS lastMsg, s.last_time AS lastTime, s.unread, s.source, s.geo, s.ua,
         s.archived_at, s.closed_at, s.last_online_at AS lastOnline,
+        s.reload_req_at AS reloadReqAt,   -- v2.90.82 刷新指令请求时间（前端据此显示「等待访客刷新」状态）
         s.pinned, s.pinned_at,
         $onlineSql AS status
         FROM v_sessions s LEFT JOIN agents a ON a.id = s.agent_id AND a.tenant_id = s.tenant_id

@@ -733,8 +733,19 @@ const app = createApp({
 
     // ===== 聊天工具条：刷新聊天记录 / 请求访客上传图片（v2.32）=====
     const refreshing = ref(false);
+    /* v2.90.82 是否正在等访客页面刷新完成：请求时间 reloadReqAt 与访客心跳 lastOnline 比 ——
+       访客刷新完回来轮询会把 lastOnline 顶到请求时间之后，即视为完成；25 秒没回来就不算（避免卡死）。 */
+    const reloadPending = computed(() => {
+      const s = sessions.value.find(x => x.id === currentId.value);
+      if (!s || !s.reloadReqAt) return false;
+      const req = Date.parse(s.reloadReqAt) || 0;
+      const seen = Date.parse(s.lastOnline || '') || 0;
+      if (seen > req) return false;
+      return (Date.now() - req) < 25000;
+    });
     const refreshChat = async () => {
       if (!currentId.value || refreshing.value) return;
+      if (reloadPending.value) { ElementPlus.ElMessage.warning('上一次刷新还在等客户页面响应，等它重新连上再点'); return; }
       refreshing.value = true;
       try {
         const r = await API.get('/api/sessions/' + currentId.value + '/messages');
@@ -742,9 +753,13 @@ const app = createApp({
         maxMsgId.value = msgs.value.length ? msgs.value[msgs.value.length - 1].id : 0;
     pinBottom(1400);
         /* v2.89.12 顺手把客户（访客端）的页面也叫刷新一次：客户那边卡住/图片不显示时最有用 */
-        let visitorOk = false;
-        try { await API.post('/api/sessions/' + currentId.value + '/reload', {}); visitorOk = true; } catch (e) {}
-        ElementPlus.ElMessage.success(visitorOk ? '已刷新聊天记录，并通知访客端刷新' : '已刷新聊天记录');
+        let visitorOk = false, pendingMsg = '';
+        try {
+          const rr = await API.post('/api/sessions/' + currentId.value + '/reload', {});
+          if (rr && rr.pending) pendingMsg = rr.error || '上一次刷新还没生效'; else visitorOk = true;
+        } catch (e) {}
+        if (pendingMsg) ElementPlus.ElMessage.warning(pendingMsg);
+        else ElementPlus.ElMessage.success(visitorOk ? '已通知访客页面刷新，等客户页面重新连上后可再次刷新' : '已刷新聊天记录');
       } catch (e) { ElementPlus.ElMessage.error(e.message); }
       finally { refreshing.value = false; }
     };
@@ -3712,7 +3727,7 @@ const app = createApp({
       createdAgentVisible, createdAgent,
       saveBrand, savePreqOn, saveProfile, changePw, exportCsv, logout,
       loadQuick, saveQuickOrder, loadWelcome, loadAuto, loadBlacklist, loadPreInq,
-      refreshing, refreshChat, askUpload,
+      refreshing, refreshChat, reloadPending, askUpload,
       askDlg, askForm, ASK_PRESETS, ASK_DEFAULT, openAskDialog, sendAskDialog,
       qa, quickAdd,
       quickDlg, qe, openQuickDlg, quickSave, quickDel, quickSendNow,

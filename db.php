@@ -93,6 +93,7 @@ function init_schema(): void
         source VARCHAR(16) NOT NULL DEFAULT 'direct',
         quota_key VARCHAR(16) NOT NULL DEFAULT '',
         last_online_at DATETIME NULL,
+        reload_req_at DATETIME NULL,   // v2.90.82 「刷新访客端」请求时间（防连按）
         closed_at DATETIME NULL,
         archived_at DATETIME NULL,
         created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
