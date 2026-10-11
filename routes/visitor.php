@@ -726,7 +726,7 @@ function handle_gate_goto(string $method): void
     header('Location: ' . $target, true, 302);
     echo '<!DOCTYPE html><html lang="zh-CN"><head><meta charset="utf-8">'
         . '<meta http-equiv="refresh" content="0;url=' . htmlspecialchars($target, ENT_QUOTES, 'UTF-8') . '">'
-        . '</head><body>正在进入…</body></html>';
+        . '<link rel="icon" href="data:,"></head><body>正在进入…</body></html>';
     exit;
 }
 
