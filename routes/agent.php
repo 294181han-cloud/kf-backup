@@ -316,7 +316,9 @@ function handle_session_archive(string $method, array $m): void
     json_out(['ok' => true, 'archived' => $on]);
 }
 
-/* ---------- 删除会话（右键菜单，彻底删除腾出会话额度；仅租户可删任意会话） ---------- */
+/* ---------- 删除会话（仅租户可删；v2.90.77 起就是「立即永久删除」，不再进回收站） ----------
+   聊天记录、联系人、欢迎语记录，以及该会话引用的附件文件（图/语音/文件）一起删掉；
+   会话额度按未删除的算，所以删完立刻腾出额度。**不可恢复**，前端有二次确认。 */
 function handle_session_delete(string $method, array $m): void
 {
     if ($method !== 'POST') { json_error('方法不允许', 405); return; }
@@ -326,10 +328,19 @@ function handle_session_delete(string $method, array $m): void
     if ($ctx['role'] !== 'tenant') json_error('仅租户可删除会话', 403);
     $tid = (int)$ctx['tenant_id'];
     $pdo = db();
-    /* v2.60.11 改成软删除（进回收站）：30 天内可以在「已删除」页签里自己恢复，
-       也能在刚删完的提示里点「撤销」。会话额度按未删除的算，所以删了就等于腾出额度。 */
-    $pdo->prepare("UPDATE v_sessions SET deleted_at = ? WHERE tenant_id = ? AND id = ?")->execute([now_dt(), $tid, $sid]);
-    json_out(['ok' => true, 'soft' => true, 'sid' => $sid]);
+    delete_session_attachments([$sid], $tid);   // 附件文件一起删
+    $pdo->beginTransaction();
+    try {
+        $pdo->prepare("DELETE FROM messages WHERE tenant_id = ? AND session_id = ?")->execute([$tid, $sid]);
+        $pdo->prepare("DELETE FROM contacts WHERE tenant_id = ? AND session_id = ?")->execute([$tid, $sid]);
+        $pdo->prepare("DELETE FROM welcome_sent WHERE tenant_id = ? AND session_id = ?")->execute([$tid, $sid]);
+        $pdo->prepare("DELETE FROM v_sessions WHERE tenant_id = ? AND id = ?")->execute([$tid, $sid]);
+        $pdo->commit();
+    } catch (\Throwable $e) {
+        try { $pdo->rollBack(); } catch (\Throwable $e2) {}
+        json_error('删除失败：' . $e->getMessage(), 500);
+    }
+    json_out(['ok' => true, 'permanent' => true, 'sid' => $sid]);
 }
 
 /* v2.60.14 会话合并：同一个人用微信来一次、浏览器又来一次 → 列表里变成两条。

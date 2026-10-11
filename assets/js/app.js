@@ -1993,19 +1993,16 @@ const app = createApp({
     const ctxMenuDelete = async () => {
       const sid = ctxMenu.sid; const name = ctxMenu.name; closeCtxMenu();
       try {
+        /* v2.90.77 删除 = 立即永久删除（不再有回收站/撤销），确认文案必须说清不可恢复 */
         await ElementPlus.ElMessageBox.confirm(
-          '删除「' + name + '」这段对话？删除后不在列表里显示，会话额度立刻腾出来。', '删除会话',
-          { type: 'warning', confirmButtonText: '删除', cancelButtonText: '取消' });
+          '删除「' + name + '」这段对话？删除后不可恢复：聊天记录、图片/语音/文件都会一起删掉，会话额度立刻腾出。', '永久删除会话',
+          { type: 'warning', confirmButtonText: '永久删除', cancelButtonText: '取消' });
         await API.post('/api/sessions/' + sid + '/delete');
         sessions.value = sessions.value.filter(s => s.id !== sid);
         if (currentId.value === sid) { currentId.value = 0; msgs.value = []; }
         await pollOnce();
         loadVisitors();   // v2.88.4 访客列表跟着刷新，删掉的会话那边也要没了
-        toastWithUndo('已删除（点撤销可找回）', '撤销', async () => {
-          await API.post('/api/sessions/' + sid + '/restore');
-          await pollOnce();
-          loadVisitors();
-        });
+        ElementPlus.ElMessage.success('已永久删除');
       } catch (e) { if (e !== 'cancel' && e && e.message) ElementPlus.ElMessage.error(e.message); }
     };
 

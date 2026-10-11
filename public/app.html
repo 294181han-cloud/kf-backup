@@ -1784,7 +1784,7 @@
   <el-dialog v-model="resumeFindOpen" title="用恢复码找回会话" width="420px" align-center>
     <p class="muted" style="font-size:12.5px;line-height:1.7;margin:0 0 10px;">
       输入客户手里的恢复码（8 位字母数字；会话头部 🔑 和「访客信息」里都能复制发给他），直接跳到那段对话。
-      如果这段对话被删进了回收站，也会一并恢复。如果当前正开着另一段对话（比如同一个人用微信来一次、浏览器又来一次），
+      如果这段对话还在（没被删除），也会一并恢复。如果当前正开着另一段对话（比如同一个人用微信来一次、浏览器又来一次），
       会问你是「合并到当前会话」还是「跳到那段对话」。
     </p>
     <el-input v-model="resumeFindCode" maxlength="16" placeholder="请输入恢复码，例如 atkqw69p" @keyup.enter="findByResume"></el-input>
@@ -1830,7 +1830,7 @@
 <script src="/assets/qr-poster.js?v=2.3.0"></script>
 <script src="/assets/api.js?v=2.1.2"></script>
 <script src="/assets/js/app-components.js?v=2.6.2"></script>
-<script src="/assets/js/app.js?v=3.68.20"></script>
+<script src="/assets/js/app.js?v=3.68.21"></script>
 <script src="/assets/js/app-boot.js?v=2.1.1"></script>
 </body>
 </html>
