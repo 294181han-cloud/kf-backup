@@ -22,8 +22,11 @@ function db(): PDO
         PDO::ATTR_ERRMODE            => PDO::ERRMODE_EXCEPTION,
         PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
         PDO::ATTR_EMULATE_PREPARES   => false,
-        // 统一 MySQL 会话时区为 +08:00（与 PHP PRC 对齐），保证 CURRENT_TIMESTAMP 与 PHP now_dt() 一致
-        PDO::MYSQL_ATTR_INIT_COMMAND => "SET NAMES utf8mb4, SESSION time_zone = '+08:00'",
+        // v2.90.83 统一 MySQL 会话时区「跟随 PHP」：原来写死 +08:00，一旦 PHP 时区不是 PRC
+        // （本机 Laragon 就是 UTC、容器里也常是 UTC），NOW() 与 PHP 写入的时间列就会差 8 小时，
+        // 导致所有「用 NOW() 比 last_online_at / created_at」的判断（在线状态、最近 N 分钟窗口）全错。
+        // date('P') 给出 PHP 当前偏移（如 +08:00 / +00:00），不依赖 MySQL 时区表。
+        PDO::MYSQL_ATTR_INIT_COMMAND => "SET NAMES utf8mb4, SESSION time_zone = '" . date('P') . "'",
     ]);
     return $pdo;
 }
