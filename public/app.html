@@ -7,7 +7,7 @@
 <link rel="icon" href="/assets/img/mi-logo.png">
 <link rel="apple-touch-icon" href="/assets/img/mi-logo.png">
 <link rel="stylesheet" href="/assets/vendor/element-plus.css">
-<link rel="stylesheet" href="/assets/css/app.css?v=3.64.38">
+<link rel="stylesheet" href="/assets/css/app.css?v=3.64.39">
 <script src="/assets/ui/ui-registry.js?v=2.10.4"></script>
 <script src="/assets/ui/ui-loader.js?v=2.10.4" data-ui-cat="auto"></script>
 </head>
@@ -517,6 +517,10 @@
           <div v-else class="chat-empty">
             <div style="font-size:40px;">💬</div>
             <div>选择左侧会话开始接待</div>
+          </div>
+          <!-- v2.90.88 切会话时的加载占位：没缓存才显示，避免空白 -->
+          <div class="chat-loading" v-if="current && loadingMsgs && !msgs.length">
+            <span class="cl-dot"></span>正在加载聊天记录…
           </div>
           <!-- v2.52 往上翻聊天记录时，右下角给个一键回到底部 -->
           <button type="button" class="chat-tobottom" v-if="current && !chatAtBottom" @click="toBottom"
@@ -1827,7 +1831,7 @@
 <script src="/assets/qr-poster.js?v=2.3.0"></script>
 <script src="/assets/api.js?v=2.1.2"></script>
 <script src="/assets/js/app-components.js?v=2.6.2"></script>
-<script src="/assets/js/app.js?v=3.68.22"></script>
+<script src="/assets/js/app.js?v=3.68.23"></script>
 <script src="/assets/js/app-boot.js?v=2.1.1"></script>
 </body>
 </html>

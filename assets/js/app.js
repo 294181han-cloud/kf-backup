@@ -868,6 +868,10 @@ const app = createApp({
       if (Date.now() < pinUntil || nearBottom) scrollBottom();
     };
 
+    /* v2.90.88 会话消息缓存：切回看过的会话先显示上次内容（秒开），同时后台刷新 */
+    const loadingMsgs = ref(false);
+    const msgCache = new Map();
+    const MSG_CACHE_MAX = 8;
     const openSession = async (id) => {
       // v2.55 草稿/待发附件按会话隔离：给 A 打了一半的字（或贴好的图）不会跟着你跑到 B 的聊天框里
       saveSessionDraft(currentId.value);
@@ -878,17 +882,32 @@ const app = createApp({
         else history.pushState({ kfChat: id }, '');
       } catch (e) {}
       restoreSessionDraft(id);
-      msgs.value = [];
-      maxMsgId.value = 0;
+      /* v2.90.88 A+B：先渲染缓存（秒开）或加载占位，避免"切换后一片空白等一秒" */
+      const cachedMsgs = msgCache.get(id);
+      if (cachedMsgs) {
+        msgs.value = cachedMsgs.msgs;
+        maxMsgId.value = cachedMsgs.maxMsgId;
+        loadingMsgs.value = false;
+        pinBottom(0);
+      } else {
+        msgs.value = [];
+        maxMsgId.value = 0;
+        loadingMsgs.value = true;
+      }
       profile.value = null;
       infoOpen.value = false;   // v2.46 手机端：切会话时收起访客信息抽屉
       chMore.value = false;     // v2.60 手机端：切会话时收起「更多」面板
       chatAtBottom.value = true;   // v2.52 换会话时先当作在底部
       try {
         const r = await API.get('/api/sessions/' + id + '/messages');
+        /* v2.90.88 慢响应保护：这期间用户可能已切到别的会话，别把别人的记录盖上去 */
+        if (currentId.value !== id) return;
         msgs.value = r.messages || [];
         prefetchAudio(msgs.value);
         if (msgs.value.length) maxMsgId.value = msgs.value[msgs.value.length - 1].id;
+        loadingMsgs.value = false;
+        msgCache.set(id, { msgs: msgs.value, maxMsgId: maxMsgId.value });
+        if (msgCache.size > MSG_CACHE_MAX) { const oldest = msgCache.keys().next().value; msgCache.delete(oldest); }
     pinBottom(1800);   // v2.58 进会话：图片/视频异步撑高，必须持续贴底一会儿
         markRead(id);
         // 资料与联系方式
@@ -906,7 +925,7 @@ const app = createApp({
         contactList.value = await API.get('/api/sessions/' + id + '/contacts');
         noteDraft.value = (contactList.value.find(c => c.type === 'note') || {}).value || '';
         if (!agentOptions.value.length) await loadAgentOptions();
-      } catch (e) { ElementPlus.ElMessage.error(e.message); }
+      } catch (e) { loadingMsgs.value = false; ElementPlus.ElMessage.error(e.message); }
     };
     /* ===== v2.57 到期提醒：剩 5 分钟提示一次，剩 2 分钟弹窗，到期再提醒一次 =====
        租户（卡密主人）才有 expires_at；子客服没有，直接跳过。
@@ -3727,7 +3746,7 @@ const app = createApp({
       createdAgentVisible, createdAgent,
       saveBrand, savePreqOn, saveProfile, changePw, exportCsv, logout,
       loadQuick, saveQuickOrder, loadWelcome, loadAuto, loadBlacklist, loadPreInq,
-      refreshing, refreshChat, reloadPending, askUpload,
+      refreshing, refreshChat, reloadPending, loadingMsgs, askUpload,
       askDlg, askForm, ASK_PRESETS, ASK_DEFAULT, openAskDialog, sendAskDialog,
       qa, quickAdd,
       quickDlg, qe, openQuickDlg, quickSave, quickDel, quickSendNow,
