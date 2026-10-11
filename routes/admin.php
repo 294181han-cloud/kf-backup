@@ -813,7 +813,10 @@ function handle_admin_nodes(string $method): void
         if (!$node || (string)$node['origin'] === '') json_error('节点不存在或未上报来源地址', 400);
         $bundle = node_bundle_build();
         if ((string)$node['app_version'] === (string)$bundle['version']) {
-            json_out(['ok' => true, 'up_to_date' => true, 'ip' => $ip, 'role' => $role, 'version' => $bundle['version']]);
+            /* v2.90.71 修：这里原来不带 app_version，前端拼出来是「已推送，节点版本 」（空版本号），
+               看起来像「点了没反应」。带上版本号，前端才能说清「已是最新，无需推送」。 */
+            json_out(['ok' => true, 'up_to_date' => true, 'ip' => $ip, 'role' => $role,
+                'version' => $bundle['version'], 'app_version' => $bundle['version']]);
         }
         $r = admin_node_http((string)$node['origin'], '/api/internal/apply', ['bundle' => $bundle]);
         if (!empty($r['ok']) && isset($r['app_version'])) {
