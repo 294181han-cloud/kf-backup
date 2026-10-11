@@ -328,6 +328,10 @@ body.dark .iq-fill { background: #262c34; border-color: #3a424e; color: #c6ccd8;
 .qr-fill:hover { background: var(--theme, #1677ff) !important; color: #fff !important; }
 .qr-fill:active { transform: scale(.95); }
 body.dark .qr-fill { background: #262c34; border-color: #3a424e; color: #98a3b4; }
+/* v2.90.94 顶栏版本号标签：让客服自己就能确认"当前页面是哪一版"（排查缓存） */
+.ver-chip { font-size: 11px; color: #98a2b3; background: #f4f6fa; border-radius: 999px; padding: 2px 8px; cursor: pointer; user-select: none; white-space: nowrap; }
+.ver-chip:hover { color: var(--theme, #1677ff); background: color-mix(in srgb, var(--theme, #1677ff) 10%, #fff); }
+body.dark .ver-chip { background: #262c34; color: #8b95a7; }
 .iq-empty { font-size: 12px; color: #86909c; text-align: center; padding: 10px 0; }
 body.dark .iq-item { background: #23272e; border-color: #31363e; }
 body.dark .iq-t { color: #e5e6eb; }

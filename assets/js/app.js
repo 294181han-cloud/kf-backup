@@ -1205,6 +1205,17 @@ const app = createApp({
     /* v2.90.21 单击行为可设置：默认「直接发送」；设成「编辑后发送」时，单击快捷消息只把它填进
        输入框（可以改文字、加图片），自己按发送才发出去。Ctrl+单击 永远是填进输入框。 */
     const quickMode = ref('direct');
+    /* v2.90.94 前端版本号（顶栏显示）：用来确认当前页面加载的是哪一版，排查缓存问题一眼就看出来。
+       app.html 是原样下发的静态模板（不经 PHP 渲染），所以版本从 /api/health 取（和 version.php 同一个值）。 */
+    const appVersion = ref((window.KF_APP_VERSION || ''));
+    if (!appVersion.value) {
+      (async () => {
+        try {
+          const r = await API.get('/api/health');
+          if (r && r.app_version) appVersion.value = String(r.app_version);
+        } catch (e) {}
+      })();
+    }
     const setQuickMode = async (m) => {
       quickMode.value = (m === 'edit') ? 'edit' : 'direct';
       try { await API.put('/api/tenant/settings', { quick_send_mode: quickMode.value }); } catch (e) {}
@@ -3748,6 +3759,7 @@ const app = createApp({
       asrText, asrBusy, transcribe,
       openSession, send, onKey, useQuick, sendQuick, quickClick, quickPanelClick, quickFill, quickMode, setQuickMode, retrySend,
       quickGroups, curGroup, visibleQuick, multiGroup, pickGroup,
+      appVersion,
       quickPanelKw, quickPanelList, qkHi, infoTab,
       quickBarOn, quickBarOpen, saveQuickBar, toggleQuickBar,
       richText,

@@ -7,7 +7,7 @@
 <link rel="icon" href="/assets/img/mi-logo.png">
 <link rel="apple-touch-icon" href="/assets/img/mi-logo.png">
 <link rel="stylesheet" href="/assets/vendor/element-plus.css">
-<link rel="stylesheet" href="/assets/css/app.css?v=3.64.43">
+<link rel="stylesheet" href="/assets/css/app.css?v=3.64.44">
 <script src="/assets/ui/ui-registry.js?v=2.10.5"></script>
 <script src="/assets/ui/ui-loader.js?v=2.10.5" data-ui-cat="auto"></script>
 </head>
@@ -137,6 +137,8 @@
         <div class="title">{{ tabTitle }}</div>
         <div style="margin-left:auto;display:flex;align-items:center;gap:14px;">
           <span v-if="unreadTotal > 0" class="unread-chip">{{ unreadTotal }} 条未读</span>
+          <!-- v2.90.94 顶栏显示版本号：方便确认手机/电脑到底加载的是哪一版前端（排查缓存非常好用） -->
+          <span class="ver-chip" :title="'当前工作台版本 v' + appVersion + '（点一下复制）'" @click="copy(appVersion)">v{{ appVersion }}</span>
           <span class="clock">{{ clock }}</span>
           <!-- v2.60.7 借鉴同行手机端：右上角给一个刷新键 -->
           <button type="button" class="m-refresh m-only" title="刷新当前页面数据" @click="navRefresh">⟳</button>
@@ -1837,7 +1839,7 @@
 <script src="/assets/qr-poster.js?v=2.3.0"></script>
 <script src="/assets/api.js?v=2.1.2"></script>
 <script src="/assets/js/app-components.js?v=2.6.2"></script>
-<script src="/assets/js/app.js?v=3.68.25"></script>
+<script src="/assets/js/app.js?v=3.68.26"></script>
 <script src="/assets/js/app-boot.js?v=2.1.1"></script>
 </body>
 </html>
