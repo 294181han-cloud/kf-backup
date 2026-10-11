@@ -354,6 +354,22 @@ body.dark .it-btn.on { background: color-mix(in srgb, var(--theme, #1677ff) 22%,
 .qrow-list::-webkit-scrollbar { width: 5px; }
 .qrow-list::-webkit-scrollbar-thumb { background: #e0e3e8; border-radius: 3px; }
 body.dark .qrow-set { background: #23272e; border-color: #31363e; color: #c9cdd4; }
+/* v2.90.67 快捷消息收起后那条细的（点一下展开） */
+.qrow-fold {
+  display: flex; align-items: center; gap: 8px; cursor: pointer;
+  margin: 2px 0 6px; padding: 5px 10px; border-radius: 9px;
+  border: 1px dashed var(--v-line, #e5e6eb); background: #fafbfd;
+  font-size: 12.5px; color: #6b7688; transition: all .12s;
+}
+.qrow-fold:hover { border-color: var(--theme, #1677ff); color: var(--theme, #1677ff); background: color-mix(in srgb, var(--theme, #1677ff) 6%, #fff); }
+.qrow-fold .qf-l { display: inline-flex; align-items: center; gap: 6px; font-weight: 600; }
+.qrow-fold .qf-l i { font-style: normal; }
+.qrow-fold .qf-l em { font-style: normal; color: #86909c; font-weight: 400; }
+.qrow-fold .qf-r { margin-left: auto; font-weight: 600; }
+body.dark .qrow-fold { background: #23272e; border-color: #31363e; color: #c9cdd4; }
+/* 图标排里的 ⚡（当前是展开状态时点亮） */
+.tool-btn.on { background: color-mix(in srgb, var(--theme, #1677ff) 12%, #fff); color: var(--theme, #1677ff); }
+body.dark .tool-btn.on { background: color-mix(in srgb, var(--theme, #1677ff) 22%, #1e2229); color: #6aa6ff; }
 /* v2.90.62 输入框上方那一排快捷消息标签（点一下就发） */
 .quick-row { display: flex; align-items: center; gap: 6px; overflow-x: auto; overscroll-behavior-x: contain; padding-bottom: 3px; margin-bottom: 5px; }
 .quick-row::-webkit-scrollbar { height: 4px; }

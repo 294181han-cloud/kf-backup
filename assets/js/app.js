@@ -156,6 +156,26 @@ const app = createApp({
       try { return localStorage.getItem('kfxt_info_tab') === 'quick' ? 'quick' : 'info'; } catch (e) { return 'info'; }
     })());
     Vue.watch(infoTab, (v) => { try { localStorage.setItem('kfxt_info_tab', v); } catch (e) {} });
+    /* v2.90.67 快捷消息常驻区能不能收起：
+       ① 「设置 → 快捷消息」里的开关 = 账号默认（存库，所有设备/子客服都跟着）；
+       ② 输入框那排图标里的 ⚡ 按钮 = 本机临时收起/展开（记在这台浏览器，不动账号设置）。 */
+    const quickBarOn = ref(true);        // 账号默认（设置页那个开关绑它）
+    const quickBarOpen = ref((function () {   // 本机现在是不是展开着
+      try { const v = localStorage.getItem('kfxt_qbar'); return v === null ? true : v === '1'; } catch (e) { return true; }
+    })());
+    const saveQuickBar = async () => {
+      try {
+        await API.put('/api/tenant/settings', { quick_bar_on: quickBarOn.value });
+        ElementPlus.ElMessage.success(quickBarOn.value ? '已开启：工作台常显快捷消息' : '已关闭：工作台默认收起（只留一条⚡）');
+      } catch (e) { ElementPlus.ElMessage.error(e.message || '保存失败'); }
+      // 本机也跟着切过去，免得跟缓存里存的状态打架
+      quickBarOpen.value = quickBarOn.value;
+      try { localStorage.setItem('kfxt_qbar', quickBarOn.value ? '1' : '0'); } catch (e) {}
+    };
+    const toggleQuickBar = () => {
+      quickBarOpen.value = !quickBarOpen.value;
+      try { localStorage.setItem('kfxt_qbar', quickBarOpen.value ? '1' : '0'); } catch (e) {}
+    };
     const pickGroup = (g) => {
       quickGroup.value = g;
       try { localStorage.setItem('kfxt_qgroup', g); } catch (e) {}
@@ -561,6 +581,11 @@ const app = createApp({
         codeStyle.custom = b.code_custom_logo || '';
         /* v2.90.21 快捷消息点击行为：direct=单击直接发送（默认）/ edit=单击只填进输入框，编辑后再手动发 */
         quickMode.value = (b.quick_send_mode === 'edit') ? 'edit' : 'direct';
+        /* v2.90.67 账号默认是否常显快捷消息；本机没手动切过（localStorage 没值）就跟着账号走 */
+        quickBarOn.value = b.quick_bar_on !== false;
+        try {
+          if (localStorage.getItem('kfxt_qbar') === null) quickBarOpen.value = quickBarOn.value;
+        } catch (e) { quickBarOpen.value = quickBarOn.value; }
         codeCheck.state = b.code_check_state || 'idle';
         codeCheck.text = b.code_check_text || '未检测';
         codeCheck.tag = b.code_check_tag || '未检测';
@@ -3624,6 +3649,7 @@ const app = createApp({
       openSession, send, onKey, useQuick, sendQuick, quickClick, quickPanelClick, quickMode, setQuickMode,
       quickGroups, curGroup, visibleQuick, multiGroup, pickGroup,
       quickPanelKw, quickPanelList, qkHi, infoTab,
+      quickBarOn, quickBarOpen, saveQuickBar, toggleQuickBar,
       richText,
       sameIpOthers, mergeSameIpNow,
       onImage, startRec, stopRec, closeSession, doTransfer,

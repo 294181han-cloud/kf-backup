@@ -284,6 +284,8 @@ function handle_tenant_settings(string $method): void
             'ask_image_text'  => ts_get($tid, 'ask_image_text', '方便的话，请上传一下相关图片，帮您更快定位问题～'),
             /* v2.90.21 快捷消息点击行为：direct=单击直接发送（默认） / edit=单击只填入输入框，编辑后再手动发 */
             'quick_send_mode' => ts_get($tid, 'quick_send_mode', 'direct'),
+            /* v2.90.67 工作台是否常显快捷消息那两排（关掉 = 只留一条「⚡快捷消息」细条，随时可点开） */
+            'quick_bar_on'   => ts_get($tid, 'quick_bar_on', '1') === '1',
             // 公告（访客端顶部横幅）—— v2.78 默认开 + 默认文案
             'notice_on'      => ts_get($tid, 'notice_on', '1') === '1',
             'notice_text'    => ts_get($tid, 'notice_text', '不要关闭此网页，若退出请先复制浏览器打开'),
@@ -350,7 +352,7 @@ function handle_tenant_settings(string $method): void
         }
         /* v2.90.9 修 bug：ip_merge_on（同 IP 自动合并/自动接回）漏在这个白名单里 → 设置页那个开关
            点了根本没落库，关不掉也开不了。 */
-        foreach (['pre_inquiry_on', 'notice_on', 'auto_blacklist', 'dedup_on', 'ip_limit_on', 'ip_merge_on', 'filtration_wx', 'filtration_pc', 'filtration_area', 'publicity_on', 'inform_on', 'tpl_nav_on', 'agent_snd_recv_on', 'agent_snd_send_on', 'visitor_snd_recv_on', 'visitor_snd_send_on', 'agent_avatar_on'] as $k) {
+        foreach (['pre_inquiry_on', 'notice_on', 'auto_blacklist', 'dedup_on', 'ip_limit_on', 'ip_merge_on', 'filtration_wx', 'filtration_pc', 'filtration_area', 'publicity_on', 'inform_on', 'tpl_nav_on', 'agent_snd_recv_on', 'agent_snd_send_on', 'visitor_snd_recv_on', 'visitor_snd_send_on', 'agent_avatar_on', 'quick_bar_on'] as $k) {
             if (array_key_exists($k, $data)) ts_set($tid, $k, $data[$k] ? '1' : '0');
         }
         if (array_key_exists('ip_limit_count', $data)) {
