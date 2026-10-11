@@ -3689,3 +3689,39 @@ const app = createApp({
 });
 app.component('crud-table', CrudTable);
 app.use(ElementPlus).mount('#app');
+
+/* ===== 临时诊断（URL 带 ?jumpdiag=1 才生效）：把"发送消息时到底哪个元素在动"直接显示在屏幕角落，
+   不用开控制台。定位完这段就删。（v2.90.73 临时加入） ===== */
+(function () {
+  if (!/(\?|&)jumpdiag/.test(location.search)) return;
+  var box = document.createElement('div');
+  box.id = 'jumpdiag';
+  box.style.cssText = 'position:fixed;right:10px;bottom:10px;z-index:99999;max-width:44vw;max-height:40vh;overflow:auto;'
+    + 'background:rgba(17,24,39,.94);color:#e5e7eb;font:11px/1.6 Consolas,monospace;padding:8px 10px;border-radius:8px;white-space:pre-wrap;';
+  box.textContent = '[jumpdiag] 监听中… 现在发一条消息（文字或图片）';
+  document.body.appendChild(box);
+  var sels = ['.qrow', '.qrow-fold', '.chat-head', '.chat-body', '.chat-tools', '.pending-atts', '.reply-bar', '.chat-input', '.ci-row', '.chat-input textarea', '.send-btn'];
+  var snap = function () {
+    return sels.map(function (s) {
+      var el = document.querySelector(s);
+      if (!el) return s + '=无';
+      var r = el.getBoundingClientRect();
+      return s + '=' + Math.round(r.top) + '/' + Math.round(r.height);
+    });
+  };
+  var last = snap(), lines = [], t0 = Date.now();
+  setInterval(function () {
+    var now = snap(), diffs = [];
+    for (var i = 0; i < now.length; i++) {
+      if (now[i] !== last[i]) diffs.push(last[i] + '  ->  ' + now[i].slice(now[i].indexOf('=') + 1));
+    }
+    if (diffs.length) {
+      lines.push('+' + ((Date.now() - t0) / 1000).toFixed(1) + 's  ' + diffs.join('   |   '));
+      if (lines.length > 16) lines.shift();
+      box.textContent = '[jumpdiag] top/height 变化（时间 + 变化项）：\n' + lines.join('\n');
+      console.log('[jumpdiag]', diffs.join(' | '));
+    }
+    last = now;
+  }, 50);
+})();
+
