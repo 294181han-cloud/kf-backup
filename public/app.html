@@ -7,7 +7,7 @@
 <link rel="icon" href="/assets/img/mi-logo.png">
 <link rel="apple-touch-icon" href="/assets/img/mi-logo.png">
 <link rel="stylesheet" href="/assets/vendor/element-plus.css">
-<link rel="stylesheet" href="/assets/css/app.css?v=3.64.36">
+<link rel="stylesheet" href="/assets/css/app.css?v=3.64.37">
 <script src="/assets/ui/ui-registry.js?v=2.10.4"></script>
 <script src="/assets/ui/ui-loader.js?v=2.10.4" data-ui-cat="auto"></script>
 </head>
@@ -443,15 +443,11 @@
                   </button>
                 </div>
               </div>
-              <!-- v2.90.67 收起状态：只留一条细的，点一下就展开 -->
-              <div class="qrow-fold" v-else-if="quickMsgs.length" @click="toggleQuickBar" title="点一下展开快捷消息">
-                <span class="qf-l"><i>⚡</i> 快捷消息 <em>· {{ visibleQuick.length }} 条</em></span>
-                <span class="qf-r">展开 ▾</span>
-              </div>
+              <!-- v2.90.78 收起状态不再显示细条：只靠下面图标排里的 ⚡ 开关（点一下就在输入框上方显示/收起） -->
               <div class="chat-tools" style="margin-bottom:6px;">
                 <!-- v2.90.67 快捷消息收起 / 展开（只影响这台浏览器） -->
                 <button class="tool-btn" v-if="quickMsgs.length" :class="{on: quickBarOpen}"
-                        :title="quickBarOpen ? '收起快捷消息（只影响这台电脑，账号默认在「设置 → 快捷消息」里改）' : '展开快捷消息'"
+                        :title="quickBarOpen ? '收起快捷消息（只影响这台电脑）' : '展开快捷消息（显示在输入框上方）'"
                         @click="toggleQuickBar"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2 4.5 13.5h6L9 22l10.5-12H13L13 2z"/></svg></button>
 
                 <!-- v2.72 手机浏览器：file 框做成按钮上的一层透明覆盖，手指直接点在 input 上（原生点击）才打得开相册 -->
