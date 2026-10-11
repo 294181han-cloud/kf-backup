@@ -1019,27 +1019,61 @@ const app = createApp({
       const atts = pendingAtts.value.slice();
       if ((!text && !atts.length) || !currentId.value || sending.value) return;
       sending.value = true;
+      const sidAtSend = currentId.value;
+      const keepReply = replyTo.value;
+      /* v2.90.75 乐观发送：先本地回显一条「发送中…」，接口回来再换成真消息。
+         以前是等接口返回才画出来，客户端到服务器一个来回 ~200ms，点发送就感觉"卡一下"。 */
+      const tmp = {
+        id: 0, tmp: true, pending: true, from: 'agent',
+        sender_id: (me.value && me.value.id) || 0,
+        sender_name: (me.value && (me.value.nickname || me.value.username)) || '客服',
+        text, attachments: atts, msg_type: atts.length ? 'mixed' : 'text',
+        time: new Date().toISOString(),
+        reply_to: replyTo.value ? replyTo.value.id : 0,
+      };
+      msgs.value.push(tmp);
+      draft.value = '';
+      resetTaHeight();
+      pendingAtts.value = [];
+      pinBottom(600);
       try {
         const payload = { text, attachments: atts.length ? atts : undefined };
         if (replyTo.value) payload.reply_to = replyTo.value.id;   // v2.43 引用回复
-        const r = await API.post('/api/sessions/' + currentId.value + '/messages', payload);
-        msgs.value.push(r.message);
-        maxMsgId.value = r.message.id;
-        draft.value = '';
-        resetTaHeight();
-        pendingAtts.value = [];
+        const r = await API.post('/api/sessions/' + sidAtSend + '/messages', payload);
+        if (currentId.value === sidAtSend) {
+          const i = msgs.value.indexOf(tmp);
+          const already = msgs.value.some(x => x.id === r.message.id);   // 轮询可能已先塞进来
+          if (i >= 0) { if (already) msgs.value.splice(i, 1); else msgs.value.splice(i, 1, r.message); }
+          else if (!already) msgs.value.push(r.message);
+        }
+        if (r.message.id > maxMsgId.value) maxMsgId.value = r.message.id;
         // v2.55 发完把该会话的草稿槽也清掉，切回来是干净的
-        draftBox[currentId.value] = '';
-        attBox[currentId.value] = [];
+        draftBox[sidAtSend] = '';
+        attBox[sidAtSend] = [];
         replyTo.value = null;
         // v2.53 发完消息不再自动收起快捷栏（用户反馈"每次都要点一次才显示"）；
         // 想收起就点「⚡快捷消息」那个按钮，纯手动。
         pinBottom(1400);
         sendBeep();
-        const s = sessions.value.find(x => x.id === currentId.value);
+        const s = sessions.value.find(x => x.id === sidAtSend);
         if (s) { s.lastMsg = (text || (atts.length ? '[图片]' : '')).slice(0, 60); s.agent_id = s.agent_id || (me.value.role === 'agent' ? me.value.id : s.agent_id); }
-      } catch (e) { ElementPlus.ElMessage.error(e.message); }
+      } catch (e) {
+        tmp.pending = false;
+        tmp.failed = true;
+        // 失败：把内容还回输入框，方便直接再发一次
+        if (currentId.value === sidAtSend) { draft.value = text; pendingAtts.value = atts; replyTo.value = keepReply; }
+        ElementPlus.ElMessage.error(e.message);
+      }
       finally { sending.value = false; }
+    };
+    /* v2.90.75 发送失败后的重试：把那条临时消息撤掉，内容塞回输入框再发一次 */
+    const retrySend = async (m) => {
+      const i = msgs.value.indexOf(m);
+      if (i >= 0) msgs.value.splice(i, 1);
+      draft.value = String(m.text || '');
+      pendingAtts.value = Array.isArray(m.attachments) ? m.attachments.slice() : [];
+      replyTo.value = m.reply_to ? { id: m.reply_to } : null;
+      await send();
     };
     /* v2.57 修：中文输入法选词时按回车是「上屏」不是「发送」。
        原来没判断 isComposing，于是选词时一回车就把还没上屏的字发出去了，
@@ -3656,7 +3690,7 @@ const app = createApp({
       navGroups,
       audioPlaying, audioDur, waveBars, toggleAudio,
       asrText, asrBusy, transcribe,
-      openSession, send, onKey, useQuick, sendQuick, quickClick, quickPanelClick, quickMode, setQuickMode,
+      openSession, send, onKey, useQuick, sendQuick, quickClick, quickPanelClick, quickMode, setQuickMode, retrySend,
       quickGroups, curGroup, visibleQuick, multiGroup, pickGroup,
       quickPanelKw, quickPanelList, qkHi, infoTab,
       quickBarOn, quickBarOpen, saveQuickBar, toggleQuickBar,
