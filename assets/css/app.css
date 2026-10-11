@@ -2581,3 +2581,13 @@ body.dark .info-reopen { background: #23272e; color: #b6bfcd; border-color: #333
   body.dark .ch-tools .cbtn { color: #b6bfcd; }
   body.dark .ch-tools .cbtn:hover, body.dark .ch-tools .cbtn.on { background: #333b46 !important; }
 }
+
+/* kfxt-no-autozoom v2.90.89: phones auto-zoom when focusing inputs with font-size < 16px.
+   Keep all form controls at 16px on small screens (incl. element-plus inputs and the note/contact dialog). */
+@media (max-width: 820px) {
+  input, textarea, select,
+  .el-input__inner, .el-textarea__inner, .el-input__inner:focus, .el-textarea__inner:focus {
+    font-size: 16px !important;
+    line-height: 1.4 !important;
+  }
+}
