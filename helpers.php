@@ -2980,7 +2980,7 @@ function gate_loader_html(string $apiBase = ''): string
     // 内层（解密后才会出现在浏览器里）
     $inner = '<!DOCTYPE html><html lang="zh-CN"><head><meta charset="utf-8">'
         . '<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">'
-        . '<meta name="referrer" content="no-referrer"><title>加载中</title>'
+        . '<meta name="referrer" content="no-referrer"><title>在线客服</title>'
         . '<style>html,body{height:100%;margin:0;background:#fff;color:#9aa3af;'
         . 'font:14px/1.7 -apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei",sans-serif}'
         . '.ld{position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:0 28px}'
@@ -3004,7 +3004,7 @@ function gate_loader_html(string $apiBase = ''): string
            上报服务端（复核后会把这台退役换一台），自己再要一次地址重试一次。 */
         . 'var okIn=false;var rdy=null;var retried=false;var CD="";'
         . 'function hideLoad(){okIn=true;if(rdy){clearTimeout(rdy);rdy=null;}if(box)box.style.display="none";}'
-        . 'window.addEventListener("message",function(e){var dd=e.data;if(dd&&dd.kf==="ready"){hideLoad();}});'
+        . 'window.addEventListener("message",function(e){var dd=e.data;if(dd&&dd.kf==="ready"){if(dd.brand){try{document.title=dd.brand;}catch(x){}}}hideLoad();}});'
         . 'function reportErr(reason,host){try{'
         . 'if(navigator.sendBeacon&&window.FormData){var fd=new FormData();fd.append("code",CD);fd.append("host",host||"");fd.append("r",reason);navigator.sendBeacon(AB+"/api/gate/err",fd);return;}'
         . 'var x=new XMLHttpRequest();x.open("POST",AB+"/api/gate/err",true);'

@@ -1107,7 +1107,8 @@ createApp({
      一直没报到的（内容主机被拦/连不上）外壳会重试并上报给服务端换一台内容域名。 */
   try {
     if (window.parent && window.parent !== window) {
-      window.parent.postMessage({ kf: 'ready' }, '*');
+      /* v2.90.84 报到时把品牌名一起带给门牌层 —— 它会把浏览器标题从「在线客服」改成该租户的品牌名 */
+      window.parent.postMessage({ kf: 'ready', brand: (brand && brand.company_name) || '' }, '*');
     }
   } catch (e) {}
   var tip = document.getElementById('boot-tip');
