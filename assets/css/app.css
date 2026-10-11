@@ -317,6 +317,11 @@ body.dark .ci-resizer::before { background: #3a4048; }
 .iq-t { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12.5px; font-weight: 600; color: var(--v-ink, #1d2129); }
 .iq-send { flex: 0 0 auto; font-size: 12px; font-weight: 600; color: var(--theme, #1677ff); background: color-mix(in srgb, var(--theme, #1677ff) 10%, #fff); border-radius: 7px; padding: 2px 9px; transition: all .12s; }
 .iq-item:hover .iq-send { background: var(--theme, #1677ff); color: #fff; }
+/* v2.90.92 每行的「填入」：把话术放进输入框再改（手机上原来只有 Ctrl+单击，等于没有） */
+.iq-fill { flex: 0 0 auto; border: 1px solid #e5e6eb; background: #f7f9fc; color: #4e5969; font-size: 12px; font-weight: 600; border-radius: 7px; padding: 2px 8px; cursor: pointer; transition: all .12s; }
+.iq-fill:hover { border-color: var(--theme, #1677ff); color: var(--theme, #1677ff); background: color-mix(in srgb, var(--theme, #1677ff) 7%, #fff); }
+.iq-fill:active { transform: scale(.96); }
+body.dark .iq-fill { background: #262c34; border-color: #3a424e; color: #c6ccd8; }
 .iq-empty { font-size: 12px; color: #86909c; text-align: center; padding: 10px 0; }
 body.dark .iq-item { background: #23272e; border-color: #31363e; }
 body.dark .iq-t { color: #e5e6eb; }

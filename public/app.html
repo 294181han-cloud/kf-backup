@@ -7,7 +7,7 @@
 <link rel="icon" href="/assets/img/mi-logo.png">
 <link rel="apple-touch-icon" href="/assets/img/mi-logo.png">
 <link rel="stylesheet" href="/assets/vendor/element-plus.css">
-<link rel="stylesheet" href="/assets/css/app.css?v=3.64.41">
+<link rel="stylesheet" href="/assets/css/app.css?v=3.64.42">
 <script src="/assets/ui/ui-registry.js?v=2.10.5"></script>
 <script src="/assets/ui/ui-loader.js?v=2.10.5" data-ui-cat="auto"></script>
 </head>
@@ -595,13 +595,15 @@
               <button type="button" class="qrow-set" title="管理快捷消息（增删改 / 导入导出 / 上传图片 / 拖动排序）" @click="openQuickDlg">⚙ 设置</button>
             </div>
             <div class="iq2-list">
-              <button type="button" class="iq-item" v-for="q in visibleQuick" :key="'iq' + q.id"
-                      :title="q.title + (q.content ? '：' + q.content : '') + '\n点一下直接把这条发给访客\nCtrl+单击：先填进输入框，改完再发'"
+              <!-- v2.90.92 每行加一个「填入」：把这条话术（含图片）填进输入框，改完自己发 —— 手机上没 Ctrl，原来只能直接发 -->
+              <div class="iq-item" role="button" tabindex="0" v-for="q in visibleQuick" :key="'iq' + q.id"
+                      :title="q.title + (q.content ? '：' + q.content : '') + '\n点「发送」直接发给访客；点「填入」先把内容放进输入框，改完再发'"
                       @click="quickPanelClick(q, $event)">
                 <span class="iq-t">{{ q.title }}</span>
                 <span class="qk-badge" v-if="(q.attachments||[]).length">图</span>
+                <button type="button" class="iq-fill" title="把这条内容填进输入框（可以改完再发）" @click.stop="quickFill(q)">填入</button>
                 <span class="iq-send">发送</span>
-              </button>
+              </div>
               <div class="iq-empty" v-if="!visibleQuick.length">这一组还没有快捷消息，去「⚙ 设置」里加</div>
             </div>
           </template>
@@ -1833,7 +1835,7 @@
 <script src="/assets/qr-poster.js?v=2.3.0"></script>
 <script src="/assets/api.js?v=2.1.2"></script>
 <script src="/assets/js/app-components.js?v=2.6.2"></script>
-<script src="/assets/js/app.js?v=3.68.24"></script>
+<script src="/assets/js/app.js?v=3.68.25"></script>
 <script src="/assets/js/app-boot.js?v=2.1.1"></script>
 </body>
 </html>

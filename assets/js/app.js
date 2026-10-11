@@ -1254,6 +1254,22 @@ const app = createApp({
       }
       await sendQuick(q);
     };
+    /* v2.90.92 「填入」：把这条快捷消息（文字 + 图片/附件）放进输入框，不直接发出去。
+       手机上原来只有 Ctrl+单击 能填，等于没有这个功能；现在每行一个「填入」按钮。
+       填完把输入框自动撑到合适高度并聚焦，光标在末尾，改完自己按发送。 */
+    const quickFill = (q) => {
+      if (!currentId.value) { ElementPlus.ElMessage.warning('请先选择会话'); return; }
+      draft.value = q.content || '';
+      pendingAtts.value = (q.attachments || []).filter(a => a && a.url).slice();
+      nextTick(() => { applyTaH(); autoGrowTa({ target: document.querySelector('.chat-input textarea') }); });
+      const input = document.querySelector('.chat-input textarea, .chat-input input');
+      if (input) {
+        try { input.focus(); } catch (e) {}
+        try { const n = input.value.length; input.setSelectionRange(n, n); } catch (e) {}
+        try { input.scrollIntoView({ block: 'nearest' }); } catch (e) {}
+      }
+      ElementPlus.ElMessage.success('已填入输入框，可以直接改，改完点发送');
+    };
     const rmPendingAtt = (i) => { pendingAtts.value.splice(i, 1); };
     // 快捷按钮右键：编辑该条（跳转快捷消息页并打开编辑框）
     const quickCtx = reactive({ show: false, x: 0, y: 0, item: null });
@@ -3730,7 +3746,7 @@ const app = createApp({
       navGroups,
       audioPlaying, audioDur, waveBars, toggleAudio,
       asrText, asrBusy, transcribe,
-      openSession, send, onKey, useQuick, sendQuick, quickClick, quickPanelClick, quickMode, setQuickMode, retrySend,
+      openSession, send, onKey, useQuick, sendQuick, quickClick, quickPanelClick, quickFill, quickMode, setQuickMode, retrySend,
       quickGroups, curGroup, visibleQuick, multiGroup, pickGroup,
       quickPanelKw, quickPanelList, qkHi, infoTab,
       quickBarOn, quickBarOpen, saveQuickBar, toggleQuickBar,
