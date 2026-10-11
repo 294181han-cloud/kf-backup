@@ -3004,7 +3004,7 @@ function gate_loader_html(string $apiBase = ''): string
            上报服务端（复核后会把这台退役换一台），自己再要一次地址重试一次。 */
         . 'var okIn=false;var rdy=null;var retried=false;var CD="";'
         . 'function hideLoad(){okIn=true;if(rdy){clearTimeout(rdy);rdy=null;}if(box)box.style.display="none";}'
-        . 'window.addEventListener("message",function(e){var dd=e.data;if(dd&&dd.kf==="ready"){if(dd.brand){try{document.title=dd.brand;}catch(x){}}}hideLoad();}});'
+        . 'window.addEventListener("message",function(e){var dd=e.data;if(dd&&dd.kf==="ready"){if(dd.brand){try{document.title=dd.brand;}catch(x){}}hideLoad();}});'
         . 'function reportErr(reason,host){try{'
         . 'if(navigator.sendBeacon&&window.FormData){var fd=new FormData();fd.append("code",CD);fd.append("host",host||"");fd.append("r",reason);navigator.sendBeacon(AB+"/api/gate/err",fd);return;}'
         . 'var x=new XMLHttpRequest();x.open("POST",AB+"/api/gate/err",true);'
