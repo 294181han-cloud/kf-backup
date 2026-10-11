@@ -7,7 +7,7 @@
 <link rel="icon" href="/assets/img/mi-logo.png">
 <link rel="apple-touch-icon" href="/assets/img/mi-logo.png">
 <link rel="stylesheet" href="/assets/vendor/element-plus.css">
-<link rel="stylesheet" href="/assets/css/app.css?v=3.64.42">
+<link rel="stylesheet" href="/assets/css/app.css?v=3.64.43">
 <script src="/assets/ui/ui-registry.js?v=2.10.5"></script>
 <script src="/assets/ui/ui-loader.js?v=2.10.5" data-ui-cat="auto"></script>
 </head>
@@ -437,12 +437,14 @@
                   <button type="button" class="qrow-set" title="管理快捷消息（增删改 / 导入导出 / 上传图片 / 拖动排序）" @click="openQuickDlg">⚙ 设置</button>
                 </div>
                 <div class="qrow-list">
-                  <button type="button" class="qr-chip" v-for="q in visibleQuick" :key="'qr' + q.id"
-                          :title="q.title + (q.content ? '：' + q.content : '') + '\n点一下直接发给访客 · Ctrl+单击：先填进输入框，改完再发'"
+                  <!-- v2.90.93 快捷消息条也加「填入」（和右侧「快捷消息」面板一致）：电脑端鼠标点一下就能填进输入框 -->
+                  <div class="qr-chip" role="button" tabindex="0" v-for="q in visibleQuick" :key="'qr' + q.id"
+                          :title="q.title + (q.content ? '：' + q.content : '') + '\n点「填入」先把内容放进输入框，改完再发；直接点这一条＝发给访客（Ctrl+单击同）'"
                           @click="quickPanelClick(q, $event)">
                     <span class="qr-t">{{ q.title }}</span>
                     <span class="qr-img" v-if="(q.attachments||[]).length">图</span>
-                  </button>
+                    <button type="button" class="qr-fill" title="把这条内容填进输入框" @click.stop="quickFill(q)">填入</button>
+                  </div>
                 </div>
               </div>
               <!-- v2.90.78 收起状态不再显示细条：只靠下面图标排里的 ⚡ 开关（点一下就在输入框上方显示/收起） -->
