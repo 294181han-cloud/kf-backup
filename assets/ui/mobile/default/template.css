@@ -211,16 +211,23 @@ html[data-ui-cat="mobile"][data-ui-template="default"] .chat-head .ch-info {
   flex: 1 1 auto; order: 0; min-width: 0; display: flex; flex-direction: column; gap: 2px;
 }
 html[data-ui-cat="mobile"][data-ui-template="default"] .chat-head .ch-top { flex-wrap: wrap; gap: 6px; row-gap: 2px; }
-/* v2.88 改过名字的长名字在手机端不要被截断成「…」，允许换行显示完整 */
+/* v2.90.91 名字紧跟头像：原来名字 flex-grow（60% 基准）把短名字撑到中间，头像和名字之间空一大片；
+   现在名字按内容宽度排、左对齐，状态/渠道跟在它右边。 */
 html[data-ui-cat="mobile"][data-ui-template="default"] .chat-head .ch-top .name {
-  flex: 1 1 60%; min-width: 0; max-width: 100%; font-size: 15px; line-height: 1.3;
-  white-space: normal; overflow: visible; text-overflow: clip; word-break: break-word;
+  flex: 0 1 auto; min-width: 0; max-width: 100%; font-size: 15px; line-height: 1.3;
+  white-space: normal; overflow: visible; text-overflow: clip; word-break: break-word; text-align: left;
 }
 html[data-ui-cat="mobile"][data-ui-template="default"] .chat-head .ch-sub {
-  /* v2.88 手机端聊天头只留「在线状态 + 最后上线」，渠道/设备/地区/IP 这些不显示了
-     （要看就去右侧「访客信息」抽屉），头部更清爽、聊天区更大 */
-  display: none;
+  /* v2.90.91 手机上只留「渠道 + IP 归属地」两枚小标签（在线状态在名字右边，最后上线时间/设备不显示）；
+     「设备」和「地区（带未知兜底）」两枚是电脑端用的，手机上收起来；聊天头仍是一行，不挤掉聊天区 */
+  display: flex; flex-wrap: nowrap; gap: 5px; row-gap: 0; overflow: hidden; margin-top: 0;
 }
+html[data-ui-cat="mobile"][data-ui-template="default"] .chat-head .ch-sub .ch-chip {
+  font-size: 11.5px; padding: 2px 7px; flex-shrink: 0; white-space: nowrap;
+}
+html[data-ui-cat="mobile"][data-ui-template="default"] .chat-head .ch-sub .ch-chip:nth-child(3),
+html[data-ui-cat="mobile"][data-ui-template="default"] .chat-head .ch-sub .ch-chip:nth-child(4) { display: none; }
+html[data-ui-cat="mobile"][data-ui-template="default"] .chat-head .ch-last-online { display: none; }
 /* 恢复码在手机端也收起来（⋯ 菜单里和「访客信息」里都有，顶部留白给名字和状态） */
 html[data-ui-cat="mobile"][data-ui-template="default"] .chat-head .ch-top .ch-resume { display: none; }
 html[data-ui-cat="mobile"][data-ui-template="default"] .chat-head .ch-sub::-webkit-scrollbar { height: 0; display: none; }

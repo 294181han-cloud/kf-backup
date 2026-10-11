@@ -8,8 +8,8 @@
 <link rel="apple-touch-icon" href="/assets/img/mi-logo.png">
 <link rel="stylesheet" href="/assets/vendor/element-plus.css">
 <link rel="stylesheet" href="/assets/css/app.css?v=3.64.41">
-<script src="/assets/ui/ui-registry.js?v=2.10.4"></script>
-<script src="/assets/ui/ui-loader.js?v=2.10.4" data-ui-cat="auto"></script>
+<script src="/assets/ui/ui-registry.js?v=2.10.5"></script>
+<script src="/assets/ui/ui-loader.js?v=2.10.5" data-ui-cat="auto"></script>
 </head>
 <body>
 <!-- 注意：#app 是挂载容器，写在这里的 @click 不会被绑定（模板取的是它的 innerHTML）。
@@ -290,6 +290,8 @@
                   <!-- v2.89.9 会话头只留三件事：渠道 / 设备 / 地区（消息数、首次、会话编号右侧「访客信息」里都有） -->
                   <span class="ch-chip chn" v-if="profile && profile.channel"
                         :title="'渠道：访客从「' + profile.channel + '」里进来的' + (profile.browser ? '（' + profile.browser + '）' : '')">渠道：{{ profile.channel }}</span>
+                  <span class="ch-chip m-only-chip" v-if="profile && (profile.region || profile.city || geoTag(profile.geo))"
+                        :title="'访客 IP 归属地：' + (profile.region || profile.city || geoTag(profile.geo))">📍 {{ profile.region || profile.city || geoTag(profile.geo) }}</span>
                   <span class="ch-chip" v-if="profile && profile.dev_tag">📱 {{ profile.dev_tag }}</span>
                   <span class="ch-chip" v-if="profile">📍 {{ profile.region || profile.city || geoTag(profile.geo) || '未知' }}</span>
                 </div>
