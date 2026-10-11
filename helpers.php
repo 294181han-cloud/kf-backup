@@ -2417,6 +2417,51 @@ function gate_door_wrap(string $url): string
     return $cand[array_rand($cand)] . $b64;
 }
 
+/** v2.90.32 「固定入口」外发链接：二维码 / 复制链接 / 管理码统一用它。
+ *  = <门牌>/?xx=base64( https://<跳板主机>/api/go?e=<入口ID> )
+ *  链接里**不含落地域名、不含壳页路径**：每次访问由 /api/go 现挑一台活着的落地主机。
+ *  于是落地域名红了 / 换了 / 整台退役了，顾客手里那张二维码和那层门牌都不用重发。
+ *  老码（没 entry_id）或域名池为空 → 退回原来的「把入口链直接套门牌」。 */
+function gate_code_link(string $entryId, string $rawLink): string
+{
+    $entryId = trim($entryId);
+    if (preg_match('/^[A-Za-z0-9]{6,32}$/', $entryId)) {
+        $hosts = gate_pool_hosts(8, true);          // 每域固定取一个子域，稳定
+        if ($hosts) {
+            $hop = 'https://' . $hosts[array_rand($hosts)] . '/api/go?e=' . rawurlencode($entryId);
+            $w = gate_door_wrap($hop);
+            if ($w !== '') return $w;
+        }
+    }
+    return gate_door_wrap($rawLink);
+}
+
+/** /api/go 用：把「入口 ID」解析成**当前该用的壳页地址**（现挑落地主机 + 保留原壳页路径）。
+ *  路径取自这条码入库时那条 link（壳页文件是按日期烤在各节点上的，换主机不能换路径）。
+ *  库不可用 / 域名池空 → 返回 ''，调用方给人话提示。 */
+function gate_hop_target(string $entryId, string $code = ''): string
+{
+    $path = ''; $query = '';
+    try {
+        $st = db()->prepare('SELECT link FROM service_codes WHERE entry_id = ? OR code = ? ORDER BY id DESC LIMIT 1');
+        $st->execute([$entryId, $code !== '' ? $code : $entryId]);
+        $link = (string)($st->fetchColumn() ?: '');
+        if ($link !== '') {
+            $p = parse_url($link);
+            $path = (string)($p['path'] ?? '');
+            $query = (string)($p['query'] ?? '');
+        }
+    } catch (\Throwable $e) { /* 无库：下面按池子兜 */ }
+    $hosts = gate_pool_hosts(8);
+    if (!$hosts) return '';
+    $host = $hosts[array_rand($hosts)];
+    if ($path === '') {                     // 理论上不会走到（老码入库时也带路径）
+        $path = '/' . date('m-d') . '/' . gen_gate_name() . '.html';
+        $query = gate_rand_param() . '=' . $entryId;
+    }
+    return 'https://' . $host . $path . ($query !== '' ? '?' . $query : '');
+}
+
 /** 门牌池·自家绿域名 —— **按用户要求停用**（门牌只用大厂站）。
  *  哪天大厂门牌全红、需要临时顶上：把域名填回这个数组即可，不用改别的。 */
 function door_own_hosts(): array
@@ -2498,8 +2543,9 @@ function tenant_mint_service_code(int $tid, string $want = '', string $domain = 
         ->execute([$tid, $code, $entryId, $url]);
     $newId = (int)$pdo->lastInsertId();
 
-    /* v2.90.11/23 「大厂门牌」包装：统一走 gate_door_wrap()（管理码、查看码、二维码都用同一份逻辑） */
-    $wrappedUrl = gate_door_wrap($url);
+    /* v2.90.11/23 「大厂门牌」包装；v2.90.32 改成「固定入口」：码里只有跳板 + 入口 ID，
+       落地主机由 /api/go 每次现挑（落地红了不用重发码） */
+    $wrappedUrl = gate_code_link($entryId, $url);
 
     /* v2.68 内容落地主机：新码先落一台（gate_content_url 会复用，保证访客会话不丢） */
     $ch = $boundHost !== '' ? $boundHost : pool_host_in($domain !== '' ? $domain : tenant_domain_for($tid));

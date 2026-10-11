@@ -678,6 +678,27 @@ function handle_gate_check(string $method): void
         'tk' => gate_token_issue($hit['code'])]);
 }
 
+/* ---------- v2.90.32 「固定入口跳板」/api/go ----------
+   链路：二维码 → 门牌 → https://<跳板主机>/api/go?e=<入口ID> → 302 → 当前该用的壳页。
+   壳页(落地)主机会被现挑一台活着的，所以**落地域名红了/换了/退役了都不用重发二维码和门牌**；
+   二维码里也从此不含落地域名和壳页路径。老码（?xx=base64(入口链)）完全不受影响。 */
+function handle_gate_goto(string $method): void
+{
+    if ($method !== 'GET' && $method !== 'HEAD') { json_out(['ok' => false, 'msg' => '方法不允许'], 405); return; }
+    header('Cache-Control: no-store, no-cache, must-revalidate');
+    $e = trim((string)input('e', ''));
+    if ($e === '') $e = trim((string)input('w', ''));
+    $hit = ($e !== '' && preg_match('/^[A-Za-z0-9]{4,64}$/', $e)) ? gate_resolve_token($e) : null;
+    /* 失效不给 404/500（宝塔错误页会拦），200 + 人话页 */
+    if (!$hit) { echo gate_fail_page(); return; }
+    $target = gate_hop_target($e, (string)$hit['code']);
+    if ($target === '') { echo gate_fail_page('暂时无法进入，请稍后重试'); return; }
+    header('Location: ' . $target, true, 302);
+    echo '<!DOCTYPE html><html lang="zh-CN"><head><meta charset="utf-8">'
+        . '<meta http-equiv="refresh" content="0;url=' . htmlspecialchars($target, ENT_QUOTES, 'UTF-8') . '">'
+        . '</head><body>正在进入…</body></html>';
+}
+
 /* ---------- v2.89 访客端「进不来」上报 ----------
    壳页把聊天页挂在 iframe 里；如果那台内容主机被拦/连不上，访客看到的是白屏 +
    「正在进入…」，服务端却以为一切正常（我们的红码巡检测的是入口链接，不是内容主机）。

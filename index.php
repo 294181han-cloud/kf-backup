@@ -486,7 +486,7 @@ function site_allow_api(string $uri): bool
     }
     // visitor
     if (str_starts_with($uri, '/api/visitor/')) return true;
-    return in_array($uri, ['/api/gate', '/api/gate/err', '/api/poll', '/api/internal/apply'], true);
+    return in_array($uri, ['/api/gate', '/api/gate/err', '/api/go', '/api/poll', '/api/internal/apply'], true);
 }
 
 /* ---------- 防红中转「空壳页」（v2.59 → v2.65 重做）：/MM-DD/xxxxxx.html?key=… ----------
@@ -632,6 +632,7 @@ function dispatch_api(string $method, string $uri): void
     if ($uri === '/api/visitor/pre-inquiry') handle_visitor_pre_inquiry($method);
     if ($uri === '/api/gate')                handle_gate_check($method);
     if ($uri === '/api/gate/err')            handle_gate_err($method);
+    if ($uri === '/api/go')                  handle_gate_goto($method);   // v2.90.32 固定入口跳板
     if ($uri === '/api/visitor/init')        handle_visitor_init($method);
     if ($uri === '/api/visitor/welcome')     handle_visitor_welcome($method);
     if ($uri === '/api/visitor/send')        handle_visitor_send($method);

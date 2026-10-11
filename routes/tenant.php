@@ -135,9 +135,10 @@ function handle_tenant_service_code(string $method): void
             // v2.82 到期时间跟卡密一致（卡密到期，码就不能用了）
             $r['expires_at'] = $tExpires !== '' ? dt_to_iso($tExpires) : '';
             /* v2.90.23 管理码里的链接也套「大厂门牌」：查看码 / 复制链接 / 二维码都用同一份链接，
-               跟客户实际扫的完全一致（原来这里吐的是没套壳的原始链接）。 */
+               跟客户实际扫的完全一致（原来这里吐的是没套壳的原始链接）。
+               v2.90.32 改走「固定入口」：链接里不含落地域名（落地红了不用重发码）。 */
             $r['link_raw'] = (string)$r['link'];
-            $r['link'] = gate_door_wrap((string)$r['link']);
+            $r['link'] = gate_code_link((string)($r['entry_id'] ?? ''), (string)$r['link']);
         }
         unset($r);
         json_out($rows);
@@ -605,14 +606,15 @@ function handle_tenant_links(string $method): void
     /* v2.79 主码 = 最新一条**启用中**的客服码（停用的不参与展示，随时可再启用）
        v2.82 带上创建时间 / 到期时间：到期时间跟卡密一致（卡密到期，码也就不能用）
        v2.90.11 「大厂门牌」自动包装逻辑（输出时动态套壳） */
-    $st = $pdo->prepare('SELECT code, link, created_at FROM service_codes
+    $st = $pdo->prepare('SELECT code, link, entry_id, created_at FROM service_codes
         WHERE tenant_id = ? AND enabled = 1 ORDER BY id DESC');
     $st->execute([$tid]);
     $codes = $st->fetchAll();
     $tExpires = (string)($ctx['row']['expires_at'] ?? '');
 
     foreach ($codes as &$c) {
-        $c['link'] = gate_door_wrap((string)$c['link']);   // v2.90.23 统一走门牌包装
+        /* v2.90.32 统一走「固定入口」外发链接（链接里不含落地域名） */
+        $c['link'] = gate_code_link((string)($c['entry_id'] ?? ''), (string)$c['link']);
         $c['created_at'] = dt_to_iso((string)$c['created_at']);
         $c['expires_at'] = $tExpires !== '' ? dt_to_iso($tExpires) : '';
     }
@@ -643,9 +645,13 @@ function tenant_current_link(int $tid): string
     $st->execute([$tid]);
     $link = (string)($st->fetchColumn() ?: '');
     if ($link === '') {
-        $st = $pdo->prepare('SELECT link FROM service_codes WHERE tenant_id = ? ORDER BY id DESC LIMIT 1');
+        $st = $pdo->prepare('SELECT link, entry_id FROM service_codes WHERE tenant_id = ? ORDER BY id DESC LIMIT 1');
         $st->execute([$tid]);
-        $link = (string)($st->fetchColumn() ?: '');
+        $row = $st->fetch();
+        if ($row) {
+            /* v2.90.32 客服码分支走「固定入口」（链接里不含落地域名） */
+            return gate_code_link((string)($row['entry_id'] ?? ''), (string)$row['link']);
+        }
     }
     // v2.90.23 统一走门牌包装（与「管理码/查看码/二维码」同一份逻辑）
     if ($link !== '') $link = gate_door_wrap($link);
