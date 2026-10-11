@@ -1267,9 +1267,13 @@ const app = createApp({
     };
     /* v2.90.92 「填入」：把这条快捷消息（文字 + 图片/附件）放进输入框，不直接发出去。
        手机上原来只有 Ctrl+单击 能填，等于没有这个功能；现在每行一个「填入」按钮。
-       填完把输入框自动撑到合适高度并聚焦，光标在末尾，改完自己按发送。 */
+       填完把输入框自动撑到合适高度并聚焦，光标在末尾，改完自己按发送。
+       v2.90.96：不再弹任何提示（原来没会话时每点一次弹一个「请先选择会话」，连点会叠一屏；
+       而且这条路径本来就没有"发出去"的风险 —— 连点几百次也只是覆盖输入框，静默处理即可）。 */
     const quickFill = (q) => {
-      if (!currentId.value) { ElementPlus.ElMessage.warning('请先选择会话'); return; }
+      /* 没打开会话就什么都不做，也不弹提示：这条路径没有"发错人"的风险，
+         连点只会覆盖输入框，静默处理比每次弹一个"请先选择会话"友好（v2.90.96）。 */
+      if (!currentId.value) return;
       draft.value = q.content || '';
       pendingAtts.value = (q.attachments || []).filter(a => a && a.url).slice();
       nextTick(() => { applyTaH(); autoGrowTa({ target: document.querySelector('.chat-input textarea') }); });
@@ -1279,7 +1283,6 @@ const app = createApp({
         try { const n = input.value.length; input.setSelectionRange(n, n); } catch (e) {}
         try { input.scrollIntoView({ block: 'nearest' }); } catch (e) {}
       }
-      ElementPlus.ElMessage.success('已填入输入框，可以直接改，改完点发送');
     };
     const rmPendingAtt = (i) => { pendingAtts.value.splice(i, 1); };
     // 快捷按钮右键：编辑该条（跳转快捷消息页并打开编辑框）
@@ -1384,7 +1387,12 @@ const app = createApp({
       setTimeout(tryOpen, 250);
     };
     const sendQuick = async (q) => {
-      if (!currentId.value || sending.value) { ElementPlus.ElMessage.warning('请先选择会话'); return false; }
+      /* v2.90.96 这条原来把两种情形混在一起弹同一个提示：
+         ① 真的没选会话 → 提示一下应该的；
+         ② 上一条还在发（sending=true）→ 用户连点就会一直弹「请先选择会话」，看着像报错，实际那条已经发出去了。
+         现在 ② 静默忽略（多半只是点太快），① 才提示。 */
+      if (sending.value) return false;
+      if (!currentId.value) { ElementPlus.ElMessage.warning('请先选择会话'); return false; }
       const text = q.content || '';
       const atts = (q.attachments || []).filter(a => a && a.url);
       if (!text && !atts.length) return false;
