@@ -322,12 +322,6 @@ body.dark .ci-resizer::before { background: #3a4048; }
 .iq-fill:hover { border-color: var(--theme, #1677ff); color: var(--theme, #1677ff); background: color-mix(in srgb, var(--theme, #1677ff) 7%, #fff); }
 .iq-fill:active { transform: scale(.96); }
 body.dark .iq-fill { background: #262c34; border-color: #3a424e; color: #c6ccd8; }
-/* v2.90.93 输入框上方那排快捷消息条里的「填入」：平时低调，鼠标悬停/手指按下时明显一点 */
-.qr-fill { flex: 0 0 auto; border: 1px solid #e5e6eb; background: #fff; color: #86909c; font-size: 10.5px; line-height: 1.5; font-weight: 600; border-radius: 6px; padding: 0 5px; cursor: pointer; transition: all .12s; }
-.qr-chip:hover .qr-fill { border-color: var(--theme, #1677ff); color: var(--theme, #1677ff); background: color-mix(in srgb, var(--theme, #1677ff) 8%, #fff); }
-.qr-fill:hover { background: var(--theme, #1677ff) !important; color: #fff !important; }
-.qr-fill:active { transform: scale(.95); }
-body.dark .qr-fill { background: #262c34; border-color: #3a424e; color: #98a3b4; }
 /* v2.90.94 顶栏版本号标签：让客服自己就能确认"当前页面是哪一版"（排查缓存） */
 .ver-chip { font-size: 11px; color: #98a2b3; background: #f4f6fa; border-radius: 999px; padding: 2px 8px; cursor: pointer; user-select: none; white-space: nowrap; }
 .ver-chip:hover { color: var(--theme, #1677ff); background: color-mix(in srgb, var(--theme, #1677ff) 10%, #fff); }
