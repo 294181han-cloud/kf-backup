@@ -406,8 +406,24 @@ createApp({
       startPoll();
     };
 
-    const loadHistory = async () => {
-      const r = await fetch((window.KF_API_BASE||'') + '/api/visitor/messages?session_id=' + sessionId.value).then(x => x.json());
+    const loadHistory = async (retried) => {
+      /* v2.90.80 读消息也要带 visitor_token（服务端已强制校验）；万一令牌丢了（清了缓存/换浏览器），
+         自动重载一次页面把令牌重新绑回来，避免客户看到空白聊天框。 */
+      const tk = loadToken();
+      let url = (window.KF_API_BASE||'') + '/api/visitor/messages?session_id=' + sessionId.value + (tk ? '&visitor_token=' + encodeURIComponent(tk) : '');
+      const res = await fetch(url);
+      if (res.status === 403) {
+        let last = 0;
+        try { last = parseInt(sessionStorage.getItem('kf_tok_fix') || '0', 10) || 0; } catch (e) {}
+        if (!retried && Date.now() - last > 30000) {
+          try { sessionStorage.setItem('kf_tok_fix', String(Date.now())); } catch (e) {}
+          location.reload();
+          return;
+        }
+        toast('会话已失效，请刷新页面后继续');
+        return;
+      }
+      const r = await res.json();
       pushMessages(r.messages || []);
       /* v2.89.12 拉完历史再打开「刷新指令」的开关：历史里以前留下的 sys_reload 不触发刷新，
          只有页面开着的时候客服新点的刷新才会让客户页刷新（避免一进来就白刷一次）。 */
@@ -668,7 +684,7 @@ createApp({
       try {
         const up = await fetch((window.KF_API_BASE||'') + '/api/visitor/upload', {
           method: 'POST', headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ session_id: sessionId.value, data, kind: 'image', filename: (f === file ? (file.name || 'image.png') : 'image.jpg') })
+          body: JSON.stringify({ session_id: sessionId.value, data, kind: 'image', visitor_token: loadToken(), filename: (f === file ? (file.name || 'image.png') : 'image.jpg') })
         }).then(x => { if (!x.ok) return x.json().then(j => { throw new Error(j.error); }); return x.json(); });
         pendingAtts.value.push(up);
         return true;
@@ -710,7 +726,7 @@ createApp({
           try {
             const up = await fetch((window.KF_API_BASE||'') + '/api/visitor/upload', {
               method: 'POST', headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ session_id: sessionId.value, data, kind: 'audio', filename: 'voice.webm' })
+              body: JSON.stringify({ session_id: sessionId.value, data, kind: 'audio', visitor_token: loadToken(), filename: 'voice.webm' })
             }).then(x => { if (!x.ok) return x.json().then(j => { throw new Error(j.error); }); return x.json(); });
             const r = await fetch((window.KF_API_BASE||'') + '/api/visitor/send', {
               method: 'POST', headers: { 'Content-Type': 'application/json' },

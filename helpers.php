@@ -322,6 +322,33 @@ function delete_attachment_files(string $json, string $base): int
     return $n;
 }
 
+/** v2.90.80 文件版简易限频（不依赖 Redis/APCu，也不建表）：同一 key 在 window 秒内最多 limit 次。
+   用途：访客上传配额等。文件很小，顺手做一次过期清理。 */
+function rate_limit_ok(string $key, int $limit, int $window = 60): bool
+{
+    if ($limit <= 0) return true;
+    $dir = __DIR__ . '/data/tmp';
+    if (!is_dir($dir)) @mkdir($dir, 0755, true);
+    $f = $dir . '/rl_' . substr(md5($key), 0, 16) . '.txt';
+    $now = time();
+    $hits = [];
+    if (is_file($f)) {
+        $j = json_decode((string)@file_get_contents($f), true);
+        if (is_array($j)) $hits = $j;
+    }
+    $hits = array_values(array_filter($hits, fn($t) => ($now - (int)$t) < $window));
+    if (count($hits) >= $limit) return false;
+    $hits[] = $now;
+    @file_put_contents($f, json_encode($hits), LOCK_EX);
+    /* 顺手清理过期计数文件（1/200 概率） */
+    if (random_int(1, 200) === 1) {
+        foreach ((array)@glob($dir . '/rl_*.txt') as $oldF) {
+            if ($now - (int)@filemtime($oldF) > 172800) @unlink($oldF);
+        }
+    }
+    return true;
+}
+
 function device_limit_for(array $t): int
 {
     $n = (int)($t['max_devices'] ?? 3);

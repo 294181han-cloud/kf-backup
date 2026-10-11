@@ -512,6 +512,33 @@ function handle_visitor_welcome(string $method): void
     json_out(['sent' => (bool)$ids, 'count' => count($ids), 'message_ids' => $ids]);
 }
 
+/* ---------- 访客侧鉴权（v2.90.80） ----------
+   历史问题：读消息 / 上传 这两个接口原来只认 session_id，而 session_id 是自增整数 ——
+   任何人把 id 从 1 递增遍历，就能拖走所有租户的聊天记录（含附件链接），还能无限上传文件刷满磁盘。
+   现在与会话绑定的 visitor_token 校验（与「发消息」同一套规则），跨租户、遍历者一律 403。 */
+function visitor_token_match(array $sess, string $inTok, string $aliasTok = ''): bool
+{
+    $real = (string)($sess['visitor_token'] ?? '');
+    if ($real === '') return true;                      // 极老数据没绑定令牌 → 不拦，避免误伤历史会话
+    if ($inTok === '') return false;
+    return $inTok === $real || ($aliasTok !== '' && $inTok === $aliasTok);
+}
+
+/** 校验并返回会话行（读消息/上传/发消息共用）。$needOpen=true 时会话已结束则拒绝。 */
+function visitor_require_session(int $sidRaw, bool $needOpen = false): array
+{
+    [$sid, $aliasTok] = visitor_sid_resolve($sidRaw);
+    $st = db()->prepare('SELECT * FROM v_sessions WHERE id = ?');
+    $st->execute([$sid]);
+    $s = $st->fetch();
+    if (!$s) json_error('会话不存在', 400);
+    if (!visitor_token_match($s, trim((string)input('visitor_token', '')), $aliasTok)) {
+        json_error('会话已失效，请刷新页面', 403);
+    }
+    if ($needOpen && (string)$s['status'] === 'closed') json_error('会话已结束', 403);
+    return $s;
+}
+
 /* ---------- GET /api/visitor/messages ---------- */
 function handle_visitor_messages(string $method): void
 {
@@ -519,6 +546,7 @@ function handle_visitor_messages(string $method): void
     $sid = (int)input('session_id', 0);
     $since = (int)input('since', 0);
     if (!$sid) json_error('缺少 session_id');
+    visitor_require_session($sid);   // v2.90.80 必须有本会话的 visitor_token
     $sid = session_alias_follow($sid);   // v2.90.2 老窗口照样能拉到合并后的完整记录
     $pdo = db();
     $sql = 'SELECT id, session_id, from_type AS `from`, sender_name, text, msg_type, attachments, reply_to, recalled_at, edited_at, read_at, created_at FROM messages WHERE session_id = ?' . ($since > 0 ? ' AND id > ?' : '') . ' ORDER BY id ASC';
@@ -543,12 +571,12 @@ function handle_visitor_upload(string $method): void
     $kind = (string)input('kind', '');
     $filename = (string)input('filename', '');
     if (!$sid || $data === '' || $kind === '') json_error('参数缺失');
+    /* v2.90.80 鉴权 + 配额：以前只要 session_id 就能无限上传（一次最多 20MB），
+       既能被用来拖库（配合读消息）也能被当免费图床/刷满磁盘。 */
+    $s = visitor_require_session($sid, true);
+    if (!rate_limit_ok('vup:' . $sid, 20, 60)) json_error('上传太频繁，请稍后再试', 429);
+    if (!rate_limit_ok('vupd:' . $sid, 200, 86400)) json_error('今天上传的文件太多了，请明天再试', 429);
     $sid = session_alias_follow($sid);   // v2.90.2 老窗口上传也落到合并后的会话
-    $pdo = db();
-    $st = $pdo->prepare('SELECT tenant_id, ip FROM v_sessions WHERE id = ?');
-    $st->execute([$sid]);
-    $s = $st->fetch();
-    if (!$s) json_error('会话不存在', 400);
     if (is_ip_blocked((int)$s['tenant_id'], $s['ip'] ?: get_client_ip())) json_error('您的访问受限', 403);
     try { json_out(save_upload($data, $kind, $filename)); }
     catch (\Throwable $e) { json_error($e->getMessage()); }
@@ -849,10 +877,9 @@ function handle_visitor_send(string $method): void
     $st->execute([$sid]);
     $s = $st->fetch();
     if (!$s) json_error('会话不存在', 400);
-    /* v2.67 会话绑定：发送必须携带与会话匹配的 visitor_token（防冒用会话发消息） */
-    $inTok = trim((string)input('visitor_token', ''));
-    if ((string)($s['visitor_token'] ?? '') !== '' && $inTok !== (string)$s['visitor_token']
-        && ($aliasTok === '' || $inTok !== $aliasTok)) {
+    /* v2.67 会话绑定：发送必须携带与会话匹配的 visitor_token（防冒用会话发消息）
+       v2.90.80 起与「读消息/上传」共用同一套 visitor_token_match 规则，避免三处各写一份。 */
+    if (!visitor_token_match($s, trim((string)input('visitor_token', '')), (string)$aliasTok)) {
         json_error('会话已失效', 403);
     }
     $tid = (int)$s['tenant_id'];
