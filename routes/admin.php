@@ -767,13 +767,18 @@ function admin_node_http(string $origin, string $path, array $body): array
             CURLOPT_TIMEOUT        => 60,
             CURLOPT_HTTPHEADER     => ['Content-Type: application/json'],
             CURLOPT_POSTFIELDS     => $payload,
+            /* v2.90.72 带浏览器 UA：节点 nginx 的反爬层会因为「UA 是 curl/空」直接回一张 HTTP 200 白纸页，
+               于是前端只能看到「节点无响应(200)」，完全看不出原因。 */
+            CURLOPT_USERAGENT      => 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            CURLOPT_SSL_VERIFYPEER => false,
+            CURLOPT_SSL_VERIFYHOST => 0,
         ]);
         $resp = curl_exec($ch);
         $code = (int)curl_getinfo($ch, CURLINFO_HTTP_CODE);
         $err = curl_error($ch);
         curl_close($ch);
     } else {
-        $ctx = stream_context_create(['http' => ['method' => 'POST', 'header' => "Content-Type: application/json\r\n", 'content' => $payload, 'timeout' => 60, 'ignore_errors' => true]]);
+        $ctx = stream_context_create(['http' => ['method' => 'POST', 'header' => "Content-Type: application/json\r\nUser-Agent: Mozilla/5.0 (compatible; kfxt-node)\r\n", 'content' => $payload, 'timeout' => 60, 'ignore_errors' => true]]);
         $resp = @file_get_contents($url, false, $ctx);
         foreach ($http_response_header ?? [] as $h) {
             if (preg_match('#^HTTP/\S+\s+(\d{3})#', $h, $m2)) $code = (int)$m2[1];
@@ -782,7 +787,8 @@ function admin_node_http(string $origin, string $path, array $body): array
     }
     $j = json_decode((string)$resp, true);
     if ($code !== 200 || !is_array($j)) {
-        return ['ok' => false, 'error' => '节点无响应(' . $code . ') ' . $err];
+        $snip = trim(preg_replace('/\s+/', ' ', mb_substr((string)$resp, 0, 90)));   // v2.90.72 把响应片段带上，方便定位
+        return ['ok' => false, 'error' => '节点无响应(' . $code . ')' . ($err !== '' ? ' ' . $err : '') . ($snip !== '' ? '：' . $snip : '')];
     }
     return $j;
 }

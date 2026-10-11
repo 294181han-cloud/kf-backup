@@ -234,7 +234,13 @@ createApp({
            原来「已是最新」和「推送失败」都落到成功分支，弹的是「已推送，节点版本 」，看着像没反应。 */
         if (r.need_cron) ElementPlus.ElMessage.warning(r.error || '请依赖节点 cron 自动更新');
         else if (r.up_to_date) { ElementPlus.ElMessage.info('这台已经是最新（' + (r.app_version || r.version || '') + '），无需推送'); await loadNodes(); }
-        else if (r.ok === false) ElementPlus.ElMessage.error('推送失败：' + (r.error || '节点没有回应'));
+        else if (r.ok === false) {
+          /* v2.90.72 这类节点 nginx 把 /api/* 反代回总控，本就推不进去、靠自己拉更新；
+             这种预期情况给蓝字说明，别再报红当成故障。 */
+          const msg = String(r.error || '节点没有回应');
+          if (msg.indexOf('反代回总控') >= 0) ElementPlus.ElMessage.info('这台节点靠自动更新跟随版本（节点 cron / 边缘自维护，约 5 分钟），不用手动推');
+          else ElementPlus.ElMessage.error('推送失败：' + msg);
+        }
         else { ElementPlus.ElMessage.success('已推送，节点版本 ' + (r.app_version || '')); await loadNodes(); }
       } catch (e) { ElementPlus.ElMessage.error(e.message); }
       finally { pushingIp.value = ''; }
