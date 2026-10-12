@@ -923,39 +923,40 @@
         </div>
 
         <!-- 管理码：该账号的全部客服码（新码默认 72 小时到期；可单独停用/删除/续期） -->
-        <el-dialog v-model="manageDlgOpen" title="管理码" width="880px" align-center>
+        <el-dialog v-model="manageDlgOpen" title="管理码" width="min(96vw, 1000px)" align-center>
           <p class="muted" style="font-size:12.5px;line-height:1.7;margin:0 0 12px;">
             <b>新发的码默认 72 小时到期</b>：到点这条码就作废（客户手里那个二维码会打不开）。快到期可以点「续 72 小时」。
             停用后这条码立刻打不开，但记录还在，随时可以再启用；老码是永久有效（到期时间显示「永久有效」），不受影响。<br>
             <b>每个账号最多 3 条正常码，分别落在 3 个不同的落地域名上</b>（互相备份，某条线的域名被微信拦了还有别的可用）。
-            已经 3 条时再点「更换码」会提示「请使用当前正常码」—— 要换新的，请先在这里<b>删除</b>一条（删掉被拦的那条即可）。
+            已经 3 条时再点「更换码」会提示「请使用当前正常码」—— 要换新的，请先在这里<b>删除</b>一条
+            （删掉被拦的那条即可）。<span style="color:#cf1322;">删除按钮在最右侧「操作」列里</span>，手机上看不到时可左右滑动表格。
           </p>
-          <el-table :data="codeList" size="small" v-loading="codeListLoading">
-            <el-table-column label="客服码" width="150">
+          <el-table :data="codeList" size="small" v-loading="codeListLoading" style="width:100%;">
+            <el-table-column label="客服码" width="140">
               <template #default="{row}"><span class="mono">{{ row.code }}</span></template>
             </el-table-column>
             <el-table-column label="域名" min-width="170">
               <template #default="{row}"><span class="mono" style="font-size:12px;">{{ row.domain || '—' }}</span></template>
             </el-table-column>
-            <el-table-column label="启用" width="76">
+            <el-table-column label="启用" width="70">
               <template #default="{row}">
                 <el-switch :model-value="row.enabled" @change="toggleCode(row, $event)"></el-switch>
               </template>
             </el-table-column>
-            <el-table-column label="创建时间" width="132">
+            <el-table-column label="创建时间" width="118">
               <template #default="{row}"><span style="font-size:12px;color:#86909c;">{{ (row.created_at || '').slice(0, 16) }}</span></template>
             </el-table-column>
-            <el-table-column label="到期时间" width="168">
+            <el-table-column label="到期时间" width="156">
               <template #default="{row}">
                 <span v-if="!row.expires_at" style="font-size:12px;color:#86909c;">永久有效</span>
                 <span v-else-if="row.expired" style="font-size:12px;color:#cf1322;font-weight:600;">{{ row.expires_at.slice(0, 16).replace('T', ' ') }} 已到期</span>
                 <span v-else style="font-size:12px;color:#86909c;">{{ row.expires_at.slice(0, 16).replace('T', ' ') }}</span>
               </template>
             </el-table-column>
-            <el-table-column label="操作" width="214">
+            <el-table-column label="操作" width="186" fixed="right">
               <template #default="{row}">
                 <el-button size="small" @click="viewQrOf(row)">查看</el-button>
-                <el-button v-if="row.expires_at" size="small" type="primary" plain @click="renewCodeRow(row)">续 72 小时</el-button>
+                <el-button v-if="row.expires_at" size="small" type="primary" plain @click="renewCodeRow(row)">续期</el-button>
                 <el-popconfirm title="删除这条码？删除后无法恢复" @confirm="delCodeRow(row)">
                   <template #reference><el-button size="small" type="danger" text>删除</el-button></template>
                 </el-popconfirm>
