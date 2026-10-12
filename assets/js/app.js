@@ -3543,6 +3543,9 @@ const app = createApp({
       if (geo) return geo;
       return s.devTag || '';
     };
+    /** v2.91.51 会话列表那一行只显示「进入渠道」（微信 / QQ / 浏览器…），
+     *  不带地区和运营商（用户反馈太长太乱；地区和 IP 在会话头与「访客信息」里都有）。 */
+    const visitorChn = (s) => (s ? (s.channel || s.devTag || '') : '');
     // 渠道配色：微信绿 / QQ 蓝 / 支付宝蓝 / 抖音红，其余中性
     const CHN_CLASS = { '微信': 'chn-wx', 'QQ': 'chn-qq', '支付宝': 'chn-ali', '抖音': 'chn-dy', '钉钉': 'chn-dt' };
     const visitorChnClass = (s) => (s && CHN_CLASS[s.channel]) || 'chn-other';
@@ -3843,7 +3846,7 @@ const app = createApp({
       presetPng, pickPosterPresetImg,
       POSTER_POS, qrFreeStyle, qrLayerStyle, textStyle,
       cropDlg, cropSrc, cropZoomPct, cropStage, cropStyle, cropImgLoaded, cropDown, cropMove, cropUp, cropWheel, cropClose, openCrop, cropConfirm, avatarPreview,
-      geoTag, visitorTag, visitorTagFull, visitorChnClass, sessArea, brandAvatarUrl, editBrandAvatar, copyQrImage, downloadQrImage, codeRotateHint, rotateCode, rotateLink, loadHistory, disableLink, saveCodeCfg, meAvatarUrl,
+      geoTag, visitorTag, visitorChn, visitorTagFull, visitorChnClass, sessArea, brandAvatarUrl, editBrandAvatar, copyQrImage, downloadQrImage, codeRotateHint, rotateCode, rotateLink, loadHistory, disableLink, saveCodeCfg, meAvatarUrl,
       manageDlgOpen, codeList, codeListLoading, openManageCodes, toggleCode, delCodeRow, renewCodeRow, codeRowCmd,
       loginInfoDlg, loginInfo, loginInfoName, loginHost, saveLoginInfoName, skipLoginInfo, markLoginInfoAsked,
       codeTextDlg,

@@ -7,7 +7,7 @@
 <link rel="icon" href="/assets/img/mi-logo.png">
 <link rel="apple-touch-icon" href="/assets/img/mi-logo.png">
 <link rel="stylesheet" href="/assets/vendor/element-plus.css">
-<link rel="stylesheet" href="/assets/css/app.css?v=3.64.50">
+<link rel="stylesheet" href="/assets/css/app.css?v=3.64.51">
 <script src="/assets/ui/ui-registry.js?v=2.10.5"></script>
 <script src="/assets/ui/ui-loader.js?v=2.10.5" data-ui-cat="auto"></script>
 </head>
@@ -262,10 +262,7 @@
                   <span class="time">{{ sessTime(s.lastTime) }}</span>
                 </div>
                 <div class="row2">
-                  <span class="geo-tag" v-if="visitorTag(s)" :class="visitorChnClass(s)" :title="visitorTagFull(s)">{{ visitorTag(s) }}</span>
-                  <!-- v2.91.47 会话栏变窄时上面那条 geo-tag 会被整体隐藏 → IP 归属地看不到了（用户反馈）。
-                       这里补一个窄屏专用的紧凑版：只显示地区，悬停仍可看完整信息。 -->
-                  <span class="geo-tag-slim" v-if="sessArea(s)" :title="visitorTagFull(s)">📍{{ sessArea(s) }}</span>
+                  <span class="geo-tag" v-if="visitorChn(s)" :class="visitorChnClass(s)" :title="visitorTagFull(s)">{{ visitorChn(s) }}</span>
                   <span v-if="s.agent_id>0" class="tag-agent">{{ s.agent_name || '客服' }}</span>
                   <span class="last" v-if="sessPreview(s)">{{ sessPreview(s) }}</span>
                   <span class="badge" v-if="s.unread>0">{{ s.unread>99?'99+':s.unread }}</span>

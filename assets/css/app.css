@@ -2523,8 +2523,10 @@ body.resizing-col { cursor: col-resize !important; user-select: none; }
 
 /* v2.89.7 会话列表「窄模式」：拖到 300px 以内自动少显示（渠道标签/预览/客服标签都收起） */
 /* v2.90.24 会话列变窄的分级适配：先丢"渠道/地区"标签，再丢预览文字，别把字挤成竖排 */
-.sess-col.slim .geo-tag,
+/* v2.91.51 会话列表那一行只显示渠道（很短），所以窄屏也不再整体隐藏它；
+   过长时用省略号，避免挤坏布局。 */
 .sess-col.slim .tag-agent { display: none; }
+.sess-col.slim .geo-tag { max-width: 6em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; vertical-align: middle; }
 /* v2.91.47 窄屏下的紧凑归属地：完整标签被隐藏时它顶上，只显示地区（悬停看完整信息） */
 .geo-tag-slim { display: none; }
 .sess-col.slim .geo-tag-slim {
