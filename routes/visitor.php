@@ -999,7 +999,7 @@ function handle_visitor_send(string $method): void
         echo json_encode(['ok' => true, 'message' => $msg, 'auto_reply' => null, 'now' => time()], JSON_UNESCAPED_UNICODE);
         if (function_exists('fastcgi_finish_request')) { @fastcgi_finish_request(); }
         try {
-            ai_chat_try_reply($tid, $sid, $text, $s);
+            ai_chat_try_reply($tid, $sid, $text, $s, $msgType);
         } catch (\Throwable $e) {
             if (function_exists('ai_chat_log')) ai_chat_log($tid, 's' . $sid . ' 异常：' . $e->getMessage());
         }
