@@ -7,7 +7,7 @@
 <link rel="icon" href="/assets/img/mi-logo.png">
 <link rel="apple-touch-icon" href="/assets/img/mi-logo.png">
 <link rel="stylesheet" href="/assets/vendor/element-plus.css">
-<link rel="stylesheet" href="/assets/css/app.css?v=3.64.49">
+<link rel="stylesheet" href="/assets/css/app.css?v=3.64.50">
 <script src="/assets/ui/ui-registry.js?v=2.10.5"></script>
 <script src="/assets/ui/ui-loader.js?v=2.10.5" data-ui-cat="auto"></script>
 </head>
@@ -115,7 +115,16 @@
       </div>
       <div class="me">
         <div class="me-top">
-          <span class="me-ava"><img v-if="meAvatarUrl" :src="meAvatarUrl"><img v-else src="/assets/img/mi-logo.png" alt="小米客服"></span>
+          <!-- v2.91.49 左下角头像改成「修改访客端客服头像」的直达入口。
+               起因：客服反馈「换访客端客服头像太难找」（原来要点 设置 → 访客端外观 → 找那一项）。
+               这里显示的就是访客端当前用的头像（所见即所得），点一下直接进到那项设置。 -->
+          <button type="button" class="me-ava me-ava-edit" @click="editBrandAvatar"
+                  title="修改访客端客服头像（点击直达设置）">
+            <img v-if="brandAvatarUrl" :src="brandAvatarUrl" alt="访客端头像">
+            <img v-else-if="meAvatarUrl" :src="meAvatarUrl" alt="">
+            <img v-else src="/assets/img/mi-logo.png" alt="小米客服">
+            <span class="ma-edit">✎</span>
+          </button>
           <div class="me-id">
             <b>{{ me ? (me.nickname || me.kami || '') : '' }}</b>
             <span class="me-sub mono" v-if="me && me.role==='tenant'">{{ me.kami }} · {{ expireText }}</span>
@@ -1053,8 +1062,12 @@
                 <span v-if="brand.avatar && !isImg(brand.avatar)" style="font-size:26px;">{{ brand.avatar }}</span>
                 <img v-if="isImg(brand.avatar)" :src="brand.avatar" style="width:40px;height:40px;border-radius:8px;object-fit:cover;">
                 <el-input v-model="brand.avatar" placeholder="表情或图片地址" style="width:170px;"></el-input>
-                <el-button size="small" @click="$refs.brandAvatarInput.click()">上传图片</el-button>
+                <el-button size="small" type="primary" @click="$refs.brandAvatarInput.click()">上传图片</el-button>
                 <input ref="brandAvatarInput" type="file" accept="image/png,image/jpeg,image/gif,image/webp" style="display:none" @change="uploadAvatar($event,'brand')"/>
+              </div>
+              <!-- v2.91.49 这是访客打开聊天页看到的那个客服头像（改完记得点下面的保存） -->
+              <div class="muted" style="font-size:11.5px;line-height:1.6;margin-top:4px;">
+                就是访客聊天页左上角显示的那个客服头像。左下角头像点一下也能直达这里。改完记得点页面下方「保存」。
               </div>
             </el-form-item>
             <el-form-item label="主题色">
@@ -1904,6 +1917,6 @@
 <script src="/assets/qr-poster.js?v=2.3.0"></script>
 <script src="/assets/api.js?v=2.1.2"></script>
 <script src="/assets/js/app-components.js?v=2.6.2"></script>
-<script src="/assets/js/app.js?v=3.68.34"></script><script src="/assets/js/app-boot.js?v=2.1.1"></script>
+<script src="/assets/js/app.js?v=3.68.35"></script><script src="/assets/js/app-boot.js?v=2.1.1"></script>
 </body>
 </html>

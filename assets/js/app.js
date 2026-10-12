@@ -3692,6 +3692,15 @@ const app = createApp({
         ElementPlus.ElMessage.success('头像已上传，记得保存');
       } catch (e) { ElementPlus.ElMessage.error(e.message); }
     };
+    /** v2.91.49 访客端客服头像（= 访客聊天页左上角那个头像，存在 brand_avatar 里）。
+     *  左下角头像直接显示它（所见即所得）；editBrandAvatar 点一下直达修改处。 */
+    const brandAvatarUrl = Vue.computed(() => (isImg(brand && brand.avatar) ? brand.avatar : ''));
+    /** 左下角头像 → 直达「设置 → 访客端外观」。
+     *  起因：客服反馈「换访客端客服头像太难找」。 */
+    const editBrandAvatar = () => {
+      openSetting('brand');
+      ElementPlus.ElMessage({ message: '在这里上传「访客端头像」，改完点下方保存', type: 'info', duration: 3200 });
+    };
     const isImg = (v) => typeof v === 'string' && (v.startsWith('http') || v.startsWith('/uploads'));
 
     // 浮层关闭：挂在 document 上（模板根是 #app 的 innerHTML，#app 上的 @click 根本绑不上）
@@ -3834,7 +3843,7 @@ const app = createApp({
       presetPng, pickPosterPresetImg,
       POSTER_POS, qrFreeStyle, qrLayerStyle, textStyle,
       cropDlg, cropSrc, cropZoomPct, cropStage, cropStyle, cropImgLoaded, cropDown, cropMove, cropUp, cropWheel, cropClose, openCrop, cropConfirm, avatarPreview,
-      geoTag, visitorTag, visitorTagFull, visitorChnClass, sessArea, copyQrImage, downloadQrImage, codeRotateHint, rotateCode, rotateLink, loadHistory, disableLink, saveCodeCfg, meAvatarUrl,
+      geoTag, visitorTag, visitorTagFull, visitorChnClass, sessArea, brandAvatarUrl, editBrandAvatar, copyQrImage, downloadQrImage, codeRotateHint, rotateCode, rotateLink, loadHistory, disableLink, saveCodeCfg, meAvatarUrl,
       manageDlgOpen, codeList, codeListLoading, openManageCodes, toggleCode, delCodeRow, renewCodeRow, codeRowCmd,
       loginInfoDlg, loginInfo, loginInfoName, loginHost, saveLoginInfoName, skipLoginInfo, markLoginInfoAsked,
       codeTextDlg,

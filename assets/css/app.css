@@ -9,6 +9,17 @@ body { margin: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'P
 @media (min-width: 768px) {
   html, body { height: 100%; overflow: hidden; overscroll-behavior: none; }
 }
+/* v2.91.49 左下角头像 = 「修改访客端客服头像」的直达入口（客服反馈原来太难找）。
+   平时是个头像，鼠标移上去出现铅笔标记和描边，提示"点击直达设置"。 */
+.me-ava-edit { position: relative; padding: 0; border: 0; background: transparent; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; }
+.me-ava-edit img { transition: filter .15s; }
+.me-ava-edit .ma-edit {
+  position: absolute; right: -3px; bottom: -3px; width: 17px; height: 17px; border-radius: 50%;
+  background: var(--theme, #1677ff); color: #fff; font-size: 10px; line-height: 17px; text-align: center;
+  opacity: 0; transform: scale(.7); transition: .15s; box-shadow: 0 1px 4px rgba(0,0,0,.22); pointer-events: none;
+}
+.me-ava-edit:hover { outline: 2px solid color-mix(in srgb, var(--theme, #1677ff) 55%, transparent); outline-offset: 2px; border-radius: 12px; }
+.me-ava-edit:hover .ma-edit { opacity: 1; transform: scale(1); }
 .layout { display: flex; height: 100vh; overflow: hidden; }
 
 /* ---------- 侧栏 ---------- */
