@@ -737,6 +737,23 @@ function handle_gate_goto(string $method): void
     if (!$hit) { echo gate_fail_page(); exit; }
     $target = gate_hop_target($e, (string)$hit['code']);
     if ($target === '') { echo gate_fail_page('暂时无法进入，请稍后重试'); exit; }
+    /* v2.91.23 测试/诊断：?host=<域名池里的主机> 时，把「壳页主机」也强制到指定域名，
+       这样才能完整复现「落地域名被红，门牌那条路还能不能进」。（同样只认自家域名池） */
+    $hv2 = trim((string)input('host', ''));
+    if ($hv2 !== '' && gate_host_in_pool($hv2)) {
+        $orig = parse_url($target, PHP_URL_PATH) ?: '';
+        $origQ = parse_url($target, PHP_URL_QUERY) ?: '';
+        $forced = gate_content_url_on($hv2, (string)$hit['code']);
+        $fp = parse_url($forced, PHP_URL_PATH) ?: '';
+        /* 用强制域名的壳页路径规则：该域名下的 /MM-DD/<rand>.html —— 沿用库里的壳页文件名 */
+        $base = basename($orig);
+        if ($base !== '' && preg_match('#^/[0-9]{2}-[0-9]{2}/#', $orig)) {
+            $forcedPath = '/' . date('m-d') . '/' . $base;
+        } else {
+            $forcedPath = $fp;
+        }
+        $target = 'https://' . $hv2 . $forcedPath . ($origQ !== '' ? '?' . $origQ : '');
+    }
     /* v2.91.22 改成返回「监听页」而不是 302：
        门牌页（大厂静态托管）经常改不动（Netlify 免费版额度封禁 / 逐站更新麻烦），而标题要靠
        「内层 ready 消息」才能改。把监听这一层搬到我们自己的跳板页上 —— 它是门牌 iframe 里的
