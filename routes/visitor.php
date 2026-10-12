@@ -813,7 +813,7 @@ function handle_probe_report(string $method): void
 
     $ip = get_client_ip();
     $geo = '';
-    try { $geo = (string)geo_lookup($ip); } catch (\Throwable $e) { }
+    try { $geo = (string)lookup_geo($ip); } catch (\Throwable $e) { }
     $region = ''; $isp = '';
     if ($geo !== '') {
         $parts = explode('|', $geo);
