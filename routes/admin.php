@@ -644,6 +644,86 @@ function handle_admin_pool_subs(string $method): void
 
 /* ---------- 已红域名名单（v2.63）：检测到红自动退役，这里查看/恢复 ---------- */
 
+/* ---------- v2.90.99 全国线路体检：读 v2.90.98 的访客探针汇总 ----------
+   回答一个问题：「当前哪些线路/地区连不上我们的客服码」。
+   数据来自访客页自带探针（line_probe 表），按 主机 × 省份 × 运营商 聚合。 */
+function handle_admin_line_health(string $method): void
+{
+    if ($method !== 'GET') { json_error('方法不允许', 405); return; }
+    require_workspace();
+    $hours = (int)input('hours', 24);
+    if ($hours <= 0 || $hours > 24 * 30) $hours = 24;
+    $host = strtolower(trim((string)input('host', '')));
+    $pdo = db();
+    $since = date('Y-m-d H:i:s', time() - $hours * 3600);
+
+    $sql = "SELECT host,
+                   COALESCE(SUM(ok_count),0) AS ok_c,
+                   COALESCE(SUM(fail_count),0) AS fail_c,
+                   COALESCE(SUM(ok_count+fail_count),0) AS total_c,
+                   MAX(last_at) AS last_at,
+                   SUBSTRING_INDEX(GROUP_CONCAT(last_reason ORDER BY last_at DESC SEPARATOR '|'), '|', 1) AS last_reason,
+                   SUM(CASE WHEN isp <> '' AND last_ok = 0 AND last_at >= ? THEN 1 ELSE 0 END) AS bad_cells,
+                   COUNT(DISTINCT CASE WHEN last_ok = 0 AND last_at >= ? THEN CONCAT(region, '/', isp) END) AS bad_regions
+            FROM line_probe
+            WHERE last_at >= ?";
+    $args = [$since, $since, $since];
+    if ($host !== '') { $sql .= ' AND host = ?'; $args[] = $host; }
+    $sql .= ' GROUP BY host ORDER BY total_c DESC LIMIT 80';
+
+    $rows = [];
+    try {
+        $st = $pdo->prepare($sql);
+        $st->execute($args);
+        foreach ($st->fetchAll() as $r) {
+            $total = (int)$r['total_c'];
+            $okc = (int)$r['ok_c'];
+            $rows[] = [
+                'host' => (string)$r['host'],
+                'ok' => $okc,
+                'fail' => (int)$r['fail_c'],
+                'total' => $total,
+                'rate' => $total > 0 ? round($okc * 100 / $total) : 0,
+                'bad_regions' => (int)$r['bad_regions'],
+                'last_reason' => (string)($r['last_reason'] ?? ''),
+                'last_at' => dt_to_iso((string)$r['last_at']),
+            ];
+        }
+    } catch (\Throwable $e) { /* 表还没建好：返回空 */ }
+
+    $detail = [];
+    try {
+        $st2 = $pdo->prepare("SELECT host, region, isp, ok_count, fail_count, last_ms, last_ok, last_reason, last_at
+            FROM line_probe WHERE last_at >= ?" . ($host !== '' ? ' AND host = ?' : '') . "
+            ORDER BY fail_count DESC, last_at DESC LIMIT 300");
+        $st2->execute($host !== '' ? [$since, $host] : [$since]);
+        foreach ($st2->fetchAll() as $r) {
+            $t = (int)$r['ok_count'] + (int)$r['fail_count'];
+            $detail[] = [
+                'host' => (string)$r['host'],
+                'region' => (string)$r['region'],
+                'isp' => (string)$r['isp'],
+                'ok' => (int)$r['ok_count'],
+                'fail' => (int)$r['fail_count'],
+                'rate' => $t > 0 ? round((int)$r['ok_count'] * 100 / $t) : 0,
+                'last_ms' => (int)$r['last_ms'],
+                'last_ok' => (int)$r['last_ok'] === 1,
+                'last_reason' => (string)$r['last_reason'],
+                'last_at' => dt_to_iso((string)$r['last_at']),
+            ];
+        }
+    } catch (\Throwable $e) { }
+
+    /* 顺手标注：每台主机解析到哪条 IP，方便和域名池的启停对上 */
+    foreach ($rows as &$r) {
+        $ip = @gethostbyname($r['host']);
+        $r['ip'] = ($ip && $ip !== $r['host']) ? $ip : '';
+    }
+    unset($r);
+
+    json_out(['hours' => $hours, 'hosts' => $rows, 'detail' => $detail, 'now' => dt_to_iso(now_dt())]);
+}
+
 function handle_admin_red_domains(string $method): void
 {
     require_admin_ctx();

@@ -794,6 +794,63 @@ function handle_gate_err(string $method): void
         'probe' => $probeOk ? 'ok' : 'fail', 'retire' => $retire]);
 }
 
+/* ---------- v2.90.98 线路探针：访客页/壳页上报「这台主机在当前网络通不通」 ----------
+   为什么需要它：服务器的自检永远能连通（我们机房出去的路由是好的），
+   所以某些省/某些运营商连不上时，系统完全不知情 —— 只能靠访客反馈。
+   现在访客页自带探针：扫码进不去时，它把自己试过的域名 + 结果顺手报回来，
+   服务端按「主机 × 省份 × 运营商」累计，就能看出「湖南电信打不开 A 组、其他省正常」。
+   隐私：只记归属地（省市 + 运营商）与匿名化的 IP，不记 UA、不记内容。
+   安全：所有字段服务端自己推导/校验（地区取自库里的 IP 归属地，不信客户端）。 */
+function handle_probe_report(string $method): void
+{
+    if ($method !== 'POST') { json_out(['ok' => false], 405); return; }
+    $host = strtolower(trim((string)input('host', '')));
+    if ($host === '' || !preg_match('/^[a-z0-9.\-]{4,120}$/', $host)) { json_out(['ok' => false, 'msg' => 'host 无效']); return; }
+    $ok = input('ok', null);
+    $ok = ($ok === '1' || $ok === 1 || $ok === true || $ok === 'true');
+    $ms = max(0, min(120000, (int)input('ms', 0)));
+    $reason = mb_substr(trim((string)input('r', '')), 0, 24);
+
+    $ip = get_client_ip();
+    $geo = '';
+    try { $geo = (string)geo_lookup($ip); } catch (\Throwable $e) { }
+    $region = ''; $isp = '';
+    if ($geo !== '') {
+        $parts = explode('|', $geo);
+        $region = trim(implode(' ', array_filter([$parts[1] ?? '', $parts[2] ?? ''])));
+        $isp = trim((string)($parts[3] ?? ''));
+    }
+    if ($region === '') $region = '未知';
+    if ($isp === '') $isp = '未知';
+    $region = mb_substr($region, 0, 60);
+    $isp = mb_substr($isp, 0, 30);
+
+    $pdo = db();
+    try {
+        $pdo->prepare('INSERT INTO line_probe (host, region, isp, ok_count, fail_count, last_ms, last_ok, last_reason, last_ip, first_at, last_at)
+                VALUES (?,?,?,?,?,?,?,?,?,?,?)
+                ON DUPLICATE KEY UPDATE
+                  ok_count   = ok_count + VALUES(ok_count),
+                  fail_count = fail_count + VALUES(fail_count),
+                  last_ms = VALUES(last_ms), last_ok = VALUES(last_ok),
+                  last_reason = VALUES(last_reason), last_ip = VALUES(last_ip), last_at = VALUES(last_at)')
+            ->execute([$host, $region, $isp, $ok ? 1 : 0, $ok ? 0 : 1, $ms, $ok ? 1 : 0, $reason, $ip, now_dt(), now_dt()]);
+    } catch (\Throwable $e) {
+        json_out(['ok' => false, 'msg' => '记录失败']);
+        return;
+    }
+
+    /* 失败也喂给现有的 /api/gate/err 判定（退役/换机逻辑复用），带 mirror 防递归 */
+    if (!$ok && (string)input('mirror', '1') === '1') {
+        $_POST['host'] = $host;
+        $_POST['r'] = $reason !== '' ? $reason : 'probe-fail';
+        $_POST['mirror'] = '0';
+        try { handle_gate_err('POST'); } catch (\Throwable $e) { }
+        return;   /* 注意：handle_gate_err 自己会 json_out 并结束 */
+    }
+    json_out(['ok' => true, 'host' => $host, 'region' => $region, 'isp' => $isp, 'succ' => $ok]);
+}
+
 /** 服务端复核：这台主机还能不能取到访客页（5 秒超时，真人 UA；证书不严校，只看拿不拿得到内容） */
 function gate_host_probe_ok(string $host): bool
 {

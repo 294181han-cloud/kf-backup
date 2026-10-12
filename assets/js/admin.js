@@ -27,7 +27,27 @@ createApp({
     const hostMsg = ref('');
     const hostOk = ref(true);
 
-    const tabTitle = computed(() => ({ overview: '平台概览', tenants: '租户管理', domains: '域名池', nodes: '节点管理', tg: '发卡机器人', settings: '全局设置' }[tab.value]));
+    /* v2.90.99 全国线路体检（数据来自 v2.90.98 的访客探针 line_probe） */
+    const healthLoading = ref(false);
+    const healthHours = ref(24);
+    const healthHost = ref('');
+    const healthHosts = ref([]);
+    const healthDetail = ref([]);
+    const healthNow = ref('');
+    const loadHealth = async () => {
+      healthLoading.value = true;
+      try {
+        let u = '/api/admin/line-health?hours=' + healthHours.value;
+        if (healthHost.value) u += '&host=' + encodeURIComponent(healthHost.value.trim());
+        const r = await API.get(u);
+        healthHosts.value = r.hosts || [];
+        healthDetail.value = r.detail || [];
+        healthNow.value = r.now || '';
+      } catch (e) { ElementPlus.ElMessage.error(e.message); }
+      finally { healthLoading.value = false; }
+    };
+
+    const tabTitle = computed(() => ({ overview: '平台概览', tenants: '租户管理', domains: '域名池', health: '线路体检', nodes: '节点管理', tg: '发卡机器人', settings: '全局设置' }[tab.value]));
     const locationOrigin = location.origin;
 
     const barWidth = (v, list) => {
@@ -499,6 +519,7 @@ createApp({
       aaVisible, aaBusy, aaPhp, aaResult, aaTip, aaTipType, aaForm, openAa, aaTest, aaImport,
       subVisible, subRow, subRows, subLoading, showSubs, copySubs,
       reds, loadReds, restoreRed,
+      healthLoading, healthHours, healthHost, healthHosts, healthDetail, healthNow, loadHealth,
       nodes, mainVersion, pushingIp, loadNodes, pushNode, forgetNode, dlBootstrap,
       nodeCodes, newCodeRole, lastCode, genNodeCode, revokeNodeCode,
       gips, newGip, newGipNote, gipVersion, addGip, delGip,

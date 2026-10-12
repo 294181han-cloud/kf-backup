@@ -188,6 +188,26 @@ function ensure_upgrade(): void
             created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
             UNIQUE KEY uk_host_channel (host, channel)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+        /* v2.90.98 线路探针汇总（访客页自带探针上报）：
+           每台主机 × 地区 × 运营商 一行，累计「通/不通」次数与最近耗时、最近时间。
+           用途：看「哪条线路在哪个省/哪个运营商不通」，并把总失败数喂给自动退役判定。 */
+        $pdo->exec("CREATE TABLE IF NOT EXISTS line_probe (
+            id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+            host VARCHAR(128) NOT NULL,
+            region VARCHAR(64) NOT NULL DEFAULT '',
+            isp VARCHAR(32) NOT NULL DEFAULT '',
+            ok_count INT UNSIGNED NOT NULL DEFAULT 0,
+            fail_count INT UNSIGNED NOT NULL DEFAULT 0,
+            last_ms INT UNSIGNED NOT NULL DEFAULT 0,
+            last_ok TINYINT NOT NULL DEFAULT 1,
+            last_reason VARCHAR(32) NOT NULL DEFAULT '',
+            last_ip VARCHAR(64) NOT NULL DEFAULT '',
+            first_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            last_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            UNIQUE KEY uk_host_region_isp (host, region, isp),
+            KEY idx_host (host),
+            KEY idx_last (last_at)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
         // v2.61 逐条/批量「检测码」的结果缓存（同链接同渠道 5 分钟内不重复扣费）
         $pdo->exec("CREATE TABLE IF NOT EXISTS code_check_cache (
             id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
@@ -639,6 +659,7 @@ function dispatch_api(string $method, string $uri): void
     if ($uri === '/api/visitor/pre-inquiry') handle_visitor_pre_inquiry($method);
     if ($uri === '/api/gate')                handle_gate_check($method);
     if ($uri === '/api/gate/err')            handle_gate_err($method);
+    if ($uri === '/api/probe/report')       handle_probe_report($method);   // v2.90.98 访客页自带探针
     if ($uri === '/api/go')                  handle_gate_goto($method);   // v2.90.32 固定入口跳板
     if ($uri === '/api/visitor/init')        handle_visitor_init($method);
     if ($uri === '/api/visitor/welcome')     handle_visitor_welcome($method);
@@ -719,6 +740,7 @@ if (preg_match('#^/api/admin/tenants/(\d+)/host$#', $uri, $m)) handle_admin_tena
     if ($uri === '/api/admin/aa-test')           handle_admin_aa_test($method);
     if ($uri === '/api/admin/aa-import')         handle_admin_aa_import($method);
     if ($uri === '/api/admin/red-domains')       handle_admin_red_domains($method);
+    if ($uri === '/api/admin/line-health')     handle_admin_line_health($method);   // v2.90.99 全国线路体检
     if (preg_match('#^/api/admin/red-domains/(\d+)$#', $uri, $m)) handle_admin_red_domain_restore($method, (int)$m[1]);
     if ($uri === '/api/admin/root-domain')       handle_admin_root_domain($method);
     if ($uri === '/api/admin/nodes')             handle_admin_nodes($method);

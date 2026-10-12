@@ -337,6 +337,28 @@
 <script src="/assets/vendor/vue.global.js?v=2.0.1"></script>
 <script src="/assets/js/visitor.js?v=2.30.8"></script>
 <script>
+/* v2.90.98 线路探针：正常访客什么都不发；只有"没跑起来"时才上报一次，
+   服务端按「主机 × 省份 × 运营商」累计，用来发现"某些地区进不来"。
+   全站通用：本页从总控出（ad.yluu.top），也可能从落地主机出（伪静态路径），
+   上报地址一律打回总控，避免"落地主机不通时连带上报也发不出去"。 */
+window.KF_API_BASE = 'https://ad.yluu.top';
+window.__KF_PROBE_T0 = Date.now();
+window.__kfProbe = function (succ, reason) {
+  try {
+    if (window.__KF_PROBED__) return;
+    window.__KF_PROBED__ = 1;
+    var fd = new FormData();
+    fd.append('host', location.hostname);
+    fd.append('ok', succ ? '1' : '0');
+    fd.append('ms', String(succ ? (Date.now() - (window.__KF_PROBE_T0 || Date.now())) : 8000));
+    if (reason) fd.append('r', reason);
+    var b = window.KF_API_BASE + '/api/probe/report';
+    if (navigator.sendBeacon) { navigator.sendBeacon(b, fd); return; }
+    var x = new XMLHttpRequest(); x.open('POST', b, true); x.send(fd);
+  } catch (e) {}
+};
+</script>
+<script>
 /* v2.52 加载兜底：正常挂载后由 visitor.js 移除提示；8 秒还没挂载就提示"加载失败" */
 (function () {
   var tip = document.getElementById('boot-tip');
@@ -344,6 +366,7 @@
   setTimeout(function () {
     if (window.__KF_MOUNTED__ || !tip.parentNode) return;
     tip.textContent = '加载失败，请下拉刷新重试';
+    try { window.__kfProbe(false, 'boot-timeout'); } catch (e) {}
   }, 8000);
 })();
 </script>
