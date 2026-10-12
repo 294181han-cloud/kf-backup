@@ -170,6 +170,21 @@ function ai_chat_guard(string $text, array $allowed): ?string
     return $text;
 }
 
+/** 客服显示名：署名 → 租户昵称 → 「客服」 */
+function ai_chat_name(int $tenantId): string
+{
+    $sign = trim(ts_get($tenantId, 'ai_sign', ''));
+    if ($sign !== '') return $sign;
+    try {
+        $st = db()->prepare('SELECT nickname FROM tenants WHERE id = ?');
+        $st->execute([$tenantId]);
+        $n = trim((string)$st->fetchColumn());
+        if ($n !== '') return $n;
+    } catch (\Throwable $e) {
+    }
+    return '客服';
+}
+
 /** 以客服身份插一条消息给访客（返回给前端的结构） */
 function ai_chat_insert_agent(int $tenantId, int $sessionId, string $name, string $text): array
 {
@@ -234,7 +249,7 @@ function ai_chat_history(int $sessionId, int $limit = 16): array
 function ai_chat_prompt(int $tenantId, array $state, array $history, string $visitorText): string
 {
     $cfg = ai_chat_cfg($tenantId);
-    $sign = $cfg['sign'] !== '' ? $cfg['sign'] : '客服';
+    $sign = ai_chat_name($tenantId);
     $cap = rtrim(rtrim(number_format($cfg['cap'], 2, '.', ''), '0'), '.');
     $retry = rtrim(rtrim(number_format($cfg['retry'], 2, '.', ''), '0'), '.');
     $floor = rtrim(rtrim(number_format($cfg['floor'], 2, '.', ''), '0'), '.');
@@ -293,30 +308,34 @@ function ai_chat_llm(int $tenantId, string $system, array $history, string $user
         'max_tokens' => 500,
         'stream' => false,
     ], JSON_UNESCAPED_UNICODE);
-    $ch = curl_init($cfg['base'] . '/chat/completions');
-    curl_setopt_array($ch, [
-        CURLOPT_RETURNTRANSFER => true,
-        CURLOPT_POST => true,
-        CURLOPT_POSTFIELDS => $payload,
-        CURLOPT_HTTPHEADER => ['Content-Type: application/json', 'Authorization: Bearer ' . $cfg['key']],
-        CURLOPT_TIMEOUT => 25,
-        CURLOPT_CONNECTTIMEOUT => 6,
-        CURLOPT_SSL_VERIFYPEER => false,
-        CURLOPT_SSL_VERIFYHOST => 0,
-    ]);
-    $body = (string)curl_exec($ch);
-    $code = (int)curl_getinfo($ch, CURLINFO_HTTP_CODE);
-    $err = curl_error($ch);
-    curl_close($ch);
-    if ($code < 200 || $code >= 300) {
-        ai_chat_log($tenantId, "模型调用失败 HTTP {$code} " . mb_substr($err !== '' ? $err : $body, 0, 200));
-        return null;
+    /* v2.91.3：模型偶发超时/返回空 —— 重试一次，并把原始响应记进日志（原来失败了什么都不留，没法查） */
+    for ($try = 1; $try <= 2; $try++) {
+        $ch = curl_init($cfg['base'] . '/chat/completions');
+        curl_setopt_array($ch, [
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_POST => true,
+            CURLOPT_POSTFIELDS => $payload,
+            CURLOPT_HTTPHEADER => ['Content-Type: application/json', 'Authorization: Bearer ' . $cfg['key']],
+            CURLOPT_TIMEOUT => 25,
+            CURLOPT_CONNECTTIMEOUT => 6,
+            CURLOPT_SSL_VERIFYPEER => false,
+            CURLOPT_SSL_VERIFYHOST => 0,
+        ]);
+        $body = (string)curl_exec($ch);
+        $code = (int)curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        $err = curl_error($ch);
+        curl_close($ch);
+        if ($code >= 200 && $code < 300) {
+            $j = json_decode($body, true);
+            $text = is_array($j) ? trim((string)($j['choices'][0]['message']['content'] ?? '')) : '';
+            if ($text !== '') return $text;
+            ai_chat_log($tenantId, "模型返回空（第 {$try} 次）HTTP {$code} body=" . mb_substr($body, 0, 160));
+        } else {
+            ai_chat_log($tenantId, "模型调用失败（第 {$try} 次）HTTP {$code} " . mb_substr($err !== '' ? $err : $body, 0, 160));
+        }
+        if ($try === 1) usleep(400000);
     }
-    $j = json_decode($body, true);
-    $text = '';
-    if (is_array($j)) $text = (string)($j['choices'][0]['message']['content'] ?? '');
-    $text = trim($text);
-    return $text !== '' ? $text : null;
+    return null;
 }
 
 function ai_chat_log(int $tenantId, string $msg): void
@@ -404,7 +423,7 @@ function ai_chat_try_reply(int $tenantId, int $sessionId, string $text, array $s
         $reply = $guarded;
     }
     $reply = mb_substr($reply, 0, 900);
-    $name = $cfg['sign'] !== '' ? $cfg['sign'] : (string)($session['agent_name'] ?? '客服');
+    $name = ai_chat_name($tenantId);
     return ai_chat_insert_agent($tenantId, $sessionId, $name, $reply);
 }
 
@@ -458,9 +477,13 @@ function handle_internal_ai_group(string $method): void
         if (!$state) $sid = 0;
     }
     if ($sid === 0) {
-        $q = $pdo->prepare("SELECT * FROM ai_chat_state WHERE tenant_id = ? AND stage IN ('need_number','verifying')
+        /* v2.91.3：没带 #S 标记时按「在等什么」配对，别按 stage ——
+           群里回的是户号 → 配最早那个「在等号」的（ask_kind=number）；
+           群里回的是「到了/没到」 → 配最早那个「在等核实」的（ask_kind=verify，那时 stage 已经是 sent_number 了）。 */
+        $kind = ai_chat_digits($text) ? 'number' : 'verify';
+        $q = $pdo->prepare("SELECT * FROM ai_chat_state WHERE tenant_id = ? AND ask_kind = ?
             AND ask_at IS NOT NULL ORDER BY ask_at ASC LIMIT 1");
-        $q->execute([$tid]);
+        $q->execute([$tid, $kind]);
         $state = $q->fetch();
         if ($state) $sid = (int)$state['session_id'];
     }
@@ -496,7 +519,7 @@ function handle_internal_ai_group(string $method): void
         if ($cleanExtra !== '' && mb_strpos($cleanExtra, $pick['account']) === false && mb_strlen($cleanExtra) <= 200) {
             $msg .= "\n" . $cleanExtra;
         }
-        ai_chat_insert_agent($tid, $sid, $cfg['sign'] !== '' ? $cfg['sign'] : '客服', mb_substr($msg, 0, 600));
+        ai_chat_insert_agent($tid, $sid, ai_chat_name($tid), mb_substr($msg, 0, 600));
         ai_chat_tg_send($tid, '已发给客户：' . $line . '（会话 #S' . $sid . '）');
         ai_chat_log($tid, "s{$sid} 群里给了户号 {$pick['account']}，已发给客户");
         json_out(['ok' => true, 'matched' => true, 'session_id' => $sid, 'sent' => $line]);
@@ -510,13 +533,13 @@ function handle_internal_ai_group(string $method): void
     }
     if ($neg) {
         ai_chat_state_set($tid, $sid, ['ask_kind' => '', 'stage' => 'sent_number']);
-        ai_chat_insert_agent($tid, $sid, $cfg['sign'] !== '' ? $cfg['sign'] : '客服', '稍等 我这边再核实一下');
+        ai_chat_insert_agent($tid, $sid, ai_chat_name($tid), '稍等 我这边再核实一下');
         ai_chat_log($tid, "s{$sid} 群里说到账未确认：{$text}");
         json_out(['ok' => true, 'matched' => true, 'session_id' => $sid, 'verified' => false]);
         return;
     }
     ai_chat_state_set($tid, $sid, ['stage' => 'done', 'ask_kind' => '']);
-    ai_chat_insert_agent($tid, $sid, $cfg['sign'] !== '' ? $cfg['sign'] : '客服',
+    ai_chat_insert_agent($tid, $sid, ai_chat_name($tid),
         "已核实到账 ✅ 已结算完毕 请勿私下充值❗️");
     ai_chat_log($tid, "s{$sid} 群里确认到账：{$text}");
     json_out(['ok' => true, 'matched' => true, 'session_id' => $sid, 'verified' => true]);
