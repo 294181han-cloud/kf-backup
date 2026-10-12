@@ -650,7 +650,7 @@ function handle_admin_pool_subs(string $method): void
 function handle_admin_line_health(string $method): void
 {
     if ($method !== 'GET') { json_error('方法不允许', 405); return; }
-    require_workspace();
+    require_admin_ctx();
     $hours = (int)input('hours', 24);
     if ($hours <= 0 || $hours > 24 * 30) $hours = 24;
     $host = strtolower(trim((string)input('host', '')));
