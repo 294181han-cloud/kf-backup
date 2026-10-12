@@ -3409,3 +3409,16 @@ VER=$(sed -n "s/.*return[[:space:]]*'\([0-9.]*\)'.*/\1/p" version.php | head -1)
 - 地区解析：`223.104.150.16 → 江苏省 南京/移动`、`124.31.34.226 → 西藏 拉萨/电信`、`39.144.98.208 → 山西省 晋中/移动`。
 - 租户侧接口用真 token 走 HTTP：返回 `hours=24，主机 3 台，地区明细 4 行`，失败原因 `boot-timeout` / `alt-unreachable` 可读。
 - 未授权访问：两个接口都返回 `{"error":"未登录"}`。
+## v2.91.7 撤掉租户端「线路体检」（只留给平台管理台）
+
+用户要求：租户/客服端不需要看到线路体检。撤掉的部分：
+
+- `public/app.html`：客服码页卡片下方的「🩺 线路体检」可展开面板（47 行）整块删除。
+- `assets/js/app.js`：lineHealth* 状态、loadLineHealth / toggleLineHealth 与 setup 返回项（22 行）。
+- `index.php`：`/api/tenant/line-health` 路由注册那行。
+- `routes/tenant.php`：`handle_tenant_line_health()` 函数（13 行）。
+
+保留（平台管理台照旧可用）：`GET /api/admin/line-health`、`admin.html` 侧栏「🩺 线路体检」页、`admin.js` 的 loadHealth。
+
+实测：线上 `app_version: 2.91.7`；`/api/tenant/line-health` 已不存在（返回 400「接口不存在」）；
+`/admin.html` 仍含「线路体检」；`/app.html` 已无任何体检入口；`app.js?v=3.68.30`。
