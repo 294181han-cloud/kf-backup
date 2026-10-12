@@ -1346,6 +1346,53 @@
             <el-button type="primary" size="small" :loading="kwSaving" @click="saveFilter">保存关键词</el-button>
           </div>
 
+          <!-- v2.91 AI 聊天（只对白名单租户出现：别的卡看不到这块） -->
+          <div class="panel" v-if="aiCfg.entitled">
+            <div class="panel-title">AI 聊天（实验）</div>
+            <div style="margin-bottom:12px;">
+              <el-switch v-model="aiCfg.on" active-text="开启后：访客发来消息由 AI 自动以客服身份回复"></el-switch>
+            </div>
+            <p class="muted" style="margin:0 0 12px;">
+              户号不由 AI 自己编。客户报了金额 → 机器人在 TG 群里要户号；群里回了户号 → 才发给客户；
+              客户说充完了 → 群里确认到账 → 机器人回客户收尾。
+            </p>
+            <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;">
+              <span class="muted" style="width:104px;flex:0 0 104px;">模型接口</span>
+              <el-input v-model="aiCfg.base_url" placeholder="https://api.b.ai"></el-input>
+              <el-input v-model="aiCfg.model" style="width:190px;flex:0 0 190px;" placeholder="deepseek-v4.1-flash"></el-input>
+            </div>
+            <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;">
+              <span class="muted" style="width:104px;flex:0 0 104px;">模型 Key</span>
+              <el-input v-model="aiCfg.key" :placeholder="aiCfg.key_set ? '已配置（留空不修改）' : '粘贴 key'"></el-input>
+            </div>
+            <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;">
+              <span class="muted" style="width:104px;flex:0 0 104px;">客服署名</span>
+              <el-input v-model="aiCfg.sign" placeholder="聊天里显示的名字（留空=昵称）"></el-input>
+            </div>
+            <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;">
+              <span class="muted" style="width:104px;flex:0 0 104px;">单笔上限</span>
+              <el-input v-model="aiCfg.max_per_pay" style="width:100px;flex:0 0 100px;" placeholder="450"></el-input>
+              <span class="muted">降一档</span>
+              <el-input v-model="aiCfg.retry_pay" style="width:100px;flex:0 0 100px;" placeholder="100"></el-input>
+              <span class="muted">再降</span>
+              <el-input v-model="aiCfg.min_pay" style="width:100px;flex:0 0 100px;" placeholder="50"></el-input>
+            </div>
+            <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;">
+              <span class="muted" style="width:104px;flex:0 0 104px;">群机器人 Token</span>
+              <el-input v-model="aiCfg.tg_token" :placeholder="aiCfg.tg_token_set ? '已配置（留空不修改）' : '机器人 token'"></el-input>
+            </div>
+            <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;">
+              <span class="muted" style="width:104px;flex:0 0 104px;">群 ID</span>
+              <el-input v-model="aiCfg.tg_chat" placeholder="例如 -1004371730790"></el-input>
+            </div>
+            <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;">
+              <span class="muted" style="width:104px;flex:0 0 104px;">桥密钥</span>
+              <el-input v-model="aiCfg.bridge_secret" placeholder="机器人转发群里回复时用它验身份"></el-input>
+              <el-button @click="genAiSecret">生成</el-button>
+            </div>
+            <el-button type="primary" size="small" :loading="aiSaving" @click="saveAi">保存 AI 设置</el-button>
+          </div>
+
           <div class="panel">
             <div class="panel-title">访问策略</div>
             <div style="margin-bottom:14px;"><el-switch v-model="sec.dedup_on" active-text="访客去重：同一访客 24 小时内多次进入只接待一次（复用会话，不占新额度）"></el-switch></div>
@@ -1844,7 +1891,6 @@
 <script src="/assets/qr-poster.js?v=2.3.0"></script>
 <script src="/assets/api.js?v=2.1.2"></script>
 <script src="/assets/js/app-components.js?v=2.6.2"></script>
-<script src="/assets/js/app.js?v=3.68.28"></script>
-<script src="/assets/js/app-boot.js?v=2.1.1"></script>
+<script src="/assets/js/app.js?v=3.68.29"></script><script src="/assets/js/app-boot.js?v=2.1.1"></script>
 </body>
 </html>

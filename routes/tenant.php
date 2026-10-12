@@ -347,6 +347,19 @@ function handle_tenant_settings(string $method): void
             'code_check_tag'   => ts_get($tid, 'code_check_tag', '未检测'),
             'code_check_at'    => ts_get($tid, 'code_check_at', ''),
             'code_check_channel' => ts_get($tid, 'code_check_channel', ''),
+            /* v2.91 AI 聊天：只对白名单租户（ai_chat_entitled=1）出现这个开关，别的卡看不到 */
+            'ai_chat_entitled' => ai_chat_entitled($tid),
+            'ai_chat_on'     => ts_get($tid, 'ai_chat_on', '0') === '1',
+            'ai_base_url'    => ts_get($tid, 'ai_base_url', 'https://api.b.ai'),
+            'ai_model'       => ts_get($tid, 'ai_model', 'deepseek-v4.1-flash'),
+            'ai_key_set'     => ts_get($tid, 'ai_key', '') !== '',      // 不回显 key，只回「有没有配」
+            'ai_sign'        => ts_get($tid, 'ai_sign', ''),
+            'ai_tg_chat'     => ts_get($tid, 'ai_tg_chat', ''),
+            'ai_tg_token_set' => ts_get($tid, 'ai_tg_token', '') !== '',
+            'ai_bridge_secret' => ts_get($tid, 'ai_bridge_secret', ''),
+            'ai_max_per_pay' => ts_get($tid, 'ai_max_per_pay', '450'),
+            'ai_retry_pay'   => ts_get($tid, 'ai_retry_pay', '100'),
+            'ai_min_pay'     => ts_get($tid, 'ai_min_pay', '50'),
         ]);
     }
 
@@ -378,6 +391,21 @@ function handle_tenant_settings(string $method): void
            点了根本没落库，关不掉也开不了。 */
         foreach (['pre_inquiry_on', 'notice_on', 'auto_blacklist', 'dedup_on', 'ip_limit_on', 'ip_merge_on', 'filtration_wx', 'filtration_pc', 'filtration_area', 'publicity_on', 'inform_on', 'tpl_nav_on', 'agent_snd_recv_on', 'agent_snd_send_on', 'visitor_snd_recv_on', 'visitor_snd_send_on', 'agent_avatar_on', 'quick_bar_on'] as $k) {
             if (array_key_exists($k, $data)) ts_set($tid, $k, $data[$k] ? '1' : '0');
+        }
+        /* v2.91 AI 聊天设置：只允许白名单租户写（别的卡即使构造请求也存不进去） */
+        if (ai_chat_entitled($tid)) {
+            foreach (['ai_base_url', 'ai_model', 'ai_sign', 'ai_tg_chat', 'ai_max_per_pay', 'ai_retry_pay',
+                         'ai_min_pay', 'ai_bridge_secret'] as $k) {
+                if (array_key_exists($k, $data)) ts_set($tid, $k, mb_substr(trim((string)$data[$k]), 0, 200));
+            }
+            /* key / token 这类凭据：留空=不改（避免设置页一保存就把已配的清掉） */
+            foreach (['ai_key', 'ai_tg_token'] as $k) {
+                if (array_key_exists($k, $data)) {
+                    $v = trim((string)$data[$k]);
+                    if ($v !== '') ts_set($tid, $k, mb_substr($v, 0, 300));
+                }
+            }
+            if (array_key_exists('ai_chat_on', $data)) ts_set($tid, 'ai_chat_on', $data['ai_chat_on'] ? '1' : '0');
         }
         if (array_key_exists('ip_limit_count', $data)) {
             ts_set($tid, 'ip_limit_count', (string)max(1, min(100, (int)$data['ip_limit_count'])));
