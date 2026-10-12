@@ -177,7 +177,7 @@
               </el-table-column>
               <el-table-column label="操作" width="330">
                 <template #default="{row}">
-                  <el-button v-if="row.subs_count" size="small" @click="showSubs(row)">子域明细</el-button>
+                  <!-- v2.91.38 按用户要求隐藏「子域明细」入口：二维码里只有门牌、不含落地域名，\n             所以子域池不再承担抗封职责（子域红了改 content_host 即可，二维码不用变）。\n             数据（kv_store pool_subs）与接口都保留，将来要恢复只需删掉下面这个 v-if="false"。 -->\n            <el-button v-if="false" size="small" @click="showSubs(row)">子域明细</el-button>
                   <el-button size="small" @click="toggleDomain(row)">{{ row.enabled ? '停用' : '启用' }}</el-button>
                   <!-- v2.73 人工判红：检测接口测不出"微信客户端拦截"，拿微信实扫一遍，打不开的点这里 -->
                   <el-popconfirm v-if="row.enabled" title="确认这台域名在微信里也打不开？标记后：停用 + 进红名单 + 通知该域名上的租户换码" @confirm="blockDomain(row)">

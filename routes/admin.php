@@ -741,11 +741,14 @@ function handle_admin_pool_subs(string $method): void
 
     $rows = [];
     $liveCodes = [];
-    foreach ($pdo->query('SELECT code, link FROM service_codes WHERE link LIKE ' . $pdo->quote($likeSub) . ' OR link LIKE ' . $pdo->quote($likeBare)) as $r) {
+    /* v2.91.38 修正：只把**启用中**的码算「使用中」；停用/已删除的码，
+       它的子域要显示成「已作废」而不是「使用中」（原来没过滤 enabled，停用的码也显示在用）。 */
+    foreach ($pdo->query('SELECT code, link, enabled FROM service_codes WHERE link LIKE ' . $pdo->quote($likeSub) . ' OR link LIKE ' . $pdo->quote($likeBare)) as $r) {
         $h = strtolower((string)(parse_url((string)$r['link'], PHP_URL_HOST) ?: ''));
         if ($h === '') continue;
-        $rows[$h] = ['host' => $h, 'status' => '使用中', 'code' => (string)$r['code'], 'checked_at' => ''];
-        $liveCodes[] = (string)$r['code'];
+        $live = ((int)$r['enabled'] === 1);
+        $rows[$h] = ['host' => $h, 'status' => $live ? '使用中' : '已作废', 'code' => (string)$r['code'], 'checked_at' => ''];
+        if ($live) $liveCodes[] = (string)$r['code'];
     }
     foreach ($pdo->query('SELECT link, state, at_ts FROM code_check_cache WHERE link LIKE ' . $pdo->quote($likeSub) . ' OR link LIKE ' . $pdo->quote($likeBare)) as $r) {
         $h = strtolower((string)(parse_url((string)$r['link'], PHP_URL_HOST) ?: ''));
@@ -754,6 +757,7 @@ function handle_admin_pool_subs(string $method): void
         $code = (string)($q['key'] ?? '');
         $isLive = $code !== '' && in_array($code, $liveCodes, true);
         $rows[$h] = ['host' => $h,
+            /* v2.91.38 码已不在/已停用 → 一律「已作废」，不要回落到「待分配」（它被用过，不是没用过） */
             'status' => $isLive ? '使用中' : ((string)$r['state'] === 'red' ? '红码' : '已作废'),
             'code' => $code,
             'checked_at' => (int)$r['at_ts'] ? date('Y-m-d H:i', (int)$r['at_ts']) : ''];
