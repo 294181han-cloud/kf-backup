@@ -935,7 +935,8 @@ function handle_visitor_send(string $method): void
         'session_id' => $sid, 'msg_type' => $msgType, 'attachments' => $attachArr, 'reply_to' => $replyTo];
 
     // v2.91 AI 聊天（只对白名单租户）：开了就走模型；**先把响应吐给访客再干活**（模型慢也不卡访客的发送）
-    $aiChatOn = ($text !== '' && function_exists('ai_chat_try_reply') && ai_chat_on($tid));
+    // 注意：纯图片/语音消息 $text 是空的，但也要走 AI（客户最常发缴费截图）→ 条件是「有文字 或 有附件」
+    $aiChatOn = (($text !== '' || $attachArr) && function_exists('ai_chat_try_reply') && ai_chat_on($tid));
     $autoReply = null;
     if ($aiChatOn) {
         header('Content-Type: application/json; charset=utf-8');
