@@ -2527,8 +2527,13 @@ function gate_door_pick(int $tenantId = 0): string
     $dom = strtolower(trim((string)kv_get('door_domain', '')));
     if ($dom !== '') return $dom;                             // ① 运营指定
     static $cache = [];
+    /* v2.91.24 递归保护：下面为了拿「上一张码的门牌」要调 gate_code_link()，
+       而它内部又会调回本函数 —— 没有这道闸会无限递归直到内存耗尽（实测踩过）。 */
+    static $busy = false;
     $ck = 't' . $tenantId;
     if (isset($cache[$ck])) return $cache[$ck];               // ④ 同请求固定
+    if ($busy) return '';                                     // ★ 递归中：本次不强求换门牌
+    $busy = true;
 
     $pool = [];
     foreach (array_merge(door_own_hosts(), door_ext_hosts()) as $d) $pool[] = strtolower((string)$d);
@@ -2556,6 +2561,7 @@ function gate_door_pick(int $tenantId = 0): string
     }
     $pick = $cand[array_rand($cand)];
     $cache[$ck] = $pick;
+    $busy = false;                                            // ★ 解除递归闸
     return $pick;
 }
 
