@@ -1958,6 +1958,19 @@ body.dark .pa-file em { color: #98a3b4; }
 .sess-multi-btn:hover { color: var(--theme, #1677ff); border-color: var(--theme, #1677ff); }
 .sess-multi-btn.on { background: var(--theme, #1677ff); border-color: var(--theme, #1677ff); color: #fff; }
 
+/* v2.91.46 多选入口：原来是一个独占整行的大按钮（用户反馈"看着很占地方"），
+   现在收成搜索框右侧的小按钮（☑ 多选）；会话栏变窄时只留图标。 */
+.sess-search-multi {
+  flex-shrink: 0; height: 30px; padding: 0 10px; border-radius: 9px; cursor: pointer;
+  border: 1px solid #dcdfe6; background: #fff; color: #4e5969; font-size: 12px; line-height: 1;
+  display: inline-flex; align-items: center; gap: 4px; transition: .15s; white-space: nowrap;
+}
+.sess-search-multi:hover { color: var(--theme, #1677ff); border-color: var(--theme, #1677ff); background: color-mix(in srgb, var(--theme, #1677ff) 6%, #fff); }
+.sess-col.slim .sess-search-multi .ssm-t { display: none; }
+.sess-col.slim .sess-search-multi { padding: 0 8px; }
+body.dark .sess-search-multi { background: #1b1e24; border-color: #2c313a; color: #a9b0bb; }
+body.dark .sess-search-multi:hover { color: var(--theme, #1677ff); border-color: var(--theme, #1677ff); }
+
 .sess-multi-bar { padding: 8px 12px 10px; background: color-mix(in srgb, var(--theme, #1677ff) 6%, #fff); border-bottom: 1px solid var(--v-line, #e5e6eb); }
 .sess-multi-bar .smb-row { display: flex; align-items: center; gap: 10px; font-size: 12px; color: #4e5969; margin-bottom: 7px; }
 .sess-multi-bar .smb-n b { color: var(--theme, #1677ff); font-size: 13px; }

@@ -7,7 +7,7 @@
 <link rel="icon" href="/assets/img/mi-logo.png">
 <link rel="apple-touch-icon" href="/assets/img/mi-logo.png">
 <link rel="stylesheet" href="/assets/vendor/element-plus.css">
-<link rel="stylesheet" href="/assets/css/app.css?v=3.64.46">
+<link rel="stylesheet" href="/assets/css/app.css?v=3.64.47">
 <script src="/assets/ui/ui-registry.js?v=2.10.5"></script>
 <script src="/assets/ui/ui-loader.js?v=2.10.5" data-ui-cat="auto"></script>
 </head>
@@ -216,11 +216,10 @@
           </div>
           <div class="search">
             <el-input v-model="sessSearch" placeholder="搜索访客/消息" size="small" clearable></el-input>
+            <!-- v2.91.46 多选入口：从「独占一整行的大按钮」改成搜索框右侧的小按钮（用户反馈太占地方） -->
+            <button type="button" class="sess-search-multi" v-if="!sessMulti" @click="toggleMulti"
+                    title="多选：批量归档 / 结束 / 删除"><span>☑</span><span class="ssm-t">多选</span></button>
           </div>
-          <!-- 多选入口（v2.70）：做成一条醒目的文字按钮，不用再找小图标 -->
-          <button type="button" class="sess-multi-entry" v-if="!sessMulti" @click="toggleMulti">
-            <span class="sme-box">☑</span><span class="sme-text"> 多选：批量归档 / 结束 / 删除</span><span class="sme-text-short">多选</span>
-          </button>
           <!-- 多选操作栏（v2.67） -->
           <div class="sess-multi-bar" v-if="sessMulti">
             <div class="smb-row">
