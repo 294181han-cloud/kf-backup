@@ -3361,3 +3361,22 @@ VER=$(sed -n "s/.*return[[:space:]]*'\([0-9.]*\)'.*/\1/p" version.php | head -1)
 - 实测：第一次放行并插入 1 条；**立刻再点被拒且没有第二条指令**；访客心跳更新后可再刷新；客户不在线超时后放行。
 - 顺带记录一个本机环境差异：本地 **PHP 是 UTC 而 MySQL 是 UTC+8**，所以「用 MySQL `NOW()` 与 PHP 写入的时间列做比较」的 SQL
   在本地会差 8 小时（生产上需确认 PHP 时区与 MySQL 是否一致；本次新增的判定避开了这个坑，只比较两个 PHP 写入的列）。
+
+## v2.91 变更记录（kf 里加「AI 聊天」，只对白名单租户开放）
+
+- 新增 `routes/ai_chat.php`：该租户 AI 开关开着时，访客发来消息由模型以客服身份自动回复。
+  流程照真人客服的实录写：欢迎语 → 问金额 → 微信操作说明 → 发户号(户号/地区/金额) → ⚠️风险预告 →
+  催单 → 交不了费先教地区写法、再不行换户号 → 单笔降额 450/100/2×50 → 要缴费详情截图核实 → 收尾。
+- **只对白名单卡密开放**：`ai_chat_kami_allow()`（内置 `CCWA8SGVJQ`，可用 kv `ai_chat_kami_extra` 追加）。
+  不是这张卡：设置页看不到「AI 聊天」这块、PUT 设置也写不进去（后端二次校验）、访客消息不走 AI。
+- **户号不由 AI 自己编**：客户报金额 → 机器人往 TG 群发「要个户号 #S<会话id>」→ 人工在群里回户号 →
+  机器人把「户号 / 地区 / 金额」三段式发给客户；客户说充完了 → 群里问「到账没」→ 群里确认 →
+  机器人回「已核实到账 ✅ 已结算完毕 请勿私下充值❗️」。
+  出站文本里凡出现 8~17 位数字必须命中白名单，否则拦下不发（模型自编户号是踩过的真事故）。
+- 新表 `ai_chat_state`（会话级阶段：等户号/已发号/等核实/已完成），幂等建表在 `ensure_upgrade()`。
+- 新接口 `POST /api/internal/ai-group`：Telegram 机器人把群里那条回复转回来（按 `ai_bridge_secret` 认租户）。
+- 租户级设置项：`ai_chat_on` / `ai_base_url` / `ai_model` / `ai_key` / `ai_sign` / `ai_tg_token` /
+  `ai_tg_chat` / `ai_bridge_secret` / `ai_max_per_pay` / `ai_retry_pay` / `ai_min_pay`；
+  设置页在「安全与维护」，`ai_key` / `ai_tg_token` 留空 = 不修改（避免一保存就把已配的清掉）。
+- 前端：`public/app.html` 新面板（`v-if="aiCfg.entitled"`）+ `assets/js/app.js`（`aiCfg`/`saveAi`/`genAiSecret`），
+  app.js 的 `?v=` 加 1。

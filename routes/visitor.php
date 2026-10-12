@@ -991,9 +991,17 @@ function handle_visitor_send(string $method): void
     $msg = ['id' => $mid, 'from' => 'visitor', 'text' => $text, 'time' => dt_to_iso($now),
         'session_id' => $sid, 'msg_type' => $msgType, 'attachments' => $attachArr, 'reply_to' => $replyTo];
 
-    // 关键词自动回复（以客服身份）
+    // v2.91 AI 聊天（只对白名单租户）：开了就用模型回复，不再走关键词自动回复
     $autoReply = null;
-    if ($text !== '') {
+    if ($text !== '' && function_exists('ai_chat_try_reply') && ai_chat_on($tid)) {
+        try {
+            $autoReply = ai_chat_try_reply($tid, $sid, $text, $s);
+        } catch (\Throwable $e) {
+            if (function_exists('ai_chat_log')) ai_chat_log($tid, 's' . $sid . ' 异常：' . $e->getMessage());
+        }
+    }
+    // 关键词自动回复（以客服身份）
+    if ($autoReply === null && $text !== '') {
         $st = $pdo->prepare('SELECT keyword, reply FROM auto_replies WHERE tenant_id = ? AND enabled = 1 ORDER BY id ASC');
         $st->execute([$tid]);
         foreach ($st->fetchAll() as $rule) {

@@ -47,6 +47,21 @@ function ensure_upgrade(): void
             created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
             KEY idx_tenant (tenant_id, id)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+        /* v2.91 AI 聊天：每个访客会话的 AI 阶段状态（等户号/已发号/等核实/已完成） */
+        $pdo->exec("CREATE TABLE IF NOT EXISTS ai_chat_state (
+            session_id INT UNSIGNED NOT NULL PRIMARY KEY,
+            tenant_id INT UNSIGNED NOT NULL,
+            stage VARCHAR(16) NOT NULL DEFAULT '',
+            amount DECIMAL(10,2) NULL,
+            account VARCHAR(32) NOT NULL DEFAULT '',
+            region VARCHAR(64) NOT NULL DEFAULT '',
+            pay VARCHAR(16) NOT NULL DEFAULT '',
+            ask_at DATETIME NULL,
+            ask_kind VARCHAR(16) NOT NULL DEFAULT '',
+            region_taught TINYINT NOT NULL DEFAULT 0,
+            updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            KEY idx_stage (tenant_id, stage, ask_at)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
         // v_sessions 增加访客 UA（用于访客资料：系统/浏览器）
         try { $pdo->exec("ALTER TABLE v_sessions ADD COLUMN ua VARCHAR(500) NOT NULL DEFAULT ''"); } catch (\Throwable $e) { /* 列已存在 */ }
         // messages 增加已读时间（已读回执）与撤回时间
@@ -627,6 +642,8 @@ require_once __DIR__ . '/routes/tenant.php';
 require_once __DIR__ . '/routes/admin.php';
 require_once __DIR__ . '/routes/telegram.php';
 require_once __DIR__ . '/routes/tgadmin.php';
+/* v2.91 AI 聊天（只对白名单租户开放）：访客消息 → 模型自动回复 + 群里要户号/确认到账 */
+require_once __DIR__ . '/routes/ai_chat.php';
 
 /* 发卡机器人：建表 + 首次灌默认套餐（只跑一次，避免每请求都查） */
 function dispatch_api(string $method, string $uri): void
@@ -643,6 +660,8 @@ function dispatch_api(string $method, string $uri): void
     // ---- 分节点网页安装：授权码换凭证 + 边缘黑名单/归属同步 ----
     if ($uri === '/api/internal/node-register') handle_internal_node_register($method);
     if ($uri === '/api/internal/sync')          handle_internal_sync($method);
+    // ---- v2.91 AI 聊天：群里那条回复由 Telegram 机器人转回来（secret 校验，不走登录态）----
+    if ($uri === '/api/internal/ai-group')      handle_internal_ai_group($method);
     // ---- 发卡机器人 webhook（Telegram 直接 POST，不走登录态，用 secret 校验）----
     if ($uri === '/api/tg/webhook')    handle_tg_webhook($method);
     if ($uri === '/api/auth/me')       handle_auth_me($method);
