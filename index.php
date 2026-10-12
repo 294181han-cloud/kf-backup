@@ -597,11 +597,14 @@ foreach (['login.html', 'app.html', 'admin.html', 'visitor.html'] as $page) {
         if ($page === 'visitor.html') {
             $ck = trim((string)($_GET['code'] ?? ($_GET['key'] ?? '')));
             if (gate_is_bot() || !gate_env_ok()) gate_blank_page();   // v2.71 爬虫拿白纸
-            /* v2.68：链接失效不再断连接（顾客会以为网站挂了）——统一给一句人话 */
-            if (!isset($_GET['code']) && !isset($_GET['t']) && $ck === '') {
-                header('Cache-Control: no-store');
-                header('Content-Type: text/html; charset=utf-8');
-                echo gate_fail_page('请通过客服码或扫码进入');
+            /* v2.91.11 主站不带 code/t 直接访问 /visitor.html → 404（原先给「请通过客服码或扫码进入」提示页，
+               结果被裸访问/爬虫刷（日志里几万次），且暴露出"这里就是访客页"。
+               边缘 visitor 节点照旧：它们靠 site_role==='visitor' 在更上面那支直接出访客页，不经过这里。
+               带 ?t=卡密 的"卡密直链"保留可用（那是功能，不是裸访问）。 */
+            if ($ck === '' && !isset($_GET['code'])) {
+                http_response_code(404);
+                header('Content-Type: text/plain; charset=utf-8');
+                echo 'Not Found';
                 exit;
             }
             if ($ck !== '' && site_role() === 'main' && !gate_resolve_token($ck)) {
