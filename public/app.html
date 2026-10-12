@@ -935,8 +935,13 @@
             <el-table-column label="客服码" width="140">
               <template #default="{row}"><span class="mono">{{ row.code }}</span></template>
             </el-table-column>
-            <el-table-column label="域名" min-width="170">
-              <template #default="{row}"><span class="mono" style="font-size:12px;">{{ row.domain || '—' }}</span></template>
+            <el-table-column label="落地域名" min-width="160">
+              <!-- v2.91.39 用户要求：这里只显示落地域名，不再显示完整子域主机；
+                   鼠标悬停可看这台子域全名（老码没落地主机时显示它入库时的链接主机）。 -->
+              <template #default="{row}">
+                <span class="mono" style="font-size:12px;"
+                      :title="(row.content_host || row.link_host || row.domain || '') + (row.content_host ? '（本码落地子域）' : '')">{{ row.domain || '—' }}</span>
+              </template>
             </el-table-column>
             <el-table-column label="启用" width="70">
               <template #default="{row}">
@@ -1900,6 +1905,6 @@
 <script src="/assets/qr-poster.js?v=2.3.0"></script>
 <script src="/assets/api.js?v=2.1.2"></script>
 <script src="/assets/js/app-components.js?v=2.6.2"></script>
-<script src="/assets/js/app.js?v=3.68.32"></script><script src="/assets/js/app-boot.js?v=2.1.1"></script>
+<script src="/assets/js/app.js?v=3.68.33"></script><script src="/assets/js/app-boot.js?v=2.1.1"></script>
 </body>
 </html>

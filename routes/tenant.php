@@ -113,7 +113,7 @@ function handle_tenant_service_code(string $method): void
 
     if ($method === 'GET') {
         /* v2.79 管理码：一次返回该租户的全部客服码（含已停用的），前台「管理码」列表用 */
-        $st = $pdo->prepare('SELECT id, code, entry_id, link, enabled, expires_at, created_at
+        $st = $pdo->prepare('SELECT id, code, entry_id, link, content_host, enabled, expires_at, created_at
             FROM service_codes WHERE tenant_id = ? ORDER BY id DESC');
         $st->execute([$tid]);
         $rows = $st->fetchAll();
@@ -126,7 +126,15 @@ function handle_tenant_service_code(string $method): void
         foreach ($rows as &$r) {
             $r['id'] = (int)$r['id'];
             $r['enabled'] = (int)($r['enabled'] ?? 1) === 1;
-            $r['domain'] = (string)(parse_url((string)$r['link'], PHP_URL_HOST) ?: '');
+            /* v2.91.39 用户要求：管理码列表只显示【落地域名】，不显示完整子域主机。
+               取值顺序：这条码的落地主机 content_host（没有就看它入库时的链接主机）→ 取所属域名。
+               link_host / content_host 仍一并返回，前端鼠标悬停可看完整主机。 */
+            $ch = kf_clean_host((string)($r['content_host'] ?? ''));
+            $linkHost = (string)(parse_url((string)$r['link'], PHP_URL_HOST) ?: '');
+            $fullHost = $ch !== '' ? $ch : $linkHost;
+            $r['content_host'] = $ch;
+            $r['link_host'] = $linkHost;
+            $r['domain'] = pool_domain_of($fullHost) ?: $fullHost;
             $r['created_at'] = dt_to_iso($r['created_at']);
             $r['content_domain'] = $dom;   // v2.70 该租户的专属落地域名（自动分配）
             /* v2.90.97 到期时间改成「这条码自己的」（新码默认 72 小时）；空 = 永久（存量码）。
