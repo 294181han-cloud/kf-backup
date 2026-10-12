@@ -292,7 +292,13 @@ function handle_visitor_init(string $method): void
 
     // ③ 新建会话（额度检查）
     $code = trim((string)input('code', ''));
-    $quotaKey = $code !== '' ? 'app' : 'web';
+    /* v2.91.56 按用户确认的方案 B：额度按「从哪个 App 打开」判定，不再按链接带不带码。
+         微信 / 抖音 / 支付宝 / QQ / 钉钉 / 小红书 / 微博 打开 → 扣【客服码】额度（app）
+         其他（普通浏览器，如 Chrome/Safari/小米浏览器）打开 → 扣【网页】额度（web）
+       说明：扫码与点链接在浏览器里无法区分，所以按 UA 判「从哪个 App 进来的」，这正是用户要的口径。 */
+    $kfUa = (string)($_SERVER['HTTP_USER_AGENT'] ?? '');
+    $kfInApp = (bool)preg_match('/MicroMessenger|aweme|ByteDance|douyin|Alipay|DingTalk|QQ\/|QQBrowser|Weibo|XiaoHongShu|xiaohongshu/i', $kfUa);
+    $quotaKey = $kfInApp ? 'app' : 'web';
     $limit = (int)($quotaKey === 'app' ? $t['quota_app'] : $t['quota_web']);
     $used = quota_used($tid, $quotaKey);
     if ($used >= $limit) {
@@ -377,7 +383,7 @@ function handle_visitor_init(string $method): void
     $resumeCode = resume_code_new();
     $pdo->prepare('INSERT INTO v_sessions (tenant_id, agent_id, visitor_name, visitor_token, ip, from_url, last_msg, last_time, unread, status, source, quota_key, last_online_at, ua, visitor_avatar, resume_code, code) VALUES (?,?,?,?,?,?,?,?,0,\'online\',?,?,?,?,?,?,?)')
         ->execute([$tid, $ctx['agent_id'], $name, $visitorToken, $ip, $fromUrl, $firstMsg, $now,
-            $code !== '' ? 'app' : 'web', $quotaKey, $now, mb_substr($_SERVER['HTTP_USER_AGENT'] ?? '', 0, 500), $visitorAvatar, $resumeCode, $code]);
+            $quotaKey, $quotaKey, $now, mb_substr($_SERVER['HTTP_USER_AGENT'] ?? '', 0, 500), $visitorAvatar, $resumeCode, $code]);
     $sid = (int)$pdo->lastInsertId();
 
     if ($phone !== '') {
