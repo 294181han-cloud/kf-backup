@@ -2969,8 +2969,10 @@ function tenant_ensure_service_code(int $tid): void
  *    而**查红服务的抓取 UA 很可能命中这条规则** → 它看到空白页 → 判定「已被封禁」。
  *    实测同一条壳页链接：微信 UA → 26687 字节正常页；curl/python/空UA/Spider/Headless → 98 字节空白页。
  *    结果就是明明好的码反复被判红 → 误报提醒 + 误下架门牌（今晚连续踩了好几次）。
- *  所以：查红说 red 时，先自己用浏览器 UA 复检一次；能拿到正常页面就当误报处理。 */
-function code_alive_probe(string $url, int $minBytes = 3000): bool
+ *  所以：查红说 red 时，先自己用浏览器 UA 复检一次；能拿到正常页面就当误报处理。
+ *  阈值说明：反爬空白页只有 98 字节；而门牌页本身只有 2.9~4.4KB、壳页 22~27KB，
+ *  所以默认阈值取 500 字节即可区分（取 3000 会把正常的门牌页误判成打不开 —— 踩过）。 */
+function code_alive_probe(string $url, int $minBytes = 500): bool
 {
     if ($url === '') return false;
     $ch = curl_init($url);
