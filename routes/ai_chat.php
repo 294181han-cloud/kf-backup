@@ -176,7 +176,7 @@ function ai_chat_insert_agent(int $tenantId, int $sessionId, string $name, strin
     $pdo = db();
     $now = now_dt();
     $pdo->prepare("INSERT INTO messages (tenant_id, session_id, from_type, sender_name, text, msg_type, created_at)
-        VALUES (?,?,'agent',?,?,?,'text',?)")->execute([$tenantId, $sessionId, $name, $text, $now]);
+        VALUES (?,?,'agent',?,?,'text',?)")->execute([$tenantId, $sessionId, $name, $text, $now]);
     $mid = (int)$pdo->lastInsertId();
     $pdo->prepare('UPDATE v_sessions SET last_msg = ?, last_time = ?, unread = 0 WHERE id = ?')
         ->execute([mb_substr($text, 0, 60), $now, $sessionId]);
