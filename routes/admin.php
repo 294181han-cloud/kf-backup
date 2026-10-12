@@ -482,6 +482,144 @@ function handle_admin_domain_pool_block(string $method, int $id): void
     json_out(['ok' => true, 'domain' => $dom, 'affected' => $n]);
 }
 
+/* ---------- v2.91.25 门牌管理系统 ----------
+   背景：门牌（二维码第一跳的大厂托管站）被微信举报多了会「红」，一红该门牌下所有码都打不开。
+   用户要求：① 门牌红了自动下架；② 后台能管理门牌（增删启停、看状态）。
+   实现：door_pool 表（domain/enabled/label/red_at/last_check/fail_count），
+        发码时 door_pool_hosts() 只取 enabled=1；巡检（bin/check_codes.php）用第三方查红接口
+        逐个查门牌，红的立即 enabled=0 并写 red_domains + red_at。 */
+
+/** 门牌列表（含停用的）、新增 */
+function handle_admin_door_pool(string $method): void
+{
+    require_admin_ctx();
+    $pdo = db();
+
+    if ($method === 'GET') {
+        $rows = $pdo->query('SELECT id, domain, enabled, label, red_at, last_check, fail_count, created_at
+            FROM door_pool ORDER BY enabled DESC, id ASC')->fetchAll();
+        /* 顺带统计每个门牌被多少条在用码使用（让后台一眼看出影响面） */
+        $use = [];
+        foreach ($pdo->query('SELECT entry_id, link FROM service_codes WHERE enabled = 1') as $sc) {
+            $d = gate_code_link((string)$sc['entry_id'], (string)$sc['link']);
+            $h = strtolower((string)(parse_url($d, PHP_URL_HOST) ?: ''));
+            if ($h !== '') $use[$h] = ($use[$h] ?? 0) + 1;
+        }
+        foreach ($rows as &$r) {
+            $r['id'] = (int)$r['id'];
+            $r['enabled'] = (int)$r['enabled'] === 1;
+            $r['fail_count'] = (int)$r['fail_count'];
+            $r['used_by'] = (int)($use[strtolower((string)$r['domain'])] ?? 0);
+            $r['kind'] = door_is_own_host((string)$r['domain']) ? 'own' : 'ext';
+        }
+        unset($r);
+        json_out($rows);
+    }
+
+    if ($method === 'POST') {
+        $data = body();
+        $raw = strtolower(trim((string)($data['domain'] ?? '')));
+        $raw = preg_replace('#^https?://#', '', $raw);
+        $raw = rtrim(explode('/', (string)$raw)[0], '/');
+        if ($raw === '' || !preg_match('/^[a-z0-9.-]{4,120}$/', $raw) || !str_contains($raw, '.')) {
+            json_error('域名格式不正确，例如：xxxx-yyyy-123456.netlify.app');
+        }
+        $label = mb_substr(trim((string)($data['label'] ?? '')), 0, 60);
+        $enabled = (isset($data['enabled']) && (int)$data['enabled'] === 0) ? 0 : 1;
+        try {
+            $pdo->prepare('INSERT INTO door_pool (domain, enabled, label, created_at) VALUES (?,?,?,?)')
+                ->execute([$raw, $enabled, $label, now_dt()]);
+        } catch (\Throwable $e) {
+            if (stripos($e->getMessage(), 'Duplicate') !== false) json_error('这个门牌已经在池里了');
+            throw $e;
+        }
+        json_out(['ok' => true, 'id' => (int)$pdo->lastInsertId(), 'domain' => $raw], 201);
+    }
+
+    json_error('方法不允许', 405);
+}
+
+/** 门牌 启停 / 改备注 / 删除 */
+function handle_admin_door_pool_id(string $method, int $id): void
+{
+    require_admin_ctx();
+    $pdo = db();
+    $st = $pdo->prepare('SELECT * FROM door_pool WHERE id = ? LIMIT 1');
+    $st->execute([$id]);
+    $row = $st->fetch();
+    if (!$row) json_error('门牌不存在', 404);
+
+    if ($method === 'DELETE') {
+        $on = (int)$pdo->query('SELECT COUNT(*) FROM door_pool')->fetchColumn();
+        if ($on <= 0) json_error('不能删到一条不剩');
+        $pdo->prepare('DELETE FROM door_pool WHERE id = ?')->execute([$id]);
+        json_out(['ok' => true]);
+    }
+    if ($method === 'PUT') {
+        $data = body();
+        $set = []; $params = [];
+        if (array_key_exists('enabled', $data)) {
+            $set[] = 'enabled = ?'; $params[] = $data['enabled'] ? 1 : 0;
+            if ($data['enabled']) $set[] = 'red_at = NULL';       // 人工启用 = 认为已恢复
+        }
+        if (array_key_exists('label', $data)) { $set[] = 'label = ?'; $params[] = mb_substr(trim((string)$data['label']), 0, 60); }
+        if ($set) { $params[] = $id; $pdo->prepare('UPDATE door_pool SET ' . implode(', ', $set) . ' WHERE id = ?')->execute($params); }
+        json_out(['ok' => true]);
+    }
+    json_error('方法不允许', 405);
+}
+
+/** 人工判红：微信里实扫打不开 → 立即下架 + 记红名单（检测接口查不出来的拦截靠这个） */
+function handle_admin_door_pool_block(string $method, int $id): void
+{
+    require_admin_ctx();
+    if ($method !== 'POST') json_error('方法不允许', 405);
+    $pdo = db();
+    $st = $pdo->prepare('SELECT * FROM door_pool WHERE id = ? LIMIT 1');
+    $st->execute([$id]);
+    $row = $st->fetch();
+    if (!$row) json_error('门牌不存在', 404);
+    $dom = strtolower((string)$row['domain']);
+    $pdo->prepare('UPDATE door_pool SET enabled = 0, red_at = ? WHERE id = ?')->execute([now_dt(), $id]);
+    try {
+        $pdo->prepare("INSERT IGNORE INTO red_domains (host, main, kind, code, channel) VALUES (?,?,?,?, 'wx')")
+            ->execute([$dom, $dom, 'main', '']);
+    } catch (\Throwable $e) { }
+    json_out(['ok' => true, 'domain' => $dom]);
+}
+
+/** 立即巡检所有门牌：用第三方查红接口逐个查，红的自动下架（后台按钮，不必等整点） */
+function handle_admin_door_pool_check(string $method): void
+{
+    require_admin_ctx();
+    if ($method !== 'POST') json_error('方法不允许', 405);
+    $pdo = db();
+    $rows = $pdo->query('SELECT id, domain, enabled FROM door_pool ORDER BY id')->fetchAll();
+    $out = [];
+    $redN = 0;
+    foreach ($rows as $r) {
+        $dom = strtolower((string)$r['domain']);
+        $state = 'err'; $msg = '';
+        try {
+            $res = wxcheck_single_run('https://' . $dom . '/', 'wx');
+            $state = (string)($res['state'] ?? 'err');
+            $msg = mb_substr((string)($res['msg'] ?? ''), 0, 120);
+        } catch (\Throwable $e) { $msg = $e->getMessage(); }
+        $pdo->prepare('UPDATE door_pool SET last_check = ? WHERE id = ?')->execute([now_dt(), (int)$r['id']]);
+        if ($state === 'red') {
+            $redN++;
+            $pdo->prepare('UPDATE door_pool SET enabled = 0, red_at = ?, fail_count = fail_count + 1 WHERE id = ?')
+                ->execute([now_dt(), (int)$r['id']]);
+            try {
+                $pdo->prepare("INSERT IGNORE INTO red_domains (host, main, kind, code, channel) VALUES (?,?,?,?, 'wx')")
+                    ->execute([$dom, $dom, 'main', '']);
+            } catch (\Throwable $e) { }
+        }
+        $out[] = ['domain' => $dom, 'state' => $state, 'msg' => $msg, 'now_enabled' => $state === 'red' ? false : ((int)$r['enabled'] === 1)];
+    }
+    json_out(['ok' => true, 'checked' => count($out), 'red' => $redN, 'items' => $out]);
+}
+
 /* ---------- aaPanel 快速导入（v2.61）----------
    用途：泛解析证书麻烦（真通配要 DNS 验证），改为「一批固定随机子域 + 主域」共用一张
    Let's Encrypt SAN 证书（一张最多 100 个域名，避开 LE 每周 50 张限额）。

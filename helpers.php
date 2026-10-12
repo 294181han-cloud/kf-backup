@@ -2514,6 +2514,43 @@ function pool_host_in(string $domain): string
    「新码 / 更换码」和「新用户第一次登录自动发一条」共用这一份发码逻辑，
    免得两处各写一遍、以后改漏一处。 */
 
+/** v2.91.25 门牌池（数据库驱动）：后台「门牌管理」页可增删启停；红了就自动下架。
+ *  取启用中的门牌；库里一条都没有时退回代码里硬编码的列表（保底，避免后台误删光后发不出码）。
+ *  $includeDisabled=true 时连停用的一起返回（后台列表用）。 */
+function door_pool_hosts(bool $includeDisabled = false): array
+{
+    $out = [];
+    try {
+        $sql = 'SELECT domain, enabled FROM door_pool' . ($includeDisabled ? '' : ' WHERE enabled = 1') . ' ORDER BY id';
+        foreach (db()->query($sql) as $r) {
+            $d = strtolower(trim((string)$r['domain']));
+            if ($d !== '') $out[] = $d;
+        }
+    } catch (\Throwable $e) { /* 表还没建/无库 → 走下面的兜底 */ }
+    if ($out) return array_values(array_unique($out));
+    if ($includeDisabled) return [];
+    /* 兜底：库不可用或一条都没配 */
+    return array_values(array_unique(array_filter(array_merge(
+        array_map('strtolower', door_own_hosts()),
+        array_map('strtolower', door_ext_hosts())
+    ))));
+}
+
+/** v2.91.25 该门牌是不是「自家域名」（自家用伪装路径 k9f3m2.html，大厂托管站用站点根） */
+function door_is_own_host(string $host): bool
+{
+    $h = strtolower(trim($host));
+    if ($h === '') return false;
+    $own = array_map('strtolower', door_own_hosts());
+    if (in_array($h, $own, true)) return true;
+    try {
+        foreach (db()->query("SELECT domain FROM door_pool WHERE label = '自家域名'") as $r) {
+            if (strtolower((string)$r['domain']) === $h) return true;
+        }
+    } catch (\Throwable $e) { }
+    return false;
+}
+
 /** v2.91.24 门牌池挑选（用户要求：**换码就换一张门牌**，不要又抽回原来那张）。
  *  规则：
  *    ① 后台配了 door_domain → 那是运营指定，不插手；
@@ -2535,9 +2572,7 @@ function gate_door_pick(int $tenantId = 0): string
     if ($busy) return '';                                     // ★ 递归中：本次不强求换门牌
     $busy = true;
 
-    $pool = [];
-    foreach (array_merge(door_own_hosts(), door_ext_hosts()) as $d) $pool[] = strtolower((string)$d);
-    $pool = array_values(array_unique(array_filter($pool)));
+    $pool = door_pool_hosts();                                // v2.91.25 数据库驱动（含兜底）
     if (!$pool) return '';
 
     /* ② 该租户上一张码用的门牌 */
@@ -2587,21 +2622,16 @@ function gate_door_wrap(string $url): string
     $lh = strtolower((string)(parse_url($url, PHP_URL_HOST) ?: ''));
     $pick = gate_door_pick((int)($GLOBALS['KF_DOOR_TENANT'] ?? 0));
     if ($pick !== '' && $pick !== $lh) {
-        $own = array_map('strtolower', door_own_hosts());
-        /* 自家域名用伪装路径 k9f3m2.html；大厂托管站用站点根 */
-        return in_array($pick, $own, true)
+        /* 自家域名用伪装路径 k9f3m2.html；大厂托管站用站点根（v2.91.25 改为按库里的 label 判断） */
+        return door_is_own_host($pick)
             ? "https://$pick/k9f3m2.html?xx=$b64"
             : "https://$pick/?xx=$b64";
     }
 
     $cand = [];
-    foreach (door_own_hosts() as $d) {
+    foreach (door_pool_hosts() as $d) {                  // v2.91.25 数据库驱动（含兜底）
         if ($lh !== '' && $d === $lh) continue;          // 同域跳过
-        $cand[] = "https://$d/k9f3m2.html?xx=";          // 自家门牌页
-    }
-    foreach (door_ext_hosts() as $d) {
-        if ($lh !== '' && $d === $lh) continue;
-        $cand[] = "https://$d/?xx=";                     // 大厂托管站（根目录 index.html）
+        $cand[] = door_is_own_host($d) ? "https://$d/k9f3m2.html?xx=" : "https://$d/?xx=";
     }
     if (!$cand) return $url;
     return $cand[array_rand($cand)] . $b64;

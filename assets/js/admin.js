@@ -47,7 +47,78 @@ createApp({
       finally { healthLoading.value = false; }
     };
 
-    const tabTitle = computed(() => ({ overview: '平台概览', tenants: '租户管理', domains: '域名池', health: '线路体检', nodes: '节点管理', tg: '发卡机器人', settings: '全局设置' }[tab.value]));
+    /* v2.91.25 门牌管理（门牌红了自动下架 + 后台增删启停）
+       门牌 = 二维码第一跳的大厂托管站；红了该门牌下所有码都打不开，
+       所以巡检红了立即 enabled=0，租户「换码」会自动换到别的门牌（落地域名不动）。 */
+    const doors = ref([]);
+    const doorNew = ref('');
+    const doorLoading = ref(false);
+    const doorBusy = ref(false);
+    const doorChecking = ref(false);
+    const doorsNow = ref('');
+    const loadDoors = async () => {
+      doorLoading.value = true;
+      try {
+        const r = await API.get('/api/admin/door-pool');
+        doors.value = Array.isArray(r) ? r : [];
+        doorsNow.value = new Date().toISOString();
+      } catch (e) { ElementPlus.ElMessage.error(e.message); }
+      finally { doorLoading.value = false; }
+    };
+    const addDoor = async () => {
+      const d = (doorNew.value || '').trim();
+      if (!d) { ElementPlus.ElMessage.warning('请输入门牌域名'); return; }
+      doorBusy.value = true;
+      try {
+        await API.post('/api/admin/door-pool', { domain: d, enabled: 1 });
+        ElementPlus.ElMessage.success('已新增门牌 ' + d);
+        doorNew.value = '';
+        await loadDoors();
+      } catch (e) { ElementPlus.ElMessage.error(e.message); }
+      finally { doorBusy.value = false; }
+    };
+    const toggleDoor = async (row, on) => {
+      try {
+        await API.put('/api/admin/door-pool/' + row.id, { enabled: on ? 1 : 0 });
+        ElementPlus.ElMessage.success(on ? '已启用（认为已恢复）' : '已停用');
+        await loadDoors();
+      } catch (e) { ElementPlus.ElMessage.error(e.message); }
+    };
+    const blockDoor = async (row) => {
+      try {
+        await ElementPlus.ElMessageBox.confirm(
+          '确认「' + row.domain + '」在微信里已经打不开？\n会立即下架并记入红名单，之后换码不会再抽到它。',
+          '人工判红', { type: 'warning', confirmButtonText: '确认已红', cancelButtonText: '取消' });
+      } catch (e) { return; }
+      try {
+        await API.post('/api/admin/door-pool/' + row.id + '/block', {});
+        ElementPlus.ElMessage.success('已下架并记入红名单');
+        await loadDoors();
+      } catch (e) { ElementPlus.ElMessage.error(e.message); }
+    };
+    const delDoor = async (row) => {
+      try {
+        await ElementPlus.ElMessageBox.confirm('删除门牌「' + row.domain + '」？删掉后不再参与发码。', '删除门牌', { type: 'warning' });
+      } catch (e) { return; }
+      try {
+        await API.del('/api/admin/door-pool/' + row.id);
+        ElementPlus.ElMessage.success('已删除');
+        await loadDoors();
+      } catch (e) { ElementPlus.ElMessage.error(e.message); }
+    };
+    const checkDoors = async () => {
+      doorChecking.value = true;
+      try {
+        const r = await API.post('/api/admin/door-pool/check', {});
+        const red = (r && r.red) || 0;
+        ElementPlus.ElMessage[red ? 'warning' : 'success'](
+          '巡检完成：共查 ' + ((r && r.checked) || 0) + ' 个门牌，其中 ' + red + ' 个被拦截' + (red ? '，已自动下架' : ''));
+        await loadDoors();
+      } catch (e) { ElementPlus.ElMessage.error(e.message); }
+      finally { doorChecking.value = false; }
+    };
+
+    const tabTitle = computed(() => ({ overview: '平台概览', tenants: '租户管理', domains: '域名池', health: '线路体检', doors: '门牌管理', nodes: '节点管理', tg: '发卡机器人', settings: '全局设置' }[tab.value]));
     const locationOrigin = location.origin;
 
     const barWidth = (v, list) => {
@@ -532,6 +603,9 @@ createApp({
       hostVisible, hostRow, hostValue, hostBusy, hostMsg, hostOk, openHost, saveHost, clearHost,
       createdVisible, created, copyCreated, openGen, genVisible, genPair, doGen, fillGenKami, openTrial,
       addDomain, toggleDomain, delDomain, blockDomain, saveRootDomain, saveDefaults, changePw, logout, isExpired,
+      /* v2.91.25 门牌管理 */
+      doors, doorNew, doorLoading, doorBusy, doorChecking, doorsNow,
+      loadDoors, addDoor, toggleDoor, blockDoor, delDoor, checkDoors,
     };
   }
 }).use(ElementPlus).mount('#app');

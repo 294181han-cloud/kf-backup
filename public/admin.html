@@ -24,6 +24,7 @@
         <div class="nav-item" :class="{active: tab==='tenants'}" @click="tab='tenants'">👥 租户管理</div>
         <div class="nav-item" :class="{active: tab==='domains'}" @click="tab='domains'">🌐 域名池</div>
         <div class="nav-item" :class="{active: tab==='health'}" @click="tab='health'; loadHealth()">🩺 线路体检</div>
+        <div class="nav-item" :class="{active: tab==='doors'}" @click="tab='doors'; loadDoors()">🚪 门牌管理</div>
         <div class="nav-item" :class="{active: tab==='nodes'}" @click="tab='nodes'">🖧 节点管理</div>
         <div class="nav-item" :class="{active: tab==='tg'}" @click="tab='tg'">🤖 发卡机器人</div>
         <div class="nav-item" :class="{active: tab==='settings'}" @click="tab='settings'">⚙️ 全局设置</div>
@@ -373,6 +374,62 @@
             </el-table>
             <p v-if="!healthLoading && !healthDetail.length" style="font-size:13px;color:#869099;padding:10px 0;">
               这个时间范围内还没有探针数据。探针只在「访客没进去」时才上报，所以没有数据 = 这段时间没人卡住（或者还没开始收集）。
+            </p>
+          </div>
+        </template>
+        <!-- ===================== 门牌管理（v2.91.25） ===================== -->
+        <template v-if="tab==='doors'">
+          <div class="panel">
+            <div class="panel-title">🚪 门牌池（二维码第一跳的大厂托管站）</div>
+            <p style="font-size:13px;color:#86909c;margin:0 0 12px;line-height:1.8;">
+              门牌 = 客户扫码后打开的第一个页面（netlify 这类大厂免费托管站）。<br>
+              <b>门牌红了会自动下架</b>（每小时巡检 + 可点「立即巡检」）→ 租户之后点「换码」就会自动换到别的门牌，
+              <b>落地域名不用动</b>。恢复后不会自动开回来，确认没问题再点「启用」。
+            </p>
+            <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:10px;">
+              <el-input v-model="doorNew" size="small" placeholder="新增门牌域名，例如 xxxx-yyyy-123456.netlify.app" style="width:380px;"></el-input>
+              <el-button size="small" type="primary" @click="addDoor" :loading="doorBusy">新增门牌</el-button>
+              <el-button size="small" @click="loadDoors" :loading="doorLoading">刷新</el-button>
+              <el-button size="small" type="warning" @click="checkDoors" :loading="doorChecking">立即巡检（查微信是否拦截）</el-button>
+              <span style="font-size:12px;color:#a8b0bd;">最近更新：{{ (doorsNow || '').slice(0,19).replace('T',' ') }}</span>
+            </div>
+            <el-table :data="doors" stripe size="small" v-loading="doorLoading">
+              <el-table-column label="门牌域名" min-width="300">
+                <template #default="{row}"><span class="mono">{{ row.domain }}</span></template>
+              </el-table-column>
+              <el-table-column label="类型" width="110">
+                <template #default="{row}">
+                  <el-tag size="small" :type="row.kind === 'own' ? 'warning' : 'info'">{{ row.kind === 'own' ? '自家域名' : '大厂托管' }}</el-tag>
+                </template>
+              </el-table-column>
+              <el-table-column label="状态" width="100">
+                <template #default="{row}">
+                  <el-tag size="small" :type="row.enabled ? 'success' : 'danger'">{{ row.enabled ? '启用中' : '已下架' }}</el-tag>
+                </template>
+              </el-table-column>
+              <el-table-column label="在用码" width="90">
+                <template #default="{row}"><span :style="{color: row.used_by ? '#1f2329' : '#a8b0bd'}">{{ row.used_by }} 条</span></template>
+              </el-table-column>
+              <el-table-column label="备注" width="130">
+                <template #default="{row}">{{ row.label || '—' }}</template>
+              </el-table-column>
+              <el-table-column label="下架时间" width="160">
+                <template #default="{row}">{{ (row.red_at || '').slice(0,19).replace('T',' ') || '—' }}</template>
+              </el-table-column>
+              <el-table-column label="最近检测" width="160">
+                <template #default="{row}">{{ (row.last_check || '').slice(0,19).replace('T',' ') || '—' }}</template>
+              </el-table-column>
+              <el-table-column label="操作" min-width="230">
+                <template #default="{row}">
+                  <el-button v-if="!row.enabled" size="small" type="success" @click="toggleDoor(row, true)">启用</el-button>
+                  <el-button v-else size="small" @click="toggleDoor(row, false)">停用</el-button>
+                  <el-button v-if="row.enabled" size="small" type="warning" @click="blockDoor(row)">标记已红</el-button>
+                  <el-button size="small" type="danger" plain @click="delDoor(row)">删除</el-button>
+                </template>
+              </el-table-column>
+            </el-table>
+            <p v-if="!doorLoading && !doors.length" style="font-size:13px;color:#869099;padding:10px 0;">
+              池子里一个门牌都没有 —— 发码会退回用代码里硬编码的那批兜底门牌。
             </p>
           </div>
         </template>
@@ -789,6 +846,6 @@
 <script src="/assets/vendor/vue.global.js?v=2.0.1"></script>
 <script src="/assets/vendor/element-plus.js?v=2.0.1"></script>
 <script src="/assets/api.js?v=2.1.1"></script>
-<script src="/assets/js/admin.js?v=2.10.8"></script>
+<script src="/assets/js/admin.js?v=2.10.9"></script>
 </body>
 </html>
