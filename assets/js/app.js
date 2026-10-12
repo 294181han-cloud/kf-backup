@@ -623,6 +623,13 @@ const app = createApp({
           dedup_on: !!b.dedup_on, ip_merge_on: b.ip_merge_on === undefined ? true : !!b.ip_merge_on,
           ip_limit_on: !!b.ip_limit_on, ip_limit_count: b.ip_limit_count || 5,
         });
+        Object.assign(aiCfg, {
+          entitled: !!b.ai_chat_entitled, on: !!b.ai_chat_on,
+          base_url: b.ai_base_url || 'https://api.b.ai', model: b.ai_model || 'deepseek-v4.1-flash',
+          key_set: !!b.ai_key_set, sign: b.ai_sign || '', tg_token_set: !!b.ai_tg_token_set,
+          tg_chat: b.ai_tg_chat || '', bridge_secret: b.ai_bridge_secret || '',
+          max_per_pay: b.ai_max_per_pay || '450', retry_pay: b.ai_retry_pay || '100', min_pay: b.ai_min_pay || '50',
+        });
       } catch (e) {}
     };
     const loadAgentOptions = async () => {
@@ -2461,6 +2468,35 @@ const app = createApp({
     };
     // ===== 安全与维护 / 访客资源 / 引导 / 深色 =====
     // v2.78 公告默认开 + 默认文案（与后端 routes/visitor.php 的默认值保持一致）
+    /* v2.91 AI 聊天（只对白名单租户渲染：aiCfg.entitled） */
+    const aiCfg = reactive({
+      entitled: false, on: false, base_url: 'https://api.b.ai', model: 'deepseek-v4.1-flash',
+      key: '', key_set: false, sign: '', tg_token: '', tg_token_set: false, tg_chat: '',
+      bridge_secret: '', max_per_pay: '450', retry_pay: '100', min_pay: '50',
+    });
+    const aiSaving = ref(false);
+    const genAiSecret = () => {
+      const a = new Uint8Array(16);
+      try { (window.crypto || {}).getRandomValues ? window.crypto.getRandomValues(a) : a.forEach((_, i) => { a[i] = Math.floor(Math.random() * 256); }); }
+      catch (e) { a.forEach((_, i) => { a[i] = Math.floor(Math.random() * 256); }); }
+      aiCfg.bridge_secret = Array.from(a).map(x => x.toString(16).padStart(2, '0')).join('');
+    };
+    const saveAi = async () => {
+      aiSaving.value = true;
+      try {
+        // key / token 留空 = 不改（后端也是这个口径）
+        await API.put('/api/tenant/settings', {
+          ai_chat_on: aiCfg.on, ai_base_url: aiCfg.base_url, ai_model: aiCfg.model,
+          ai_sign: aiCfg.sign, ai_tg_chat: aiCfg.tg_chat, ai_bridge_secret: aiCfg.bridge_secret,
+          ai_max_per_pay: aiCfg.max_per_pay, ai_retry_pay: aiCfg.retry_pay, ai_min_pay: aiCfg.min_pay,
+          ai_key: aiCfg.key, ai_tg_token: aiCfg.tg_token,
+        });
+        if (aiCfg.key) { aiCfg.key_set = true; aiCfg.key = ''; }
+        if (aiCfg.tg_token) { aiCfg.tg_token_set = true; aiCfg.tg_token = ''; }
+        ElementPlus.ElMessage.success('AI 聊天设置已保存');
+      } catch (e) { ElementPlus.ElMessage.error(e.message); }
+      finally { aiSaving.value = false; }
+    };
     const sec = reactive({ notice_on: true, notice_text: '不要关闭此网页，若退出请先复制浏览器打开', filter_keywords: '', auto_blacklist: false, dedup_on: false, ip_merge_on: true, ip_limit_on: false, ip_limit_count: 5 });
     const loginLogs = ref([]);
     const visitors = ref([]);
@@ -3727,6 +3763,7 @@ const app = createApp({
       uiCatList, uiCurrentCat, uiActiveCat, uiActiveList, uiSel, uiTplList, uiColorList, uiPick, sideCollapsed, mSideOpen,
       sessW, sessTabText, sessResizing, sessResizeStart, sessResetW, toggleSide, infoCollapsed, toggleInfo,
       blockSession, blockIp, kwList, kwInput, kwSaving, addKw, removeKw, saveFilter, agentCmd, restartPoll,
+ aiCfg, aiSaving, saveAi, genAiSecret,
       devices, deviceLimit, loadDevices, kickDevice, renameDevice, isCurDevice,
       chatSearchOn, chatSearchKw, searchHit, visibleMsgs, canRecall, recallMsg, isRead,
       pol, savePolicy, uploadPolHead, clock, unreadTotal, sessCollapsed,
