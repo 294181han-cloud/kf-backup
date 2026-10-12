@@ -151,13 +151,8 @@ function handle_visitor_config(string $method): void
     $av = tenant_availability($t);
     $brand = tenant_brand($t);
     // 超额只对新建会话有影响，config 阶段不拦截（前端显示名额已满提示）
-    /* v2.91.55 按用户要求：客服码 / 网页 两个渠道的额度【合并成一个总额度】。
-       原来各算各的（各 1000，谁满只挡谁），现在合计本周新增会话 >= 总额度就统一挡。
-       总额度取两个上限里的较大值（通常都是 1000，所以合计封顶 1000）。 */
-    $kfQuotaLimit = max((int)$t['quota_web'], (int)$t['quota_app']);
-    $kfQuotaUsed  = quota_used((int)$t['id'], 'web') + quota_used((int)$t['id'], 'app');
-    $webFull = $kfQuotaLimit > 0 && $kfQuotaUsed >= $kfQuotaLimit;
-    $appFull = $webFull;
+    $webFull = quota_used((int)$t['id'], 'web') >= (int)$t['quota_web'];
+    $appFull = quota_used((int)$t['id'], 'app') >= (int)$t['quota_app'];
     json_out([
         'kami' => $t['kami'],
         'available' => $av['ok'],
@@ -298,10 +293,9 @@ function handle_visitor_init(string $method): void
     // ③ 新建会话（额度检查）
     $code = trim((string)input('code', ''));
     $quotaKey = $code !== '' ? 'app' : 'web';
-    /* v2.91.55 额度合并：两个渠道共用一个总额度（合计本周新增会话 ≥ 额度即挡，不再分渠道各算各的） */
-    $limit = max((int)$t['quota_web'], (int)$t['quota_app']);
-    $used = quota_used($tid, 'web') + quota_used($tid, 'app');
-    if ($limit > 0 && $used >= $limit) {
+    $limit = (int)($quotaKey === 'app' ? $t['quota_app'] : $t['quota_web']);
+    $used = quota_used($tid, $quotaKey);
+    if ($used >= $limit) {
         json_error('本周客服名额已满，请下周再来或联系客服', 403);
     }
     // 会话总数额度（v2.25）：0=不限；到顶后新访客被拒（老访客恢复会话不受影响）
