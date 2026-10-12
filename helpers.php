@@ -2417,9 +2417,8 @@ function domain_pick_for_tenant(): string
         $rows = db()->query('SELECT domain FROM domain_pool WHERE enabled = 1 ORDER BY id ASC')->fetchAll(PDO::FETCH_COLUMN);
     } catch (\Throwable $e) { return ''; }
     $rows = array_values(array_filter(array_map(fn($d) => strtolower(trim((string)$d)), $rows)));
-    /* 保险（很重要）：只要这台域名进过红名单（哪怕只是它的某个子域被拦），就整台不再分配。
-       微信封的是域名——"这个子域红了、换个兄弟子域还能用"是错觉，实测主域一起红。 */
-    $rows = array_values(array_filter($rows, fn($d) => !domain_in_red_list($d)));
+    /* v2.91.29 去掉了「域名红名单」过滤 —— 用户明确：只有【门牌】会被微信红，落地域名不会被红。
+       落地域名只在「慢到不可用」时才停用（由人工在后台域名池里操作）。 */
     if (!$rows) return '';
     $cap = max(1, (int)kv_get('domain_tenant_cap', '1'));   // 一台域名默认只带 1 个租户
     for ($round = 0; $round < 6; $round++) {
@@ -2431,23 +2430,9 @@ function domain_pick_for_tenant(): string
     return $rows[array_rand($rows)];
 }
 
-/** 这台**主域名**是否进过红名单（主域级判红才作数）。
- *  v2.91.26 修正：原来 `main = ? OR host = ?` 会把「某个子域曾红」也算成整域红 ——
- *  实测踩坑：bea2be95.hi6o7e.shop / cvhl3vbp.h652ww.shop 只是两条子域记录（探针上报内容主机失败时写的），
- *  却让 h652ww.shop / hi6o7e.shop 整个域名被发码逻辑跳过，结果「3 条码落 3 个域名」退化成一个域名。
- *  子域红了换一个子域就行，整域是否红要看 kind='main' 的记录。 */
-function domain_in_red_list(string $domain): bool
-{
-    $domain = strtolower(trim($domain));
-    if ($domain === '') return false;
-    try {
-        $st = db()->prepare("SELECT 1 FROM red_domains WHERE kind = 'main' AND (main = ? OR host = ?) LIMIT 1");
-        $st->execute([$domain, $domain]);
-        return (bool)$st->fetchColumn();
-    } catch (\Throwable $e) { return false; }   // 表不存在/查询失败：不当红处理
-}
-
-/** 某个**具体主机**（含子域）是否进过红名单：子域级记录也要算（换子域能解决，但优先别用它）。 */
+/** v2.91.29 已移除「域名红名单」概念（用户明确：只有门牌会被微信红，落地域名不会）。
+ *  保留一份「域名是否可用」的判断：只看它在域名池里是否启用 —— 停用通常是因为那条线太慢。
+ *  主机级红名单（host_in_red_list）仍保留：门牌被红时会写进 red_domains，便于排查。 */
 function host_in_red_list(string $host): bool
 {
     $host = strtolower(trim($host));
@@ -2459,12 +2444,12 @@ function host_in_red_list(string $host): bool
     } catch (\Throwable $e) { return false; }
 }
 
-/** 落地主机是否还能用：域名池里启用的、且主域没进过红名单 */
+/** 落地主机是否还能用：只看它所属域名在域名池里是否启用（v2.91.29 去掉红名单判断） */
 function pool_host_usable(string $host): bool
 {
     $host = strtolower(trim($host));
     if ($host === '' || !pool_host_enabled($host)) return false;
-    return !domain_in_red_list(pool_domain_of($host));
+    return true;
 }
 
 /** v2.90.14 这个租户的「专属主机」（可选，形如 f1kov5q6.hi6o7e.shop）：
@@ -2527,7 +2512,7 @@ function tenant_next_domain(int $tenantId): string
             $d = strtolower(trim((string)$r['domain']));
             if ($d === '') continue;
             if (isset($used[$d])) continue;                       // 这条线他已经在用了
-            if (domain_in_red_list($d)) continue;                 // 红名单里的不要
+            /* v2.91.29 去掉红名单过滤：只有门牌会被微信红，落地域名不会 */
             $pick = $d;
             break;
         }

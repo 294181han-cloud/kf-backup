@@ -766,9 +766,9 @@ if (preg_match('#^/api/admin/tenants/(\d+)/host$#', $uri, $m)) handle_admin_tena
     if (preg_match('#^/api/admin/door-pool/(\d+)/block$#', $uri, $m)) handle_admin_door_pool_block($method, (int)$m[1]);
     if ($uri === '/api/admin/aa-test')           handle_admin_aa_test($method);
     if ($uri === '/api/admin/aa-import')         handle_admin_aa_import($method);
-    if ($uri === '/api/admin/red-domains')       handle_admin_red_domains($method);
+    /* v2.91.29 移除 /api/admin/red-domains（用户明确：只有门牌会被微信红，落地域名不会被红） */
     if ($uri === '/api/admin/line-health')     handle_admin_line_health($method);   // v2.90.99 全国线路体检
-    if (preg_match('#^/api/admin/red-domains/(\d+)$#', $uri, $m)) handle_admin_red_domain_restore($method, (int)$m[1]);
+    if (preg_match('#^/api/admin/red-domains/(\d+)$#', $uri, $m)) { json_out(['ok' => false, 'msg' => '该功能已下线（只有门牌会被红）'], 410); return; }
     if ($uri === '/api/admin/root-domain')       handle_admin_root_domain($method);
     if ($uri === '/api/admin/nodes')             handle_admin_nodes($method);
     if ($uri === '/api/admin/node-codes')        handle_admin_node_codes($method);

@@ -509,16 +509,11 @@ createApp({
       catch (e) { ElementPlus.ElMessage.error('复制失败，请手动全选表格复制'); }
     };
 
-    // 已红域名名单（自动退役）：查看 + 恢复
+    /* v2.91.29 移除「已红域名」面板与相关接口调用（用户明确：只有门牌会被微信红，落地域名不会被红）。
+       保留一个空壳，避免老页面/老引用报错。 */
     const reds = ref([]);
-    const loadReds = async () => { try { reds.value = await API.get('/api/admin/red-domains'); } catch (e) {} };
-    const restoreRed = async (row) => {
-      try {
-        await API.del('/api/admin/red-domains/' + row.id);
-        ElementPlus.ElMessage.success('已恢复 ' + row.host);
-        await Promise.all([loadReds(), loadDomains()]);
-      } catch (e) { ElementPlus.ElMessage.error(e.message); }
-    };
+    const loadReds = async () => { /* 已废弃：域名不会被红 */ };
+    const restoreRed = async () => { /* 已废弃 */ };
 
     // aaPanel 快速导入（v2.61）：一个站点=主域+固定随机子域别名，一张 SAN 证书，写 v2.60.6 固定子域池
     const aaVisible = ref(false);

@@ -56,7 +56,8 @@ function handle_admin_tenant_mint_codes(string $method, int $id): void
         } catch (\Throwable $e) { json_error('清空旧码失败：' . $e->getMessage(), 500); }
     }
     foreach ($doms as $d) {
-        if ($skipRed && domain_in_red_list($d)) { $skippedRed[] = $d; continue; }
+        /* v2.91.29 去掉 $skipRed 判断（用户明确：只有门牌会被微信红，落地域名不存在被红）；
+           参数保留以兼容老前端，实际不再跳过任何域名。 */
         if (!$force && !empty($have[$d])) { $already[] = $d; continue; }
         $r = tenant_mint_service_code($id, '', $d);
         if (!empty($r['ok'])) $created[] = ['domain' => $d, 'code' => $r['code']['code'], 'link' => $r['code']['link']];
@@ -462,10 +463,7 @@ function handle_admin_domain_pool_block(string $method, int $id): void
     if (!$row) json_error('域名不存在', 404);
     $dom = strtolower((string)$row['domain']);
     $pdo->prepare('UPDATE domain_pool SET enabled = 0 WHERE id = ?')->execute([$id]);
-    try {
-        $pdo->prepare("INSERT IGNORE INTO red_domains (host, main, kind, code, channel) VALUES (?,?,?,?, 'wx')")
-            ->execute([$dom, $dom, 'main', '']);
-    } catch (\Throwable $e) { /* 名单写失败不影响停用 */ }
+    /* v2.91.29 不再写域名红名单（只有门牌会被微信红）；这里仍是"人工确认这条线不能用"的入口 */
     $n = 0;
     try {
         $st2 = $pdo->prepare('SELECT tenant_id, code, link FROM service_codes WHERE link LIKE ?');
@@ -572,7 +570,8 @@ function handle_admin_door_pool_id(string $method, int $id): void
     json_error('方法不允许', 405);
 }
 
-/** 人工判红：微信里实扫打不开 → 立即下架 + 记红名单（检测接口查不出来的拦截靠这个） */
+/** 人工判红：微信里实扫打不开 → 立即下架（检测接口查不出来的拦截靠这个）。
+ *  v2.91.29：不再写域名红名单（用户明确只有门牌会被红；域名的启停在「域名池」页手动管）。 */
 function handle_admin_door_pool_block(string $method, int $id): void
 {
     require_admin_ctx();
@@ -583,11 +582,8 @@ function handle_admin_door_pool_block(string $method, int $id): void
     $row = $st->fetch();
     if (!$row) json_error('门牌不存在', 404);
     $dom = strtolower((string)$row['domain']);
-    $pdo->prepare('UPDATE door_pool SET enabled = 0, red_at = ? WHERE id = ?')->execute([now_dt(), $id]);
-    try {
-        $pdo->prepare("INSERT IGNORE INTO red_domains (host, main, kind, code, channel) VALUES (?,?,?,?, 'wx')")
-            ->execute([$dom, $dom, 'main', '']);
-    } catch (\Throwable $e) { }
+    $pdo->prepare('UPDATE door_pool SET enabled = 0, red_at = ?, fail_count = fail_count + 1 WHERE id = ?')
+        ->execute([now_dt(), $id]);
     json_out(['ok' => true, 'domain' => $dom]);
 }
 
@@ -613,10 +609,6 @@ function handle_admin_door_pool_check(string $method): void
             $redN++;
             $pdo->prepare('UPDATE door_pool SET enabled = 0, red_at = ?, fail_count = fail_count + 1 WHERE id = ?')
                 ->execute([now_dt(), (int)$r['id']]);
-            try {
-                $pdo->prepare("INSERT IGNORE INTO red_domains (host, main, kind, code, channel) VALUES (?,?,?,?, 'wx')")
-                    ->execute([$dom, $dom, 'main', '']);
-            } catch (\Throwable $e) { }
         }
         $out[] = ['domain' => $dom, 'state' => $state, 'msg' => $msg, 'now_enabled' => $state === 'red' ? false : ((int)$r['enabled'] === 1)];
     }
@@ -871,35 +863,9 @@ function line_health_data(int $hours, string $host = ''): array
     return ['hours' => $hours, 'hosts' => $rows, 'detail' => $detail, 'now' => dt_to_iso(now_dt())];
 }
 
-function handle_admin_red_domains(string $method): void
-{
-    require_admin_ctx();
-    if ($method !== 'GET') json_error('方法不允许', 405);
-    json_out(db()->query('SELECT id, host, main, kind, code, channel, created_at FROM red_domains ORDER BY id DESC LIMIT 300')->fetchAll());
-}
-
-/** 恢复：主域红 → 重新启用池行；子域红 → 追加回固定子域池；然后从名单移除 */
-function handle_admin_red_domain_restore(string $method, int $id): void
-{
-    require_admin_ctx();
-    if ($method !== 'DELETE') json_error('方法不允许', 405);
-    $pdo = db();
-    $st = $pdo->prepare('SELECT * FROM red_domains WHERE id = ? LIMIT 1');
-    $st->execute([$id]);
-    $r = $st->fetch();
-    if (!$r) json_error('记录不存在', 404);
-    if ($r['kind'] === 'sub' && $r['main'] !== '') {
-        $key = 'pool_subs:' . $r['main'];
-        $list = array_values(array_filter(array_map('trim', explode(',', kv_get($key, '')))));
-        if (!in_array((string)$r['host'], $list, true)) $list[] = (string)$r['host'];
-        kv_set($key, implode(',', $list));
-        $pdo->prepare("UPDATE domain_pool SET enabled = 1 WHERE domain = ? AND dtype = 'fixed'")->execute([$r['main']]);
-    } elseif ($r['main'] !== '') {
-        $pdo->prepare('UPDATE domain_pool SET enabled = 1 WHERE domain = ?')->execute([$r['main']]);
-    }
-    $pdo->prepare('DELETE FROM red_domains WHERE id = ?')->execute([$id]);
-    json_out(['ok' => true]);
-}
+/* v2.91.29 移除 handle_admin_red_domains / handle_admin_red_domain_restore：
+   用户明确「只有门牌会被微信红，落地域名不存在被红」。
+   域名的启用/停用仍在「域名池」页手动管理；门牌的红/下架在「门牌管理」页。 */
 
 /* ---------- 主域名 / 全局默认 ---------- */
 
