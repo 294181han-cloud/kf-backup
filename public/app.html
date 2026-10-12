@@ -658,7 +658,7 @@
             <div class="kv-row"><span class="kv-k">状态</span><span class="kv-v" :class="meExpired ? 'warn' : 'ok'">{{ meExpired ? '账号已到期' : '在线接待' }}</span></div>
             <div class="kv-row"><span class="kv-k">到期</span><span class="kv-v">{{ me.expires_at ? (fmtDay(me.expires_at) + ' · ' + expireText) : '永久有效' }}</span></div>
             <template v-if="me.role==='tenant'">
-              <div class="kv-row"><span class="kv-k">本周额度</span><span class="kv-v">{{ weekUsedTotal }} / {{ weekQuotaTotal }}</span></div>
+              <div class="kv-row"><span class="kv-k">本周额度</span><span class="kv-v">客服码 {{ me.used_app }} / {{ me.quota_app }} · 网页 {{ me.used_web }} / {{ me.quota_web }}</span></div>
               <div class="kv-row"><span class="kv-k">子客服上限</span><span class="kv-v">{{ me.max_agents }} 个</span></div>
             </template>
           </div>
@@ -1926,6 +1926,6 @@
 <script src="/assets/qr-poster.js?v=2.3.0"></script>
 <script src="/assets/api.js?v=2.1.2"></script>
 <script src="/assets/js/app-components.js?v=2.6.2"></script>
-<script src="/assets/js/app.js?v=3.68.42"></script><script src="/assets/js/app-boot.js?v=2.1.1"></script>
+<script src="/assets/js/app.js?v=3.68.41"></script><script src="/assets/js/app-boot.js?v=2.1.1"></script>
 </body>
 </html>
