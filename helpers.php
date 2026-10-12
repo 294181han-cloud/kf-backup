@@ -2514,6 +2514,51 @@ function pool_host_in(string $domain): string
    「新码 / 更换码」和「新用户第一次登录自动发一条」共用这一份发码逻辑，
    免得两处各写一遍、以后改漏一处。 */
 
+/** v2.91.24 门牌池挑选（用户要求：**换码就换一张门牌**，不要又抽回原来那张）。
+ *  规则：
+ *    ① 后台配了 door_domain → 那是运营指定，不插手；
+ *    ② 换码（发新码）时，跳过「该租户上一张已发出去的码」用的那张门牌；
+ *    ③ 门牌池里只剩一张可选时就用它（总比没有强）；
+ *    ④ 同一次请求里结果固定（发码时 gate_code_link 会被调用两次，必须选同一张）。
+ *  为什么要这样：门牌被微信红掉时，租户点「换码」的意义就是换一张没红的门牌；
+ *  原来纯随机 `array_rand`，实测会抽回同一张（3 次里 2 次），等于白换。 */
+function gate_door_pick(int $tenantId = 0): string
+{
+    $dom = strtolower(trim((string)kv_get('door_domain', '')));
+    if ($dom !== '') return $dom;                             // ① 运营指定
+    static $cache = [];
+    $ck = 't' . $tenantId;
+    if (isset($cache[$ck])) return $cache[$ck];               // ④ 同请求固定
+
+    $pool = [];
+    foreach (array_merge(door_own_hosts(), door_ext_hosts()) as $d) $pool[] = strtolower((string)$d);
+    $pool = array_values(array_unique(array_filter($pool)));
+    if (!$pool) return '';
+
+    /* ② 该租户上一张码用的门牌 */
+    $last = '';
+    if ($tenantId > 0) {
+        try {
+            $st = db()->prepare('SELECT entry_id, link FROM service_codes WHERE tenant_id = ? ORDER BY id DESC LIMIT 1');
+            $st->execute([$tenantId]);
+            $row = $st->fetch();
+            if ($row) {
+                $prev = gate_code_link((string)($row['entry_id'] ?? ''), (string)($row['link'] ?? ''));
+                if ($prev !== '') $last = strtolower((string)(parse_url($prev, PHP_URL_HOST) ?: ''));
+            }
+        } catch (\Throwable $e) { /* 无库/查不到：按全池随机 */ }
+    }
+
+    $cand = $pool;
+    if ($last !== '') {
+        $rest = array_values(array_filter($pool, fn($d) => $d !== $last));
+        if ($rest) $cand = $rest;                             // ③ 只剩一张时退回全池
+    }
+    $pick = $cand[array_rand($cand)];
+    $cache[$ck] = $pick;
+    return $pick;
+}
+
 /** v2.90.24 「门牌池」包装：真实落地链接 → https://门牌/?xx=<base64url>
  *  为什么要池子：只用一个门牌，被举报多了必红（实测 unrivaled-moxie-03037b 红了 → 全站码一起打不开）。
  *  后台配了 door_domain 就固定用它；没配就从池子随机挑一个，且**跳过与落地域同域的门牌**
@@ -2532,7 +2577,17 @@ function gate_door_wrap(string $url): string
         return $clean === '' ? $url : "https://$clean/?xx=$b64";
     }
 
+    /* v2.91.24 走门牌池挑选（换码换门牌）：gate_door_pick 会跳过该租户上一张码用的门牌 */
     $lh = strtolower((string)(parse_url($url, PHP_URL_HOST) ?: ''));
+    $pick = gate_door_pick((int)($GLOBALS['KF_DOOR_TENANT'] ?? 0));
+    if ($pick !== '' && $pick !== $lh) {
+        $own = array_map('strtolower', door_own_hosts());
+        /* 自家域名用伪装路径 k9f3m2.html；大厂托管站用站点根 */
+        return in_array($pick, $own, true)
+            ? "https://$pick/k9f3m2.html?xx=$b64"
+            : "https://$pick/?xx=$b64";
+    }
+
     $cand = [];
     foreach (door_own_hosts() as $d) {
         if ($lh !== '' && $d === $lh) continue;          // 同域跳过
@@ -2673,7 +2728,9 @@ function tenant_mint_service_code(int $tid, string $want = '', string $domain = 
     $newId = (int)$pdo->lastInsertId();
 
     /* v2.90.11/23 「大厂门牌」包装；v2.90.32 改成「固定入口」：码里只有跳板 + 入口 ID，
-       落地主机由 /api/go 每次现挑（落地红了不用重发码） */
+       落地主机由 /api/go 每次现挑（落地红了不用重发码）。
+       v2.91.24：告诉门牌挑选逻辑「这是哪个租户的码」，好跳过该租户上一张码用的门牌（换码换门牌）。 */
+    $GLOBALS['KF_DOOR_TENANT'] = $tid;
     $wrappedUrl = gate_code_link($entryId, $url);
 
     /* v2.68 内容落地主机：新码先落一台（gate_content_url 会复用，保证访客会话不丢） */
