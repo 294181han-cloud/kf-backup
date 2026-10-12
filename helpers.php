@@ -3016,6 +3016,8 @@ function gate_loader_html(string $apiBase = ''): string
         . 'var FA=' . json_encode(array_values($frameAllow), JSON_UNESCAPED_SLASHES) . ';'
         . 'var AB=' . json_encode($apiBase) . ';'
         . 'var box=document.getElementById("ld");var done=false;'
+        . 'var DIAG="";'                     /* v2.91.16 诊断串 */
+        . 'function diag(s){DIAG=s;}'
         /* v2.89 进入成功判定 + 内容主机连不上时的自愈：
            访客页挂载后会 postMessage 报到（kf=ready）；7 秒没报到就认为这台内容主机不行 ——
            上报服务端（复核后会把这台退役换一台），自己再要一次地址重试一次。 */
@@ -3035,9 +3037,16 @@ function gate_loader_html(string $apiBase = ''): string
         . 'var tried=(q.get("_t")||"").split(",").filter(Boolean);'
         . 'if(tried.indexOf(location.hostname)<0)tried.push(location.hostname);'
         . 'function msg(s){if(okIn)return;done=true;if(box){box.style.display="";box.innerHTML="";}var p=document.createElement("div");'
-        . 'p.textContent=(s||"链接已失效，请重新扫码进入");var a=document.createElement("div");'
-        . 'a.className="rl";a.textContent="点击重新加载";a.onclick=function(){location.reload()};'
-        . 'if(box){box.appendChild(p);box.appendChild(a);}}'
+        . 'p.textContent=(s||"链接已失效，请重新扫码进入");'
+        /* v2.91.16 诊断行：只在失败时出现，弱网/被拦时截图就能定位是哪一层断了 */
+        . 'var dg=document.createElement("div");dg.style.cssText="margin-top:10px;font-size:11px;color:#b6bcc6;line-height:1.7;word-break:break-all";'
+        . 'dg.textContent="诊断 "+DIAG;if(box)box.appendChild(p);if(box&&dg)box.appendChild(dg);'
+        . 'var a=document.createElement("div");a.className="rl";a.textContent="点击重试";'
+        /* v2.91.16 原地重试：只重新要一次地址并重载落地页，不再整页 reload（弱网下少走两层，成功率高得多） */
+        . 'a.onclick=function(){done=false;okIn=false;if(box){box.style.display="";box.innerHTML="正在重试…";}'
+        . 'try{var of=document.getElementById("kfframe");if(of&&of.parentNode)of.parentNode.removeChild(of);}catch(e){}'
+        . 'retried=false;ask(0);};'
+        . 'if(box){box.appendChild(a);}}'
         /* 只在「连服务器都连不上」时换域名（域名被拦/被墙）；码本身失效换域名也救不回来 */
         . 'function nextHost(){if(okIn)return;if(tried.length>ALT.length+2){'
         . 'for(var j=0;j<ALT.length;j++){if(tried.indexOf(ALT[j])>=0)reportOne(ALT[j],"alt-unreachable");}msg();return;}'
@@ -3051,17 +3060,21 @@ function gate_loader_html(string $apiBase = ''): string
         . 'CD=r.code||CD;'
         . 'var full=u+(u.indexOf("?")<0?"?":"&")+"code="+encodeURIComponent(r.code||"")+(r.tk?"&t="+encodeURIComponent(r.tk):"");'
         . 'var chost="";try{chost=(new URL(full)).host}catch(e){}'
-        . 'var f=document.createElement("iframe");'
+        . 'try{var of=document.getElementById("kfframe");if(of&&of.parentNode)of.parentNode.removeChild(of);}catch(e){}'   /* v2.91.16 原地重试时先删旧 iframe */
+        . 'var f=document.createElement("iframe");f.id="kfframe";'
         . 'f.src=full;'
         . 'f.setAttribute("referrerpolicy","no-referrer");'
         . 'f.setAttribute("allow","microphone; autoplay; clipboard-write; fullscreen");'
         . 'document.body.appendChild(f);'
         . 'if(rdy)clearTimeout(rdy);'
         /* v2.89.2 4.5 秒还在转就先说一句「网络较慢，正在重试」，别让人对着「正在进入…」发呆 */
-        . 'setTimeout(function(){if(okIn||done)return;if(box)box.textContent="网络较慢，正在重试…";},4500);'
+        . 'diag("host="+location.hostname+" 落地="+chost+" 门牌="+document.referrer.slice(0,42));'   /* v2.91.16 */
+        . 'setTimeout(function(){if(okIn||done)return;if(box)box.textContent="网络较慢，正在重试…";},6000);'
+        /* v2.91.16 硬超时 12s → 20s：弱网手机下 12 秒太严苛，会把"慢但能进"误判成失败 */
         . 'rdy=setTimeout(function(){if(okIn)return;reportErr("frame-timeout",chost);reportOne(location.hostname,"shell-timeout");'
+        . 'diag(DIAG+" 结果=iframe 20s 未就绪");'
         . 'if(!retried){retried=true;try{f.parentNode.removeChild(f)}catch(e){}ask(0);return;}'
-        . 'msg("网络较慢，没能进入聊天页，请点击重试");},12000);}'
+        . 'msg("网络较慢，没能进入聊天页，请点击重试");},20000);}'
         . 'var pf=function(k){var h=5381,s=k+"|' . $year . '|kfxt";for(var i=0;i<s.length;i++){h=((h<<5)+h+s.charCodeAt(i))>>>0}return h.toString(16)};'
         . 'function ask(n){var x=new XMLHttpRequest();x.open("POST",AB+"/api/gate",true);'
         . 'x.setRequestHeader("Content-Type","application/x-www-form-urlencoded");x.timeout=6000;'
@@ -3073,6 +3086,7 @@ function gate_loader_html(string $apiBase = ''): string
         . '  msg(r&&r.msg);return;}'
         /* 连不上/报错（域名被拦、超时、断连）→ 同域名重试 2 次，再换备用域名 */
         . 'if(n<2){setTimeout(function(){ask(n+1)},300);return;}'
+        . 'diag("host="+location.hostname+" 接口=/api/gate 连不上(重试"+n+"次) 门牌="+document.referrer.slice(0,42));'
         . 'nextHost();};'
         . 'x.send("w="+encodeURIComponent(t)+"&key="+encodeURIComponent(t)+"&pf="+encodeURIComponent(pf(t)));}'
         . 'if(!t){msg();return;}'
