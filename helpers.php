@@ -2578,8 +2578,13 @@ function pool_host_in(string $domain): string
         $w = $st->fetchColumn();
     } catch (\Throwable $e) { $w = false; }
     if ((int)$w === 1) {
-        $sub = substr(preg_replace('/[^a-z0-9]/', 'x', strtolower(base64_encode(random_bytes(6)))), 0, 8);
-        return $sub . '.' . $domain;
+        /* v2.91.40 【兜底闸】子域池空了，原来的做法是现场随机生成 8 位子域。
+           但**证书只覆盖申请时那批子域**（实测：池外随机子域 ssl_verify=20 证书无效），
+           生成出来的子域 HTTPS 会直接失败 → 客户看到"打不开"，而且没有任何日志，属于静默故障。
+           现在改为：宁可退回**裸域名**（它在证书 SAN 里，一定有证书），也不生成没证书的子域，
+           同时记一条错误日志便于排查（裸域名做落地会与跳板同主机名，被拦时一起挂，但比打不开好）。 */
+        error_log('[kf] pool_subs:' . $domain . ' 子域池为空 → 退回裸域名做落地（不生成无证书子域）');
+        return $domain;
     }
     return $domain;
 }
