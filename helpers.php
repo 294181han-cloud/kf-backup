@@ -2431,16 +2431,32 @@ function domain_pick_for_tenant(): string
     return $rows[array_rand($rows)];
 }
 
-/** 这台域名（或其任意子域）是否进过红名单 */
+/** 这台**主域名**是否进过红名单（主域级判红才作数）。
+ *  v2.91.26 修正：原来 `main = ? OR host = ?` 会把「某个子域曾红」也算成整域红 ——
+ *  实测踩坑：bea2be95.hi6o7e.shop / cvhl3vbp.h652ww.shop 只是两条子域记录（探针上报内容主机失败时写的），
+ *  却让 h652ww.shop / hi6o7e.shop 整个域名被发码逻辑跳过，结果「3 条码落 3 个域名」退化成一个域名。
+ *  子域红了换一个子域就行，整域是否红要看 kind='main' 的记录。 */
 function domain_in_red_list(string $domain): bool
 {
     $domain = strtolower(trim($domain));
     if ($domain === '') return false;
     try {
-        $st = db()->prepare('SELECT 1 FROM red_domains WHERE main = ? OR host = ? LIMIT 1');
+        $st = db()->prepare("SELECT 1 FROM red_domains WHERE kind = 'main' AND (main = ? OR host = ?) LIMIT 1");
         $st->execute([$domain, $domain]);
         return (bool)$st->fetchColumn();
     } catch (\Throwable $e) { return false; }   // 表不存在/查询失败：不当红处理
+}
+
+/** 某个**具体主机**（含子域）是否进过红名单：子域级记录也要算（换子域能解决，但优先别用它）。 */
+function host_in_red_list(string $host): bool
+{
+    $host = strtolower(trim($host));
+    if ($host === '') return false;
+    try {
+        $st = db()->prepare('SELECT 1 FROM red_domains WHERE host = ? LIMIT 1');
+        $st->execute([$host]);
+        return (bool)$st->fetchColumn();
+    } catch (\Throwable $e) { return false; }
 }
 
 /** 落地主机是否还能用：域名池里启用的、且主域没进过红名单 */
