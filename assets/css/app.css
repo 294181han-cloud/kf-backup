@@ -2647,3 +2647,6 @@ body.dark .info-reopen { background: #23272e; color: #b6bfcd; border-color: #333
    手机端窄抽屉里最明显。 */
 .info-item .v { display: flex; align-items: center; justify-content: flex-end; }
 .info-item .v .vt { flex: 1 1 auto; min-width: 0; text-align: right; }
+
+/* v2.91.53 消息头像支持图片（原来只有 emoji，客服自己的头像显示不出来） */
+.msg-ava img { width: 100%; height: 100%; border-radius: inherit; object-fit: cover; display: block; }

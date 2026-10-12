@@ -3697,6 +3697,20 @@ const app = createApp({
     };
     /** v2.91.49 访客端客服头像（= 访客聊天页左上角那个头像，存在 brand_avatar 里）。
      *  左下角头像直接显示它（所见即所得）；editBrandAvatar 点一下直达修改处。 */
+    /** v2.91.53 工作台里"自己发的消息"要显示同一个客服头像。
+     *  原来模板里硬编码 '🎧'，而客户那边看到的是真头像（visitor.php 的 agent_avatar）
+     *  → 客服会觉得"我的头像没同步"（用户反馈）。这里跟访客端用同一套优先级：
+     *  开了「聊天中显示客服个人头像」且个人头像有图 → 用个人头像；否则用访客端品牌头像。 */
+    const agentChatAvatar = Vue.computed(() => {
+      if (brand.agent_avatar_on !== false && isImg(me.value && me.value.avatar)) return me.value.avatar;
+      if (isImg(brand && brand.avatar)) return brand.avatar;
+      return '';
+    });
+    /** 没有图片头像时显示什么：品牌头像若是表情就用它（如 💬），否则退回耳机 */
+    const agentChatEmoji = Vue.computed(() => {
+      const a = brand && brand.avatar;
+      return (typeof a === 'string' && a && !isImg(a)) ? a : '🎧';
+    });
     const brandAvatarUrl = Vue.computed(() => (isImg(brand && brand.avatar) ? brand.avatar : ''));
     /** 左下角头像 → 直达「设置 → 访客端外观」。
      *  起因：客服反馈「换访客端客服头像太难找」。 */
@@ -3846,7 +3860,7 @@ const app = createApp({
       presetPng, pickPosterPresetImg,
       POSTER_POS, qrFreeStyle, qrLayerStyle, textStyle,
       cropDlg, cropSrc, cropZoomPct, cropStage, cropStyle, cropImgLoaded, cropDown, cropMove, cropUp, cropWheel, cropClose, openCrop, cropConfirm, avatarPreview,
-      geoTag, visitorTag, visitorChn, visitorTagFull, visitorChnClass, sessArea, brandAvatarUrl, editBrandAvatar, copyQrImage, downloadQrImage, codeRotateHint, rotateCode, rotateLink, loadHistory, disableLink, saveCodeCfg, meAvatarUrl,
+      geoTag, visitorTag, visitorChn, visitorTagFull, visitorChnClass, sessArea, brandAvatarUrl, editBrandAvatar, agentChatAvatar, agentChatEmoji, copyQrImage, downloadQrImage, codeRotateHint, rotateCode, rotateLink, loadHistory, disableLink, saveCodeCfg, meAvatarUrl,
       manageDlgOpen, codeList, codeListLoading, openManageCodes, toggleCode, delCodeRow, renewCodeRow, codeRowCmd,
       loginInfoDlg, loginInfo, loginInfoName, loginHost, saveLoginInfoName, skipLoginInfo, markLoginInfoAsked,
       codeTextDlg,
