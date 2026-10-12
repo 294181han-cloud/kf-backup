@@ -205,19 +205,6 @@ function handle_tenant_service_code_toggle(string $method): void
     json_out(['ok' => true, 'code' => $code, 'enabled' => (bool)$enabled]);
 }
 
-/* ---------- v2.91.5 线路体检（租户侧只读）：客服自己看「哪条线路在哪个地区进不来」 ----------
-   数据同样来自访客页探针（line_probe），只读、只看汇总，不给任何写入口。 */
-function handle_tenant_line_health(string $method): void
-{
-    if ($method !== 'GET') { json_error('方法不允许', 405); return; }
-    require_tenant();
-    $hours = (int)input('hours', 24);
-    if ($hours <= 0 || $hours > 168) $hours = 24;
-    $host = strtolower(trim((string)input('host', '')));
-    if ($host !== '' && !preg_match('/^[a-z0-9.\-]{4,120}$/', $host)) $host = '';
-    if (!function_exists('line_health_data')) { json_out(['hours' => $hours, 'hosts' => [], 'detail' => [], 'now' => dt_to_iso(now_dt())]); return; }
-    json_out(line_health_data($hours, $host));
-}
 /* ---------- 专属链接 ---------- */
 
 function handle_tenant_link(string $method): void

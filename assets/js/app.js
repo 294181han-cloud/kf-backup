@@ -3440,27 +3440,6 @@ const app = createApp({
         await loadCodes(); await loadLinks();
       } catch (e) { ElementPlus.ElMessage.error(e.message); }
     };
-    /* v2.91.5 线路体检（客服码页）：数据来自访客探针，只读 */
-    const lineHealthOn = ref(false);
-    const lineHealthLoading = ref(false);
-    const lineHealthHours = ref(24);
-    const lineHealthHosts = ref([]);
-    const lineHealthDetail = ref([]);
-    const lineHealthNow = ref('');
-    const loadLineHealth = async () => {
-      lineHealthLoading.value = true;
-      try {
-        const r = await API.get('/api/tenant/line-health?hours=' + lineHealthHours.value);
-        lineHealthHosts.value = r.hosts || [];
-        lineHealthDetail.value = r.detail || [];
-        lineHealthNow.value = r.now || '';
-      } catch (e) { ElementPlus.ElMessage.error(e.message || '线路体检加载失败'); }
-      finally { lineHealthLoading.value = false; }
-    };
-    const toggleLineHealth = () => {
-      lineHealthOn.value = !lineHealthOn.value;
-      if (lineHealthOn.value && !lineHealthDetail.value.length) loadLineHealth();
-    };
     /* v2.90.97 续期：新码默认 72 小时到期，快到期/已到期时点一下重新计时（默认从现在起算 +72 小时） */
     const renewCodeRow = async (row) => {
       try {
@@ -3821,7 +3800,6 @@ const app = createApp({
       cropDlg, cropSrc, cropZoomPct, cropStage, cropStyle, cropImgLoaded, cropDown, cropMove, cropUp, cropWheel, cropClose, openCrop, cropConfirm, avatarPreview,
       geoTag, visitorTag, visitorTagFull, visitorChnClass, copyQrImage, downloadQrImage, codeRotateHint, rotateCode, rotateLink, loadHistory, disableLink, saveCodeCfg, meAvatarUrl,
       manageDlgOpen, codeList, codeListLoading, openManageCodes, toggleCode, delCodeRow, renewCodeRow,
-      lineHealthOn, lineHealthLoading, lineHealthHours, lineHealthHosts, lineHealthDetail, lineHealthNow, loadLineHealth, toggleLineHealth,
       loginInfoDlg, loginInfo, loginInfoName, loginHost, saveLoginInfoName, skipLoginInfo, markLoginInfoAsked,
       codeTextDlg,
       codeCreatedAt, codeExpiresAt,
