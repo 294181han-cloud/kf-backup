@@ -2740,6 +2740,31 @@ function gate_content_host_for(string $code, string $fallback = ''): string
     return $fallback;
 }
 
+/** v2.91.23 测试/诊断用：某台主机是否属于我们自己的域名池（或它是启用中机器上的子域）。
+ *  只给 /api/gate 的 ?host= 覆盖参数做校验用，避免变成开放跳转。 */
+function gate_host_in_pool(string $host): bool
+{
+    $h = strtolower(trim($host));
+    if ($h === '' || !preg_match('/^[a-z0-9.-]{4,80}$/', $h)) return false;
+    try {
+        foreach (db()->query('SELECT domain FROM domain_pool') as $r) {
+            $d = strtolower((string)$r['domain']);
+            if ($d !== '' && ($h === $d || str_ends_with($h, '.' . $d))) return true;
+        }
+    } catch (\Throwable $e) { /* 无库就拒绝 */ }
+    return false;
+}
+
+/** v2.91.23 测试/诊断用：强制把聊天页地址指到指定主机（绕过「这张码固定用哪台」的落库逻辑）。
+ *  仅当 gate_host_in_pool() 通过时才由 /api/gate 调用；正常访客流一律走 gate_content_url()。 */
+function gate_content_url_on(string $host, string $code): string
+{
+    $domain = pool_domain_of($host);
+    $paths = gate_content_paths($domain !== '' ? $domain : $host);
+    if (!$paths) $paths = ['/web/data/' . date('Y/m/d') . '/' . bin2hex(random_bytes(16)) . '.html'];
+    return 'https://' . $host . $paths[array_rand($paths)];
+}
+
 /** 真正下发给壳页的聊天页地址：固定内容主机 + 伪装静态路径 + 客服码 */
 function gate_content_url(string $code, string $host = ''): string
 {

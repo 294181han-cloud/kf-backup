@@ -706,11 +706,18 @@ function handle_gate_check(string $method): void
     }
     $hit = gate_resolve_token($key);
     if (!$hit) { json_out(['ok' => false, 'msg' => '链接已失效，请重新扫码进入']); return; }
+    /* v2.91.23 测试/诊断专用的落地主机覆盖：?host=<我们自己域名池里的主机>
+       用途：验证「落地域名被微信红掉时门牌那条路还通不通」——把落地指向一个已知有问题的域名，
+       但门牌和跳板保持正常。**只允许域名池里的域名（或其子域）**，绝不做成开放跳转。 */
+    $hostOverride = '';
+    $hv = trim((string)input('host', ''));
+    if ($hv !== '' && preg_match('/^[A-Za-z0-9.-]{4,80}$/', $hv) && gate_host_in_pool($hv)) $hostOverride = $hv;
     /* v2.68：真实聊天页地址由总控下发 —— 内容域名（域名池里挑）+ 伪装静态路径。
        二维码里那个入口域名跟内容域名解耦：域名红了、换码了，顾客手里那张二维码都还能用。 */
     /* v2.71 内容页凭票进入：下发票据给壳页，内容页 5 分钟内凭票访问（防扒链接重复用） */
-    json_out(['ok' => true, 'code' => $hit['code'], 'url' => gate_content_url($hit['code']),
-        'tk' => gate_token_issue($hit['code'])]);
+    json_out(['ok' => true, 'code' => $hit['code'],
+        'url' => $hostOverride !== '' ? gate_content_url_on($hostOverride, (string)$hit['code']) : gate_content_url((string)$hit['code']),
+        'tk' => gate_token_issue((string)$hit['code'])]);
 }
 
 /* ---------- v2.90.32 「固定入口跳板」/api/go ----------
