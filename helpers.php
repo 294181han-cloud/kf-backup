@@ -2756,6 +2756,31 @@ function gate_door_wrap(string $url): string
 function gate_code_link(string $entryId, string $rawLink): string
 {
     $entryId = trim($entryId);
+
+    /* v2.91.36e 【关键】先查这张码落库的门牌，命中就直接用它返回 —— 不再往下走。
+       为什么必须放在最前面：下面会用**随机跳板主机**重建 $hop，再交给 gate_door_wrap()，
+       而 gate_door_wrap 里我是拿「重建后的 $hop」去库里匹配 link 的（永远匹配不上）→
+       结果落库门牌形同虚设，每次请求还是随机挑一张门牌。实测踩过这个坑。 */
+    $fixedEarly = kf_clean_host((string)($GLOBALS['KF_DOOR_FIXED'] ?? ''));
+    if ($fixedEarly === '') {
+        try {
+            $urls = [];
+            if ($rawLink !== '') $urls[] = $rawLink;
+            /* 老式 link（带 ?key=entryId）也兼容：用 rawLink 本体精确匹配 */
+            $st = db()->prepare('SELECT door_host FROM service_codes WHERE link = ? ORDER BY id DESC LIMIT 1');
+            $st->execute([$rawLink]);
+            $fixedEarly = kf_clean_host((string)($st->fetchColumn() ?: ''));
+        } catch (\Throwable $e) {
+            if (!empty($GLOBALS['KF_DEBUG_DOOR'])) error_log('[kf door early] ' . $e->getMessage());
+        }
+    }
+    if ($fixedEarly !== '' && in_array($fixedEarly, door_pool_hosts(), true)) {
+        $b64e = str_replace(['+', '/', '='], ['-', '_', ''], base64_encode($rawLink));
+        return door_is_own_host($fixedEarly)
+            ? "https://$fixedEarly/k9f3m2.html?xx=$b64e"
+            : "https://$fixedEarly/?xx=$b64e";
+    }
+
     if (preg_match('/^[A-Za-z0-9]{6,32}$/', $entryId)) {
         $hosts = gate_pool_hosts(8, true);          // 每域固定取一个子域，稳定
         if ($hosts) {
