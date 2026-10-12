@@ -3449,11 +3449,25 @@ const app = createApp({
       } catch (e) { ElementPlus.ElMessage.error(e.message); }
     };
     const delCodeRow = async (row) => {
+      /* v2.91.31 删除是不可恢复的，加一次确认（原来直接删，误点就没了） */
+      try {
+        await ElementPlus.ElMessageBox.confirm(
+          '确定删除客服码 ' + (row.code || '') + ' ？删除后无法恢复，客户手里那个二维码会打不开。',
+          '删除这条码', { type: 'warning', confirmButtonText: '删除', cancelButtonText: '取消', confirmButtonClass: 'el-button--danger' });
+      } catch (e) { return; }
       try {
         await API.del('/api/tenant/service-code?code=' + encodeURIComponent(row.code));
         ElementPlus.ElMessage.success('已删除');
         await loadCodes(); await loadLinks();
       } catch (e) { ElementPlus.ElMessage.error(e.message); }
+    };
+    /** v2.91.31 管理码每行的「操作 ▾」菜单：查看 / 续期 / 删除。
+     *  这样做是为了不依赖列宽 —— 之前把三个按钮平铺在「操作」列里，
+     *  弹窗窄一点（或手机竖屏）最右边的删除就被裁掉，用户点不到。 */
+    const codeRowCmd = (cmd, row) => {
+      if (cmd === 'view') return viewQrOf(row);
+      if (cmd === 'renew') return renewCodeRow(row);
+      if (cmd === 'del') return delCodeRow(row);
     };
     /* v2.90.97 续期：新码默认 72 小时到期，快到期/已到期时点一下重新计时（默认从现在起算 +72 小时） */
     const renewCodeRow = async (row) => {
@@ -3814,7 +3828,7 @@ const app = createApp({
       POSTER_POS, qrFreeStyle, qrLayerStyle, textStyle,
       cropDlg, cropSrc, cropZoomPct, cropStage, cropStyle, cropImgLoaded, cropDown, cropMove, cropUp, cropWheel, cropClose, openCrop, cropConfirm, avatarPreview,
       geoTag, visitorTag, visitorTagFull, visitorChnClass, copyQrImage, downloadQrImage, codeRotateHint, rotateCode, rotateLink, loadHistory, disableLink, saveCodeCfg, meAvatarUrl,
-      manageDlgOpen, codeList, codeListLoading, openManageCodes, toggleCode, delCodeRow, renewCodeRow,
+      manageDlgOpen, codeList, codeListLoading, openManageCodes, toggleCode, delCodeRow, renewCodeRow, codeRowCmd,
       loginInfoDlg, loginInfo, loginInfoName, loginHost, saveLoginInfoName, skipLoginInfo, markLoginInfoAsked,
       codeTextDlg,
       codeCreatedAt, codeExpiresAt,
