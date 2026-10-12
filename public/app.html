@@ -919,6 +919,52 @@
             <div class="cc-tip" v-if="codeCheck.msg">{{ codeCheck.msg }}</div>
 
           </div>
+
+          <!-- v2.91.5 线路体检：从访客探针汇总出「哪条线路在哪些地区进不来」 -->
+          <div class="cc-card" style="margin-top:14px;">
+            <div class="cc-top" style="cursor:pointer;" @click="toggleLineHealth">
+              <div class="cc-top-l">
+                <span class="cc-name" style="font-weight:600;">🩺 线路体检</span>
+                <span class="muted" style="font-size:12px;">看「哪些地区/运营商扫码进不来」（数据来自访客进不来时的自动上报）</span>
+              </div>
+              <div class="cc-top-r">
+                <el-button size="small" @click.stop="toggleLineHealth">{{ lineHealthOn ? '收起' : '展开查看' }}</el-button>
+              </div>
+            </div>
+            <div v-if="lineHealthOn" style="margin-top:10px;">
+              <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:10px;">
+                <el-radio-group v-model="lineHealthHours" size="small" @change="loadLineHealth">
+                  <el-radio-button :label="6">6 小时</el-radio-button>
+                  <el-radio-button :label="24">24 小时</el-radio-button>
+                  <el-radio-button :label="168">7 天</el-radio-button>
+                </el-radio-group>
+                <el-button size="small" type="primary" :loading="lineHealthLoading" @click="loadLineHealth">刷新</el-button>
+                <span class="muted" style="font-size:12px;">最近更新：{{ (lineHealthNow || '').slice(0,19).replace('T',' ') || '—' }}</span>
+              </div>
+              <el-table :data="lineHealthDetail" size="small" v-loading="lineHealthLoading" max-height="360">
+                <el-table-column label="主机" min-width="180"><template #default="{row}"><span class="mono" style="font-size:12px;">{{ row.host }}</span></template></el-table-column>
+                <el-table-column prop="region" label="地区" width="150"></el-table-column>
+                <el-table-column prop="isp" label="运营商" width="110"></el-table-column>
+                <el-table-column label="成功率" width="90">
+                  <template #default="{row}">
+                    <span :style="{color: row.rate >= 95 ? '#0aa15a' : (row.rate >= 80 ? '#d48806' : '#cf1322'), fontWeight:600}">{{ row.rate }}%</span>
+                  </template>
+                </el-table-column>
+                <el-table-column prop="fail" label="进不来" width="80"></el-table-column>
+                <el-table-column label="最近结果" width="130">
+                  <template #default="{row}">
+                    <span v-if="row.last_ok" style="color:#0aa15a;">✓ 能进</span>
+                    <span v-else style="color:#cf1322;">✗ {{ row.last_reason || '进不来' }}</span>
+                  </template>
+                </el-table-column>
+                <el-table-column label="最近时间" width="150"><template #default="{row}">{{ (row.last_at || '').slice(0,19).replace('T',' ') }}</template></el-table-column>
+              </el-table>
+              <p v-if="!lineHealthLoading && !lineHealthDetail.length" class="muted" style="font-size:12.5px;line-height:1.8;padding:8px 0 0;">
+                这个时间范围内还没有探针数据 —— 探针只在「访客没进去」时才上报，没有数据说明这段时间没人卡住（或者刚开始收集）。<br>
+                正常访客不会产生任何上报，所以这里看到的一次失败 ≈ 一个真实进不来的访客。
+              </p>
+            </div>
+          </div>
         </div>
 
         <!-- 管理码：该账号的全部客服码（新码默认 72 小时到期；可单独停用/删除/续期） -->

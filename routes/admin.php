@@ -654,6 +654,12 @@ function handle_admin_line_health(string $method): void
     $hours = (int)input('hours', 24);
     if ($hours <= 0 || $hours > 24 * 30) $hours = 24;
     $host = strtolower(trim((string)input('host', '')));
+    json_out(line_health_data($hours, $host));
+}
+
+/** v2.91.5 线路体检数据（管理员 + 租户侧共用）：按主机汇总 + 按 地区×运营商 明细 */
+function line_health_data(int $hours, string $host = ''): array
+{
     $pdo = db();
     $since = date('Y-m-d H:i:s', time() - $hours * 3600);
 
@@ -721,7 +727,7 @@ function handle_admin_line_health(string $method): void
     }
     unset($r);
 
-    json_out(['hours' => $hours, 'hosts' => $rows, 'detail' => $detail, 'now' => dt_to_iso(now_dt())]);
+    return ['hours' => $hours, 'hosts' => $rows, 'detail' => $detail, 'now' => dt_to_iso(now_dt())];
 }
 
 function handle_admin_red_domains(string $method): void

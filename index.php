@@ -760,6 +760,7 @@ if (preg_match('#^/api/admin/tenants/(\d+)/host$#', $uri, $m)) handle_admin_tena
     if ($uri === '/api/admin/aa-import')         handle_admin_aa_import($method);
     if ($uri === '/api/admin/red-domains')       handle_admin_red_domains($method);
     if ($uri === '/api/admin/line-health')     handle_admin_line_health($method);   // v2.90.99 全国线路体检
+    if ($uri === '/api/tenant/line-health')    handle_tenant_line_health($method);  // v2.91.5 租户侧只读线路体检
     if (preg_match('#^/api/admin/red-domains/(\d+)$#', $uri, $m)) handle_admin_red_domain_restore($method, (int)$m[1]);
     if ($uri === '/api/admin/root-domain')       handle_admin_root_domain($method);
     if ($uri === '/api/admin/nodes')             handle_admin_nodes($method);
