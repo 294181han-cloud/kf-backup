@@ -3697,6 +3697,23 @@ const app = createApp({
     const brandAvatarUrl = Vue.computed(() => (isImg(brand && brand.avatar) ? brand.avatar : ''));
     /** 左下角头像 → 直达「设置 → 访客端外观」。
      *  起因：客服反馈「换访客端客服头像太难找」。 */
+    /** v2.91.50 左下角头像一步到位：选图 → 上传 → 自动保存（不用再进设置页）。
+     *  沿用 v2.91.49 的入口；editBrandAvatar 仍保留给"想进设置页细调"的场景。 */
+    const sideAvatarPick = async (ev) => {
+      const file = (ev.target.files || [])[0];
+      ev.target.value = '';
+      if (!file) return;
+      if (file.size > 2 * 1024 * 1024) { ElementPlus.ElMessage.warning('头像不能超过 2MB'); return; }
+      try {
+        const data = await new Promise(res => { const fr = new FileReader(); fr.onload = () => res(fr.result); fr.readAsDataURL(file); });
+        const up = await API.post('/api/upload', { data, kind: 'image', filename: file.name });
+        brand.avatar = up.url;
+        await saveBrand();
+        ElementPlus.ElMessage.success('访客端客服头像已更新（访客页刷新即可看到）');
+      } catch (e) {
+        ElementPlus.ElMessage.error('上传失败：' + (e && e.message ? e.message : '未知错误'));
+      }
+    };
     const editBrandAvatar = () => {
       openSetting('brand');
       ElementPlus.ElMessage({ message: '在这里上传「访客端头像」，改完点下方保存', type: 'info', duration: 3200 });
@@ -3843,7 +3860,7 @@ const app = createApp({
       presetPng, pickPosterPresetImg,
       POSTER_POS, qrFreeStyle, qrLayerStyle, textStyle,
       cropDlg, cropSrc, cropZoomPct, cropStage, cropStyle, cropImgLoaded, cropDown, cropMove, cropUp, cropWheel, cropClose, openCrop, cropConfirm, avatarPreview,
-      geoTag, visitorTag, visitorTagFull, visitorChnClass, sessArea, brandAvatarUrl, editBrandAvatar, copyQrImage, downloadQrImage, codeRotateHint, rotateCode, rotateLink, loadHistory, disableLink, saveCodeCfg, meAvatarUrl,
+      geoTag, visitorTag, visitorTagFull, visitorChnClass, sessArea, brandAvatarUrl, editBrandAvatar, sideAvatarPick, copyQrImage, downloadQrImage, codeRotateHint, rotateCode, rotateLink, loadHistory, disableLink, saveCodeCfg, meAvatarUrl,
       manageDlgOpen, codeList, codeListLoading, openManageCodes, toggleCode, delCodeRow, renewCodeRow, codeRowCmd,
       loginInfoDlg, loginInfo, loginInfoName, loginHost, saveLoginInfoName, skipLoginInfo, markLoginInfoAsked,
       codeTextDlg,

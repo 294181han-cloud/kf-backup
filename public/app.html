@@ -118,13 +118,15 @@
           <!-- v2.91.49 左下角头像改成「修改访客端客服头像」的直达入口。
                起因：客服反馈「换访客端客服头像太难找」（原来要点 设置 → 访客端外观 → 找那一项）。
                这里显示的就是访客端当前用的头像（所见即所得），点一下直接进到那项设置。 -->
-          <button type="button" class="me-ava me-ava-edit" @click="editBrandAvatar"
-                  title="修改访客端客服头像（点击直达设置）">
+          <button type="button" class="me-ava me-ava-edit" @click="$refs.sideBrandAva.click()"
+                  title="修改访客端客服头像（点一下选图，自动上传并保存）">
             <img v-if="brandAvatarUrl" :src="brandAvatarUrl" alt="访客端头像">
             <img v-else-if="meAvatarUrl" :src="meAvatarUrl" alt="">
             <img v-else src="/assets/img/mi-logo.png" alt="小米客服">
             <span class="ma-edit">✎</span>
           </button>
+          <input ref="sideBrandAva" type="file" accept="image/png,image/jpeg,image/gif,image/webp"
+                 style="display:none" @change="sideAvatarPick"/>
           <div class="me-id">
             <b>{{ me ? (me.nickname || me.kami || '') : '' }}</b>
             <span class="me-sub mono" v-if="me && me.role==='tenant'">{{ me.kami }} · {{ expireText }}</span>
@@ -1917,6 +1919,6 @@
 <script src="/assets/qr-poster.js?v=2.3.0"></script>
 <script src="/assets/api.js?v=2.1.2"></script>
 <script src="/assets/js/app-components.js?v=2.6.2"></script>
-<script src="/assets/js/app.js?v=3.68.35"></script><script src="/assets/js/app-boot.js?v=2.1.1"></script>
+<script src="/assets/js/app.js?v=3.68.36"></script><script src="/assets/js/app-boot.js?v=2.1.1"></script>
 </body>
 </html>
