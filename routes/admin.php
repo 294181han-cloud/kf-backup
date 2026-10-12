@@ -498,9 +498,12 @@ function handle_admin_door_pool(string $method): void
     if ($method === 'GET') {
         $rows = $pdo->query('SELECT id, domain, enabled, label, red_at, last_check, fail_count, created_at
             FROM door_pool ORDER BY enabled DESC, id ASC')->fetchAll();
-        /* 顺带统计每个门牌被多少条在用码使用（让后台一眼看出影响面） */
+        /* 顺带统计每个门牌被多少条在用码使用（让后台一眼看出影响面）。
+           v2.91.25 注意：gate_door_pick 有请求级缓存（按租户键），逐条统计前必须重置，
+           否则同租户的码会全被算到同一张门牌上（曾经"在用码"全显示 0）。 */
         $use = [];
         foreach ($pdo->query('SELECT entry_id, link FROM service_codes WHERE enabled = 1') as $sc) {
+            gate_door_pick_reset();
             $d = gate_code_link((string)$sc['entry_id'], (string)$sc['link']);
             $h = strtolower((string)(parse_url($d, PHP_URL_HOST) ?: ''));
             if ($h !== '') $use[$h] = ($use[$h] ?? 0) + 1;

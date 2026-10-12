@@ -2551,7 +2551,15 @@ function door_is_own_host(string $host): bool
     return false;
 }
 
-/** v2.91.24 门牌池挑选（用户要求：**换码就换一张门牌**，不要又抽回原来那张）。
+/** v2.91.25 清掉门牌挑选的请求级缓存。
+ *  用途：需要「逐条码枚举它真正用哪张门牌」时（后台门牌管理的"在用码"统计、审计脚本），
+ *  否则同一请求内所有码都会算出同一张门牌（缓存按租户键固定，见 gate_door_pick）。 */
+function gate_door_pick_reset(): void
+{
+    $GLOBALS['KF_DOOR_PICK_CACHE'] = [];
+}
+
+/** v2.91.25 门牌池挑选（用户要求：**换码就换一张门牌**，不要又抽回原来那张）。
  *  规则：
  *    ① 后台配了 door_domain → 那是运营指定，不插手；
  *    ② 换码（发新码）时，跳过「该租户上一张已发出去的码」用的那张门牌；
@@ -2563,10 +2571,14 @@ function gate_door_pick(int $tenantId = 0): string
 {
     $dom = strtolower(trim((string)kv_get('door_domain', '')));
     if ($dom !== '') return $dom;                             // ① 运营指定
-    static $cache = [];
+    /* v2.91.25 缓存改用 $GLOBALS（原来用 static，外部无法重置 → 后台统计"在用码"会把所有码算成同一张门牌）。
+       gate_door_pick_reset() 可清空；键按租户。 */
+    if (!isset($GLOBALS['KF_DOOR_PICK_CACHE']) || !is_array($GLOBALS['KF_DOOR_PICK_CACHE'])) $GLOBALS['KF_DOOR_PICK_CACHE'] = [];
+    $cache = &$GLOBALS['KF_DOOR_PICK_CACHE'];
     /* v2.91.24 递归保护：下面为了拿「上一张码的门牌」要调 gate_code_link()，
        而它内部又会调回本函数 —— 没有这道闸会无限递归直到内存耗尽（实测踩过）。 */
-    static $busy = false;
+    if (!isset($GLOBALS['KF_DOOR_PICK_BUSY'])) $GLOBALS['KF_DOOR_PICK_BUSY'] = false;
+    $busy = &$GLOBALS['KF_DOOR_PICK_BUSY'];
     $ck = 't' . $tenantId;
     if (isset($cache[$ck])) return $cache[$ck];               // ④ 同请求固定
     if ($busy) return '';                                     // ★ 递归中：本次不强求换门牌
@@ -2599,7 +2611,6 @@ function gate_door_pick(int $tenantId = 0): string
     $busy = false;                                            // ★ 解除递归闸
     return $pick;
 }
-
 /** v2.90.24 「门牌池」包装：真实落地链接 → https://门牌/?xx=<base64url>
  *  为什么要池子：只用一个门牌，被举报多了必红（实测 unrivaled-moxie-03037b 红了 → 全站码一起打不开）。
  *  后台配了 door_domain 就固定用它；没配就从池子随机挑一个，且**跳过与落地域同域的门牌**
