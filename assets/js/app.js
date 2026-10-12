@@ -384,13 +384,20 @@ const app = createApp({
     const quotaW = (u, l) => Math.min(100, l > 0 ? Math.round(u / l * 100) : 100) + '%';
     /* v2.88.2 名额提醒：客服码/网页名额快满或已满时，工作台顶部自己提醒一条 ——
        原来要等客户反馈「扫码进不来」才知道额度用完了。 */
+    /** v2.91.54 按用户要求：本周额度只显示【一个总数】。
+     *  原来分「客服码 x/1000 · 网页 y/1000」两条，看着乱；现在合并成 已用/总额度。
+     *  注意：后端两个池子仍是各自独立计数的（合并的只是显示，以及下面预警条的口径）。 */
+    const weekUsedTotal = Vue.computed(() => Number((me.value && me.value.used_app) || 0) + Number((me.value && me.value.used_web) || 0));
+    const weekQuotaTotal = Vue.computed(() => {
+      const m = me.value || {};
+      return Math.max(Number(m.quota_app || 0), Number(m.quota_web || 0)) || 0;
+    });
     const quotaWarn = computed(() => {
       const m = me.value;
       if (!m || m.role !== 'tenant') return null;
       const list = [
-        { k: '客服码', u: Number(m.used_app || 0), l: Number(m.quota_app || 0) },
-        { k: '网页', u: Number(m.used_web || 0), l: Number(m.quota_web || 0) },
-      ].filter(x => x.l > 0);
+          { k: '本周额度', u: Number(m.used_app || 0) + Number(m.used_web || 0), l: Math.max(Number(m.quota_app || 0), Number(m.quota_web || 0)) },
+        ].filter(x => x.l > 0);
       const fmt = (arr) => arr.map(x => x.k + ' ' + x.u + ' / ' + x.l).join('、');
       const full = list.filter(x => x.u >= x.l);
       if (full.length) {
@@ -3866,7 +3873,7 @@ const app = createApp({
       codeTextDlg,
       codeCreatedAt, codeExpiresAt,
       quickFields, welcomeFields, autoFields, blFields, preqFields,
-      shortTime, fmtTime, sourceText, contactLabel, barW, quotaW, trendW, trendDesc, dailyDesc, quotaWarn,
+      shortTime, fmtTime, sourceText, contactLabel, barW, quotaW, trendW, weekUsedTotal, weekQuotaTotal, trendDesc, dailyDesc, quotaWarn,
       sessTime,
       sessIcon, sessPreview,
       setTab, setGroups, openSetting, switchSetting,
