@@ -71,7 +71,7 @@ foreach ($codes as $c) {
    而是**以「租户在用的客服码」为依据**：某条码被判红 → 顺着它找到对应的【门牌】和【落地域名】，
    两个都自动下架退役，避免租户之后点「换码」又换到红的门牌/域名。
    恢复后不会自动开回来（要人工在后台确认）。 */
-$doorOff = 0; $landOff = 0; $alerts = 0;
+$doorOff = 0; $alerts = 0;   // v2.91.28 只统计门牌下架
 
 /* 预建映射（避免在循环里反复查库）：
    $entryMap[客服码] = entry_id ；$codeRows[客服码] = 该码整行 ；$doorToCodes[门牌] = 用到它的码列表 */
@@ -91,26 +91,11 @@ foreach ($redCodes as $rc) {
     $rcLink = (string)$rc['link'];
     $landDomain = strtolower((string)pool_domain_of((string)parse_url($rcLink, PHP_URL_HOST)));
 
-    /* ① 对应的落地域名：停用 + 记红名单 + 清掉租户固定域名/内容主机（下次发码自动换台） */
-    if ($landDomain !== '') {
-        try {
-            $st = $pdo->prepare('SELECT id, enabled FROM domain_pool WHERE domain = ? LIMIT 1');
-            $st->execute([$landDomain]);
-            $dp = $st->fetch(PDO::FETCH_ASSOC);
-            if ($dp) {
-                $pdo->prepare("INSERT IGNORE INTO red_domains (host, main, kind, code, channel) VALUES (?,?,?,?, 'wx')")
-                    ->execute([$landDomain, $landDomain, 'main', $rcCode]);
-                if ((int)$dp['enabled'] === 1) {
-                    $pdo->prepare('UPDATE domain_pool SET enabled = 0 WHERE id = ?')->execute([(int)$dp['id']]);
-                    $landOff++;
-                    echo date('Y-m-d H:i:s'), " 落地域名 ", $landDomain, " 因客服码 ", $rcCode, " 被判红 → 已下架\n";
-                }
-                /* 该租户绑的固定域名如果是它，清掉；他名下的内容主机也清掉（发码时会重新分配） */
-                $pdo->prepare("UPDATE tenants SET content_domain = '' WHERE content_domain = ?")->execute([$landDomain]);
-                $pdo->prepare("UPDATE service_codes SET content_host = '' WHERE content_host LIKE ?")->execute(['%.' . $landDomain]);
-            }
-        } catch (\Throwable $e) { /* 下架失败不影响下面的门牌处理 */ }
-    }
+    /* v2.91.28 按用户要求：红码【只退役门牌，不动落地域名】。
+       实测依据（用户给的这条红码）：门牌 unrivaled-moxie-03037b 查红 = red（被封），
+       而它指向的落地 h652ww.shop 查红 = ok（完全正常）。
+       一个落地域名上通常挂着好几个租户的多条码，因一条红码就下架整个落地域名会连累别人。
+       落地域名真要停用，由管理员在后台「域名池」页手动处理。 */
 
     /* ② 对应的门牌：停用 + 记红名单（租户换码就不会再抽到它） */
     try {
@@ -154,4 +139,4 @@ foreach ($redCodes as $rc) {
 
 /* v2.91.27b 汇总行必须放在「顺藤下架」之后，否则统计恒为 0 */
 echo date('Y-m-d H:i:s'), " 巡检完成：共 ", count($codes), " 个码 → 正常 {$ok}、红 {$red}、异常/未开通 {$other}；新增提醒 {$newAlerts} 条",
-    "；因红码下架：门牌 {$doorOff} 个、落地域名 {$landOff} 个；顺带提醒 {$alerts} 条\n";
+    "；因红码下架：门牌 {$doorOff} 个；顺带提醒 {$alerts} 条\n";
