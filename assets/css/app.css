@@ -2,6 +2,13 @@
 * { box-sizing: border-box; }
 [v-cloak] { display: none; }
 body { margin: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif; background: #f2f3f5; }
+/* v2.91.45 电脑端：把整页锁死在视口内，鼠标滚轮不再把整个工作台上下拖动。
+   原因：html/#app 没有高度约束，只要浮层（右键菜单、弹窗、下拉）超出视口就会把 body 撑高，
+   于是滚轮变成了"整页滚动"。工作台本身就是固定外壳 + 内部面板各自滚动，锁住 body 才是正确行为。
+   只在桌面宽度生效，避免影响手机端布局。 */
+@media (min-width: 768px) {
+  html, body { height: 100%; overflow: hidden; overscroll-behavior: none; }
+}
 .layout { display: flex; height: 100vh; overflow: hidden; }
 
 /* ---------- 侧栏 ---------- */
