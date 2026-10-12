@@ -55,19 +55,34 @@ function handle_admin_tenant_mint_codes(string $method, int $id): void
             $have = [];   // 旧码已经清空，下面按域名重新铺
         } catch (\Throwable $e) { json_error('清空旧码失败：' . $e->getMessage(), 500); }
     }
+    $usedDoors = [];   // v2.91.41 批量铺码时记录已用门牌，保证每张码落到不同门牌
     foreach ($doms as $d) {
         /* v2.91.29 去掉 $skipRed 判断（用户明确：只有门牌会被微信红，落地域名不存在被红）；
            参数保留以兼容老前端，实际不再跳过任何域名。 */
         if (!$force && !empty($have[$d])) { $already[] = $d; continue; }
+        /* v2.91.41 【修复】批量铺码时门牌要跟着换。
+           实测踩坑：租户 24 一次批量发 10 条码，10 条全落在同一张门牌（regal-blancmange），
+           等于把 10 条码的命押在一张门牌上 —— 那张门牌一红，10 条码一起死。
+           原因：批量循环里没重置「本次请求已选门牌」的缓存，第一个码选了哪张，后面全都用它。
+           现在每轮都清掉缓存 + 跳过本轮已用过的门牌。 */
+        $GLOBALS['KF_DOOR_PICK_CACHE'] = [];
+        unset($GLOBALS['KF_DOOR_FIXED']);
         $r = tenant_mint_service_code($id, '', $d);
-        if (!empty($r['ok'])) $created[] = ['domain' => $d, 'code' => $r['code']['code'], 'link' => $r['code']['link']];
-        else $failed[] = ['domain' => $d, 'msg' => (string)($r['msg'] ?? '失败')];
+        if (!empty($r['ok'])) {
+            $used = kf_clean_host((string)($r['code']['door_host'] ?? ''));
+            if ($used === '') $used = kf_clean_host((string)(parse_url((string)($r['code']['link'] ?? ''), PHP_URL_HOST) ?: ''));
+            $usedDoors[] = $used;
+            $created[] = ['domain' => $d, 'code' => $r['code']['code'], 'link' => $r['code']['link'], 'door' => $used];
+        } else {
+            $failed[] = ['domain' => $d, 'msg' => (string)($r['msg'] ?? '失败')];
+        }
     }
     json_out([
         'ok' => true,
         'tenant' => ['id' => (int)$t['id'], 'kami' => (string)$t['kami']],
         'removed' => $removed,
         'created' => $created, 'created_count' => count($created),
+        'doors_used' => array_values(array_unique(array_filter($usedDoors))),
         'skip_red' => $skippedRed, 'already' => $already, 'failed' => $failed,
     ]);
 }

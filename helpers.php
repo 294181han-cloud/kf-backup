@@ -2943,6 +2943,9 @@ function tenant_mint_service_code(int $tid, string $want = '', string $domain = 
     return ['ok' => true, 'code' => [
         'id' => $newId, 'code' => $code, 'entry_id' => $entryId, 'link' => $wrappedUrl,
         'enabled' => true, 'created_at' => dt_to_iso(now_dt()),
+        /* v2.91.41 把这张码固定的门牌一并返回（批量铺码要用它判断本轮是否换了门牌） */
+        'door_host' => $doorHost ?? '',
+        'content_host' => $ch ?? '',
         /* v2.90.97 新码默认 72 小时到期 */
         'expires_at' => dt_to_iso(now_dt(time() + SERVICE_CODE_TTL_SECS)),
     ]];
