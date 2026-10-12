@@ -24,7 +24,7 @@ if (!$cfg['on']) {
     exit;
 }
 
-$codes = $pdo->query('SELECT id, tenant_id, code, link FROM service_codes ORDER BY id ASC')->fetchAll();
+$codes = $pdo->query('SELECT id, tenant_id, code, link, enabled, expires_at, door_host FROM service_codes ORDER BY id ASC')->fetchAll();
 if (!$codes) {
     echo date('Y-m-d H:i:s'), " 没有客服码，跳过\n";
     exit;
@@ -63,6 +63,11 @@ foreach ($codes as $c) {
     } else {
         $other++;   // off / err：不动提醒，避免误清
     }
+    /* v2.91.37 这条码已停用/过期 → 它的未读红码提醒自动清掉，免得租户端一直挂着过期的红条 */
+    if (empty($c['enabled']) || service_code_expired((string)($c['expires_at'] ?? ''))) {
+        try { $pdo->prepare('DELETE FROM code_alerts WHERE code = ? AND seen = 0')->execute([(string)$c['code']]); } catch (\Throwable $e) { }
+    }
+
     usleep(300000);   // 每条间隔 0.3s，别把接口打爆
 }
 
