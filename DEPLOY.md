@@ -3380,3 +3380,32 @@ VER=$(sed -n "s/.*return[[:space:]]*'\([0-9.]*\)'.*/\1/p" version.php | head -1)
   设置页在「安全与维护」，`ai_key` / `ai_tg_token` 留空 = 不修改（避免一保存就把已配的清掉）。
 - 前端：`public/app.html` 新面板（`v-if="aiCfg.entitled"`）+ `assets/js/app.js`（`aiCfg`/`saveAi`/`genAiSecret`），
   app.js 的 `?v=` 加 1。
+
+## v2.91.5 线路体检 + 访客页自带探针（v2.91.4/v2.91.6 为其配套修复）
+
+**要解决的问题**：客服/平台只能等客户反馈「某些地区扫码进不来」，系统自己也看不见 ——
+因为服务器的自检永远连得通（我们机房出去的路由是好的），坏线路会一直留在池子里继续发给访客。
+
+**做法（探针来源①：访客页自带探针，不用部署任何东西，真实全国访客就是探针）**
+- 新表 `line_probe`（幂等建表在 `ensure_upgrade()`）：每台主机 × 省份 × 运营商 一行，
+  累计通/不通次数 + 最近耗时/原因/时间 + 匿名 IP。只记归属地，不记 UA、不记内容。
+- 新接口 `POST /api/probe/report`（公开）：地区/运营商由服务端用访客真实 IP 反查（`lookup_geo`，不信客户端）；
+  失败时顺带转给现有 `/api/gate/err` 判定（复用退役/换机逻辑，带 mirror 防递归）。
+- 访客页（`public/visitor.html`，服务端 `visitor_page_packed` 打包后 document.write）：
+  `__kfProbe()` —— **正常访客什么都不发**；只有「8 秒还没挂载」时才上报一次（host + 失败原因），
+  上报地址固定打回总控 `https://ad.yluu.top`（落地主机不通时也能报出来）。
+- 门牌壳页（`gate_loader_html`）：新增 `reportOne()`，把「试过但打不开」的备用域名逐个报回来 ——
+  所以「换备用域名也进不去」时，是哪些域名坏的一清二楚；iframe 超时、备用域名耗尽两处都补了上报。
+- 读侧：`GET /api/admin/line-health`（管理员）+ `GET /api/tenant/line-health`（租户本人，只读）；
+  后台「🩺 线路体检」页（admin.html）+ 客服码页可展开的「线路体检」面板（app.html），
+  都能按 1h/6h/24h/7d 看「主机 × 地区 × 运营商」的成功率与最近失败原因。
+
+**配套修复**
+- v2.91.4：`handle_admin_line_health` 鉴权用错函数（`require_workspace` → `require_admin_ctx`），管理员会被 403。
+- v2.91.6：探针取地区调了不存在的 `geo_lookup()`（真名 `lookup_geo()`），导致地区/运营商永远记成「未知」。
+
+**实测**
+- 探针接口：`ok=0` 写失败计数并转 `/api/gate/err`（当时已有 4 次上报 → 返回 `noted`）；`ok=1` 写成功计数。
+- 地区解析：`223.104.150.16 → 江苏省 南京/移动`、`124.31.34.226 → 西藏 拉萨/电信`、`39.144.98.208 → 山西省 晋中/移动`。
+- 租户侧接口用真 token 走 HTTP：返回 `hours=24，主机 3 台，地区明细 4 行`，失败原因 `boot-timeout` / `alt-unreachable` 可读。
+- 未授权访问：两个接口都返回 `{"error":"未登录"}`。
