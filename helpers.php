@@ -3098,6 +3098,9 @@ function gate_loader_html(string $apiBase = ''): string
         . 'var _rh="";try{_rh=(new URL(document.referrer||"")).hostname.toLowerCase()}catch(e){}'
         . 'var _ok=false;for(var _i=0;_i<FA.length;_i++){var _h=FA[_i];'
         . 'if(_h&&(_rh===_h||_rh.slice(-(_h.length+1))==="."+_h)){_ok=true;break}}'
+        /* v2.91.18 referrer 为空且我们有白名单 → 当作「老 WebView 不发 referrer」放行。
+           此前这里直接 return 罢工，导致扫码进来页面被门牌装着、却没人收起「正在进入…」、也没人改标题。 */
+        . 'if(!_ok&&_rh===""&&FA.length>0){_ok=true;diag("referrer 为空，按白名单放行");}'
         . 'if(!_ok){document.title="在线客服";return;}}'
         . 'ask(0);'
         . '})();</' . 'script></body></html>';
@@ -3111,7 +3114,7 @@ function gate_loader_html(string $apiBase = ''): string
     }
     $outer = '<!DOCTYPE html><html lang="zh-CN"><head><meta charset="utf-8">'
         . '<meta name="viewport" content="width=device-width,initial-scale=1">'
-        . '<meta name="referrer" content="no-referrer"><meta name="robots" content="noindex">'
+        . '<meta name="referrer" content="origin"><meta name="robots" content="noindex">'
         . '<title>id-' . random_int(1000, 9999) . '</title>'
         . $brandTags . '</head>'
         . '<body><script>(function(){'
