@@ -3325,9 +3325,17 @@ const app = createApp({
     const rotateCode = async () => {
       try {
         await API.post('/api/tenant/service-code', {});
-        ElementPlus.ElMessage.success('已新增一条客服码（默认 72 小时到期；旧码继续有效，可在「管理码」里续期或停用）');
+        ElementPlus.ElMessage.success('已新增一条客服码（落在另一个落地域名上，互为备份；默认 72 小时到期，旧码继续有效）');
         await loadLinks(); renderMainQr(); checkCode(true);
-      } catch (e) { ElementPlus.ElMessage.error(e.message); }
+      } catch (e) {
+        /* v2.91.26 已有 3 条正常码：后端会明确回话，这里把提示放大一点，别让用户以为是网络错 */
+        const msg = (e && e.message) || '换码失败';
+        if (msg.indexOf('请使用当前正常码') >= 0) {
+          ElementPlus.ElMessageBox.alert(msg, '无需再换码', { type: 'info', confirmButtonText: '知道了' }).catch(() => {});
+        } else {
+          ElementPlus.ElMessage.error(msg);
+        }
+      }
     };
     /** 真换一张二维码：作废旧链接（顾客需要重新扫码） */
     const rotateLink = async () => {
@@ -3335,7 +3343,14 @@ const app = createApp({
         await API.post('/api/tenant/service-code', { new_link: 1 });
         ElementPlus.ElMessage.success('已新增一条客服码（旧码继续有效）——把新链接发给客户即可');
         await loadLinks(); renderMainQr(); checkCode(true);
-      } catch (e) { ElementPlus.ElMessage.error(e.message); }
+      } catch (e) {
+        const msg = (e && e.message) || '换码失败';
+        if (msg.indexOf('请使用当前正常码') >= 0) {
+          ElementPlus.ElMessageBox.alert(msg, '无需再换码', { type: 'info', confirmButtonText: '知道了' }).catch(() => {});
+        } else {
+          ElementPlus.ElMessage.error(msg);
+        }
+      }
     };
     const loadHistory = async () => {
       try { history.value = await API.get('/api/tenant/link/history'); } catch (e) {}

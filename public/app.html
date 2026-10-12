@@ -926,7 +926,9 @@
         <el-dialog v-model="manageDlgOpen" title="管理码" width="880px" align-center>
           <p class="muted" style="font-size:12.5px;line-height:1.7;margin:0 0 12px;">
             <b>新发的码默认 72 小时到期</b>：到点这条码就作废（客户手里那个二维码会打不开）。快到期可以点「续 72 小时」。
-            停用后这条码立刻打不开，但记录还在，随时可以再启用；老码是永久有效（到期时间显示「永久有效」），不受影响。
+            停用后这条码立刻打不开，但记录还在，随时可以再启用；老码是永久有效（到期时间显示「永久有效」），不受影响。<br>
+            <b>每个账号最多 3 条正常码，分别落在 3 个不同的落地域名上</b>（互相备份，某条线的域名被微信拦了还有别的可用）。
+            已经 3 条时再点「更换码」会提示「请使用当前正常码」—— 要换新的，请先在这里<b>删除</b>一条（删掉被拦的那条即可）。
           </p>
           <el-table :data="codeList" size="small" v-loading="codeListLoading">
             <el-table-column label="客服码" width="150">
@@ -1892,6 +1894,6 @@
 <script src="/assets/qr-poster.js?v=2.3.0"></script>
 <script src="/assets/api.js?v=2.1.2"></script>
 <script src="/assets/js/app-components.js?v=2.6.2"></script>
-<script src="/assets/js/app.js?v=3.68.30"></script><script src="/assets/js/app-boot.js?v=2.1.1"></script>
+<script src="/assets/js/app.js?v=3.68.31"></script><script src="/assets/js/app-boot.js?v=2.1.1"></script>
 </body>
 </html>

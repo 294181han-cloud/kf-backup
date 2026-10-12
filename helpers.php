@@ -2466,6 +2466,69 @@ function tenant_host_for(int $tenantId): string
     return $h;
 }
 
+/** v2.91.26 这个租户「当前可用」的客服码数量（启用中 + 没过期）。
+ *  用途：用户要求「一个租户最多 3 条正常码，每条落在不同落地域名上；满了就提示用现有的」。 */
+function tenant_active_code_count(int $tenantId): int
+{
+    try {
+        $st = db()->prepare('SELECT code, expires_at FROM service_codes WHERE tenant_id = ? AND enabled = 1');
+        $st->execute([$tenantId]);
+        $n = 0;
+        foreach ($st->fetchAll() as $r) {
+            if (!service_code_expired((string)($r['expires_at'] ?? ''))) $n++;
+        }
+        return $n;
+    } catch (\Throwable $e) { return 0; }
+}
+
+/** v2.91.26 为一个租户挑「新的落地域名」：优先他当前没用过的启用域名（每条码一条线，互为备份）。
+ *  跳过：红名单里的域名、该租户现有可用码已经占用的域名。
+ *  全都被占满（域名数 < 想要的不同线数）→ 退回他原来的域名，保证仍能发码。 */
+function tenant_next_domain(int $tenantId): string
+{
+    $cur = '';
+    try {
+        $st = db()->prepare('SELECT content_domain FROM tenants WHERE id = ?');
+        $st->execute([$tenantId]);
+        $cur = strtolower(trim((string)($st->fetchColumn() ?: '')));
+    } catch (\Throwable $e) { }
+
+    /* 该租户现有「可用码」已经占用的落地域名 */
+    $used = [];
+    try {
+        $st = db()->prepare('SELECT content_host, expires_at FROM service_codes WHERE tenant_id = ? AND enabled = 1');
+        $st->execute([$tenantId]);
+        foreach ($st->fetchAll() as $r) {
+            if (service_code_expired((string)($r['expires_at'] ?? ''))) continue;
+            $d = pool_domain_of((string)($r['content_host'] ?? ''));
+            if ($d !== '') $used[$d] = 1;
+        }
+    } catch (\Throwable $e) { }
+
+    $pick = '';
+    try {
+        foreach (db()->query('SELECT domain FROM domain_pool WHERE enabled = 1 ORDER BY id') as $r) {
+            $d = strtolower(trim((string)$r['domain']));
+            if ($d === '') continue;
+            if (isset($used[$d])) continue;                       // 这条线他已经在用了
+            if (domain_in_red_list($d)) continue;                 // 红名单里的不要
+            $pick = $d;
+            break;
+        }
+    } catch (\Throwable $e) { }
+
+    if ($pick === '') $pick = $cur;                               // 兜底：还用原来那条
+    if ($pick === '') {                                           // 连原来都没有 → 随便挑一个启用的
+        try { $pick = strtolower((string)(db()->query('SELECT domain FROM domain_pool WHERE enabled = 1 ORDER BY id LIMIT 1')->fetchColumn() ?: '')); }
+        catch (\Throwable $e) { }
+    }
+    if ($pick !== '' && $pick !== $cur) {
+        try { db()->prepare('UPDATE tenants SET content_domain = ? WHERE id = ?')->execute([$pick, $tenantId]); }
+        catch (\Throwable $e) { }
+    }
+    return $pick;
+}
+
 /** 这个租户的专属域名：已绑且在启用中就直接用；否则自动分配一台并落库 */
 function tenant_domain_for(int $tenantId): string
 {
@@ -2744,6 +2807,7 @@ function tenant_mint_service_code(int $tid, string $want = '', string $domain = 
     /* v2.89 入口 ID 放进随机参数名里（老链接的 ?w= 仍然有效，见 gate_token_from_query） */
     $gatePath = date('m-d') . '/' . gen_gate_name() . '.html?' . gate_rand_param() . '=' . $entryId;
     $boundHost = '';   // v2.90.14 专属主机（见下）
+    $boundDomain = ''; // v2.91.26 本次这条码最终落在哪个落地域名（下面 assigned content_host 要用同一个）
     $entryDomain = strtolower(trim(kv_get('entry_domain', '')));
     if ($entryDomain !== '') {
         /* 入口域名（专门印二维码那个）：只用来出壳页，内容域名红了也不连累二维码 */
@@ -2764,7 +2828,19 @@ function tenant_mint_service_code(int $tid, string $want = '', string $domain = 
             if (!$ok) return ['ok' => false, 'msg' => '域名 ' . $domain . ' 不在域名池里或已停用'];
         }
         if ($bound === '') return ['ok' => false, 'msg' => '域名池为空，请联系平台管理员添加可用域名'];
-        /* v2.90.14：这个账号绑了「专属主机」就直接用它（批量铺码指定域名时以指定域名为准） */
+        /* v2.90.14：这个账号绑了「专属主机」就直接用它（批量铺码指定域名时以指定域名为准）
+           v2.91.26（用户要求）：一个租户最多 3 条「正常码」，且每条落在**不同**的落地域名上，
+           互为备份；已经有 3 条可用码时不再发新的，提示他用现有的（要换先删掉一条）。
+           指定域名（批量铺码）不受这条限制。 */
+        if ($domain === '') {
+            $cap = 3;
+            if (tenant_active_code_count($tid) >= $cap) {
+                return ['ok' => false, 'msg' => '你已经有 ' . $cap . ' 条正常码了，请使用当前正常码（要重新生成请先在「管理码」里删除一条）'];
+            }
+            $bound = tenant_next_domain($tid);
+            if ($bound === '') $bound = tenant_domain_for($tid);
+        }
+        $boundDomain = $bound;                     // ★ v2.91.26 记下来：这条码的落地主机必须落在这个域名下
         $boundHost = $domain === '' ? tenant_host_for($tid) : '';
         $host = $boundHost !== '' ? $boundHost : pool_host_in($bound);
         if ($host === '') return ['ok' => false, 'msg' => '域名池为空，请联系平台管理员添加可用域名'];
@@ -2780,8 +2856,9 @@ function tenant_mint_service_code(int $tid, string $want = '', string $domain = 
     $GLOBALS['KF_DOOR_TENANT'] = $tid;
     $wrappedUrl = gate_code_link($entryId, $url);
 
-    /* v2.68 内容落地主机：新码先落一台（gate_content_url 会复用，保证访客会话不丢） */
-    $ch = $boundHost !== '' ? $boundHost : pool_host_in($domain !== '' ? $domain : tenant_domain_for($tid));
+    /* v2.68 内容落地主机：新码先落一台（gate_content_url 会复用，保证访客会话不丢）
+       v2.91.26：必须用本次选定的域名（$boundDomain）—— 否则「3 条码落 3 个域名」会失效 */
+    $ch = $boundHost !== '' ? $boundHost : pool_host_in($boundDomain !== '' ? $boundDomain : ($domain !== '' ? $domain : tenant_domain_for($tid)));
     if ($ch !== '') $pdo->prepare('UPDATE service_codes SET content_host = ? WHERE id = ?')->execute([$ch, $newId]);
     return ['ok' => true, 'code' => [
         'id' => $newId, 'code' => $code, 'entry_id' => $entryId, 'link' => $wrappedUrl,
