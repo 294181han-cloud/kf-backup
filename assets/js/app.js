@@ -3546,6 +3546,13 @@ const app = createApp({
     // 渠道配色：微信绿 / QQ 蓝 / 支付宝蓝 / 抖音红，其余中性
     const CHN_CLASS = { '微信': 'chn-wx', 'QQ': 'chn-qq', '支付宝': 'chn-ali', '抖音': 'chn-dy', '钉钉': 'chn-dt' };
     const visitorChnClass = (s) => (s && CHN_CLASS[s.channel]) || 'chn-other';
+    /** v2.91.47 窄屏专用的紧凑归属地：只取地区（省/市），不带宽高。
+     *  会话栏变窄时完整标签会被隐藏，导致 IP 归属地看不见（用户反馈），这里补一个短版。 */
+    const sessArea = (s) => {
+      if (!s) return '';
+      const g = s.region || s.city || geoTag(s.geo) || '';
+      return String(g).slice(0, 8);
+    };
     const visitorTagFull = (s) => {
       if (!s) return '';
       const bits = [];
@@ -3827,7 +3834,7 @@ const app = createApp({
       presetPng, pickPosterPresetImg,
       POSTER_POS, qrFreeStyle, qrLayerStyle, textStyle,
       cropDlg, cropSrc, cropZoomPct, cropStage, cropStyle, cropImgLoaded, cropDown, cropMove, cropUp, cropWheel, cropClose, openCrop, cropConfirm, avatarPreview,
-      geoTag, visitorTag, visitorTagFull, visitorChnClass, copyQrImage, downloadQrImage, codeRotateHint, rotateCode, rotateLink, loadHistory, disableLink, saveCodeCfg, meAvatarUrl,
+      geoTag, visitorTag, visitorTagFull, visitorChnClass, sessArea, copyQrImage, downloadQrImage, codeRotateHint, rotateCode, rotateLink, loadHistory, disableLink, saveCodeCfg, meAvatarUrl,
       manageDlgOpen, codeList, codeListLoading, openManageCodes, toggleCode, delCodeRow, renewCodeRow, codeRowCmd,
       loginInfoDlg, loginInfo, loginInfoName, loginHost, saveLoginInfoName, skipLoginInfo, markLoginInfoAsked,
       codeTextDlg,

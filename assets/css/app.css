@@ -2513,8 +2513,15 @@ body.resizing-col { cursor: col-resize !important; user-select: none; }
 /* v2.89.7 会话列表「窄模式」：拖到 300px 以内自动少显示（渠道标签/预览/客服标签都收起） */
 /* v2.90.24 会话列变窄的分级适配：先丢"渠道/地区"标签，再丢预览文字，别把字挤成竖排 */
 .sess-col.slim .geo-tag,
-.sess-col.slim .tag-agent,
-.sess-col.slim .sess-multi-entry .sme-text { display: none; }
+.sess-col.slim .tag-agent { display: none; }
+/* v2.91.47 窄屏下的紧凑归属地：完整标签被隐藏时它顶上，只显示地区（悬停看完整信息） */
+.geo-tag-slim { display: none; }
+.sess-col.slim .geo-tag-slim {
+  display: inline-block; vertical-align: middle; font-size: 11px; color: #86909c;
+  max-width: 7em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.sess-col.tiny .geo-tag-slim { max-width: 4.6em; font-size: 10.5px; }
+body.dark .sess-col.slim .geo-tag-slim { color: #8b919c; }
 .sess-col .sme-text-short { display: none; }
 .sess-col.slim .sme-text-short { display: inline; }
 .sess-col.slim .sess-item { gap: 8px; padding: 9px 26px 9px 8px; }
