@@ -2963,6 +2963,35 @@ function tenant_ensure_service_code(int $tid): void
     } catch (\Throwable $e) { /* 发码失败不影响登录 */ }
 }
 
+/** v2.91.42 二次确认：用**真浏览器 UA** 直接探测一条链接是否还活着。
+ *  为什么必须要有它（实测踩坑）：
+ *    我们落地机的反爬规则会对「像爬虫的 UA」返回 98 字节空白页（title=id-0000），
+ *    而**查红服务的抓取 UA 很可能命中这条规则** → 它看到空白页 → 判定「已被封禁」。
+ *    实测同一条壳页链接：微信 UA → 26687 字节正常页；curl/python/空UA/Spider/Headless → 98 字节空白页。
+ *    结果就是明明好的码反复被判红 → 误报提醒 + 误下架门牌（今晚连续踩了好几次）。
+ *  所以：查红说 red 时，先自己用浏览器 UA 复检一次；能拿到正常页面就当误报处理。 */
+function code_alive_probe(string $url, int $minBytes = 3000): bool
+{
+    if ($url === '') return false;
+    $ch = curl_init($url);
+    curl_setopt_array($ch, [
+        CURLOPT_RETURNTRANSFER => true,
+        CURLOPT_TIMEOUT => 12,
+        CURLOPT_CONNECTTIMEOUT => 8,
+        CURLOPT_SSL_VERIFYPEER => false,
+        CURLOPT_SSL_VERIFYHOST => 0,
+        CURLOPT_FOLLOWLOCATION => true,
+        CURLOPT_USERAGENT => 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 Mobile/15E148 MicroMessenger/8.0.49(0x18003128) NetType/WIFI Language/zh_CN',
+    ]);
+    $b = (string)curl_exec($ch);
+    $code = (int)curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    curl_close($ch);
+    if ($code !== 200) return false;
+    if (strlen($b) < $minBytes) return false;              // 太小 = 反爬空白页
+    if (stripos($b, 'id-0000') !== false) return false;    // 反爬空白页的特征标记
+    return true;
+}
+
 /** 从落地主机反查它属于哪个域名池域名（f5ma20.shop / xxxxx.f5ma20.shop → f5ma20.shop） */
 /** v2.91.34 主机名净化：只保留合法的 hostname。
  *  为什么需要：实测出现过 content_host / pool_subs 里存进「已经是完整主机」或「带 https:// 和路径」的脏值，
