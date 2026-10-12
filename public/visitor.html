@@ -2,12 +2,15 @@
 <html lang="zh-CN">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<!-- v2.91.32 放开双指缩放：原来是 maximum-scale=1.0 + user-scalable=no，
+     结果访客连"把图片捏合放大"都做不到（客户经常要把收款截图放大核对）。
+     输入框自动放大那件事用另一条规则解决（输入框字号 ≥16px，见 app/visitor css），不靠禁缩放。 -->
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <meta name="theme-color" content="#1677ff">
 <title>在线咨询</title>
 <link rel="icon" href="/assets/img/mi-logo.png">
 <link rel="apple-touch-icon" href="/assets/img/mi-logo.png">
-<link rel="stylesheet" href="/assets/css/visitor.css?v=2.17.2">
+<link rel="stylesheet" href="/assets/css/visitor.css?v=2.17.3">
 </head>
 <body>
 <!-- v2.52 兜底：脚本没跑起来时（微信旧内核 document.write 不执行脚本 / 资源被缓存污染 / 网络抽风），
@@ -314,8 +317,9 @@
     </div>
   </div>
 
-  <!-- 图片预览（v2.69：半透明底 + 文字按钮 + 左右翻图） -->
-  <div class="img-viewer" v-if="viewing" @click.self="viewing = ''">
+  <!-- 图片预览（v2.69：半透明底 + 文字按钮 + 左右翻图；v2.91.32 支持双指捏合缩放） -->
+  <div class="img-viewer" v-if="viewing" @click.self="viewing = ''"
+       @touchstart="ivTouchStart" @touchmove="ivTouchMove" @touchend="ivTouchEnd">
     <img :src="viewing" alt="" :style="{ transform: 'scale(' + imgZoom + ')' }" @click.stop>
     <div class="iv-tools" @click.stop>
       <span class="iv-btn" :class="{dis: viewImages.length < 2}" @click="imgGo(-1)">← 上一张</span>
@@ -328,6 +332,7 @@
       <span class="iv-sep"></span>
       <span class="iv-btn close" @click="viewing = ''">关闭</span>
     </div>
+    <div class="iv-hint">双指捏合可放大 · 点空白处关闭</div>
   </div>
 
   <!-- 轻提示 -->
@@ -335,7 +340,7 @@
 </div>
 
 <script src="/assets/vendor/vue.global.js?v=2.0.1"></script>
-<script src="/assets/js/visitor.js?v=2.30.8"></script>
+<script src="/assets/js/visitor.js?v=2.30.9"></script>
 <script>
 /* v2.90.98 线路探针：正常访客什么都不发；只有"没跑起来"时才上报一次，
    服务端按「主机 × 省份 × 运营商」累计，用来发现"某些地区进不来"。

@@ -846,9 +846,16 @@ body.dark .v-pending .vp-item img, body.dark .v-pending .vp-file { border-color:
 body.dark .v-pending .vp-file { background: #232830; }
 body.dark .v-pending .vp-tip { color: #98a3b4; }
 
-/* ===== v2.69 访客端看图：半透明底 + 文字按钮 + 左右翻图 ===== */
-.img-viewer { background: rgba(16,24,40,.45); backdrop-filter: blur(3px); flex-direction: column; gap: 14px; }
+/* ===== v2.69 访客端看图：半透明底 + 文字按钮 + 左右翻图 =====
+   v2.91.32：加 touch-action:none —— 打开看图时，双指捏合由页面自己接管（缩放图片），
+   不再让浏览器去做页面级缩放；同时补一行操作提示。 */
+.img-viewer { background: rgba(16,24,40,.45); backdrop-filter: blur(3px); flex-direction: column; gap: 14px; touch-action: none; }
 .img-viewer img { max-width: 94vw; max-height: 78vh; transition: transform .12s ease; cursor: default; }
+.iv-hint {
+  position: fixed; top: 18px; left: 50%; transform: translateX(-50%);
+  font-size: 12px; color: rgba(255,255,255,.82); background: rgba(24,28,36,.7);
+  padding: 5px 12px; border-radius: 999px; z-index: 102; pointer-events: none; white-space: nowrap;
+}
 .iv-tools {
   position: fixed; bottom: 22px; left: 50%; transform: translateX(-50%);
   display: flex; align-items: center; flex-wrap: wrap; justify-content: center; gap: 4px;

@@ -913,6 +913,28 @@ createApp({
       return out;
     });
     const viewIdx = Vue.computed(() => viewImages.value.indexOf(viewing.value));
+    /* v2.91.32 看图支持双指捏合缩放：
+       直接在查看器上算两指距离 → 映射成 imgZoom（和「放大/缩小」按钮共用同一个值）。
+       只有两指时才接管（单指仍可点空白关闭 / 翻页按钮照常）。 */
+    let ivDist0 = 0, ivZoom0 = 1;
+    const ivTouchStart = (e) => {
+      if (!e.touches || e.touches.length !== 2) return;
+      const [a, b] = e.touches;
+      ivDist0 = Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY) || 1;
+      ivZoom0 = imgZoom.value;
+    };
+    const ivTouchMove = (e) => {
+      if (!e.touches || e.touches.length !== 2 || !ivDist0) return;
+      const [a, b] = e.touches;
+      const d = Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY);
+      if (!d) return;
+      const next = ivZoom0 * (d / ivDist0);
+      imgZoom.value = Math.min(6, Math.max(0.3, Math.round(next * 100) / 100));
+      if (e.cancelable) e.preventDefault();   // 拦住页面级滚动/缩放，改由我们控制图片缩放
+    };
+    const ivTouchEnd = (e) => {
+      if (e.touches && e.touches.length < 2) ivDist0 = 0;
+    };
     const showToast = (t, ms = 1200) => { toastMsg.value = t; clearTimeout(toastTimer); toastTimer = setTimeout(() => { toastMsg.value = ''; }, ms); };
     const imgGo = (step) => {
       const list = viewImages.value;
@@ -1076,7 +1098,7 @@ createApp({
     return {
       page, blockedTitle, blockedDesc, brand, messages, draft, sending, agentAvatar,
       bodyRef, inputRef, imgInput, viewing, viewImage,
-      imgZoom, viewImages, viewIdx, imgGo,
+      imgZoom, viewImages, viewIdx, imgGo, ivTouchStart, ivTouchMove, ivTouchEnd,
       imgsOf,
       showForm, formItems, formValues, formSubmitting, submitForm,
       recording, recSecs, startRec, stopRec,
