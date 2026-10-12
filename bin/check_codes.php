@@ -30,7 +30,7 @@ if (!$codes) {
     exit;
 }
 
-$ok = 0; $red = 0; $other = 0; $newAlerts = 0;
+$ok = 0; $red = 0; $other = 0; $newAlerts = 0; $redCodes = [];   // v2.91.27 红码明细（用于顺藤下架门牌/落地域名）
 foreach ($codes as $c) {
     $res = wxcheck_run((string)$c['link'], 'wx');
     // 留档（code_check_cache 只当"上次检测记录"，不参与结果）
@@ -45,6 +45,7 @@ foreach ($codes as $c) {
 
     if ($res['state'] === 'red') {
         $red++;
+        $redCodes[] = ['code' => (string)$c['code'], 'link' => (string)$c['link'], 'tenant_id' => (int)$c['tenant_id']];
         /* v2.63 码红了 → 自动退役：固定子域从子域池摘除 / 主域停用池行，并记入红名单 */
         try { code_red_retire((string)$c['link'], 'wx'); } catch (\Throwable $e) {}
         $st = $pdo->prepare('SELECT id FROM code_alerts WHERE tenant_id = ? AND code = ? AND seen = 0 LIMIT 1');
@@ -65,25 +66,92 @@ foreach ($codes as $c) {
     usleep(300000);   // 每条间隔 0.3s，别把接口打爆
 }
 
-/* v2.60.17 域名体检：域名池里某个域名被微信封了 → 自动下掉（enabled=0），
-   免得「换码」时又抽到一个已经红了的域名（现场踩过：moupz.cn 整域被封，换码还可能抽到它）。
-   恢复了**不会**自动开回来，要人工在「域名池」里确认后再启用。 */
-$pool = $pdo->query('SELECT id, domain, enabled FROM domain_pool ORDER BY id')->fetchAll();
-$disabled = 0; $poolRed = 0;
-foreach ($pool as $d) {
-    $r = wxcheck_single_run('https://' . $d['domain'] . '/', 'wx');
-    if (($r['state'] ?? '') === 'red') {
-        $poolRed++;
-        /* v2.63 主域红也记入红名单（子域/主域明细统一在此表），并自动停用池行 */
-        try { code_red_retire('https://' . $d['domain'] . '/', 'wx'); } catch (\Throwable $e) {}
-        if ((int)$d['enabled'] === 1) {
-            $pdo->prepare('UPDATE domain_pool SET enabled = 0 WHERE id = ?')->execute([(int)$d['id']]);
-            $disabled++;
-            echo date('Y-m-d H:i:s'), " 域名 ", $d['domain'], " 已被微信拦截（", mb_substr((string)($r['msg'] ?? ''), 0, 30), "）→ 已从域名池下掉\n";
-        }
+
+/* v2.91.27 按用户要求：巡检不再单独逐个查域名池/门牌池（省接口调用），
+   而是**以「租户在用的客服码」为依据**：某条码被判红 → 顺着它找到对应的【门牌】和【落地域名】，
+   两个都自动下架退役，避免租户之后点「换码」又换到红的门牌/域名。
+   恢复后不会自动开回来（要人工在后台确认）。 */
+$doorOff = 0; $landOff = 0; $alerts = 0;
+
+/* 预建映射（避免在循环里反复查库）：
+   $entryMap[客服码] = entry_id ；$codeRows[客服码] = 该码整行 ；$doorToCodes[门牌] = 用到它的码列表 */
+$entryMap = []; $codeRows = []; $doorToCodes = [];
+try {
+    foreach ($pdo->query('SELECT tenant_id, code, entry_id, link FROM service_codes WHERE enabled = 1') as $c0) {
+        $c0code = (string)$c0['code'];
+        $entryMap[$c0code] = (string)$c0['entry_id'];
+        $codeRows[$c0code] = $c0;
+        $d0 = strtolower((string)(parse_url(gate_code_link((string)$c0['entry_id'], (string)$c0['link']), PHP_URL_HOST) ?: ''));
+        if ($d0 !== '') $doorToCodes[$d0][] = $c0code;
     }
-    usleep(300000);
+} catch (\Throwable $e) { }
+
+foreach ($redCodes as $rc) {
+    $rcCode = (string)$rc['code'];
+    $rcLink = (string)$rc['link'];
+    $landDomain = strtolower((string)pool_domain_of((string)parse_url($rcLink, PHP_URL_HOST)));
+
+    /* ① 对应的落地域名：停用 + 记红名单 + 清掉租户固定域名/内容主机（下次发码自动换台） */
+    if ($landDomain !== '') {
+        try {
+            $st = $pdo->prepare('SELECT id, enabled FROM domain_pool WHERE domain = ? LIMIT 1');
+            $st->execute([$landDomain]);
+            $dp = $st->fetch(PDO::FETCH_ASSOC);
+            if ($dp) {
+                $pdo->prepare("INSERT IGNORE INTO red_domains (host, main, kind, code, channel) VALUES (?,?,?,?, 'wx')")
+                    ->execute([$landDomain, $landDomain, 'main', $rcCode]);
+                if ((int)$dp['enabled'] === 1) {
+                    $pdo->prepare('UPDATE domain_pool SET enabled = 0 WHERE id = ?')->execute([(int)$dp['id']]);
+                    $landOff++;
+                    echo date('Y-m-d H:i:s'), " 落地域名 ", $landDomain, " 因客服码 ", $rcCode, " 被判红 → 已下架\n";
+                }
+                /* 该租户绑的固定域名如果是它，清掉；他名下的内容主机也清掉（发码时会重新分配） */
+                $pdo->prepare("UPDATE tenants SET content_domain = '' WHERE content_domain = ?")->execute([$landDomain]);
+                $pdo->prepare("UPDATE service_codes SET content_host = '' WHERE content_host LIKE ?")->execute(['%.' . $landDomain]);
+            }
+        } catch (\Throwable $e) { /* 下架失败不影响下面的门牌处理 */ }
+    }
+
+    /* ② 对应的门牌：停用 + 记红名单（租户换码就不会再抽到它） */
+    try {
+        $entryId = (string)($entryMap[$rcCode] ?? '');
+        $doorLink = gate_code_link($entryId, $rcLink);
+        $doorHost = strtolower((string)parse_url($doorLink, PHP_URL_HOST));
+        if ($doorHost !== '') {
+            $st2 = $pdo->prepare('SELECT id, enabled FROM door_pool WHERE domain = ? LIMIT 1');
+            $st2->execute([$doorHost]);
+            $row2 = $st2->fetch(PDO::FETCH_ASSOC);
+            if ($row2) {
+                $pdo->prepare("INSERT IGNORE INTO red_domains (host, main, kind, code, channel) VALUES (?,?,?,?, 'wx')")
+                    ->execute([$doorHost, $doorHost, 'main', $rcCode]);
+                $pdo->prepare('UPDATE door_pool SET fail_count = fail_count + 1, red_at = ? WHERE id = ?')
+                    ->execute([now_dt(), (int)$row2['id']]);
+                if ((int)$row2['enabled'] === 1) {
+                    $pdo->prepare('UPDATE door_pool SET enabled = 0 WHERE id = ?')->execute([(int)$row2['id']]);
+                    $doorOff++;
+                    echo date('Y-m-d H:i:s'), " 门牌 ", $doorHost, " 因客服码 ", $rcCode, " 被判红 → 已下架\n";
+                }
+                /* 同一张门牌下的其他在用码：也提醒一下（它们的码实际已经打不开了） */
+                foreach ($doorToCodes[$doorHost] ?? [] as $ocCode) {
+                    if ($ocCode === $rcCode) continue;
+                    $oc = $codeRows[$ocCode] ?? null;
+                    if (!$oc) continue;
+                    try {
+                        $chk = $pdo->prepare('SELECT id FROM code_alerts WHERE tenant_id = ? AND code = ? AND seen = 0 LIMIT 1');
+                        $chk->execute([(int)$oc['tenant_id'], $ocCode]);
+                        if (!$chk->fetchColumn()) {
+                            $pdo->prepare('INSERT INTO code_alerts (tenant_id, code, link, msg) VALUES (?,?,?,?)')
+                                ->execute([(int)$oc['tenant_id'], $ocCode, (string)$oc['link'],
+                                    '这条码所在的门牌已被微信拦截，客户扫不开 —— 请到「客服码」页点「更换码」换一条']);
+                            $alerts++;
+                        }
+                    } catch (\Throwable $e) { }
+                }
+            }
+        }
+    } catch (\Throwable $e) { }
 }
 
+/* v2.91.27b 汇总行必须放在「顺藤下架」之后，否则统计恒为 0 */
 echo date('Y-m-d H:i:s'), " 巡检完成：共 ", count($codes), " 个码 → 正常 {$ok}、红 {$red}、异常/未开通 {$other}；新增提醒 {$newAlerts} 条",
-    "；域名池 ", count($pool), " 个域名 → 红 {$poolRed}、本次下掉 {$disabled} 个\n";
+    "；因红码下架：门牌 {$doorOff} 个、落地域名 {$landOff} 个；顺带提醒 {$alerts} 条\n";
