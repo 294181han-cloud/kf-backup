@@ -113,18 +113,15 @@ function handle_tenant_service_code(string $method): void
 
     if ($method === 'GET') {
         /* v2.79 管理码：一次返回该租户的全部客服码（含已停用的），前台「管理码」列表用 */
-        $st = $pdo->prepare('SELECT id, code, entry_id, link, enabled, created_at
+        $st = $pdo->prepare('SELECT id, code, entry_id, link, enabled, expires_at, created_at
             FROM service_codes WHERE tenant_id = ? ORDER BY id DESC');
         $st->execute([$tid]);
         $rows = $st->fetchAll();
         $dom = '';
-        $tExpires = '';
         try {
-            $d2 = $pdo->prepare('SELECT content_domain, expires_at FROM tenants WHERE id = ?');
+            $d2 = $pdo->prepare('SELECT content_domain FROM tenants WHERE id = ?');
             $d2->execute([$tid]);
-            $trow = $d2->fetch() ?: [];
-            $dom = (string)($trow['content_domain'] ?? '');
-            $tExpires = (string)($trow['expires_at'] ?? '');
+            $dom = (string)(($d2->fetch() ?: [])['content_domain'] ?? '');
         } catch (\Throwable $e) { }
         foreach ($rows as &$r) {
             $r['id'] = (int)$r['id'];
@@ -132,8 +129,10 @@ function handle_tenant_service_code(string $method): void
             $r['domain'] = (string)(parse_url((string)$r['link'], PHP_URL_HOST) ?: '');
             $r['created_at'] = dt_to_iso($r['created_at']);
             $r['content_domain'] = $dom;   // v2.70 该租户的专属落地域名（自动分配）
-            // v2.82 到期时间跟卡密一致（卡密到期，码就不能用了）
-            $r['expires_at'] = $tExpires !== '' ? dt_to_iso($tExpires) : '';
+            /* v2.90.97 到期时间改成「这条码自己的」（新码默认 72 小时）；空 = 永久（存量码）。
+               以前这里是拿卡密的到期时间充数，看着永远是"永久有效"。 */
+            $r['expires_at'] = !empty($r['expires_at']) ? dt_to_iso((string)$r['expires_at']) : '';
+            $r['expired'] = service_code_expired($r['expires_at'] ?? null);
             /* v2.90.23 管理码里的链接也套「大厂门牌」：查看码 / 复制链接 / 二维码都用同一份链接，
                跟客户实际扫的完全一致（原来这里吐的是没套壳的原始链接）。
                v2.90.32 改走「固定入口」：链接里不含落地域名（落地红了不用重发码）。 */
@@ -152,7 +151,30 @@ function handle_tenant_service_code(string $method): void
                  跟「新用户第一次登录自动发码」共用一份，避免两处改漏。 */
         $r = tenant_mint_service_code($tid, (string)input('code', ''));
         if (empty($r['ok'])) json_error((string)($r['msg'] ?? '发码失败'), 400);
-        json_out(['ok' => true, 'code' => $r['code']], 201);
+        json_out(['ok' => true, 'code' => $r['code'], 'ttl_hours' => 72, 'expires_at' => (string)($r['code']['expires_at'] ?? '')], 201);
+    }
+
+    /* v2.90.97 续期：给一条快到期/已到期的客服码重新计时（默认 +72 小时）。
+       从"现在"起算还是从"原到期时间"续，由 hours 正负之外的 now 参数决定，默认 now=1（从现在起算）。 */
+    if ($method === 'PUT') {
+        $code = trim((string)input('code', ''));
+        $hours = (float)input('hours', 72);
+        $fromNow = (int)input('now', 1) === 1;
+        if ($code === '') json_error('缺少 code');
+        if ($hours <= 0 || $hours > 24 * 365) json_error('续期时长不合法');
+        $st = $pdo->prepare('SELECT id, expires_at FROM service_codes WHERE code = ? AND tenant_id = ? LIMIT 1');
+        $st->execute([$code, $tid]);
+        $row = $st->fetch() ?: [];
+        $id = (int)($row['id'] ?? 0);
+        if (!$id) json_error('客服码不存在', 404);
+        $base = time();
+        if (!$fromNow && !empty($row['expires_at'])) {
+            $old = strtotime((string)$row['expires_at']);
+            if ($old !== false && $old > $base) $base = $old;   // 还没到期就从原到期时间往后顺延
+        }
+        $newExp = date('Y-m-d H:i:s', $base + (int)round($hours * 3600));
+        $pdo->prepare('UPDATE service_codes SET expires_at = ?, enabled = 1 WHERE id = ?')->execute([$newExp, $id]);
+        json_out(['ok' => true, 'code' => $code, 'expires_at' => dt_to_iso($newExp), 'enabled' => true]);
     }
 
     if ($method === 'DELETE') {

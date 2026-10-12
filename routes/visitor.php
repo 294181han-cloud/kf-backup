@@ -14,10 +14,11 @@ function resolve_visitor_context(): ?array
     $t = trim((string)input('t', ''));
 
     if ($code !== '') {
-        $st = $pdo->prepare('SELECT sc.agent_id, tn.* FROM service_codes sc JOIN tenants tn ON tn.id = sc.tenant_id WHERE sc.code = ? LIMIT 1');
+        /* v2.90.97 客服码自身到期（新码默认 72 小时）：到期就当这个码不存在 */
+        $st = $pdo->prepare('SELECT sc.agent_id, sc.expires_at AS sc_expires, tn.* FROM service_codes sc JOIN tenants tn ON tn.id = sc.tenant_id WHERE sc.code = ? LIMIT 1');
         $st->execute([$code]);
         $r = $st->fetch();
-        if ($r) return ['tenant' => $r, 'agent_id' => (int)$r['agent_id']];
+        if ($r && !service_code_expired($r['sc_expires'] ?? null)) return ['tenant' => $r, 'agent_id' => (int)$r['agent_id']];
     }
 
     if ($t !== '') {
@@ -50,14 +51,15 @@ function resolve_visitor_context(): ?array
         }
         // 客服码根路径子域（v2.28 链接格式）：service_codes.link 的 Host 精确匹配
         // 列名防冲突：tenants 历史遗留 link 列会覆盖 sc.link（tn.* 通配的坑），显式别名
-        $st = $pdo->prepare('SELECT sc.link AS sc_link, sc.code, sc.agent_id, tn.* FROM service_codes sc JOIN tenants tn ON tn.id = sc.tenant_id');
+        $st = $pdo->prepare('SELECT sc.link AS sc_link, sc.code, sc.agent_id, sc.expires_at AS sc_expires, tn.* FROM service_codes sc JOIN tenants tn ON tn.id = sc.tenant_id');
         $st->execute();
         foreach ($st->fetchAll() as $sc) {
             $linkRaw = $sc['sc_link'] ?? '';
             if (!is_string($linkRaw) || $linkRaw === '') continue;
             $linkHost = strtolower((string)(parse_url($linkRaw, PHP_URL_HOST) ?: ''));
             if ($linkHost !== '' && $host === $linkHost) {
-                unset($sc['sc_link']);
+                if (service_code_expired($sc['sc_expires'] ?? null)) continue;   // v2.90.97 码到期
+                unset($sc['sc_link'], $sc['sc_expires']);
                 return ['tenant' => $sc, 'agent_id' => (int)$sc['agent_id']];
             }
         }
@@ -636,7 +638,12 @@ function handle_visitor_poll(string $method): void
            每次全量轮询都查（两条索引小查询），轻量探针不查。 */
         $sessCode = trim((string)($sess['code'] ?? ''));
         if ($sessCode !== '') {
-            $ok1 = (bool)db()->query('SELECT 1 FROM service_codes WHERE code = ' . db()->quote($sessCode) . ' LIMIT 1')->fetchColumn();
+            /* v2.90.97 码还在、没停用、也没到期才算有效（到期 = 这条码作废，访客端会被告知断开） */
+            $st1 = $pdo->prepare('SELECT enabled, expires_at FROM service_codes WHERE code = ? LIMIT 1');
+            $st1->execute([$sessCode]);
+            $codeRow = $st1->fetch() ?: [];
+            $ok1 = !empty($codeRow) && (int)($codeRow['enabled'] ?? 0) === 1
+                && !service_code_expired($codeRow['expires_at'] ?? null);
             $t1 = $pdo->prepare('SELECT status, expires_at FROM tenants WHERE id = ?');
             $t1->execute([$tid2]);
             $tRow = $t1->fetch();

@@ -218,6 +218,8 @@ function init_schema(): void
         entry_id VARCHAR(16) NULL,
         content_host VARCHAR(120) NOT NULL DEFAULT '',
         link VARCHAR(255) NOT NULL DEFAULT '',
+        enabled TINYINT NOT NULL DEFAULT 1,
+        expires_at DATETIME NULL DEFAULT NULL,
         created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
         KEY idx_tenant (tenant_id),
         UNIQUE KEY uk_entry_id (entry_id)

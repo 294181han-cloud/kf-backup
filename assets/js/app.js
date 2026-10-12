@@ -1028,7 +1028,7 @@ const app = createApp({
             + '<div style="margin:8px 0;padding:8px 10px;background:#fff8e6;border-radius:8px;font-size:13px;">' + detail
             + (list.length > 6 ? ('<br>…共 ' + list.length + ' 个') : '') + '</div>'
             + '建议去「客服码」页点「立即换码」——会新增一条链接（换掉被拦的域名），把新的发给客户即可。<br>'
-            + '<b>旧码不会失效</b>，可以在「管理码」里停用或删除。</div>',
+            + '<b>旧码不会因为换码而失效</b>（新码默认 72 小时到期），可以在「管理码」里续期、停用或删除。</div>',
             '⚠️ 有客服码被微信拦截',
             { confirmButtonText: '去客服码页处理', type: 'warning', dangerouslyUseHTMLString: true });
           go = true;
@@ -2899,6 +2899,7 @@ const app = createApp({
     });
     const codeExpiresAt = Vue.computed(() => {
       const cs = ((links.value && links.value.codes) || []);
+      /* v2.90.97 显示这条码自己的到期时间（新码默认 72 小时）；空 = 永久（老码/存量码仍是永久） */
       return (cs.length && fmtDt(cs[0].expires_at)) || '永久有效';
     });
     const codeIcons = () => (window.KFQCard && window.KFQCard.ICONS) || {};
@@ -3284,11 +3285,11 @@ const app = createApp({
        把它换成本次要用的客服码 + 内容域名 —— 所以：
          ·「新码 / 立即换码」= 原地换码：链接（=顾客手里的二维码）**保持不变**，只是背后换了码；
          ·「换新链接」= 真换一张二维码（旧二维码作废）。 */
-    const codeRotateHint = Vue.computed(() => '新增一条客服码？\n\n会生成一条全新的链接（通常换一台域名），方便客户扫新的。\n旧码不会失效 —— 想停用旧码可以去「管理码」里关掉。');
+    const codeRotateHint = Vue.computed(() => '新增一条客服码？\n\n会生成一条全新的链接（通常换一台域名），方便客户扫新的。\n新码默认 72 小时到期（老码不受影响，仍是永久）—— 快到期可以在「管理码」里点「续 72 小时」，或直接停用旧码。');
     const rotateCode = async () => {
       try {
         await API.post('/api/tenant/service-code', {});
-        ElementPlus.ElMessage.success('已新增一条客服码（旧码继续有效，可在「管理码」里停用）');
+        ElementPlus.ElMessage.success('已新增一条客服码（默认 72 小时到期；旧码继续有效，可在「管理码」里续期或停用）');
         await loadLinks(); renderMainQr(); checkCode(true);
       } catch (e) { ElementPlus.ElMessage.error(e.message); }
     };
@@ -3400,6 +3401,14 @@ const app = createApp({
       try {
         await API.del('/api/tenant/service-code?code=' + encodeURIComponent(row.code));
         ElementPlus.ElMessage.success('已删除');
+        await loadCodes(); await loadLinks();
+      } catch (e) { ElementPlus.ElMessage.error(e.message); }
+    };
+    /* v2.90.97 续期：新码默认 72 小时到期，快到期/已到期时点一下重新计时（默认从现在起算 +72 小时） */
+    const renewCodeRow = async (row) => {
+      try {
+        const r = await API.put('/api/tenant/service-code', { code: row.code, hours: 72, now: 1 });
+        ElementPlus.ElMessage.success('已续期到 ' + String(r.expires_at || '').slice(0, 16).replace('T', ' '));
         await loadCodes(); await loadLinks();
       } catch (e) { ElementPlus.ElMessage.error(e.message); }
     };
@@ -3753,7 +3762,7 @@ const app = createApp({
       POSTER_POS, qrFreeStyle, qrLayerStyle, textStyle,
       cropDlg, cropSrc, cropZoomPct, cropStage, cropStyle, cropImgLoaded, cropDown, cropMove, cropUp, cropWheel, cropClose, openCrop, cropConfirm, avatarPreview,
       geoTag, visitorTag, visitorTagFull, visitorChnClass, copyQrImage, downloadQrImage, codeRotateHint, rotateCode, rotateLink, loadHistory, disableLink, saveCodeCfg, meAvatarUrl,
-      manageDlgOpen, codeList, codeListLoading, openManageCodes, toggleCode, delCodeRow,
+      manageDlgOpen, codeList, codeListLoading, openManageCodes, toggleCode, delCodeRow, renewCodeRow,
       loginInfoDlg, loginInfo, loginInfoName, loginHost, saveLoginInfoName, skipLoginInfo, markLoginInfoAsked,
       codeTextDlg,
       codeCreatedAt, codeExpiresAt,

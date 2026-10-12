@@ -68,6 +68,20 @@ function now_dt(?int $ts = null): string
     return date('Y-m-d H:i:s', $ts ?? time());
 }
 
+/** v2.90.97 新发客服码的默认有效期：72 小时（到点整条码作废）。
+ *  存量码 expires_at 是 NULL = 永久，不受影响；比较一律在 PHP 里用 strtotime（不用 MySQL NOW()，
+ *  避开「PHP 时区与 MySQL 不一致」那个历史坑）。 */
+if (!defined('SERVICE_CODE_TTL_SECS')) define('SERVICE_CODE_TTL_SECS', 72 * 3600);
+
+/** 客服码是否已过期（expires_at 为空 = 永久有效） */
+function service_code_expired(?string $expiresAt): bool
+{
+    $s = trim((string)$expiresAt);
+    if ($s === '') return false;
+    $ts = strtotime($s);
+    return $ts !== false && $ts < time();
+}
+
 function dt_to_iso(?string $dt): ?string
 {
     if (!$dt) return null;
@@ -2295,13 +2309,13 @@ function gate_resolve_token(string $token): ?array
     try {
         $pdo = db();
         $row = null;
-        $st = $pdo->prepare('SELECT sc.code, sc.tenant_id, t.status, t.expires_at
+        $st = $pdo->prepare('SELECT sc.code, sc.tenant_id, sc.expires_at, t.status, t.expires_at AS t_expires
             FROM service_codes sc JOIN tenants t ON t.id = sc.tenant_id
             WHERE sc.entry_id = ? AND sc.enabled = 1 LIMIT 1');
         $st->execute([$token]);
         $row = $st->fetch();
         if (!$row) {
-            $st = $pdo->prepare('SELECT sc.code, sc.tenant_id, t.status, t.expires_at
+            $st = $pdo->prepare('SELECT sc.code, sc.tenant_id, sc.expires_at, t.status, t.expires_at AS t_expires
                 FROM service_codes sc JOIN tenants t ON t.id = sc.tenant_id
                 WHERE sc.code = ? AND sc.enabled = 1 LIMIT 1');
             $st->execute([$token]);
@@ -2312,7 +2326,8 @@ function gate_resolve_token(string $token): ?array
     }
     if (!$row) return null;
     if (($row['status'] ?? '') !== 'active') return null;
-    if (!empty($row['expires_at']) && strtotime((string)$row['expires_at']) < time()) return null;
+    if (service_code_expired($row['expires_at'] ?? null)) return null;              // v2.90.97 客服码自身到期
+    if (!empty($row['t_expires']) && strtotime((string)$row['t_expires']) < time()) return null;   // 卡密到期
     return ['code' => (string)$row['code'], 'tenant_id' => (int)$row['tenant_id']];
 }
 
@@ -2653,8 +2668,8 @@ function tenant_mint_service_code(int $tid, string $want = '', string $domain = 
         if ($host === '') return ['ok' => false, 'msg' => '域名池为空，请联系平台管理员添加可用域名'];
         $url = "$scheme://$host/$gatePath";
     }
-    $pdo->prepare('INSERT INTO service_codes (tenant_id, code, entry_id, link, enabled) VALUES (?,?,?,?,1)')
-        ->execute([$tid, $code, $entryId, $url]);
+    $pdo->prepare('INSERT INTO service_codes (tenant_id, code, entry_id, link, enabled, expires_at) VALUES (?,?,?,?,1,?)')
+        ->execute([$tid, $code, $entryId, $url, now_dt(time() + SERVICE_CODE_TTL_SECS)]);
     $newId = (int)$pdo->lastInsertId();
 
     /* v2.90.11/23 「大厂门牌」包装；v2.90.32 改成「固定入口」：码里只有跳板 + 入口 ID，
@@ -2667,6 +2682,8 @@ function tenant_mint_service_code(int $tid, string $want = '', string $domain = 
     return ['ok' => true, 'code' => [
         'id' => $newId, 'code' => $code, 'entry_id' => $entryId, 'link' => $wrappedUrl,
         'enabled' => true, 'created_at' => dt_to_iso(now_dt()),
+        /* v2.90.97 新码默认 72 小时到期 */
+        'expires_at' => dt_to_iso(now_dt(time() + SERVICE_CODE_TTL_SECS)),
     ]];
 }
 

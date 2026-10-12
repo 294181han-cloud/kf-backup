@@ -94,6 +94,9 @@ function ensure_upgrade(): void
         /* v2.79 管理码：一个租户可同时存在多条客服码（发新码不再让旧码失效），
            每条码可单独启用/停用（停用后立刻打不开，等价于旧版的"作废"）。 */
         try { $pdo->exec("ALTER TABLE service_codes ADD COLUMN enabled TINYINT NOT NULL DEFAULT 1"); } catch (\Throwable $e) { /* 列已存在 */ }
+        /* v2.90.97 客服码独立到期时间：新发的码默认 72 小时（NULL = 永久，存量码一律 NULL 保持原样）。
+           到点整条码作废：入口 /api/gate、访客接入、会话轮询的废码检测都要认这一列。 */
+        try { $pdo->exec("ALTER TABLE service_codes ADD COLUMN expires_at DATETIME NULL DEFAULT NULL"); } catch (\Throwable $e) { /* 列已存在 */ }
         try { $pdo->exec("ALTER TABLE service_codes ADD INDEX idx_tenant_enabled (tenant_id, enabled)"); } catch (\Throwable $e) { /* 索引已存在 */ }
         /* v2.70 租户专属落地域名（自动分配）：把一个租户固定在同一台域名上，
            某台域名红了只影响它自己，不再"一个域名红了全体陪葬"。
