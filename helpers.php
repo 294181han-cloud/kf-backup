@@ -3452,10 +3452,16 @@ function gate_loader_html(string $apiBase = ''): string
         . 'diag("host="+location.hostname+" 落地="+chost+" 门牌="+document.referrer.slice(0,42));'   /* v2.91.16 */
         . 'setTimeout(function(){if(okIn||done)return;if(box)box.textContent="网络较慢，正在重试…";},6000);'
         /* v2.91.16 硬超时 12s → 20s：弱网手机下 12 秒太严苛，会把"慢但能进"误判成失败 */
-        . 'rdy=setTimeout(function(){if(okIn)return;reportErr("frame-timeout",chost);reportOne(location.hostname,"shell-timeout");'
-        . 'diag(DIAG+" 结果=iframe 20s 未就绪");'
+        /* v2.91.57 只在【重试之后仍然进不去】才上报失败。
+           原来第一次 20 秒超时就上报，而绝大多数客户随后重试就进去了
+           → 体检面板里全是假失败、"成功率"必然 0%（用户反馈"全是红的但客户能进"）。
+           最终这一次的超时放宽到 30 秒，弱网手机也不容易误判。 */
+        . 'var _to=retried?30000:20000;'
+        . 'rdy=setTimeout(function(){if(okIn)return;'
         . 'if(!retried){retried=true;try{f.parentNode.removeChild(f)}catch(e){}ask(0);return;}'
-        . 'msg("网络较慢，没能进入聊天页，请点击重试");},20000);}'
+        . 'reportErr("frame-timeout",chost);reportOne(location.hostname,"shell-timeout");'
+        . 'diag(DIAG+" 结果=iframe 未就绪(重试后仍失败)");'
+        . 'msg("网络较慢，没能进入聊天页，请点击重试");},_to);}'
         . 'var pf=function(k){var h=5381,s=k+"|' . $year . '|kfxt";for(var i=0;i<s.length;i++){h=((h<<5)+h+s.charCodeAt(i))>>>0}return h.toString(16)};'
         . 'function ask(n){var x=new XMLHttpRequest();x.open("POST",AB+"/api/gate",true);'
         . 'x.setRequestHeader("Content-Type","application/x-www-form-urlencoded");x.timeout=6000;'

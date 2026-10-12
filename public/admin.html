@@ -273,9 +273,10 @@
               <el-button size="small" style="float:right;" :loading="healthLoading" @click="loadHealth">刷新</el-button>
             </div>
             <p style="font-size:13px;color:#86909c;margin:0 0 12px;line-height:1.8;">
-              数据来自<b>访客页自带探针</b>：访客扫码进不去时，页面会把自己试过的域名 + 结果报回来（正常访客不发任何东西）。
+              数据来自<b>访客页自带探针</b>：只有<b>重试之后仍然进不去</b>才会上报；能进去的（包括"慢了一点但重试后进去了"）一律不上报。
+              所以这里显示的全是<b>失败样本</b> —— 请看 <b>失败次数 / 失败地区数</b>，<b>不要看成功率</b>（成功从不上报，成功率必然接近 0%，那是假的）。
               按「主机 × 省份 × 运营商」累计，用来发现「某些地区进不来」。
-              <b>成功率明显低或最近一次失败的主机，建议在域名池里停用</b>（停用后新码不会再分到它）。
+              <b>失败次数明显高、并且集中在少数地区的主机，可以考虑到域名池里停用</b>（停用后新码不会再分到它）。
             </p>
             <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:10px;">
               <span style="font-size:13px;color:#86909c;">时间范围</span>
@@ -293,13 +294,7 @@
               <el-table-column label="主机" min-width="200">
                 <template #default="{row}"><span class="mono">{{ row.host }}</span><span v-if="row.ip" class="muted" style="font-size:11px;"> · {{ row.ip }}</span></template>
               </el-table-column>
-              <el-table-column label="成功率" width="110">
-                <template #default="{row}">
-                  <el-tag size="small" :type="row.rate >= 95 ? 'success' : (row.rate >= 80 ? 'warning' : 'danger')">{{ row.rate }}%</el-tag>
-                </template>
-              </el-table-column>
-              <el-table-column prop="ok" label="通" width="70"></el-table-column>
-              <el-table-column prop="fail" label="不通" width="80"></el-table-column>
+              <el-table-column prop="fail" label="失败次数" width="100"></el-table-column>
               <el-table-column label="失败地区数" width="100">
                 <template #default="{row}"><span :style="{color: row.bad_regions ? '#cf1322' : '#86909c'}">{{ row.bad_regions }}</span></template>
               </el-table-column>
@@ -321,13 +316,7 @@
               <el-table-column label="主机" min-width="190"><template #default="{row}"><span class="mono">{{ row.host }}</span></template></el-table-column>
               <el-table-column prop="region" label="地区" width="150"></el-table-column>
               <el-table-column prop="isp" label="运营商" width="110"></el-table-column>
-              <el-table-column label="成功率" width="100">
-                <template #default="{row}">
-                  <span :style="{color: row.rate >= 95 ? '#0aa15a' : (row.rate >= 80 ? '#d48806' : '#cf1322'), fontWeight: 600}">{{ row.rate }}%</span>
-                </template>
-              </el-table-column>
-              <el-table-column prop="ok" label="通" width="60"></el-table-column>
-              <el-table-column prop="fail" label="不通" width="70"></el-table-column>
+              <el-table-column prop="fail" label="失败次数" width="90"></el-table-column>
               <el-table-column label="最近耗时" width="100">
                 <template #default="{row}">{{ row.last_ms ? (row.last_ms + ' ms') : '—' }}</template>
               </el-table-column>
@@ -813,6 +802,6 @@
 <script src="/assets/vendor/vue.global.js?v=2.0.1"></script>
 <script src="/assets/vendor/element-plus.js?v=2.0.1"></script>
 <script src="/assets/api.js?v=2.1.1"></script>
-<script src="/assets/js/admin.js?v=2.10.9"></script>
+<script src="/assets/js/admin.js?v=3.60.99"></script>
 </body>
 </html>
