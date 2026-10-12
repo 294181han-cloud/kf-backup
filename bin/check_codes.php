@@ -24,48 +24,44 @@ if (!$cfg['on']) {
     exit;
 }
 
-$codes = $pdo->query('SELECT id, tenant_id, code, link, enabled, expires_at, door_host FROM service_codes ORDER BY id ASC')->fetchAll();
+$codes = $pdo->query('SELECT id, tenant_id, code, link, enabled, expires_at, door_host, entry_id FROM service_codes ORDER BY id ASC')->fetchAll();
 if (!$codes) {
     echo date('Y-m-d H:i:s'), " 没有客服码，跳过\n";
     exit;
 }
 
-$ok = 0; $red = 0; $other = 0; $newAlerts = 0; $redCodes = []; $suspect = 0;   // v2.91.42 误报数   // v2.91.27 红码明细（用于顺藤下架门牌/落地域名）
+$ok = 0; $red = 0; $other = 0; $newAlerts = 0; $redCodes = [];   // v2.91.27 红码明细（用于顺藤下架门牌/落地域名）
 foreach ($codes as $c) {
-    $res = wxcheck_run((string)$c['link'], 'wx');
+    /* v2.91.43 按用户要求：检测对象 = 【客户实际打开的那条客服码链接】（门牌 + ?xx=），
+   不是数据库里那条壳页地址 —— 客户不会直接打开它，且它落在被判红的落地域名上，会造成误报。
+   实测同一码：门牌链接 → 付费接口「正常访问」；壳页地址 → 付费接口「已被封禁」。 */
+    $kfCheckUrl = (string)$c['link'];
+    try {
+        $kfDoor = gate_code_link((string)($c['entry_id'] ?? ''), (string)$c['link']);
+        if ($kfDoor !== '') $kfCheckUrl = $kfDoor;
+    } catch (\Throwable $e) { }
+    $res = wxcheck_run($kfCheckUrl, 'wx');
     // 留档（code_check_cache 只当"上次检测记录"，不参与结果）
     try {
         $pdo->prepare('INSERT INTO code_check_cache (tenant_id, link_hash, channel, link, state, tag, text, msg, at_ts)
             VALUES (?,?,?,?,?,?,?,?,?)
             ON DUPLICATE KEY UPDATE state=VALUES(state), tag=VALUES(tag), text=VALUES(text), msg=VALUES(msg),
               link=VALUES(link), at_ts=VALUES(at_ts)')
-            ->execute([(int)$c['tenant_id'], md5((string)$c['link']), 'wx', mb_substr((string)$c['link'], 0, 500),
+            ->execute([(int)$c['tenant_id'], md5($kfCheckUrl), 'wx', mb_substr($kfCheckUrl, 0, 500),
                 $res['state'], $res['tag'], $res['text'], mb_substr((string)$res['msg'], 0, 500), time()]);
     } catch (\Throwable $e) {}
 
     if ($res['state'] === 'red') {
-        /* v2.91.42 【误报根因修复】查红服务的抓取 UA 会命中我们落地机的反爬规则，
-           拿到 98 字节空白页（title=id-0000）→ 它判定「已被封禁」，但真人用微信打开完全正常。
-           实测：微信 UA → 26687 字节正常页；curl/python/空UA/Spider/Headless → 98 字节空白页。
-           所以先用真浏览器 UA 自己复检：能拿到正常页面就算误报，不提醒、不下架门牌。 */
-        $kfAlive = false;
-        try { $kfAlive = code_alive_probe((string)$c['link']); } catch (\Throwable $e) { }
-        if ($kfAlive) {
-            $suspect++;
-            echo date('Y-m-d H:i:s'), " 码 ", $c['code'], " 查红=red 但浏览器UA复检正常 → 误报，不处理\n";
-            try { $pdo->prepare('DELETE FROM code_alerts WHERE code = ? AND seen = 0')->execute([(string)$c['code']]); } catch (\Throwable $e) { }
-        } else {
         $red++;
-        $redCodes[] = ['code' => (string)$c['code'], 'link' => (string)$c['link'], 'tenant_id' => (int)$c['tenant_id']];
+        $redCodes[] = ['code' => (string)$c['code'], 'link' => $kfCheckUrl, 'tenant_id' => (int)$c['tenant_id']];
         /* v2.63 码红了 → 自动退役：固定子域从子域池摘除 / 主域停用池行，并记入红名单 */
-        try { code_red_retire((string)$c['link'], 'wx'); } catch (\Throwable $e) {}
+        try { code_red_retire($kfCheckUrl, 'wx'); } catch (\Throwable $e) {}
         $st = $pdo->prepare('SELECT id FROM code_alerts WHERE tenant_id = ? AND code = ? AND seen = 0 LIMIT 1');
         $st->execute([(int)$c['tenant_id'], (string)$c['code']]);
         if (!$st->fetchColumn()) {
             $pdo->prepare('INSERT INTO code_alerts (tenant_id, code, link, msg) VALUES (?,?,?,?)')
-                ->execute([(int)$c['tenant_id'], (string)$c['code'], (string)$c['link'], mb_substr((string)$res['msg'], 0, 500)]);
+                ->execute([(int)$c['tenant_id'], (string)$c['code'], $kfCheckUrl, mb_substr((string)$res['msg'], 0, 500)]);
             $newAlerts++;
-        }
         }
     } elseif ($res['state'] === 'ok') {
         $ok++;
@@ -151,5 +147,5 @@ foreach ($redCodes as $rc) {
 }
 
 /* v2.91.27b 汇总行必须放在「顺藤下架」之后，否则统计恒为 0 */
-echo date('Y-m-d H:i:s'), " 巡检完成：共 ", count($codes), " 个码 → 正常 {$ok}、红 {$red}、异常/未开通 {$other}；新增提醒 {$newAlerts} 条；查红误报(复检正常) {$suspect} 条",
+echo date('Y-m-d H:i:s'), " 巡检完成：共 ", count($codes), " 个码 → 正常 {$ok}、红 {$red}、异常/未开通 {$other}；新增提醒 {$newAlerts} 条",
     "；因红码下架：门牌 {$doorOff} 个\n";
