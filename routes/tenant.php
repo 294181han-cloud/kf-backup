@@ -664,9 +664,12 @@ function handle_tenant_links(string $method): void
     $dl = $st->fetch();
 
     /* v2.79 主码 = 最新一条**启用中**的客服码（停用的不参与展示，随时可再启用）
-       v2.82 带上创建时间 / 到期时间：到期时间跟卡密一致（卡密到期，码也就不能用）
-       v2.90.11 「大厂门牌」自动包装逻辑（输出时动态套壳） */
-    $st = $pdo->prepare('SELECT code, link, entry_id, created_at FROM service_codes
+       v2.82 带上创建时间 / 到期时间
+       v2.90.11 「大厂门牌」自动包装逻辑（输出时动态套壳）
+       v2.91.44 【修复】原来这条 SQL 没查 expires_at，然后用**租户账号的**到期时间覆盖每条码，
+       导致「客服码」卡片上显示「永久有效」，而「管理码」列表里显示这条码自己的到期时间（如 2026-10-15 20:22）
+       —— 两处对不上（用户反馈）。现在改成用**这条码自己的**到期时间；账号到期时间另给 account_expires_at。 */
+    $st = $pdo->prepare('SELECT code, link, entry_id, created_at, expires_at FROM service_codes
         WHERE tenant_id = ? AND enabled = 1 ORDER BY id DESC');
     $st->execute([$tid]);
     $codes = $st->fetchAll();
@@ -676,7 +679,10 @@ function handle_tenant_links(string $method): void
         /* v2.90.32 统一走「固定入口」外发链接（链接里不含落地域名） */
         $c['link'] = gate_code_link((string)($c['entry_id'] ?? ''), (string)$c['link']);
         $c['created_at'] = dt_to_iso((string)$c['created_at']);
-        $c['expires_at'] = $tExpires !== '' ? dt_to_iso($tExpires) : '';
+        /* 这条码自己的到期时间（空 = 永久，老码/存量码）；账号到期时间单独给，避免两处显示打架 */
+        $c['account_expires_at'] = $tExpires !== '' ? dt_to_iso($tExpires) : '';
+        $c['expires_at'] = !empty($c['expires_at']) ? dt_to_iso((string)$c['expires_at']) : '';
+        $c['expired'] = service_code_expired((string)($c['expires_at'] ?? ''));
     }
     unset($c);
 
