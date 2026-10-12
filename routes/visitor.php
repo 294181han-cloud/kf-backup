@@ -783,17 +783,17 @@ function handle_gate_err(string $method): void
 {
     if ($method !== 'POST') { json_out(['ok' => false], 405); return; }
     $code = trim((string)input('code', ''));
-    $host = strtolower(trim((string)input('host', '')));
+    $host = kf_clean_host((string)input('host', ''));   // v2.91.34 统一净化
     $reason = mb_substr(trim((string)input('r', '')), 0, 32);
     try { $pdo = db(); } catch (\Throwable $e) { json_out(['ok' => false]); return; }
     if ($host === '' && $code !== '') {
         try {
             $st = $pdo->prepare('SELECT content_host FROM service_codes WHERE code = ? LIMIT 1');
             $st->execute([$code]);
-            $host = strtolower(trim((string)$st->fetchColumn()));
+            $host = kf_clean_host((string)$st->fetchColumn());
         } catch (\Throwable $e) { }
     }
-    if ($host === '' || !preg_match('/^[a-z0-9.\-]{4,120}$/', $host)) { json_out(['ok' => false, 'msg' => 'host 无效']); return; }
+    if ($host === '') { json_out(['ok' => false, 'msg' => 'host 无效']); return; }
 
     // 30 分钟窗口内按主机聚合（去重 IP，避免同一台设备刷次数）
     $k = 'gateerr:' . md5($host);
@@ -838,8 +838,8 @@ function handle_gate_err(string $method): void
 function handle_probe_report(string $method): void
 {
     if ($method !== 'POST') { json_out(['ok' => false], 405); return; }
-    $host = strtolower(trim((string)input('host', '')));
-    if ($host === '' || !preg_match('/^[a-z0-9.\-]{4,120}$/', $host)) { json_out(['ok' => false, 'msg' => 'host 无效']); return; }
+    $host = kf_clean_host((string)input('host', ''));   // v2.91.34 统一净化（防脏主机写进库）
+    if ($host === '') { json_out(['ok' => false, 'msg' => 'host 无效']); return; }
     $ok = input('ok', null);
     $ok = ($ok === '1' || $ok === 1 || $ok === true || $ok === 'true');
     $ms = max(0, min(120000, (int)input('ms', 0)));

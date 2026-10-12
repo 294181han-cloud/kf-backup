@@ -2555,13 +2555,23 @@ function tenant_domain_for(int $tenantId): string
     return $pick;
 }
 
-/** 在指定域名下挑一个落地主机（固定子域池随机 / 泛解析随机 8 位 / 裸域） */
+/** 在指定域名下挑一个落地主机（固定子域池随机 / 泛解析随机 8 位 / 裸域）
+ *  v2.91.34 加固：入参先净化。历史脏数据里 pool_subs 存过「子域.域名」这种完整形式、
+ *  也存过带路径的整串 URL，直接拼域名会拼出 xxx.域名.域名（打不开）。 */
 function pool_host_in(string $domain): string
 {
-    $domain = strtolower(trim($domain));
+    $domain = pool_domain_of($domain) ?: kf_clean_host($domain);
     if ($domain === '') return '';
     $subs = array_values(array_filter(array_map('trim', explode(',', kv_get('pool_subs:' . $domain, '')))));
-    if ($subs) return $subs[array_rand($subs)] . '.' . $domain;
+    if ($subs) {
+        $s = strtolower((string)$subs[array_rand($subs)]);
+        /* 脏条目的两种形态都要救回成合法主机：
+           ①「urtx6c49.7xlhs4.shop」→ 已经含域名，直接用（别再拼一次）
+           ②「urtx6c49.7xlhs4.shop.7xlhs4.shop」→ 把重复的域名段去掉 */
+        if (str_contains($s, '.' . $domain . '.' . $domain)) $s = str_replace('.' . $domain . '.' . $domain, '.' . $domain, $s);
+        if (str_ends_with($s, '.' . $domain)) return kf_clean_host($s);
+        return kf_clean_host($s . '.' . $domain);
+    }
     try {
         $st = db()->prepare('SELECT wildcard FROM domain_pool WHERE domain = ? LIMIT 1');
         $st->execute([$domain]);
@@ -2882,9 +2892,27 @@ function tenant_ensure_service_code(int $tid): void
 }
 
 /** 从落地主机反查它属于哪个域名池域名（f5ma20.shop / xxxxx.f5ma20.shop → f5ma20.shop） */
-function pool_domain_of(string $host): string
+/** v2.91.34 主机名净化：只保留合法的 hostname。
+ *  为什么需要：实测出现过 content_host / pool_subs 里存进「已经是完整主机」或「带 https:// 和路径」的脏值，
+ *  再被拼一次域名就变成 urtx6c49.7xlhs4.shop.7xlhs4.shop（根本解析不了）→ 访客看到「网络较慢，正在重试」。
+ *  这里统一在**写入前**洗一遍，杜绝畸形主机进库。 */
+function kf_clean_host(string $host): string
 {
     $h = strtolower(trim($host));
+    if ($h === '') return '';
+    $h = preg_replace('#^[a-z][a-z0-9+.-]*://#', '', $h);   // 去掉协议
+    $h = explode('/', $h)[0];                               // 去掉路径
+    $h = explode('?', $h)[0];                                // 去掉查询
+    $h = explode('#', $h)[0];
+    $h = explode(':', $h)[0];                                // 去掉端口
+    $h = trim($h, ". \t\n\r\0\x0B");
+    if ($h === '' || !preg_match('/^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)+$/', $h)) return '';
+    return $h;
+}
+
+function pool_domain_of(string $host): string
+{
+    $h = kf_clean_host($host);
     if ($h === '') return '';
     try {
         foreach (db()->query('SELECT domain FROM domain_pool') as $r) {
@@ -2901,6 +2929,7 @@ function pool_domain_of(string $host): string
  *  聊天记录接不上；所以只在「原主机已停用」时才换，并顺手落库。 */
 function gate_content_host_for(string $code, string $fallback = ''): string
 {
+    $fallback = kf_clean_host($fallback);        // v2.91.34 入参先净化，杜绝畸形主机
     try {
         $pdo = db();
         $st = $pdo->prepare('SELECT id, tenant_id, content_host FROM service_codes WHERE code = ? LIMIT 1');
@@ -2912,6 +2941,7 @@ function gate_content_host_for(string $code, string $fallback = ''): string
             /* 原主机已停用（红了）：换到「这个租户的专属域名」下的主机（没有就自动分配） */
             $dom = tenant_domain_for((int)$row['tenant_id']);
             $next = $dom !== '' ? pool_host_in($dom) : $fallback;
+            $next = kf_clean_host($next);        // v2.91.34 净化后再落库
             if ($next !== '' && $next !== $cur) {
                 $pdo->prepare('UPDATE service_codes SET content_host = ? WHERE id = ?')
                     ->execute([$next, (int)$row['id']]);
@@ -2950,7 +2980,8 @@ function gate_content_url_on(string $host, string $code): string
 /** 真正下发给壳页的聊天页地址：固定内容主机 + 伪装静态路径 + 客服码 */
 function gate_content_url(string $code, string $host = ''): string
 {
-    $host = gate_content_host_for($code, $host !== '' ? $host : (gate_pool_hosts(1)[0] ?? ''));
+    $host = kf_clean_host(gate_content_host_for($code, $host !== '' ? $host : (gate_pool_hosts(1)[0] ?? '')));
+    $host = kf_clean_host($host);                 // v2.91.34 双保险：坏值绝不拼进 URL
     $domain = pool_domain_of($host);
     $paths = gate_content_paths($domain !== '' ? $domain : $host);
     if (!$paths) $paths = ['/web/data/' . date('Y/m/d') . '/' . bin2hex(random_bytes(16)) . '.html'];
