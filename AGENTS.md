@@ -91,6 +91,20 @@
 - GitHub 上给 `main` 打开 **Settings → Branches → Add branch protection rule**（勾 "Require a pull request before merging"），协作者即使点错也上不了线。
 - 给协作者加 **Settings → Collaborators → Write** 权限即可，**不要**把服务器 root 私钥给他。
 
+### 5.4 三个仓库的自动同步（v2.91.13 起）
+
+- **推 `origin main` = 部署 + 自动同步 GitHub**。裸库 `/www/git/kf.git` 的 `post-receive` 钩子做完
+  `git pull --ff-only` 之后，会**后台异步**跑 `/www/git/kf-sync-github.sh`，把主站代码推到
+  `git@github.com:ylbc222/Xiaomiyun.git` 的 **`dev`** 分支（失败只写 `/www/git/kf-sync.log`，绝不影响部署）。
+  这需要 GitHub 仓库里那把 **Deploy key（Allow write access）**：`kfxt-autosync@95.169.14.164`
+  （私钥在服务器 `/www/git/.ssh/kf_sync`；换了要重新在 GitHub → Settings → Deploy keys 增加）。
+- **GitHub `main` 是孤儿快照分支**（只有一个提交，每次覆盖），由本机发版后手动推：
+  `git push --force-with-lease mygit <快照提交>:refs/heads/main`（做法见 git 历史里的 `mygit-snapshot` 分支）。
+  **不要把 `dev` 合并进 `main`**，两者没有共同祖先。
+- 手工兜底（钩子没跑成 / 想立刻同步）：
+  - 服务器：`/www/git/kf-sync-github.sh`（看 `/www/git/kf-sync.log`）
+  - 本机：`git push mygit refs/heads/main:refs/heads/dev`
+- 协作者拉代码永远用 **`dev`**；`main`（GitHub 那个）只是备份快照，不参与协作。
 ### 5.3 每次改动（主人和协作者同一套）
 
 1. **开工先同步**：`git fetch --all --prune`，热点文件（`assets/js/app.js`、`routes/agent.php`）先拉再改。
