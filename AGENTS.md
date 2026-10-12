@@ -91,7 +91,7 @@
 - GitHub 上给 `main` 打开 **Settings → Branches → Add branch protection rule**（勾 "Require a pull request before merging"），协作者即使点错也上不了线。
 - 给协作者加 **Settings → Collaborators → Write** 权限即可，**不要**把服务器 root 私钥给他。
 
-### 5.4 三个仓库的自动同步（v2.91.13 起）
+### 5.3 三个仓库的自动同步（v2.91.13 起）
 
 - **推 `origin main` = 部署 + 自动同步 GitHub**。裸库 `/www/git/kf.git` 的 `post-receive` 钩子做完
   `git pull --ff-only` 之后，会**后台异步**跑 `/www/git/kf-sync-github.sh`，把主站代码推到
@@ -105,7 +105,7 @@
   - 服务器：`/www/git/kf-sync-github.sh`（看 `/www/git/kf-sync.log`）
   - 本机：`git push mygit refs/heads/main:refs/heads/dev`
 - 协作者拉代码永远用 **`dev`**；`main`（GitHub 那个）只是备份快照，不参与协作。
-### 5.3 每次改动（主人和协作者同一套）
+### 5.4 每次改动（主人和协作者同一套）
 
 1. **开工先同步**：`git fetch --all --prune`，热点文件（`assets/js/app.js`、`routes/agent.php`）先拉再改。
 2. **小步提交**：一个提交只做一件事，message 用 `类型: 描述`（`feat:` / `fix:` / `perf:` / `chore:` / `revert:`）。中文 message 只用 `git commit -F <文件>`（PowerShell here-string 会把消息拆坏）。
