@@ -3026,7 +3026,7 @@ function gate_loader_html(string $apiBase = ''): string
            上报服务端（复核后会把这台退役换一台），自己再要一次地址重试一次。 */
         . 'var okIn=false;var rdy=null;var retried=false;var CD="";'
         . 'function hideLoad(){okIn=true;if(rdy){clearTimeout(rdy);rdy=null;}if(box)box.style.display="none";}'
-        . 'window.addEventListener("message",function(e){var dd=e.data;if(dd&&dd.kf==="ready"){if(dd.brand){try{document.title=dd.brand;}catch(x){}}hideLoad();}else if(dd&&dd.kf==="ping"){if(rdy){clearTimeout(rdy);rdy=null;}}});'
+        . 'window.addEventListener("message",function(e){var dd=e.data;if(dd&&dd.kf==="ready"){if(dd.brand){try{document.title=dd.brand;}catch(x){}}hideLoad();try{if(window.parent&&window.parent!==window)window.parent.postMessage({kf:"ready",brand:dd.brand||""},"*");}catch(x){}}else if(dd&&dd.kf==="ping"){if(rdy){clearTimeout(rdy);rdy=null;}try{if(window.parent&&window.parent!==window)window.parent.postMessage({kf:"ping"},"*");}catch(x){}}});'
         . 'function reportOne(h,reason){try{'
         . 'var fd=new FormData();fd.append("host",h);fd.append("ok","0");fd.append("r",reason||"shell-fail");'
         . 'var px=AB+"/api/probe/report";if(navigator.sendBeacon){navigator.sendBeacon(px,fd);return;}'
