@@ -730,10 +730,20 @@ function handle_gate_goto(string $method): void
     if (!$hit) { echo gate_fail_page(); exit; }
     $target = gate_hop_target($e, (string)$hit['code']);
     if ($target === '') { echo gate_fail_page('暂时无法进入，请稍后重试'); exit; }
-    header('Location: ' . $target, true, 302);
-    echo '<!DOCTYPE html><html lang="zh-CN"><head><meta charset="utf-8">'
-        . '<meta http-equiv="refresh" content="0;url=' . htmlspecialchars($target, ENT_QUOTES, 'UTF-8') . '">'
-        . '<link rel="icon" href="data:,"></head><body>正在进入…</body></html>';
+    /* v2.91.22 改成返回「监听页」而不是 302：
+       门牌页（大厂静态托管）经常改不动（Netlify 免费版额度封禁 / 逐站更新麻烦），而标题要靠
+       「内层 ready 消息」才能改。把监听这一层搬到我们自己的跳板页上 —— 它是门牌 iframe 里的
+       **直接子文档**，消息只需上一层就到它，于是门牌一个字都不用改，已发二维码也不用重发。
+       兜底：万一监听页生成不出来，退回原来的 302。 */
+    $listen = gate_listener_html($target);
+    if ($listen === '') {
+        header('Location: ' . $target, true, 302);
+        echo '<!DOCTYPE html><html lang="zh-CN"><head><meta charset="utf-8">'
+            . '<meta http-equiv="refresh" content="0;url=' . htmlspecialchars($target, ENT_QUOTES, 'UTF-8') . '">'
+            . '<link rel="icon" href="data:,"></head><body>正在进入…</body></html>';
+        exit;
+    }
+    echo $listen;
     exit;
 }
 

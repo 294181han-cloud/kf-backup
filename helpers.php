@@ -2974,6 +2974,43 @@ function gate_frame_allow_hosts(): array
     return array_values(array_unique($hosts));
 }
 
+/** v2.91.22 「跳板监听页」：/api/go 返回它，它再嵌真正的壳页。
+ *  为什么需要它：门牌页（大厂静态托管）经常改不动（Netlify 免费版额度封禁、或逐站更新麻烦），
+ *  而「标题从加载中变成客服品牌名」要靠内层的 ready 消息才能做到。
+ *  把监听这一层搬到我们自己的跳板页上（它是门牌 iframe 里的**直接子文档**），消息只需上一层就到它，
+ *  于是**门牌一个字都不用改**，已发出去的二维码也不用重发。
+ *  链路：二维码 → 门牌(iframe) → 本监听页(iframe) → 壳页(iframe) → 访客页
+ *        ready/ping 逐层向上：访客页 → 壳页（壳页转发给 parent）→ 本页（改标题）
+ *  $shellUrl：壳页地址（gate_hop_target 现挑落地主机 + 保留原壳页路径）。 */
+function gate_listener_html(string $shellUrl): string
+{
+    if ($shellUrl === '') return '';
+    $u = htmlspecialchars($shellUrl, ENT_QUOTES, 'UTF-8');
+    return '<!DOCTYPE html><html lang="zh-CN"><head><meta charset="utf-8">'
+        . '<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">'
+        /* referrer=origin：壳页要靠 document.referrer 认出「父页是自家域名」才干活
+           （本页跑在域名池主机上，已在 gate_frame_allow_hosts 白名单内） */
+        . '<meta name="referrer" content="origin"><meta name="robots" content="noindex">'
+        . '<title>在线客服</title><link rel="icon" href="data:,">'
+        . '<style>html,body{width:100%;height:100%;margin:0;overflow:hidden;background:#fff}'
+        . '#f{position:fixed;inset:0;width:100%;height:100%;border:0;display:block}'
+        . '#w{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;'
+        . 'color:#9aa3af;font:14px/1.7 -apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei",sans-serif}'
+        . '</style></head><body>'
+        . '<div id="w">正在进入…</div>'
+        . '<iframe id="f" src="' . $u . '" scrolling="auto" referrerpolicy="origin"'
+        . ' allow="geolocation *; microphone *; camera *; autoplay *; clipboard-write; fullscreen *"></iframe>'
+        . '<script>(function(){'
+        . 'var done=false;function hide(){if(done)return;done=true;var w=document.getElementById("w");if(w)w.style.display="none";}'
+        // 内层（壳页转发上来的）ready：改自己的标题（若本页正好在最外层，浏览器标题也跟着变）+ 收起占位
+        . 'window.addEventListener("message",function(e){var d=e.data;if(!d||typeof d!=="object")return;'
+        . 'if(d.kf==="ready"){if(d.brand){try{document.title=String(d.brand);}catch(x){}}hide();}'
+        . 'else if(d.kf==="ping"){hide();}});'
+        // 25 秒仍未就绪：把界面让给壳页自己的「重试/换域名」提示（这里只收起占位）
+        . 'setTimeout(hide,25000);'
+        . '})();</script></body></html>';
+}
+
 /** 防红壳 Loader（v2.68 重做）
  *  外层：零资源引用的 XOR(年份) 载荷 —— 数字切成固定宽度分片（静态抓取拿不到连续数字串），
  *        另加两条大厂 CDN 的 jquery 引用（域名信誉 / 干扰静态扫描，不依赖它们执行）。
