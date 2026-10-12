@@ -991,17 +991,22 @@ function handle_visitor_send(string $method): void
     $msg = ['id' => $mid, 'from' => 'visitor', 'text' => $text, 'time' => dt_to_iso($now),
         'session_id' => $sid, 'msg_type' => $msgType, 'attachments' => $attachArr, 'reply_to' => $replyTo];
 
-    // v2.91 AI 聊天（只对白名单租户）：开了就用模型回复，不再走关键词自动回复
+    // v2.91 AI 聊天（只对白名单租户）：开了就走模型；**先把响应吐给访客再干活**（模型慢也不卡访客的发送）
+    $aiChatOn = ($text !== '' && function_exists('ai_chat_try_reply') && ai_chat_on($tid));
     $autoReply = null;
-    if ($text !== '' && function_exists('ai_chat_try_reply') && ai_chat_on($tid)) {
+    if ($aiChatOn) {
+        header('Content-Type: application/json; charset=utf-8');
+        echo json_encode(['ok' => true, 'message' => $msg, 'auto_reply' => null, 'now' => time()], JSON_UNESCAPED_UNICODE);
+        if (function_exists('fastcgi_finish_request')) { @fastcgi_finish_request(); }
         try {
-            $autoReply = ai_chat_try_reply($tid, $sid, $text, $s);
+            ai_chat_try_reply($tid, $sid, $text, $s);
         } catch (\Throwable $e) {
             if (function_exists('ai_chat_log')) ai_chat_log($tid, 's' . $sid . ' 异常：' . $e->getMessage());
         }
+        exit;   // AI 的回复已写进库，访客端轮询时会看到（2.5 秒内）
     }
     // 关键词自动回复（以客服身份）
-    if ($autoReply === null && $text !== '') {
+    if ($text !== '') {
         $st = $pdo->prepare('SELECT keyword, reply FROM auto_replies WHERE tenant_id = ? AND enabled = 1 ORDER BY id ASC');
         $st->execute([$tid]);
         foreach ($st->fetchAll() as $rule) {
