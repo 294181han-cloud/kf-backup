@@ -73,18 +73,35 @@
 - 新表/新列：幂等写法放 `ensure_upgrade()`（try ALTER + 忽略已存在），别要求手工迁移。
 - 消息轮询是 2.5s 自适应（接待中 1.2s / 空闲 3s），无 WebSocket（FPM 环境勿引入常驻进程）。
 
-## 5. 协作与部署流程（两人 + AI）
+## 5. 协作与部署流程（多人 + AI）
 
-1. **开工先 `git pull`**——两人同时改 `assets/js/app.js` 之类热点文件时，先同步再改，改完尽快推。
-   - **发版前先合并同事的分支**：`git fetch --prune` → `git branch -r` 看 `origin/feat-*`，有未合并的先 `git merge origin/<分支>` 再发版。
-     漏合 = 下次 `git reset --hard origin/main` 会把同事的改动静默丢掉。（合并只动后台的改动对正在使用的客服码无影响，不会重置 `service_codes`。）
-2. **小步提交**：一个提交只做一件事（修 bug / 加功能 / 重构分开），message 用 `类型: 描述`（见 git log 惯例）。
-3. **推送 = 自动部署到生产**（webhook → 服务器 git pull）。禁止推送未验证的代码。
-4. **验证三步**（AI 改动后同样适用）：
-   - 后端改了 → 跑 `powershell -ExecutionPolicy Bypass -File selftest.ps1`（注意：直接打线上，幂等，会自建自清测试租户）
-   - 前端改了 → 打开 https://kf.ylcz.cc/ 对应页面过一遍功能；控制台不能有红错（app-boot.js 会在页面顶部显示错误条）
-   - 大改 → 本地 `python -m http.server 8000` 起在仓库根目录，浏览器开 `http://localhost:8000/public/<page>.html` 冒烟（API 会 404 属预期，看的是 JS 报错）
-5. **变更记录**：功能级变更在 DEPLOY.md 文末追加一节 `## vN.N 变更记录`。
+### 5.1 三个仓库分别是什么（2026-10-12 核实）
+
+| 远端 | 地址 | 作用 |
+|---|---|---|
+| `origin` | `ssh://root@95.169.14.164/www/git/kf.git` | **推它 = 上线**。裸库的 `post-receive` 钩子会执行 `cd /www/wwwroot/ad.yluu.top && git pull --ff-only origin main`，回显 `DEPLOY OK` 即部署成功（日志 `/www/git/kf-deploy.log`） |
+| `prodssh` | `ssh://root@95.169.14.164/www/wwwroot/ad.yluu.top` | 生产工作区本身（只用来核对，不要往里推） |
+| `mygit` | `git@github-xm:ylbc222/Xiaomiyun.git` | GitHub 备份/协作镜像。`main` 是**孤儿单提交快照**（每次 force-push 覆盖），`dev` 是**完整历史**分支，给协作者 clone、开 PR 用 |
+
+### 5.2 分工（重要）
+
+- **只有账号主人往 `origin` 推**（推 = 上线，没有测试环境、没有二次确认）。
+- **协作者只推 GitHub**：`git clone … → git checkout dev → git checkout -b feat/xxx → push → 开 PR（base 选 dev）`。
+- 主人 review 后：本地 `git fetch mygit && git merge mygit/dev`（或直接 cherry-pick）→ 并进 `main` → `git push origin main` 上线。
+- GitHub 上给 `main` 打开 **Settings → Branches → Add branch protection rule**（勾 "Require a pull request before merging"），协作者即使点错也上不了线。
+- 给协作者加 **Settings → Collaborators → Write** 权限即可，**不要**把服务器 root 私钥给他。
+
+### 5.3 每次改动（主人和协作者同一套）
+
+1. **开工先同步**：`git fetch --all --prune`，热点文件（`assets/js/app.js`、`routes/agent.php`）先拉再改。
+2. **小步提交**：一个提交只做一件事，message 用 `类型: 描述`（`feat:` / `fix:` / `perf:` / `chore:` / `revert:`）。中文 message 只用 `git commit -F <文件>`（PowerShell here-string 会把消息拆坏）。
+3. **改了 css/js 必须把 `?v=` +1**（`public/app.html` 里的引用），否则用户拿 7 天旧缓存；功能级改动再 `version.php` +1。
+4. **验证三步**：
+   - 后端改了 → `powershell -ExecutionPolicy Bypass -File selftest.ps1`（直打线上、幂等、自建自清测试租户）；
+   - 前端改了 → 打开 https://ad.yluu.top/ 对应页面走一遍；控制台不能有红错（`app-boot.js` 会在页面顶部显示错误条）；
+   - 大改 → 本地 `python -m http.server 8000` 起在仓库根目录，开 `http://localhost:8000/public/<page>.html` 冒烟（API 404 属预期，看的是 JS 报错）。
+5. **推 `origin main` → 看服务器回显 `DEPLOY OK` → 立刻核线上**：`curl https://ad.yluu.top/api/health` 的 `app_version` 应对上新版本号（工作台顶栏那个 `vX.Y.Z` 标签也能看）。
+6. **变更记录**：功能级变更在 `DEPLOY.md` 文末追加一节 `## vN.N 变更记录`。
 
 ## 6. 历史坑（勿重复踩）
 
