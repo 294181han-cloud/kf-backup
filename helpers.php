@@ -2710,10 +2710,11 @@ function gate_door_wrap(string $url): string
        现在发码时把门牌写进 service_codes.door_host，之后永远用它；只有那张门牌被下架时才换（并更新落库值）。 */
     $fixed = kf_clean_host((string)($GLOBALS['KF_DOOR_FIXED'] ?? ''));
     $stored = '';
-    if ($fixed === '' && $entryId !== '') {
+    if ($fixed === '' && $url !== '') {
         try {
-            $st = db()->prepare('SELECT door_host FROM service_codes WHERE entry_id = ? OR link LIKE ? ORDER BY id DESC LIMIT 1');
-            $st->execute([$entryId, '%' . $entryId . '%']);
+            /* 用这条码入库时的 link（唯一）精确匹配；entry_id 也要兼容（老码 link 里可能带它） */
+            $st = db()->prepare('SELECT door_host FROM service_codes WHERE link = ? OR (entry_id IS NOT NULL AND entry_id <> "" AND entry_id = ?) ORDER BY id DESC LIMIT 1');
+            $st->execute([$url, $entryId]);
             $stored = kf_clean_host((string)($st->fetchColumn() ?: ''));
         } catch (\Throwable $e) { /* 无库：走下面的随机 */ }
     }
