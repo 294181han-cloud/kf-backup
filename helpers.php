@@ -2720,6 +2720,9 @@ function gate_door_wrap(string $url): string
     }
     $doorWant = $fixed !== '' ? $fixed : $stored;
     if ($doorWant !== '' && in_array($doorWant, door_pool_hosts(), true)) {
+        /* v2.91.36c 注意：这里**不要**写 $GLOBALS['KF_DOOR_FIXED']。
+           那是"本次请求刚挑出来的门牌"，会被后续调用当成本次的选择 →
+           于是本次请求里所有码都用同一个门牌（实测 9 条码里 8 条对不上自己的落库值）。 */
         return door_is_own_host($doorWant)
             ? "https://$doorWant/k9f3m2.html?xx=$b64"
             : "https://$doorWant/?xx=$b64";
