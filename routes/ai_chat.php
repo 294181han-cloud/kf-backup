@@ -348,8 +348,9 @@ function ai_chat_log(int $tenantId, string $msg): void
     }
 }
 
-/** 按客户消息决定「要不要往群里要东西」，并返回要发的群消息 */
-function ai_chat_group_ask(int $tenantId, int $sessionId, array $state, string $visitorText, ?float $amount): ?array
+/** 按客户消息决定「要不要往群里要东西」，并返回要发的群消息
+ *  $done = 客户是否在表达"我充完了"（文字关键词，或直接发了截图/附件）*/
+function ai_chat_group_ask(int $tenantId, int $sessionId, array $state, string $visitorText, ?float $amount, bool $done = false): ?array
 {
     $age = $state['ask_at'] ? (time() - strtotime((string)$state['ask_at'])) : 999999;
     if ($amount !== null && $state['account'] === '') {
@@ -358,7 +359,7 @@ function ai_chat_group_ask(int $tenantId, int $sessionId, array $state, string $
             . ' 要个户号（回：户号 地区 金额，或直接发户号） #S' . $sessionId;
         return ['kind' => 'number', 'text' => $txt];
     }
-    if ($state['account'] !== '' && $state['ask_kind'] !== 'verify' && ai_chat_done($visitorText)) {
+    if ($state['account'] !== '' && $state['ask_kind'] !== 'verify' && $done) {
         $txt = '【AI客服】客户说充完了 户号 ' . $state['account'] . ' 到账没？（回「到了」或「没到」） #S' . $sessionId;
         return ['kind' => 'verify', 'text' => $txt];
     }
@@ -369,6 +370,18 @@ function ai_chat_group_ask(int $tenantId, int $sessionId, array $state, string $
             return ['kind' => 'renew', 'text' => $txt];
         }
     }
+    /* v2.91.9：群里一直没回（>7 分钟），客户又说话了 → 把同一件事再问一次，别让单子卡死 */
+    if ($state['ask_kind'] !== '' && $state['account'] !== '' && $age > 420) {
+        if ($state['ask_kind'] === 'verify') {
+            $txt = '【AI客服】再确认一下：户号 ' . $state['account'] . ' 到账没？（回「到了」或「没到」） #S' . $sessionId;
+            return ['kind' => 'verify', 'text' => $txt];
+        }
+        if ($state['ask_kind'] === 'number') {
+            $amt = $state['amount'] !== null ? rtrim(rtrim(number_format((float)$state['amount'], 2, '.', ''), '0'), '.') : '';
+            $txt = '【AI客服】上面那单还等户号：客户报金' . $amt . '（回：户号 地区 金额） #S' . $sessionId;
+            return ['kind' => 'number', 'text' => $txt];
+        }
+    }
     return null;
 }
 
@@ -376,10 +389,13 @@ function ai_chat_group_ask(int $tenantId, int $sessionId, array $state, string $
  * 主入口：访客发来一条消息时调用（visitor.php）。
  * 返回 null = 不处理（没开/没资格/失败）；返回数组 = 要发给访客的客服消息（复用 auto_reply 字段）。
  */
-function ai_chat_try_reply(int $tenantId, int $sessionId, string $text, array $session = []): ?array
+function ai_chat_try_reply(int $tenantId, int $sessionId, string $text, array $session = [], string $msgType = 'text'): ?array
 {
     if (!ai_chat_on($tenantId)) return null;
-    if ($text === '') return null;
+    /* v2.91.9：客户只发截图/语音（没有文字）也要处理 —— 客户最常做的就是发张缴费截图 */
+    $media = in_array($msgType, ['image', 'audio', 'video', 'file'], true);
+    if ($text === '' && !$media) return null;
+    if ($text === '') $text = ($msgType === 'image' ? '（客户发来一张截图）' : '（客户发来一个附件）');
     $cfg = ai_chat_cfg($tenantId);
     $state = ai_chat_state($sessionId);
     $amount = ai_chat_amount($text);
@@ -387,9 +403,12 @@ function ai_chat_try_reply(int $tenantId, int $sessionId, string $text, array $s
         $state['amount'] = $amount;
         $state['stage'] = 'need_number';
     }
+    /* 「我充完了」的判断：文字关键词，或者「已经发过号 + 客户发来截图」 */
+    $done = ai_chat_done($text);
+    if ($media && $state['account'] !== '' && $state['ask_kind'] !== 'verify') $done = true;
 
     // 要不要往群里要东西
-    $ask = ai_chat_group_ask($tenantId, $sessionId, $state, $text, $amount);
+    $ask = ai_chat_group_ask($tenantId, $sessionId, $state, $text, $amount, $done);
     $askSent = false;
     if ($ask) {
         $askSent = ai_chat_tg_send($tenantId, $ask['text']);
@@ -534,6 +553,7 @@ function handle_internal_ai_group(string $method): void
     if ($neg) {
         ai_chat_state_set($tid, $sid, ['ask_kind' => '', 'stage' => 'sent_number']);
         ai_chat_insert_agent($tid, $sid, ai_chat_name($tid), '稍等 我这边再核实一下');
+        ai_chat_tg_send($tid, '收到，我这边再跟客户核实（#S' . $sid . '）');   // v2.91.9：群里也回一句
         ai_chat_log($tid, "s{$sid} 群里说到账未确认：{$text}");
         json_out(['ok' => true, 'matched' => true, 'session_id' => $sid, 'verified' => false]);
         return;
@@ -541,6 +561,7 @@ function handle_internal_ai_group(string $method): void
     ai_chat_state_set($tid, $sid, ['stage' => 'done', 'ask_kind' => '']);
     ai_chat_insert_agent($tid, $sid, ai_chat_name($tid),
         "已核实到账 ✅ 已结算完毕 请勿私下充值❗️");
+    ai_chat_tg_send($tid, '好，已跟客户说结算完毕（#S' . $sid . '）');   // v2.91.9：群里也回一句
     ai_chat_log($tid, "s{$sid} 群里确认到账：{$text}");
     json_out(['ok' => true, 'matched' => true, 'session_id' => $sid, 'verified' => true]);
 }
