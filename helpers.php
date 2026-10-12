@@ -2997,7 +2997,10 @@ function gate_loader_html(string $apiBase = ''): string
     // 内层（解密后才会出现在浏览器里）
     $inner = '<!DOCTYPE html><html lang="zh-CN"><head><meta charset="utf-8">'
         . '<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">'
-        . '<meta name="referrer" content="no-referrer"><link rel="icon" href="data:,"><title>在线客服</title>'
+        /* v2.91.19 内层壳页也改成 origin：原为 no-referrer，配合外层防盗嵌校验会把自己误杀
+           （referrer 为空 → 白名单不命中 → 壳页 return 罢工，门牌标题永远「加载中…」）。
+           现在内外一致，壳页能认出父页是不是自家门牌；陌生站点照旧被拦。 */
+        . '<meta name="referrer" content="origin"><link rel="icon" href="data:,"><title>在线客服</title>'
         . '<style>html,body{height:100%;margin:0;background:#fff;color:#9aa3af;'
         . 'font:14px/1.7 -apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei",sans-serif}'
         . '.ld{position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:0 28px}'
