@@ -46,6 +46,28 @@ node update-doors.js <TOKEN> --only=regal-blancmange,chimerical
 脚本行为：列站点 → 逐个拉线上 `index.html` 判断是否已是新版（含 `_kfDoor`）→ 旧版才部署 →
 部署后复核。**不删除、不改名任何站点**。用完记得在 Netlify 把令牌删掉。
 
+## ⚠️ 2026-10-12 的两次事故与结论（重要，别再踩）
+
+**事故 1：用 Windows 自带 `tar` 打的 zip 部署后，Netlify 把 `index.html` 当 `text/plain` 发** ——
+访客看到的是**整页源码**。原因：`tar -a`（bsdtar）产出的 zip 在 Netlify 侧丢了文件类型信息。
+**结论：必须用标准 zip**（UTF-8 文件名 + 正确目录项），本目录 `update-doors.js` 已改用
+PowerShell 的 `[System.IO.Compression.ZipFile]::CreateFromDirectory()`。
+
+**事故 2：Netlify Free 计划按 credits 计费，额度用尽后新部署一律 `403 Account credit usage exceeded`。**
+（本次 3 天内 12 个站 × 多次部署把额度耗光。）此时**回滚仍然可用**：
+
+```bash
+node rollback-doors.js <TOKEN> --list                 # 看每站部署历史
+node rollback-doors.js <TOKEN> --rollback=站点名       # 回滚到上一个部署
+node rollback-all.js <TOKEN>                          # 批量回滚到今天之前那份
+# 或直接 POST /api/v1/sites/<site_id>/deploys/<deploy_id>/restore
+```
+
+**结论：门牌站要少而稳**（够分散即可，别每个站频繁重部署），并优先用
+`drop/` 目录（含 `_headers` 强制 `Content-Type: text/html`）通过 **Netlify 网页端拖拽部署**
+（不消耗 API 额度，且不会出现 text/plain 问题）。
+
+
 ## 改了这个文件之后
 
 正常情况下**不需要动门牌**（标题/重试/超时这些逻辑都在服务端壳页里）。只有门牌自身的

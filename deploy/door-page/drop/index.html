@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<!-- _kfDoor v2.91.20 门牌页：会听内层 postMessage(kf=ready) → 改标题 + 收提示条。
+     这个标记给批量更新脚本用，别删。 -->
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<!-- 门牌页（大厂免费托管版）。文件名必须是 index.html，这样链接就是 https://xxx.netlify.app/?xx=…
+     referrer 必须是 origin 或完整：落地页（壳页）要靠 document.referrer 认门牌，no-referrer 会被拦。
+     robots noindex：别让搜索引擎/爬虫收录这张门牌。 -->
+<meta name="referrer" content="origin">
+<meta name="robots" content="noindex">
+<title>在线客服</title>
+<style>
+  *{margin:0;padding:0;box-sizing:border-box}
+  html,body{width:100%;height:100%;overflow:hidden;background:#fff}
+  #frame{position:fixed;inset:0;width:100%;height:100%;border:none;display:block}
+  #bar{position:fixed;left:0;right:0;bottom:0;z-index:9;text-align:center;padding:8px 0 10px;
+    background:linear-gradient(transparent,rgba(255,255,255,.92));pointer-events:none}
+  #bar a{pointer-events:auto;color:#9aa3af;font:12px/1.6 -apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei",sans-serif;text-decoration:underline}
+  #bar.hide{display:none}
+</style>
+</head>
+<body>
+<!-- 全屏 iframe 装载落地页；地址栏全程停在门牌域名上，不做 302 跳转。 -->
+<iframe id="frame" src="about:blank" scrolling="auto" referrerpolicy="origin"
+        allow="geolocation *; microphone *; camera *; autoplay *; clipboard-write; fullscreen *"></iframe>
+<div id="bar"><a id="go" href="#">加载太慢？点此直接打开</a></div>
+<script>
+function getParam(n){var m=location.search.match(new RegExp('[?&]'+n+'=([^&]*)'));return m?decodeURIComponent(m[1]):'';}
+function b64decode(s){s=s.replace(/-/g,'+').replace(/_/g,'/');while(s.length%4)s+='=';var bin=atob(s),bytes=new Uint8Array(bin.length);for(var i=0;i<bin.length;i++)bytes[i]=bin.charCodeAt(i);return new TextDecoder().decode(bytes);}
+
+/* v2.91.20 新增：听内层的报到（访客页/壳页挂载后会 postMessage）
+   —— 原版门牌没有这段，导致标题永远停在「加载中…」、底部提示也一直挂着。
+   ready：带上品牌名 → 立刻改标题、收起「加载太慢」提示条
+   ping：只说明内层在跑 → 收起提示条（不改标题，等 ready） */
+var _ready=false;
+window.addEventListener('message',function(e){
+  var d=e.data; if(!d||typeof d!=='object') return;
+  if(d.kf==='ready'){
+    _ready=true;
+    if(d.brand){ try{document.title=String(d.brand);}catch(x){} }
+    var b=document.getElementById('bar'); if(b) b.className='hide';
+  } else if(d.kf==='ping'){
+    var b2=document.getElementById('bar'); if(b2) b2.className='hide';
+  }
+});
+
+(function(){
+  var raw=getParam('xx')||getParam('u')||getParam('url')||getParam('target'),url='';
+  try{url=raw?b64decode(raw):'';}catch(e){}
+  if(!/^https?:\/\//i.test(url)&&/^https?:\/\//i.test(raw))url=raw;
+  if(!url){document.body.innerHTML='<div style="padding:40px;text-align:center;color:#333;font:15px -apple-system,sans-serif">缺少跳转地址<br><span style="color:#999;font-size:13px">格式：?xx=base64编码后的网址</span></div>';return;}
+  var bar=document.getElementById('bar'),go=document.getElementById('go');
+  go.href=url;
+  document.getElementById('frame').src=url;
+  /* 兜底：内层一声不吭（老页面/直接打开）时，也别一直挂着提示条 */
+  setTimeout(function(){ bar.className='hide'; },4000);
+})();
+</script>
+</body>
+</html>
