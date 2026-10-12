@@ -2963,7 +2963,7 @@ function gate_content_url(string $code, string $host = ''): string
 function gate_fail_page(string $msg = '链接已失效，请重新扫码进入'): string
 {
     return '<!DOCTYPE html><html lang="zh-CN"><head><meta charset="utf-8">'
-        . '<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">'
+        . '<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><!-- v2.91.32b 放开缩放：访客要能双指放大图片，禁缩放会把这条也禁掉 -->'
         . '<meta name="referrer" content="no-referrer"><link rel="icon" href="data:,"><title>在线客服</title>'
         . '<style>html,body{height:100%;margin:0;background:#fff;color:#6b7280;'
         . 'font:15px/1.8 -apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei",sans-serif}'
@@ -3194,7 +3194,7 @@ function gate_listener_html(string $shellUrl): string
     if ($shellUrl === '') return '';
     $u = htmlspecialchars($shellUrl, ENT_QUOTES, 'UTF-8');
     return '<!DOCTYPE html><html lang="zh-CN"><head><meta charset="utf-8">'
-        . '<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">'
+        . '<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><!-- v2.91.32b 放开缩放：访客要能双指放大图片，禁缩放会把这条也禁掉 -->'
         /* referrer=origin：壳页要靠 document.referrer 认出「父页是自家域名」才干活
            （本页跑在域名池主机上，已在 gate_frame_allow_hosts 白名单内） */
         . '<meta name="referrer" content="origin"><meta name="robots" content="noindex">'
@@ -3240,7 +3240,7 @@ function gate_loader_html(string $apiBase = ''): string
 
     // 内层（解密后才会出现在浏览器里）
     $inner = '<!DOCTYPE html><html lang="zh-CN"><head><meta charset="utf-8">'
-        . '<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">'
+        . '<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><!-- v2.91.32b 放开缩放：访客要能双指放大图片，禁缩放会把这条也禁掉 -->'
         /* v2.91.19 内层壳页也改成 origin：原为 no-referrer，配合外层防盗嵌校验会把自己误杀
            （referrer 为空 → 白名单不命中 → 壳页 return 罢工，门牌标题永远「加载中…」）。
            现在内外一致，壳页能认出父页是不是自家门牌；陌生站点照旧被拦。 */
