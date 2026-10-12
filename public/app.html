@@ -7,7 +7,7 @@
 <link rel="icon" href="/assets/img/mi-logo.png">
 <link rel="apple-touch-icon" href="/assets/img/mi-logo.png">
 <link rel="stylesheet" href="/assets/vendor/element-plus.css">
-<link rel="stylesheet" href="/assets/css/app.css?v=3.64.48">
+<link rel="stylesheet" href="/assets/css/app.css?v=3.64.49">
 <script src="/assets/ui/ui-registry.js?v=2.10.5"></script>
 <script src="/assets/ui/ui-loader.js?v=2.10.5" data-ui-cat="auto"></script>
 </head>
@@ -280,10 +280,7 @@
                   <span class="ch-edit" title="点名字就能改" @click="startRename('head')">✏️</span>
                   <span class="ch-state" :class="current.status"><i></i>{{ current.status==='online' ? '在线' : '离线' }}</span>
                   <!-- v2.60.1 访客最后上线时间（心跳时间；离线/已结束都看得到） -->
-                  <span class="ch-last-online" v-if="current.status!=='online' && (current.lastOnline || current.lastTime)"
-                        :title="'访客最后上线：' + fmtTime(current.lastOnline || current.lastTime)">
-                    🕒 <span class="clo-t">最后上线</span>{{ fmtTime(current.lastOnline || current.lastTime) }}
-                  </span>
+                  <!-- v2.91.48 按用户要求：去掉「最后上线 <时间>」这条（太占地方） -->
                     <!-- v2.90.22 同一个 IP 下还有别的没结束的窗口 → 一键并进来（自动合并不上的兜底，比如系统版本被识别成两台设备） -->
                     <button v-if="sameIpOthers.length" class="ch-merge-ip" :title="'同一个 IP 下还有 ' + sameIpOthers.length + ' 条没结束的会话：' + sameIpOthers.map(s => s.name).join('、')"
                             @click="mergeSameIpNow">🧩 <span class="cbtn-t">同 IP 还有 {{ sameIpOthers.length }} 条 · 合并</span><span class="ch-merge-short">{{ sameIpOthers.length }} 条</span></button>
@@ -291,13 +288,13 @@
                   <!-- v2.89.9 恢复码不再堆在标题行：右侧「访客信息」里能复制，工具栏 🔑 能找回/合并对话 -->
                 </div>
                 <div class="ch-sub">
-                  <!-- v2.89.9 会话头只留三件事：渠道 / 设备 / 地区（消息数、首次、会话编号右侧「访客信息」里都有） -->
+                  <!-- v2.89.9 会话头只留三件事：渠道 / 设备 / 地区（消息数、首次、会话编号右侧「访客信息」里都有）
+                       v2.91.48 按用户要求：这里只保留【进入渠道】和【地区】两项；
+                       并把原来重复出现的「地区」（同一内容显示两次）去重。 -->
                   <span class="ch-chip chn" v-if="profile && profile.channel"
                         :title="'渠道：访客从「' + profile.channel + '」里进来的' + (profile.browser ? '（' + profile.browser + '）' : '')">渠道：{{ profile.channel }}</span>
-                  <span class="ch-chip m-only-chip" v-if="profile && (profile.region || profile.city || geoTag(profile.geo))"
-                        :title="'访客 IP 归属地：' + (profile.region || profile.city || geoTag(profile.geo))">📍 {{ profile.region || profile.city || geoTag(profile.geo) }}</span>
-                  <span class="ch-chip" v-if="profile && profile.dev_tag">📱 {{ profile.dev_tag }}</span>
-                  <span class="ch-chip" v-if="profile">📍 {{ profile.region || profile.city || geoTag(profile.geo) || '未知' }}</span>
+                  <span class="ch-chip" v-if="profile && (profile.region || profile.city || geoTag(profile.geo))"
+                        :title="'访客 IP 归属地：' + (profile.region || profile.city || geoTag(profile.geo)) + (profile.dev_tag ? ' · 设备：' + profile.dev_tag : '')">📍 {{ profile.region || profile.city || geoTag(profile.geo) }}</span>
                 </div>
               </div>
 
