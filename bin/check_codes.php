@@ -71,15 +71,15 @@ foreach ($codes as $c) {
    而是**以「租户在用的客服码」为依据**：某条码被判红 → 顺着它找到对应的【门牌】和【落地域名】，
    两个都自动下架退役，避免租户之后点「换码」又换到红的门牌/域名。
    恢复后不会自动开回来（要人工在后台确认）。 */
-$doorOff = 0; $alerts = 0;   // v2.91.28 只统计门牌下架
+$doorOff = 0;   // v2.91.28 只统计门牌下架
 
 /* 预建映射（避免在循环里反复查库）：
    $entryMap[客服码] = entry_id ；$codeRows[客服码] = 该码整行 ；$doorToCodes[门牌] = 用到它的码列表 */
-$entryMap = []; $codeRows = []; $doorToCodes = [];
+$entryMap = []; $codeRows = []; $doorToCodes = []; $doorMap = [];
 try {
-    foreach ($pdo->query('SELECT tenant_id, code, entry_id, link FROM service_codes WHERE enabled = 1') as $c0) {
+    foreach ($pdo->query('SELECT tenant_id, code, entry_id, link, door_host FROM service_codes WHERE enabled = 1') as $c0) {
         $c0code = (string)$c0['code'];
-        $entryMap[$c0code] = (string)$c0['entry_id'];
+        $entryMap[$c0code] = (string)$c0['entry_id']; $doorMap[$c0code] = kf_clean_host((string)($c0['door_host'] ?? ''));
         $codeRows[$c0code] = $c0;
         $d0 = strtolower((string)(parse_url(gate_code_link((string)$c0['entry_id'], (string)$c0['link']), PHP_URL_HOST) ?: ''));
         if ($d0 !== '') $doorToCodes[$d0][] = $c0code;
@@ -99,9 +99,16 @@ foreach ($redCodes as $rc) {
 
     /* ② 对应的门牌：停用 + 记红名单（租户换码就不会再抽到它） */
     try {
-        $entryId = (string)($entryMap[$rcCode] ?? '');
-        $doorLink = gate_code_link($entryId, $rcLink);
-        $doorHost = strtolower((string)parse_url($doorLink, PHP_URL_HOST));
+        /* v2.91.36b 优先用这条码【落库】的门牌（发码时固定下来的那张）；老码没记过才现算。 */
+        $doorHost = kf_clean_host((string)($doorMap[$rcCode] ?? ''));
+        if ($doorHost === '') {
+            $entryId = (string)($entryMap[$rcCode] ?? '');
+            $doorLink = gate_code_link($entryId, $rcLink);
+            $doorHost = kf_clean_host((string)parse_url($doorLink, PHP_URL_HOST));
+            if ($doorHost !== '') {
+                try { $pdo->prepare('UPDATE service_codes SET door_host = ? WHERE code = ?')->execute([$doorHost, $rcCode]); } catch (\Throwable $e) { }
+            }
+        }
         if ($doorHost !== '') {
             $st2 = $pdo->prepare('SELECT id, enabled FROM door_pool WHERE domain = ? LIMIT 1');
             $st2->execute([$doorHost]);
@@ -116,22 +123,11 @@ foreach ($redCodes as $rc) {
                     $doorOff++;
                     echo date('Y-m-d H:i:s'), " 门牌 ", $doorHost, " 因客服码 ", $rcCode, " 被判红 → 已下架\n";
                 }
-                /* 同一张门牌下的其他在用码：也提醒一下（它们的码实际已经打不开了） */
-                foreach ($doorToCodes[$doorHost] ?? [] as $ocCode) {
-                    if ($ocCode === $rcCode) continue;
-                    $oc = $codeRows[$ocCode] ?? null;
-                    if (!$oc) continue;
-                    try {
-                        $chk = $pdo->prepare('SELECT id FROM code_alerts WHERE tenant_id = ? AND code = ? AND seen = 0 LIMIT 1');
-                        $chk->execute([(int)$oc['tenant_id'], $ocCode]);
-                        if (!$chk->fetchColumn()) {
-                            $pdo->prepare('INSERT INTO code_alerts (tenant_id, code, link, msg) VALUES (?,?,?,?)')
-                                ->execute([(int)$oc['tenant_id'], $ocCode, (string)$oc['link'],
-                                    '这条码所在的门牌已被微信拦截，客户扫不开 —— 请到「客服码」页点「更换码」换一条']);
-                            $alerts++;
-                        }
-                    } catch (\Throwable $e) { }
-                }
+                /* v2.91.35 【已删除】原来这里会给「同一张门牌下的其他在用码」也发红码提醒。
+                   实测证明那是**误报**：门牌域名判红 ≠ 挂在上面的每条码都红。
+                   案例：租户 28 的 D4Fr6HbcKu 被弹「你的码被拦截」，但查红接口返回 ok、
+                   门牌 HTTP 200 正常。租户白紧张一场。
+                   现在只对被判红的那条码自己发提醒（主循环负责），绝不连坐。 */
             }
         }
     } catch (\Throwable $e) { }
@@ -139,4 +135,4 @@ foreach ($redCodes as $rc) {
 
 /* v2.91.27b 汇总行必须放在「顺藤下架」之后，否则统计恒为 0 */
 echo date('Y-m-d H:i:s'), " 巡检完成：共 ", count($codes), " 个码 → 正常 {$ok}、红 {$red}、异常/未开通 {$other}；新增提醒 {$newAlerts} 条",
-    "；因红码下架：门牌 {$doorOff} 个；顺带提醒 {$alerts} 条\n";
+    "；因红码下架：门牌 {$doorOff} 个\n";

@@ -106,6 +106,14 @@ function ensure_upgrade(): void
         try { $pdo->exec("ALTER TABLE service_codes ADD UNIQUE KEY uk_entry_id (entry_id)"); } catch (\Throwable $e) { /* 索引已存在 */ }
         // v2.68 内容落地主机：一张码固定一台（访客 localStorage 按域隔离，换域会丢会话）
         try { $pdo->exec("ALTER TABLE service_codes ADD COLUMN content_host VARCHAR(120) NOT NULL DEFAULT ''"); } catch (\Throwable $e) { /* 列已存在 */ }
+        /* v2.91.36 门牌落库（重要修复）：一张码**发出去时用哪张门牌就固定下来**。
+           之前没存，每次请求（生成二维码/管理码列表/巡检）都重新随机挑一张 →
+           同一张码每次算出的门牌都不一样（实测连续 6 次出现 4~6 个不同门牌）：
+             · 客户手里的二维码指向哪张门牌，取决于他扫的那一刻随机到什么；
+             · 巡检判红后退役的门牌，是另一次随机算出来的（退的不是那张码实际用的）；
+             · 租户端「你的码被拦截」提醒因此经常误报。
+           存下来以后：二维码稳定、判红能对上门牌、下架门牌时能准确知道影响哪些码。 */
+        try { $pdo->exec("ALTER TABLE service_codes ADD COLUMN door_host VARCHAR(120) NOT NULL DEFAULT ''"); } catch (\Throwable $e) { /* 列已存在 */ }
         /* v2.79 管理码：一个租户可同时存在多条客服码（发新码不再让旧码失效），
            每条码可单独启用/停用（停用后立刻打不开，等价于旧版的"作废"）。 */
         try { $pdo->exec("ALTER TABLE service_codes ADD COLUMN enabled TINYINT NOT NULL DEFAULT 1"); } catch (\Throwable $e) { /* 列已存在 */ }

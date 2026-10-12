@@ -217,6 +217,7 @@ function init_schema(): void
         code VARCHAR(24) NOT NULL UNIQUE,
         entry_id VARCHAR(16) NULL,
         content_host VARCHAR(120) NOT NULL DEFAULT '',
+        door_host VARCHAR(120) NOT NULL DEFAULT '',   -- v2.91.36 这张码固定用哪张门牌（发码时定，之后不变）
         link VARCHAR(255) NOT NULL DEFAULT '',
         enabled TINYINT NOT NULL DEFAULT 1,
         expires_at DATETIME NULL DEFAULT NULL,

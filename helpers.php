@@ -2682,6 +2682,7 @@ function gate_door_pick(int $tenantId = 0): string
     }
     $pick = $cand[array_rand($cand)];
     $cache[$ck] = $pick;
+    $GLOBALS['KF_DOOR_FIXED'] = $pick;      // v2.91.36 告诉调用方「这次选中的是哪张」，好落库固定下来
     $busy = false;                                            // ★ 解除递归闸
     return $pick;
 }
@@ -2703,7 +2704,28 @@ function gate_door_wrap(string $url): string
         return $clean === '' ? $url : "https://$clean/?xx=$b64";
     }
 
-    /* v2.91.24 走门牌池挑选（换码换门牌）：gate_door_pick 会跳过该租户上一张码用的门牌 */
+    /* v2.91.36 【关键修复】优先用**落库的那张门牌**。
+       以前这里每次请求都现挑一张 → 同一张码每次算出的门牌都不同（实测连续 6 次出现 4~6 个），
+       导致：客户扫到的门牌取决于他扫的那一刻、巡检退役的门牌与实际用的对不上、租户端提醒经常误报。
+       现在发码时把门牌写进 service_codes.door_host，之后永远用它；只有那张门牌被下架时才换（并更新落库值）。 */
+    $fixed = kf_clean_host((string)($GLOBALS['KF_DOOR_FIXED'] ?? ''));
+    $stored = '';
+    if ($fixed === '' && $entryId !== '') {
+        try {
+            $st = db()->prepare('SELECT door_host FROM service_codes WHERE entry_id = ? OR link LIKE ? ORDER BY id DESC LIMIT 1');
+            $st->execute([$entryId, '%' . $entryId . '%']);
+            $stored = kf_clean_host((string)($st->fetchColumn() ?: ''));
+        } catch (\Throwable $e) { /* 无库：走下面的随机 */ }
+    }
+    $doorWant = $fixed !== '' ? $fixed : $stored;
+    if ($doorWant !== '' && in_array($doorWant, door_pool_hosts(), true)) {
+        return door_is_own_host($doorWant)
+            ? "https://$doorWant/k9f3m2.html?xx=$b64"
+            : "https://$doorWant/?xx=$b64";
+    }
+
+    /* v2.91.24 换码换门牌：没有落库值时（老码/正被换掉的那张已下架）才现挑，
+       gate_door_pick 会跳过该租户上一张码用的门牌 */
     $lh = strtolower((string)(parse_url($url, PHP_URL_HOST) ?: ''));
     $pick = gate_door_pick((int)($GLOBALS['KF_DOOR_TENANT'] ?? 0));
     if ($pick !== '' && $pick !== $lh) {
@@ -2865,7 +2887,20 @@ function tenant_mint_service_code(int $tid, string $want = '', string $domain = 
        落地主机由 /api/go 每次现挑（落地红了不用重发码）。
        v2.91.24：告诉门牌挑选逻辑「这是哪个租户的码」，好跳过该租户上一张码用的门牌（换码换门牌）。 */
     $GLOBALS['KF_DOOR_TENANT'] = $tid;
+    unset($GLOBALS['KF_DOOR_FIXED']);          // v2.91.36 清掉上一个码留下的选择，让本次重新挑
     $wrappedUrl = gate_code_link($entryId, $url);
+    /* v2.91.36 【关键】把这张码用到的门牌落库固定下来（以后每次都用它，不再每次重新随机）。
+       同时记进请求级缓存，避免同一次请求里再算出别的门牌。 */
+    $doorHost = kf_clean_host((string)($GLOBALS['KF_DOOR_FIXED'] ?? ''));
+    if ($doorHost === '') {
+        /* 极端情况（门牌池空/被固定门牌配置接管）：从最终链接里回读 */
+        $doorHost = kf_clean_host((string)(parse_url($wrappedUrl, PHP_URL_HOST) ?: ''));
+    }
+    if ($doorHost !== '') {
+        $GLOBALS['KF_DOOR_PICK_CACHE']['t' . $tid] = $doorHost;
+        try { $pdo->prepare('UPDATE service_codes SET door_host = ? WHERE id = ?')->execute([$doorHost, $newId]); }
+        catch (\Throwable $e) { /* 列还没建好也不影响发码 */ }
+    }
 
     /* v2.68 内容落地主机：新码先落一台（gate_content_url 会复用，保证访客会话不丢）
        v2.91.26：必须用本次选定的域名（$boundDomain）—— 否则「3 条码落 3 个域名」会失效 */
