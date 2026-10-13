@@ -505,6 +505,7 @@ function tg_main_menu(int $chat, array $u = [], int $mid = 0): void
         [tg_btn('🛒 购买卡密', 'buy'), tg_btn('♻️ 续费已有卡密', 'renew')],
         [tg_btn('🎁 免费领测试卡', 'trial')],
         [tg_btn('📦 我的卡密', 'mine'), tg_btn('📖 使用教程', 'help')],
+        [tg_btn('🔔 绑定客服账号（码红了提醒你）', 'bind')],
         [tg_support_btn()],
     ];
     if (tg_is_admin((int)($u['id'] ?? 0))) array_unshift($kb, [tg_btn('🛠 管理后台', 'admin')]);
@@ -672,9 +673,145 @@ function tg_mine(int $chat, int $tgId, int $mid = 0): void
         $html .= "\n🔗 登录入口：\n" . tg_entrance_text();
         $kb = [tg_entrance_row(),
                [tg_btn('♻️ 续费', 'renew'), tg_btn('🛒 再买一张', 'buy')],
+               [tg_btn('🔔 绑定客服账号（码红了提醒你）', 'bind')],
                [tg_btn('⬅️ 返回主菜单', 'menu')]];
     }
     if ($mid > 0) tg_edit($chat, $mid, $html, $kb); else tg_send($chat, $html, $kb);
+}
+
+/* ==================== 客户自助绑定客服账号（v2.92）====================
+   客户在机器人里把自己的卡密绑上 → 他的客服码被微信判红时，机器人私聊提醒他本人。
+   绑定只需要卡密（用户定的：只输卡密就行）；一个 TG 号可以绑多个账号。 */
+
+function tg_bind_schema(): void
+{
+    try {
+        db()->exec("CREATE TABLE IF NOT EXISTS tg_bindings (
+            id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+            tg_id BIGINT NOT NULL,
+            tenant_id INT UNSIGNED NOT NULL,
+            kami VARCHAR(32) NOT NULL DEFAULT '',
+            enabled TINYINT NOT NULL DEFAULT 1,
+            created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            UNIQUE KEY uk_tg_tenant (tg_id, tenant_id),
+            KEY idx_tenant (tenant_id)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+    } catch (\Throwable $e) {
+    }
+}
+
+function tg_bind_rows(int $tgId): array
+{
+    tg_bind_schema();
+    try {
+        $st = db()->prepare('SELECT b.tenant_id, b.kami, b.enabled, t.nickname, t.expires_at
+            FROM tg_bindings b LEFT JOIN tenants t ON t.id = b.tenant_id
+            WHERE b.tg_id = ? ORDER BY b.id DESC');
+        $st->execute([$tgId]);
+        return $st->fetchAll() ?: [];
+    } catch (\Throwable $e) {
+        return [];
+    }
+}
+
+function tg_bind_prompt(int $chat, int $tgId, int $mid = 0): void
+{
+    tg_set_state($tgId, 'bind');
+    $html = "🔔 <b>绑定客服账号</b>\n━━━━━━━━━━━━━━━\n"
+        . "把你的<b>卡密</b>发给我（就是登录客服系统用的那串，例如 <code>ABCD123456</code>）。\n\n"
+        . "绑上以后：<b>你的客服码被微信判红</b>（客户扫码打不开）时，我会第一时间在这里私聊提醒你，不用自己盯。\n"
+        . "（一个号可以绑多个卡密）";
+    $kb = [[tg_btn('📋 我绑了哪些', 'bindlist')], [tg_btn('⬅️ 返回主菜单', 'menu')]];
+    if ($mid > 0) tg_edit($chat, $mid, $html, $kb); else tg_send($chat, $html, $kb);
+}
+
+function tg_bind_do(int $chat, int $tgId, string $text): void
+{
+    tg_bind_schema();
+    $kami = strtoupper((string)preg_replace('/[^A-Za-z0-9]/', '', $text));
+    if ($kami === '') {
+        tg_send($chat, "请把卡密发我（字母数字那串）。", [[tg_btn('⬅️ 返回主菜单', 'menu')]]);
+        return;
+    }
+    $st = db()->prepare('SELECT id, nickname, expires_at FROM tenants WHERE kami = ?');
+    $st->execute([$kami]);
+    $t = $st->fetch();
+    if (!$t) {
+        tg_send($chat, "❓ 没找到卡密 <code>" . tg_h($kami) . "</code>\n\n请检查一下（大小写不区分，能登进客服系统的那串就是）。",
+            [[tg_btn('🔔 重新输入', 'bind'), tg_btn('⬅️ 返回主菜单', 'menu')]]);
+        return;
+    }
+    $tid = (int)$t['id'];
+    $exp = !empty($t['expires_at']) ? date('Y-m-d', strtotime((string)$t['expires_at'])) : '未设置';
+    try {
+        db()->prepare('INSERT INTO tg_bindings (tg_id, tenant_id, kami, enabled) VALUES (?,?,?,1)
+            ON DUPLICATE KEY UPDATE kami = VALUES(kami), enabled = 1, updated_at = CURRENT_TIMESTAMP')
+            ->execute([$tgId, $tid, $kami]);
+    } catch (\Throwable $e) {
+        tg_log('bind fail: ' . $e->getMessage());
+        tg_send($chat, "绑定没成功，稍后再试一次。", [[tg_btn('🔔 重新输入', 'bind'), tg_btn('⬅️ 主菜单', 'menu')]]);
+        return;
+    }
+    tg_set_state($tgId, '');
+    $codes = 0;
+    try {
+        $s2 = db()->prepare('SELECT COUNT(*) FROM service_codes WHERE tenant_id = ? AND enabled = 1');
+        $s2->execute([$tid]);
+        $codes = (int)$s2->fetchColumn();
+    } catch (\Throwable $e) {
+    }
+    tg_send($chat, "✅ <b>绑定成功</b>\n━━━━━━━━━━━━━━━\n"
+        . "账号：" . tg_h((string)(($t['nickname'] ?? '') !== '' ? $t['nickname'] : ('租户#' . $tid))) . "\n"
+        . "卡密：<code>" . tg_h($kami) . "</code>\n"
+        . "到期：{$exp}\n"
+        . "在用客服码：{$codes} 条\n\n"
+        . "以后这个账号的<b>客服码被判红</b>（客户扫码打不开）时，我会在这里提醒你。",
+        [[tg_btn('🔔 再绑一个', 'bind'), tg_btn('📋 我绑了哪些', 'bindlist')], [tg_btn('⬅️ 返回主菜单', 'menu')]]);
+}
+
+function tg_bind_list_view(int $chat, int $tgId, int $mid = 0): void
+{
+    $rows = tg_bind_rows($tgId);
+    if (!$rows) {
+        $html = "📋 <b>我绑定的客服账号</b>\n━━━━━━━━━━━━━━━\n还没有绑定。绑一个，码红了我就私聊提醒你 👇";
+        $kb = [[tg_btn('🔔 绑定客服账号', 'bind')], [tg_btn('⬅️ 返回主菜单', 'menu')]];
+        if ($mid > 0) tg_edit($chat, $mid, $html, $kb); else tg_send($chat, $html, $kb);
+        return;
+    }
+    $html = "📋 <b>我绑定的客服账号</b>\n━━━━━━━━━━━━━━━";
+    $kbRows = [];
+    foreach ($rows as $r) {
+        $tid = (int)$r['tenant_id'];
+        $codes = 0;
+        try {
+            $s = db()->prepare('SELECT COUNT(*) FROM service_codes WHERE tenant_id = ? AND enabled = 1');
+            $s->execute([$tid]);
+            $codes = (int)$s->fetchColumn();
+        } catch (\Throwable $e) {
+        }
+        $exp = !empty($r['expires_at']) ? date('Y-m-d', strtotime((string)$r['expires_at'])) : '未设置';
+        $on  = (int)$r['enabled'] === 1;
+        $html .= "\n\n🎫 <code>" . tg_h((string)$r['kami']) . "</code>\n"
+            . "　　" . tg_h((string)(!empty($r['nickname']) ? $r['nickname'] : ('租户#' . $tid))) . "\n"
+            . "　　📅 {$exp}　🔗 在用码 {$codes} 条\n"
+            . ($on ? "　　🔔 红码提醒：已开启" : "　　🔕 红码提醒：已关闭");
+        $kbRows[] = [tg_btn(($on ? '🔕 关闭 ' : '🔔 开启 ') . (string)$r['kami'], 'unbind:' . $tid)];
+    }
+    $kbRows[] = [tg_btn('🔔 绑定新账号', 'bind')];
+    $kbRows[] = [tg_btn('⬅️ 返回主菜单', 'menu')];
+    if ($mid > 0) tg_edit($chat, $mid, $html, $kbRows); else tg_send($chat, $html, $kbRows);
+}
+
+function tg_bind_toggle(int $chat, int $tgId, int $tenantId, int $mid = 0): void
+{
+    tg_bind_schema();
+    try {
+        db()->prepare('UPDATE tg_bindings SET enabled = IF(enabled = 1, 0, 1), updated_at = CURRENT_TIMESTAMP
+            WHERE tg_id = ? AND tenant_id = ?')->execute([$tgId, $tenantId]);
+    } catch (\Throwable $e) {
+    }
+    tg_bind_list_view($chat, $tgId, $mid);
 }
 
 /* ==================== 下单 ==================== */
@@ -773,6 +910,13 @@ function tg_on_update(array $u): void
         if ($data === 'menu')  { tg_cb_answer((string)$cq['id']); tg_main_menu($chat, $from, $mid); return; }
         if ($data === 'buy')   { tg_cb_answer((string)$cq['id']); tg_buy_menu($chat, '选择套餐', $mid); return; }
         if ($data === 'mine')  { tg_cb_answer((string)$cq['id']); tg_mine($chat, $tgId, $mid); return; }
+        if ($data === 'bind')  { tg_cb_answer((string)$cq['id']); tg_bind_prompt($chat, $tgId, $mid); return; }
+        if ($data === 'bindlist') { tg_cb_answer((string)$cq['id']); tg_bind_list_view($chat, $tgId, $mid); return; }
+        if (strpos($data, 'unbind:') === 0) {
+            tg_cb_answer((string)$cq['id'], '已更新');
+            tg_bind_toggle($chat, $tgId, (int)substr($data, 7), $mid);
+            return;
+        }
         if ($data === 'trial') { tg_cb_answer((string)$cq['id']); tg_trial($chat, $from, $me, $mid); return; }
         if ($data === 'help')  { tg_cb_answer((string)$cq['id']); tg_edit($chat, $mid, tg_help_text(), [tg_entrance_row(), [tg_btn('⬅️ 返回主菜单', 'menu')]]); return; }
         if ($data === 'support') {
@@ -868,6 +1012,12 @@ function tg_on_update(array $u): void
     if ($cmd === '/buy')  { tg_buy_menu($chat); return; }
     if ($cmd === '/trial' || $cmd === '/test') { tg_trial($chat, $from, $me); return; }
     if ($cmd === '/my' || $cmd === '/mine') { tg_mine($chat, $tgId); return; }
+    if ($cmd === '/bind' || $cmd === '/绑定') {
+        $rest = trim((string)preg_replace('/^\S+\s*/u', '', $text));
+        if ($rest !== '') { tg_bind_do($chat, $tgId, $rest); } else { tg_bind_prompt($chat, $tgId); }
+        return;
+    }
+    if ($cmd === '/mybind' || $cmd === '/我的绑定') { tg_bind_list_view($chat, $tgId); return; }
     if ($cmd === '/help') { tg_send($chat, tg_help_text(), [tg_entrance_row(), [tg_btn('⬅️ 返回主菜单', 'menu')]]); return; }
     if ($cmd === '/support' || $cmd === '/kf') { [$h, $k] = tg_support_view(); tg_send($chat, $h, $k); return; }
     if ($cmd === '/admin' && tg_is_admin($tgId)) {
@@ -881,6 +1031,9 @@ function tg_on_update(array $u): void
             . number_format($paid, 2) . "</b> USDT\n💵 累计收款 <b>" . number_format($all, 2) . "</b> USDT\n⏳ 待支付 {$pend} 单");
         return;
     }
+
+    // 绑定客服账号：等用户发卡密
+    if ((string)$me['state'] === 'bind') { tg_bind_do($chat, $tgId, $text); return; }
 
     // 续费：等用户发卡密
     if ((string)$me['state'] === 'renew') {
