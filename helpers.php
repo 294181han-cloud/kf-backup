@@ -1744,6 +1744,12 @@ function wxcheck_run(string $link, string $channel = 'wx'): array
     }
     $hasPaid = ($cfg['user'] !== '' && $cfg['key'] !== '');
     $order = $hasPaid ? ['uouin', 'mir6'] : ['mir6'];
+    /* v2.91.62 米人免费接口开关：kv wxcheck_mir6_on=0 即关闭，只走付费接口。
+       为什么关：实测它对"用户实扫确认被微信拦"的链接也报"未被拦截" —— 只会漏报、不会帮忙，
+       留着唯一的作用是在有付费接口时多烧一次调用、并给判定添乱。 */
+    if (kv_get('wxcheck_mir6_on', '1') === '0') {
+        $order = array_values(array_filter($order, fn($x) => $x !== 'mir6'));
+    }
     $res = [];
     foreach ($order as $src) {
         if ($src === 'mir6' && $channel !== 'wx') continue;   // 米人只做微信
