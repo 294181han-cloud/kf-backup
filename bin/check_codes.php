@@ -16,6 +16,7 @@ declare(strict_types=1);
 
 chdir(dirname(__DIR__));
 require __DIR__ . '/../helpers.php';
+require __DIR__ . '/../routes/notify.php';   // v2.92 告警发送口（红码/门牌 → 管理员 + 绑定客户）
 
 $pdo = db();
 $cfg = wxcheck_cfg();
@@ -62,6 +63,9 @@ foreach ($codes as $c) {
             $pdo->prepare('INSERT INTO code_alerts (tenant_id, code, link, msg) VALUES (?,?,?,?)')
                 ->execute([(int)$c['tenant_id'], (string)$c['code'], $kfCheckUrl, mb_substr((string)$res['msg'], 0, 500)]);
             $newAlerts++;
+            /* v2.92 同一条码判红 → 私聊提醒管理员 / 已绑定该客服账号的客户（1 小时内不重复发） */
+            notify_code_red((int)$c['tenant_id'], (string)$c['code'], $kfCheckUrl,
+                (string)($res['msg'] ?? ''), kf_clean_host((string)($c['door_host'] ?? '')));
         }
     } elseif ($res['state'] === 'ok') {
         $ok++;
@@ -135,6 +139,8 @@ foreach ($redCodes as $rc) {
                     $pdo->prepare('UPDATE door_pool SET enabled = 0 WHERE id = ?')->execute([(int)$row2['id']]);
                     $doorOff++;
                     echo date('Y-m-d H:i:s'), " 门牌 ", $doorHost, " 因客服码 ", $rcCode, " 被判红 → 已下架\n";
+                    /* v2.92 门牌被下架也提醒一下（1 小时内同一门牌只发一次） */
+                    notify_door_off($doorHost, $rcCode);
                 }
                 /* v2.91.35 【已删除】原来这里会给「同一张门牌下的其他在用码」也发红码提醒。
                    实测证明那是**误报**：门牌域名判红 ≠ 挂在上面的每条码都红。
