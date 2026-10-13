@@ -331,6 +331,7 @@ function handle_tenant_settings(string $method): void
             'ip_limit_count' => (int)ts_get($tid, 'ip_limit_count', '5'),
             // 聊天头像：是否显示客服设置的个人头像（关闭/未设置时用品牌头像）
             'agent_avatar_on' => ts_get($tid, 'agent_avatar_on', '1') === '1',
+            'idle_logout' => ts_get($tid, 'idle_logout', '0') === '1',
             // 声音设置（v2.27，租户级；客服端/访客端分开，发送/接收分开）
             'agent_snd_recv_on'   => ts_get($tid, 'agent_snd_recv_on', '1') === '1',
             'agent_snd_recv_which' => ts_get($tid, 'agent_snd_recv_which', 'dindon'),
@@ -397,7 +398,7 @@ function handle_tenant_settings(string $method): void
         }
         /* v2.90.9 修 bug：ip_merge_on（同 IP 自动合并/自动接回）漏在这个白名单里 → 设置页那个开关
            点了根本没落库，关不掉也开不了。 */
-        foreach (['pre_inquiry_on', 'notice_on', 'auto_blacklist', 'dedup_on', 'ip_limit_on', 'ip_merge_on', 'filtration_wx', 'filtration_pc', 'filtration_area', 'publicity_on', 'inform_on', 'tpl_nav_on', 'agent_snd_recv_on', 'agent_snd_send_on', 'visitor_snd_recv_on', 'visitor_snd_send_on', 'agent_avatar_on', 'quick_bar_on'] as $k) {
+        foreach (['pre_inquiry_on', 'notice_on', 'auto_blacklist', 'dedup_on', 'ip_limit_on', 'ip_merge_on', 'idle_logout', 'filtration_wx', 'filtration_pc', 'filtration_area', 'publicity_on', 'inform_on', 'tpl_nav_on', 'agent_snd_recv_on', 'agent_snd_send_on', 'visitor_snd_recv_on', 'visitor_snd_send_on', 'agent_avatar_on', 'quick_bar_on'] as $k) {
             if (array_key_exists($k, $data)) ts_set($tid, $k, $data[$k] ? '1' : '0');
         }
         /* v2.91 AI 聊天设置：只允许白名单租户写（别的卡即使构造请求也存不进去） */

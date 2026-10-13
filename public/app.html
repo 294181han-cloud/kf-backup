@@ -1367,6 +1367,18 @@
         <div class="grid-auto">
           <!-- v2.60.20 「公告」已挪到「访客端模板」页 -->
           <div class="panel">
+          <!-- v2.91.64 登录安全：1 小时无操作自动退出 -->
+          <div class="panel">
+            <div class="panel-title">登录安全</div>
+            <div style="margin-bottom:10px;">
+              <el-switch v-model="sec.idle_logout" active-text="1 小时无操作自动退出登录"></el-switch>
+            </div>
+            <p class="muted" style="margin:0 0 12px;">
+              开启后：连续 <b>60 分钟</b>没有鼠标 / 键盘 / 触摸操作，工作台会自动退出登录（防止人离开后账号一直挂着被他人使用）。
+              鼠标动一下、敲一下键盘就会重新计时。<b>不影响</b>正在接待的客户（客户消息照常进库，重新登录后能看到）。
+            </p>
+            <el-button type="primary" size="small" @click="saveSecurity">保存</el-button>
+          </div>
             <div class="panel-title">关键词拉黑</div>
             <div class="kw-tags">
               <el-tag v-for="kw in kwList" :key="kw" closable type="danger" effect="light" style="margin:0 8px 8px 0;" @close="removeKw(kw)">{{ kw }}</el-tag>
@@ -1926,6 +1938,6 @@
 <script src="/assets/qr-poster.js?v=2.3.0"></script>
 <script src="/assets/api.js?v=2.1.2"></script>
 <script src="/assets/js/app-components.js?v=2.6.2"></script>
-<script src="/assets/js/app.js?v=3.68.43"></script><script src="/assets/js/app-boot.js?v=2.1.1"></script>
+<script src="/assets/js/app.js?v=3.68.44"></script><script src="/assets/js/app-boot.js?v=2.1.1"></script>
 </body>
 </html>

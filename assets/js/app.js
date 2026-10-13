@@ -618,6 +618,7 @@ const app = createApp({
           visitor_send_which: b.visitor_snd_send_which || 'water',
         });
         Object.assign(sec, {
+      idle_logout: b.idle_logout === true,
           notice_on: !!b.notice_on, notice_text: b.notice_text || '',
           filter_keywords: b.filter_keywords || '', auto_blacklist: !!b.auto_blacklist,
           dedup_on: !!b.dedup_on, ip_merge_on: b.ip_merge_on === undefined ? true : !!b.ip_merge_on,
@@ -2497,7 +2498,7 @@ const app = createApp({
       } catch (e) { ElementPlus.ElMessage.error(e.message); }
       finally { aiSaving.value = false; }
     };
-    const sec = reactive({ notice_on: true, notice_text: '不要关闭此网页，若退出请先复制浏览器打开', filter_keywords: '', auto_blacklist: false, dedup_on: false, ip_merge_on: true, ip_limit_on: false, ip_limit_count: 5 });
+    const sec = reactive({ idle_logout: false, notice_on: true, notice_text: '不要关闭此网页，若退出请先复制浏览器打开', filter_keywords: '', auto_blacklist: false, dedup_on: false, ip_merge_on: true, ip_limit_on: false, ip_limit_count: 5 });
     const loginLogs = ref([]);
     const visitors = ref([]);
     const cleanupOpts = [
@@ -2506,6 +2507,23 @@ const app = createApp({
       { label: '清理 7 天前的会话', days: 7 },
       { label: '清理全部会话', days: -1 },
     ];
+    /* v2.91.64 按用户要求：设置→安全维护 的「1 小时无操作自动退出登录」。
+       打开后：连续 60 分钟没有鼠标/键盘/触摸动作 → 弹一句提示并退出登录（保护账号，
+       避免人离开后工作台一直挂着）。任何动作都会重置计时。 */
+    let kfIdleTimer = null;
+    const kfIdleReset = () => {
+      if (kfIdleTimer) { clearTimeout(kfIdleTimer); kfIdleTimer = null; }
+      if (!sec.idle_logout) return;
+      kfIdleTimer = setTimeout(() => {
+        try {
+          ElementPlus.ElMessageBox.alert('已 1 小时无操作，为保护账号安全，已自动退出登录', '自动退出登录',
+            { confirmButtonText: '重新登录', showClose: false }).finally(() => logout());
+        } catch (e) { logout(); }
+      }, 60 * 60 * 1000);
+    };
+    ['mousemove', 'mousedown', 'keydown', 'touchstart', 'scroll', 'wheel', 'click'].forEach((ev) =>
+      window.addEventListener(ev, kfIdleReset, { passive: true }));
+    Vue.watch(() => sec.idle_logout, () => kfIdleReset(), { immediate: true });
     const loadSecurityPage = async () => {
       try {
         loginLogs.value = await API.get('/api/tenant/login-logs');
