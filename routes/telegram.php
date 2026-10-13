@@ -1054,9 +1054,15 @@ function tg_on_update(array $u): void
         return;
     }
 
-    // 其它文字：当成找客服
-    tg_send($chat, "💬 已收到你的消息，客服看到会尽快回复。\n\n需要自助买卡/续费的话，点下面按钮 👇",
-        [[tg_btn('🛒 购买卡密', 'buy'), tg_btn('♻️ 续费', 'renew')], [tg_btn('⬅️ 返回主菜单', 'menu')]]);
+    /* v2.92.3 按用户要求：去掉「已收到你的消息，客服看到会尽快回复」那句兜底话术
+       —— 这个机器人的私聊其实没人盯，那句话是骗人的。
+       改成：直接把卡密发过来就绑定（不点按钮也认，这是最自然的动作）；认不出来的文字安静处理，不再乱回。 */
+    $maybe = strtoupper((string)preg_replace('/[^A-Za-z0-9]/', '', $text));
+    if (strlen($maybe) >= 4 && strlen($maybe) <= 32) {
+        $st = db()->prepare('SELECT id FROM tenants WHERE kami = ?');
+        $st->execute([$maybe]);
+        if ($st->fetchColumn()) { tg_bind_do($chat, $tgId, $text); return; }
+    }
 }
 
 /* ==================== Webhook 入口 ==================== */
